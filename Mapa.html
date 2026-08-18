@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Mapa de Ordens de Serviço - OS Manager</title>
+    
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+    <script src="js/domain/ChamadoModel.js?v=9"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
+    <script src="js/services/ChamadosService.js?v=9"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Sidebar collapse mechanics */
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { ml: 80px; width: calc(100% - 80px); left: 80px; margin-left: 0;}
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+
+        /* Pulse halo animation for duplicate markers */
+        @keyframes pulseHaloDuplicado {
+            0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+        }
+
+        .marker-duplicado-badge {
+            width: 26px; height: 26px; border: 2px solid #ffffff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4); cursor: pointer; z-index: 25;
+            animation: pulseHaloDuplicado 1.8s infinite;
+        }
+        .marker-duplicado-text { color: #ffffff; font-size: 11px; font-weight: bold; line-height: 1; }
+
+        /* Modal fullscreen for map */
+        .modal-fullscreen-map {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 99999 !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+
+        /* Overlay Glassmorphism Container */
+        .glass-overlay {
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        /* Custom Scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.03);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(0, 0, 0, 0.35);
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
+
+<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    const vertexShader = `
+        varying vec2 v_texCoord;
+        void main() {
+            v_texCoord = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float t = u_time * 0.2;
+            vec3 color1 = vec3(0.988, 0.973, 0.98); 
+            vec3 color2 = vec3(0.957, 0.941, 0.953);
+            vec3 accent = vec3(0.059, 0.09, 0.165); 
+            
+            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
+            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
+            vec3 base = mix(color1, color2, w1 * w2);
+            
+            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
+            vec3 finalColor = mix(base, accent, edge * 0.02);
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `;
+    
+    const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() }
+    };
+    
+    const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    function animate(time) {
+        uniforms.u_time.value = time * 0.001;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+</script>
+
+<app-sidebar active="mapa"></app-sidebar>
+
+<app-header placeholder="Buscar OS no mapa (Protocolo, Plaqueta, Endereço)..." search-id="global-search-input" oninput="filtrarOSsMapaDirect(this.value)"></app-header>
+
+<main class="ml-[260px] mt-16 p-0 h-[calc(100vh-64px)] overflow-hidden w-[calc(100%-260px)] mx-auto transition-all duration-300 relative z-0 flex flex-col" id="main-content">
+    
+    <!-- MAIN MAP CONTAINER -->
+    <div id="mapContainerWrapper" class="w-full flex-1 relative overflow-hidden bg-surface-container-lowest opacity-0 animate-fade-in-up [animation-delay:100ms]">
+        
+        <!-- MAPBOX CANVAS -->
+        <div id="canvasMapaOSsAbertas" class="absolute inset-0 w-full h-full z-0"></div>
+
+        <!-- PAINEL SUPERIOR: FILTROS DE STATUS E PERÍODO (GLASSMORPHISM) -->
+        <div id="topControlsMapaOverlay" class="glass-overlay absolute top-3 left-3 z-10 p-2 rounded-xl transition-all duration-300 shadow-md border border-outline-variant/60 w-fit max-w-[calc(100%-100px)]">
+            <div class="flex flex-wrap gap-2 items-center">
+                <span class="text-xs font-bold text-on-surface mr-1">Status:</span>
+                <button type="button" id="chipStatusAbertas" onclick="alterarFiltroStatus('abertas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-secondary bg-secondary/10 text-secondary">🟢 Abertas</button>
+                <button type="button" id="chipStatusResolvidas" onclick="alterarFiltroStatus('resolvidas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary">✅ Concluídas</button>
+                <button type="button" id="chipStatusCanceladas" onclick="alterarFiltroStatus('canceladas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-error">❌ Canceladas</button>
+                <button type="button" id="chipStatusTodas" onclick="alterarFiltroStatus('todas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary">🌐 Todas</button>
+
+                <div class="flex items-center gap-1.5 border-l border-outline-variant/60 pl-2 ml-1">
+                    <span class="text-xs font-semibold text-on-surface-variant">Período:</span>
+                    <select id="selectJanelaTempo" onchange="alterarJanelaTempo()" class="text-xs font-medium border border-outline-variant rounded-md px-2 py-1 bg-surface-container-lowest text-on-surface outline-none cursor-pointer focus:ring-1 focus:ring-secondary">
+                        <option value="0" selected>Somente Ativas</option>
+                        <option value="7">Últimos 7 dias</option>
+                        <option value="30">Últimos 30 dias</option>
+                        <option value="90">Últimos 90 dias</option>
+                        <option value="365">Este Ano (365d)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAINEL INFERIOR: LEGENDA DE MARCADORES E CONTROLES DE VISÃO (GLASSMORPHISM) -->
+        <div id="barLegendaMapa" class="glass-overlay absolute bottom-3 left-3 right-3 z-10 p-2.5 rounded-xl transition-all duration-300 shadow-md border border-outline-variant/60 flex flex-wrap items-center justify-between gap-2.5 text-[11px] text-on-surface-variant">
+            <div id="conteudoLegendaCores" class="flex flex-wrap items-center gap-2.5">
+                <span class="font-bold text-on-surface">Emissão:</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#188038]"></span> 0-3d</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#f2994a]"></span> 4-7d</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-[#d93025]"></span> >7d</span>
+
+                <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Status:</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-secondary/80 flex items-center justify-center text-[7px] text-white font-bold">✓</span> Resolvida</span>
+                <span id="legendaStatusCanceladaItem" class="flex items-center gap-1"><span class="text-error font-bold text-[12px]">✖</span> Cancelada</span>
+
+                <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Tipo:</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Normal</span>
+                <span class="flex items-center gap-1 font-bold text-on-surface"><span class="w-3 h-3 bg-slate-600 rounded-[2px] rotate-45 flex items-center justify-center text-[7px] text-white"><span class="-rotate-45">⚡</span></span> Urgente</span>
+                <span class="flex items-center gap-1 font-bold text-amber-600"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
+                <span class="border-l border-outline-variant pl-2 font-bold text-secondary" id="statMapaOSsAbertas">Inicializando mapa...</span>
+            </div>
+
+            <!-- CONTROLES DE MODO E ATUALIZAÇÃO -->
+            <div class="flex items-center gap-1.5 ml-auto">
+                <button type="button" id="btnModoPinos" onclick="alternarModoVisao('pinos')" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-secondary bg-secondary/10 text-secondary transition-all">📍 Pinos</button>
+                <button type="button" id="btnModoHeatmap" onclick="alternarModoVisao('heatmap')" class="px-2.5 py-1 text-xs rounded-lg font-medium border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary transition-all">🔥 Heatmap</button>
+                <button type="button" onclick="carregarMapaOSsAbertas()" class="px-2.5 py-1 text-xs rounded-lg font-semibold bg-secondary text-on-secondary hover:bg-secondary-container transition-all active:scale-95 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">refresh</span>
+                    <span>Atualizar</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- PAINEL LATERAL INTERATIVO DA OS -->
+        <div id="painelLateralOS" class="glass-overlay absolute top-3 right-3 bottom-16 w-80 z-20 rounded-xl p-4 overflow-y-auto hidden shadow-2xl border border-white/80 font-body-md text-xs space-y-3">
+            <!-- Conteúdo dinâmico gerado via JS ao clicar no pino -->
+        </div>
+
+    </div>
+</main>
+
+<!-- MODAL DE ALTERAÇÃO DE PRIORIDADE -->
+<div id="modalConfirmacaoPrioridade" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60000] hidden items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-6 text-center shadow-2xl border border-outline-variant">
+        <div id="iconModalPrioridade" class="text-5xl mb-2">⚡</div>
+        <h3 id="tituloModalPrioridade" class="text-lg font-bold text-secondary mb-2">Alterar Prioridade da OS</h3>
+        <p id="msgModalPrioridade" class="text-xs text-on-surface-variant mb-5 leading-relaxed"></p>
+        <div class="flex gap-3">
+            <button type="button" onclick="fecharModalConfirmacaoPrioridade()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Cancelar</button>
+            <button type="button" id="btnConfirmarPrioridadeModal" onclick="executarTrocaPrioridadeConfirmada()" class="flex-1 py-2 px-4 rounded-xl text-white font-semibold shadow-md hover:opacity-90 transition-all">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE CANCELAMENTO DE OS -->
+<div id="modalConfirmacaoCancelamento" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60000] hidden items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="text-center text-4xl mb-2">❌</div>
+        <h3 class="text-lg font-bold text-error text-center mb-1">Cancelar Ordem de Serviço</h3>
+        <p class="text-xs text-on-surface-variant text-center mb-4">Tem certeza que deseja cancelar a OS <b id="protModalCancelamento" class="text-on-surface"></b>?</p>
+        <div class="text-left mb-5">
+            <label class="text-xs font-bold text-on-surface-variant block mb-1">Motivo / Justificativa do Cancelamento:</label>
+
+            <textarea id="obsModalCancelamento" rows="3" placeholder="Digite a justificativa (ex: OS duplicada com o protocolo...)" class="w-full text-xs p-2.5 border border-outline-variant rounded-lg bg-surface-container-lowest outline-none focus:ring-1 focus:ring-error text-on-surface resize-none"></textarea>
+
+            <!-- Botões de Mensagens Padrão (Quick Presets) -->
+            <div class="mt-2.5">
+                <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
+                    <span class="material-symbols-outlined text-[13px] text-error">chat_bubble_outline</span>
+                    <span>Mensagens Padrão:</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" 
+                            onclick="setModalJustification('Identificada duplicidade de protocolo.', 'obsModalCancelamento')" 
+                            title="Identificada duplicidade de protocolo."
+                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Identificada duplicidade</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Resolvido em outro protocolo.', 'obsModalCancelamento')" 
+                            title="Resolvido em outro protocolo."
+                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Resolvido em outro protocolo</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Atendimento cancelado pela equipe.', 'obsModalCancelamento')" 
+                            title="Atendimento cancelado pela equipe."
+                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Cancelado pela equipe</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Endereço não localizado.', 'obsModalCancelamento')" 
+                            title="Endereço não localizado."
+                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Endereço não localizado</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button type="button" onclick="fecharModalCancelamento()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Voltar</button>
+            <button type="button" onclick="executarCancelamentoOSConfirmado()" class="flex-1 py-2 px-4 rounded-xl bg-error text-white font-semibold shadow-md hover:bg-error/90 transition-all">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL DE REABERTURA / REVERSÃO DE OS -->
+<div id="modalConfirmacaoReversao" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60000] hidden items-center justify-center p-4">
+    <div class="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant">
+        <div class="text-center text-4xl mb-2">🔄</div>
+        <h3 class="text-lg font-bold text-secondary text-center mb-1">Reabrir Ordem de Serviço</h3>
+        <p class="text-xs text-on-surface-variant text-center mb-4">Tem certeza que deseja reabrir a OS <b id="protModalReversao" class="text-on-surface"></b>?</p>
+        <div class="text-left mb-5">
+            <label class="text-xs font-bold text-on-surface-variant block mb-1">Motivo / Justificativa da Reabertura:</label>
+            <textarea id="obsModalReversao" rows="3" placeholder="Digite a justificativa (ex: serviço pendente / reaberto a pedido do supervisor)..." class="w-full text-xs p-2.5 border border-outline-variant rounded-lg bg-surface-container-lowest outline-none focus:ring-1 focus:ring-secondary text-on-surface resize-none"></textarea>
+        </div>
+        <div class="flex gap-3">
+            <button type="button" onclick="fecharModalReversao()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Voltar</button>
+            <button type="button" onclick="executarReversaoOSConfirmado()" class="flex-1 py-2 px-4 rounded-xl bg-secondary text-white font-semibold shadow-md hover:bg-secondary-container transition-all">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL GALERIA DE FOTOS CLOUDINARY -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[70000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Image Stage -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Footer Thumbnail Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Dynamic thumbnails -->
+        </div>
+    </div>
+</div>
+
+<!-- LÓGICA DE DADOS E EVENTOS DO MAPA -->
+<script>
+    var MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+
+    var mapOSsInstance = null;
+    var todosMarkersOSsAbertas = [];
+    var dadosOSsAbertasCache = [];
+    var filtroStatusAtual = 'abertas';
+    var diasHistoricoAtual = 0;
+    var modoVisaoMapaAtual = 'pinos';
+    var chamadosService = new window.ChamadosService();
+    var currentUserRole = 'operador';
+
+    document.addEventListener('DOMContentLoaded', () => {
+        carregarMapaOSsAbertas();
+    });
+
+    function filtrarOSsMapaDirect(val) {
+        filtrarOSsMapa(val);
+    }
+
+    function alterarFiltroStatus(status) {
+        filtroStatusAtual = status;
+        const statusList = ['abertas', 'resolvidas', 'canceladas', 'todas'];
+        statusList.forEach(s => {
+            const btnId = 'chipStatus' + s.charAt(0).toUpperCase() + s.slice(1);
+            const btn = document.getElementById(btnId);
+            if (btn) {
+                if (s === status) {
+                    btn.className = "px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-secondary bg-secondary/10 text-secondary";
+                } else {
+                    btn.className = "px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary";
+                }
+            }
+        });
+
+        const selTempo = document.getElementById('selectJanelaTempo');
+        if (status !== 'abertas' && diasHistoricoAtual === 0) {
+            diasHistoricoAtual = 30;
+            if (selTempo) selTempo.value = "30";
+        }
+
+        if (dadosOSsAbertasCache && dadosOSsAbertasCache.length > 0) {
+            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+            const stat = document.getElementById('statMapaOSsAbertas');
+            if (stat) stat.innerHTML = `Exibindo ${filtradas.length} OSs (${status.toUpperCase()})`;
+            renderizarMapaOSs(filtradas);
+        } else {
+            carregarMapaOSsAbertas();
+        }
+    }
+
+    function alterarJanelaTempo() {
+        const selTempo = document.getElementById('selectJanelaTempo');
+        if (selTempo) {
+            diasHistoricoAtual = parseInt(selTempo.value, 10) || 0;
+        }
+        carregarMapaOSsAbertas();
+    }
+
+
+
+    async function carregarMapaOSsAbertas() {
+        if (window.AuthGuard) {
+            const authData = await window.AuthGuard.requireAuth();
+            if (!authData) return;
+            currentUserRole = window.AuthGuard.getUserRole(authData.user, authData.profile);
+        }
+
+        if (currentUserRole === 'manutentor') {
+            const btnCanc = document.getElementById('chipStatusCanceladas');
+            if (btnCanc) btnCanc.style.display = 'none';
+            const legCanc = document.getElementById('legendaStatusCanceladaItem');
+            if (legCanc) legCanc.style.display = 'none';
+        }
+
+        const stat = document.getElementById('statMapaOSsAbertas');
+        const painelDetalhes = document.getElementById('painelLateralOS');
+        if (stat) stat.innerHTML = "Carregando OSs do Supabase...";
+        if (painelDetalhes) painelDetalhes.style.display = 'none';
+
+        try {
+            // Carrega a lista de chamados via ChamadosService (idêntico ao Painel.html)
+            const chamadosList = await chamadosService.getChamadosList();
+            
+            // Converte as entidades ChamadoModel para a estrutura de renderização do mapa
+            dadosOSsAbertasCache = converterChamadosModelParaMapa(chamadosList || []);
+
+            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+            if (stat) stat.innerHTML = `Exibindo ${filtradas.length} OSs (${filtroStatusAtual.toUpperCase()})`;
+            renderizarMapaOSs(filtradas);
+        } catch (err) {
+            console.warn("⚠️ Erro ao carregar OSs para o mapa via Supabase:", err);
+            if (stat) stat.innerHTML = '<span class="text-error">Erro ao carregar dados do Supabase.</span>';
+        }
+    }
+
+    function converterChamadosModelParaMapa(chamadosList) {
+        return chamadosList.map(c => {
+            let lat = null;
+            let lng = null;
+
+            // Extrai coordenadas formatadas da entidade ChamadoModel
+            const coordStr = window.ChamadoModel ? window.ChamadoModel.formatLocationText(c.coordenadaInicial || c.coordenadaReparo) : (c.coordenadaInicial || c.coordenadaReparo || '');
+            if (coordStr) {
+                const parts = coordStr.split(',');
+                if (parts.length >= 2) {
+                    const pLat = parseFloat(parts[0]);
+                    const pLng = parseFloat(parts[1]);
+                    if (!isNaN(pLat) && !isNaN(pLng)) {
+                        lat = pLat;
+                        lng = pLng;
+                    }
+                }
+            }
+
+            // Fallback de amostragem geográfica determinística em Araraquara quando a OS não possuir GPS explícito
+            if (lat === null || lng === null) {
+                const hashStr = String(c.id || c.protocolo || 'OS');
+                let hash = 0;
+                for (let i = 0; i < hashStr.length; i++) {
+                    hash = (hash << 5) - hash + hashStr.charCodeAt(i);
+                    hash |= 0;
+                }
+                const offsetLat = ((Math.abs(hash) % 100) - 50) * 0.0006;
+                const offsetLng = ((Math.abs(hash * 13) % 100) - 50) * 0.0006;
+                lat = -21.7946 + offsetLat;
+                lng = -48.1766 + offsetLng;
+            }
+
+            const formattedDate = (c.dataAbertura && !isNaN(c.dataAbertura.getTime())) 
+                ? c.dataAbertura.toLocaleDateString('pt-BR') 
+                : new Date().toLocaleDateString('pt-BR');
+            
+            return {
+                id: c.id,
+                protocolo: c.protocolo,
+                data: formattedDate,
+                dataObjeto: c.dataAbertura,
+                prioridade: c.prioridade || 'Normal',
+                status: c.rawStatus || 'Aberta',
+                normalizedStatus: c.normalizedStatus,
+                municipe: c.municipeNome || '',
+                telefoneCelular: '',
+                telefoneFixo: '',
+                operador: c.operador || '',
+                descricao: c.problemaInicial || '',
+                logs: c.observacaoFinal || '',
+                fotos: c.fotosEvidencias || [],
+                pontos: [{
+                    lat: lat,
+                    lng: lng,
+                    endereco: (c.addressPoints && Array.isArray(c.addressPoints)) ? c.addressPoints.join(' | ') : (c.endereco || 'Araraquara, SP'),
+                    plaqueta: c.plaquetaInicial || '[---]',
+                    problema: c.problemaInicial || 'Outro'
+                }]
+            };
+        });
+    }
+
+    function obterListaFiltradaPorStatus(lista, statusFiltro) {
+        if (!lista) return [];
+        return lista.filter(os => {
+            const st = (os.status || "Aberta").toLowerCase();
+            const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad");
+            const isCanc = st.includes("cancel");
+            const isAberta = !isResolv && !isCanc;
+
+            if (currentUserRole === 'manutentor' && isCanc) {
+                return false;
+            }
+
+            if (statusFiltro === 'abertas') return isAberta;
+            if (statusFiltro === 'resolvidas') return isResolv;
+            if (statusFiltro === 'canceladas') return isCanc;
+            return true; // 'todas'
+        });
+    }
+
+    function calcularDiasEmAberto(dataStr) {
+        if (!dataStr) return 0;
+        const partes = dataStr.toString().trim().split('/');
+        if (partes.length === 3) {
+            const dia = parseInt(partes[0], 10);
+            const mes = parseInt(partes[1], 10) - 1;
+            const ano = parseInt(partes[2], 10);
+            const dataOS = new Date(ano, mes, dia);
+            const hoje = new Date();
+            hoje.setHours(0,0,0,0);
+            dataOS.setHours(0,0,0,0);
+            const diff = Math.floor((hoje.getTime() - dataOS.getTime()) / (1000 * 3600 * 24));
+            return diff < 0 ? 0 : diff;
+        }
+        return 0;
+    }
+
+    function atualizarKPIsMapa(listaOSs) {
+        const elTotal = document.getElementById('kpiTotalOSs');
+        const elAntiga = document.getElementById('kpiOSMaisAntiga');
+        const elMedia = document.getElementById('kpiMediaEspera');
+
+        const totalOSs = listaOSs.length;
+        let totalPontos = 0;
+        let maiorDias = 0;
+        let protMaisAntigo = '-';
+        let somaDias = 0;
+        let countNormalForAging = 0;
+
+        listaOSs.forEach(os => {
+            if (os.pontos) totalPontos += os.pontos.length;
+            const st = (os.status || "Aberta").toLowerCase();
+            const isAberta = (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+
+            if (isAberta) {
+                const dias = calcularDiasEmAberto(os.data);
+                somaDias += dias;
+                countNormalForAging++;
+                if (dias >= maiorDias) {
+                    maiorDias = dias;
+                    protMaisAntigo = os.protocolo;
+                }
+            }
+        });
+
+        const mediaDias = countNormalForAging > 0 ? (somaDias / countNormalForAging).toFixed(1) : 0;
+
+        if (elTotal) elTotal.innerHTML = `${totalOSs} OSs <span class="text-xs font-normal text-on-surface-variant">(${totalPontos} pontos)</span>`;
+        if (elAntiga) {
+            if (countNormalForAging > 0) {
+                elAntiga.innerHTML = `<b>${maiorDias} dias</b> pendente <span class="text-[11px] font-normal text-error">(#${protMaisAntigo})</span>`;
+            } else {
+                elAntiga.innerText = 'Sem ativas no filtro';
+            }
+        }
+        if (elMedia) elMedia.innerText = `${mediaDias} dias em média`;
+    }
+
+    function alternarModoVisao(modo) {
+        modoVisaoMapaAtual = modo;
+        const btnPinos = document.getElementById('btnModoPinos');
+        const btnHeatmap = document.getElementById('btnModoHeatmap');
+        const conteudoLegenda = document.getElementById('conteudoLegendaCores');
+
+        if (modo === 'heatmap') {
+            btnHeatmap.className = "px-2.5 py-1 text-xs rounded-lg font-bold border border-secondary bg-secondary/10 text-secondary transition-all";
+            btnPinos.className = "px-2.5 py-1 text-xs rounded-lg font-medium border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary transition-all";
+            if (conteudoLegenda) conteudoLegenda.classList.add('hidden');
+        } else {
+            btnPinos.className = "px-2.5 py-1 text-xs rounded-lg font-bold border border-secondary bg-secondary/10 text-secondary transition-all";
+            btnHeatmap.className = "px-2.5 py-1 text-xs rounded-lg font-medium border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary transition-all";
+            if (conteudoLegenda) conteudoLegenda.classList.remove('hidden');
+        }
+
+        renderizarMapaOSs(dadosOSsAbertasCache);
+    }
+
+    function renderizarMapaOSs(listaOSs) {
+        const stat = document.getElementById('statMapaOSsAbertas');
+        atualizarKPIsMapa(listaOSs);
+
+        if (!mapOSsInstance) {
+            mapOSsInstance = new mapboxgl.Map({
+                container: 'canvasMapaOSsAbertas',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-48.1766, -21.7946],
+                zoom: 13
+            });
+            mapOSsInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            mapOSsInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+            mapOSsInstance.on('click', () => {
+                const painel = document.getElementById('painelLateralOS');
+                if (painel) painel.style.display = 'none';
+            });
+        }
+
+        todosMarkersOSsAbertas.forEach(m => m.remove());
+        todosMarkersOSsAbertas = [];
+
+        if (mapOSsInstance.getLayer('os-heatmap-layer')) mapOSsInstance.removeLayer('os-heatmap-layer');
+        if (mapOSsInstance.getSource('os-heatmap-source')) mapOSsInstance.removeSource('os-heatmap-source');
+
+        const bounds = new mapboxgl.LngLatBounds();
+        let totalPontos = 0;
+        const featuresHeatmap = [];
+        const todosPontosFlat = [];
+
+        listaOSs.forEach(os => {
+            const diasEmAberto = calcularDiasEmAberto(os.data);
+            let corMarker = "#188038"; // Verde (0-3 dias)
+            if (diasEmAberto > 7) {
+                corMarker = "#d93025"; // Vermelho (>7 dias)
+            } else if (diasEmAberto > 3) {
+                corMarker = "#f2994a"; // Amarelo/Laranja (4-7 dias)
+            }
+
+            if (os.pontos && Array.isArray(os.pontos)) {
+                os.pontos.forEach(pt => {
+                    const pLat = parseFloat(pt.lat);
+                    const pLng = parseFloat(pt.lng);
+                    if (!isNaN(pLat) && !isNaN(pLng)) {
+                        totalPontos++;
+                        bounds.extend([pLng, pLat]);
+
+                        featuresHeatmap.push({
+                            type: 'Feature',
+                            geometry: { type: 'Point', coordinates: [pLng, pLat] },
+                            properties: { weight: (diasEmAberto > 7 ? 3 : 1) }
+                        });
+
+                        todosPontosFlat.push({
+                            os: os,
+                            pt: pt,
+                            lat: pLat,
+                            lng: pLng,
+                            diasEmAberto: diasEmAberto,
+                            corMarker: corMarker
+                        });
+                    }
+                });
+            }
+        });
+
+        if (modoVisaoMapaAtual === 'pinos') {
+            const gruposPontos = [];
+            todosPontosFlat.forEach(item => {
+                let achouGrupo = false;
+                for (let g = 0; g < gruposPontos.length; g++) {
+                    const rep = gruposPontos[g][0];
+                    const mesmaPlaqueta = (item.pt.plaqueta && item.pt.plaqueta !== "[---]" && rep.pt.plaqueta && rep.pt.plaqueta !== "[---]" && item.pt.plaqueta.toUpperCase().trim() === rep.pt.plaqueta.toUpperCase().trim());
+                    const distM = calcularDistancia(item.lat, item.lng, rep.lat, rep.lng);
+                    if (mesmaPlaqueta || distM <= 25) {
+                        gruposPontos[g].push(item);
+                        achouGrupo = true;
+                        break;
+                    }
+                }
+                if (!achouGrupo) {
+                    gruposPontos.push([item]);
+                }
+            });
+
+            gruposPontos.forEach(grp => {
+                let marker = null;
+                if (grp.length > 1) {
+                    const temAbertaNoGrupo = grp.some(gItem => {
+                        const st = (gItem.os.status || "Aberta").toLowerCase();
+                        return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+                    });
+
+                    let corMarkerDup = "#188038";
+                    if (!temAbertaNoGrupo) {
+                        corMarkerDup = "rgba(26, 115, 232, 0.6)";
+                    } else {
+                        let maxDiasGrp = 0;
+                        grp.forEach(gItem => {
+                            if (gItem.diasEmAberto > maxDiasGrp) {
+                                maxDiasGrp = gItem.diasEmAberto;
+                            }
+                        });
+                        if (maxDiasGrp > 7) corMarkerDup = "#d93025";
+                        else if (maxDiasGrp > 3) corMarkerDup = "#f2994a";
+                    }
+
+                    const elDup = document.createElement('div');
+                    elDup.className = 'marker-duplicado-badge';
+                    elDup.style.backgroundColor = corMarkerDup;
+                    elDup.title = `⚠️ ${grp.length} OSs neste local (Possível Duplicidade)`;
+                    elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${grp.length}</span>`;
+
+                    marker = new mapboxgl.Marker({ element: elDup })
+                        .setLngLat([grp[0].lng, grp[0].lat])
+                        .addTo(mapOSsInstance);
+
+                    marker.getElement().addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        exibirDetalhesGrupoDuplicadoCard(grp);
+                    });
+                } else {
+                    const item = grp[0];
+                    const os = item.os;
+                    const pt = item.pt;
+                    const corMarker = item.corMarker;
+                    const diasEmAberto = item.diasEmAberto;
+
+                    const stLower = (os.status || "Aberta").toLowerCase();
+                    const isResolvida = (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad'));
+                    const isCancelada = stLower.includes('cancel');
+
+                    if (isCancelada) {
+                        const elCanc = document.createElement('div');
+                        elCanc.className = 'marker-cancelada-x';
+                        elCanc.title = `OS #${os.protocolo} (Cancelada)`;
+                        elCanc.style.cssText = 'font-size: 18px; font-weight: 900; color: #d93025; opacity: 0.7; cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; line-height: 1; text-shadow: 0 0 3px #ffffff;';
+                        elCanc.innerHTML = '✖';
+
+                        marker = new mapboxgl.Marker({ element: elCanc })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    } else if (isResolvida) {
+                        const elResolv = document.createElement('div');
+                        elResolv.className = 'marker-resolvida-circle';
+                        elResolv.title = `OS #${os.protocolo} (Resolvida)`;
+                        elResolv.style.cssText = 'width: 18px; height: 18px; background: rgba(26, 115, 232, 0.8); border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: bold;';
+                        elResolv.innerHTML = '✓';
+
+                        marker = new mapboxgl.Marker({ element: elResolv })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    } else if (os.prioridade === "Urgente") {
+                        const el = document.createElement('div');
+                        el.className = 'marker-urgente-badge';
+                        el.title = `OS #${os.protocolo} (URGENTE)`;
+                        el.style.cssText = `width: 22px; height: 22px; background: ${corMarker}; border: 2px solid #ffffff; border-radius: 4px; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: pointer; z-index: 10;`;
+                        el.innerHTML = '<span style="transform: rotate(-45deg); color: #ffffff; font-size: 11px; font-weight: bold; line-height: 1;">⚡</span>';
+
+                        marker = new mapboxgl.Marker({ element: el })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    } else {
+                        const elNormal = document.createElement('div');
+                        elNormal.className = 'marker-normal-circle';
+                        elNormal.title = `OS #${os.protocolo}`;
+                        elNormal.style.cssText = `width: 16px; height: 16px; background: ${corMarker}; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; z-index: 5;`;
+
+                        marker = new mapboxgl.Marker({ element: elNormal })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    }
+
+                    marker.getElement().addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        exibirDetalhesOSCard(os, pt, diasEmAberto);
+                    });
+                }
+
+                if (marker) todosMarkersOSsAbertas.push(marker);
+            });
+        }
+
+        if (modoVisaoMapaAtual === 'heatmap' && featuresHeatmap.length > 0) {
+            mapOSsInstance.addSource('os-heatmap-source', {
+                type: 'geojson',
+                data: { type: 'FeatureCollection', features: featuresHeatmap }
+            });
+            mapOSsInstance.addLayer({
+                id: 'os-heatmap-layer',
+                type: 'heatmap',
+                source: 'os-heatmap-source',
+                paint: {
+                    'heatmap-weight': 1,
+                    'heatmap-intensity': 1.2,
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0, 'rgba(33,102,172,0)',
+                        0.2, 'rgb(103,169,207)',
+                        0.4, 'rgb(209,229,240)',
+                        0.6, 'rgb(253,219,199)',
+                        0.8, 'rgb(239,138,98)',
+                        1, 'rgb(178,24,43)'
+                    ],
+                    'heatmap-radius': 30,
+                    'heatmap-opacity': 0.85
+                }
+            });
+        }
+
+        if (stat) stat.innerHTML = `Exibindo <b>${listaOSs.length} OSs</b> (${totalPontos} pontos no mapa)`;
+
+        setTimeout(() => {
+            if (mapOSsInstance) mapOSsInstance.resize();
+            if (!bounds.isEmpty()) {
+                mapOSsInstance.fitBounds(bounds, { padding: 40, maxZoom: 16 });
+            }
+        }, 200);
+    }
+
+    function filtrarOSsMapa(termoManual) {
+        const globalInput = document.getElementById('global-search-input');
+        let raw = termoManual !== undefined ? termoManual : (globalInput ? globalInput.value : "");
+        const termo = String(raw).toLowerCase().trim();
+        if (!termo) {
+            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+            renderizarMapaOSs(filtradas);
+            return;
+        }
+
+        const baseLista = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        const filtrados = baseLista.filter(os => {
+            const emProt = String(os.protocolo || "").toLowerCase().includes(termo);
+            const emMun = String(os.municipe || "").toLowerCase().includes(termo);
+            const emPlaq = os.pontos && os.pontos.some(p => String(p.plaqueta || "").toLowerCase().includes(termo));
+            const emEnd = os.pontos && os.pontos.some(p => String(p.endereco || "").toLowerCase().includes(termo));
+            const emProb = os.pontos && os.pontos.some(p => String(p.problema || "").toLowerCase().includes(termo));
+            return emProt || emMun || emPlaq || emEnd || emProb;
+        });
+
+        renderizarMapaOSs(filtrados);
+    }
+
+    function calcularDistancia(lat1, lon1, lat2, lon2) {
+        const R = 6371000;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    function exibirDetalhesGrupoDuplicadoCard(grp) {
+        const painel = document.getElementById('painelLateralOS');
+        if (!painel) return;
+        painel.style.display = 'block';
+        if (!painel.dataset.hasClickGuard) {
+            painel.dataset.hasClickGuard = 'true';
+            painel.addEventListener('click', (e) => e.stopPropagation());
+        }
+
+        let html = `
+        <div class="flex justify-between items-center border-b border-error/30 pb-2 mb-2">
+            <strong class="text-sm text-error flex items-center gap-1">⚠️ ${grp.length} OSs no Mesmo Local</strong>
+            <button type="button" onclick="document.getElementById('painelLateralOS').style.display='none'" class="text-on-surface-variant hover:text-on-surface text-lg cursor-pointer">&times;</button>
+        </div>
+        <div class="text-[11px] text-on-surface-variant bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg mb-3">
+            📍 <b>Alerta de Duplicidade:</b> Chamados múltiplos detectados nesta mesma localização ou plaqueta.
+        </div>`;
+
+        grp.forEach(item => {
+            const os = item.os;
+            const pt = item.pt;
+            const diasEmAberto = item.diasEmAberto;
+            const stLower = (os.status || "Aberta").toLowerCase();
+
+            let badgeHTML = "";
+            if (stLower.includes('cancel')) {
+                badgeHTML = '<span class="px-2 py-0.5 rounded-full font-bold text-[10px] text-white bg-error">❌ Cancelada</span>';
+            } else if (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
+                badgeHTML = '<span class="px-2 py-0.5 rounded-full font-bold text-[10px] text-white bg-secondary">✅ Resolvida</span>';
+            } else {
+                let corAging = "bg-[#188038]";
+                let labelAging = `${diasEmAberto}d (Recente)`;
+                if (diasEmAberto > 7) { corAging = "bg-[#d93025]"; labelAging = `${diasEmAberto}d (Atrasada)`; }
+                else if (diasEmAberto > 3) { corAging = "bg-[#f2994a]"; labelAging = `${diasEmAberto}d (Atenção)`; }
+                badgeHTML = `<span class="px-2 py-0.5 rounded-full font-bold text-[10px] text-white ${corAging}">⏱️ ${labelAging}</span>`;
+            }
+
+            const linkGmaps = (pt && pt.lat && pt.lng) ? `https://www.google.com/maps/search/?api=1&query=${pt.lat},${pt.lng}` : "#";
+
+            let btnAcaoCard = "";
+            if (currentUserRole === 'admin') {
+                if (stLower.includes('cancel') || stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
+                    btnAcaoCard = `<button type="button" onclick="solicitarReversaoOS('${os.protocolo}')" class="bg-secondary/10 text-secondary border border-secondary/30 px-2 py-1 rounded font-bold text-[10px] hover:bg-secondary/20 transition-colors cursor-pointer">🔄 Reabrir</button>`;
+                } else {
+                    btnAcaoCard = `<button type="button" onclick="solicitarCancelamentoOS('${os.protocolo}')" class="bg-error/10 text-error border border-error/30 px-2 py-1 rounded font-bold text-[10px] hover:bg-error/20 transition-colors cursor-pointer">❌ Cancelar</button>`;
+                }
+            }
+
+            let btnFotoGroup = "";
+            if (os.fotos && os.fotos.length > 0) {
+                btnFotoGroup = `<button type="button" onclick="abrirGaleriaFotosModal('${os.protocolo}', 0)" class="bg-amber-500/10 text-amber-700 border border-amber-500/30 px-2 py-1 rounded font-bold text-[10px] hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1">📸 ${os.fotos.length} foto(s)</button>`;
+            }
+
+            html += `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-2.5 mb-2.5 shadow-sm">
+                <div class="flex justify-between items-center mb-1">
+                    <strong class="text-xs text-secondary font-bold">#${os.protocolo}</strong>
+                    ${badgeHTML}
+                </div>
+                <div class="text-[11px] leading-relaxed text-on-surface space-y-0.5">
+                    <div><b>Data:</b> ${os.data} | <b>Prioridade:</b> ${os.prioridade}</div>
+                    <div><b>Plaqueta:</b> ${pt ? pt.plaqueta : "-"}</div>
+                    <div><b>Problema:</b> ${pt ? pt.problema : "-"}</div>
+                    <div><b>Endereço:</b> ${pt ? pt.endereco : "-"}</div>
+                    <div><b>Munícipe:</b> ${os.municipe || "-"}</div>
+                </div>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <a href="${linkGmaps}" target="_blank" class="flex-1 text-center bg-secondary text-white no-underline py-1 rounded font-bold text-[10px] hover:bg-secondary-container transition-colors">🗺️ Maps</a>
+                    <button type="button" onclick="exibirDetalhesOSCardByProt('${os.protocolo}')" class="flex-1 bg-surface-container-high text-on-surface border border-outline-variant py-1 rounded font-bold text-[10px] hover:bg-surface-container transition-colors cursor-pointer">🔍 Detalhes</button>
+                    ${btnFotoGroup}
+                    ${btnAcaoCard}
+                </div>
+            </div>`;
+        });
+
+        painel.innerHTML = html;
+    }
+
+    function exibirDetalhesOSCardByProt(protocolo) {
+        if (!dadosOSsAbertasCache) return;
+        const osObj = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase());
+        if (osObj) {
+            const ptObj = (osObj.pontos && osObj.pontos.length > 0) ? osObj.pontos[0] : null;
+            exibirDetalhesOSCard(osObj, ptObj);
+        }
+    }
+
+    function exibirDetalhesOSCard(os, pt, diasEmAberto) {
+        const painel = document.getElementById('painelLateralOS');
+        if (!painel) return;
+        painel.style.display = 'block';
+        if (!painel.dataset.hasClickGuard) {
+            painel.dataset.hasClickGuard = 'true';
+            painel.addEventListener('click', (e) => e.stopPropagation());
+        }
+
+        if (!pt && os && os.pontos && os.pontos.length > 0) {
+            pt = os.pontos[0];
+        }
+
+        if (diasEmAberto === undefined) {
+            diasEmAberto = calcularDiasEmAberto(os.data);
+        }
+
+        const stLower = (os.status || "Aberta").toLowerCase();
+        const isFechadaOuCancelada = (stLower.includes('cancel') || stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad'));
+
+        let badgeHTML = "";
+        if (stLower.includes('cancel')) {
+            badgeHTML = '<span class="px-2.5 py-1 rounded-full font-bold text-xs text-white bg-error">❌ OS Cancelada</span>';
+        } else if (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
+            badgeHTML = '<span class="px-2.5 py-1 rounded-full font-bold text-xs text-white bg-secondary">✅ OS Resolvida</span>';
+        } else {
+            let corAging = "bg-[#188038]";
+            let labelAging = `${diasEmAberto} dias (Recente)`;
+            if (diasEmAberto > 7) {
+                corAging = "bg-[#d93025]";
+                labelAging = `${diasEmAberto} dias (Atrasada)`;
+            } else if (diasEmAberto > 3) {
+                corAging = "bg-[#f2994a]";
+                labelAging = `${diasEmAberto} dias (Atenção)`;
+            }
+            badgeHTML = `<span class="px-2.5 py-1 rounded-full font-bold text-xs text-white ${corAging}">⏱️ ${labelAging}</span>`;
+        }
+
+        const ptLat = (pt && pt.lat !== undefined && pt.lat !== null) ? pt.lat : "";
+        const ptLng = (pt && pt.lng !== undefined && pt.lng !== null) ? pt.lng : "";
+        const linkGmaps = (ptLat && ptLng) ? `https://www.google.com/maps/search/?api=1&query=${ptLat},${ptLng}` : "#";
+
+        const opVal = String(os.operador || "").trim();
+        const opLower = opVal.toLowerCase();
+        const isGovBrOp = !opVal || opLower.includes('gov.br') || opLower === 'cidadão' || opLower === 'cidadao' || opLower.includes('gov');
+
+        let html = `
+        <div class="flex justify-between items-center border-b border-outline-variant pb-2 mb-2">
+            <strong class="text-base text-secondary font-bold">#${os.protocolo}</strong>
+            <button type="button" onclick="document.getElementById('painelLateralOS').style.display='none'" class="text-on-surface-variant hover:text-on-surface text-lg cursor-pointer">&times;</button>
+        </div>
+        <div class="mb-3">
+            ${badgeHTML}
+        </div>
+        <div class="space-y-1 text-xs text-on-surface leading-relaxed">
+            <div><b>Data Abertura:</b> ${os.data}</div>
+            <div><b>Prioridade:</b> ${os.prioridade}</div>
+            <div><b>Plaqueta:</b> ${pt ? pt.plaqueta : "-"}</div>
+            <div><b>Problema:</b> ${pt ? pt.problema : "-"}</div>
+            <div><b>Endereço:</b> ${pt ? pt.endereco : "-"}</div>
+            <div><b>Munícipe:</b> ${os.municipe || "-"}</div>
+            <div><b>Telefone:</b> ${os.telefoneCelular || os.telefoneFixo || "-"}</div>
+            ${!isGovBrOp ? `<div><b>Operador:</b> ${os.operador}</div>` : ''}
+        </div>`;
+
+        if (os.descricao) {
+            html += `<div class="mt-2 p-2 bg-surface-container-high/60 rounded-lg italic text-on-surface-variant text-[11px]"><b>Obs:</b> ${os.descricao}</div>`;
+        }
+
+        if (os.logs) {
+            const linhasLog = os.logs.split('\n');
+            const itemsLog = linhasLog.map(l => `<div class="py-0.5 border-b border-dashed border-outline-variant/40">• ${l}</div>`).join('');
+            html += `
+            <div class="mt-3 p-2 bg-surface-container-low border border-outline-variant rounded-lg text-[10px]">
+                <strong class="text-secondary block mb-1">📜 Trilha de Auditoria:</strong>
+                <div class="max-h-20 overflow-y-auto font-mono leading-tight">${itemsLog}</div>
+            </div>`;
+        }
+
+        // BLOCO DE FOTOS E EVIDÊNCIAS
+        if (os.fotos && Array.isArray(os.fotos) && os.fotos.length > 0) {
+            html += `
+            <div class="mt-3 p-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl shadow-sm">
+                <div class="flex items-center justify-between mb-2">
+                    <strong class="text-xs font-bold text-secondary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-amber-500">photo_library</span>
+                        <span>Fotos & Evidências (${os.fotos.length})</span>
+                    </strong>
+                </div>
+                <div class="grid grid-cols-2 gap-2">`;
+            
+            os.fotos.forEach((foto, fIdx) => {
+                html += `
+                <div class="relative group rounded-lg overflow-hidden border border-outline-variant/60 cursor-pointer shadow-sm hover:shadow-md transition-all aspect-video bg-slate-900" onclick="abrirGaleriaFotosModal('${os.protocolo}', ${fIdx})">
+                    <img src="${foto.url}" alt="${foto.titulo || 'Foto Evidência'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
+                        <span class="text-[9px] font-semibold text-white truncate drop-shadow">${foto.titulo || 'Evidência'}</span>
+                    </div>
+                    <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
+                        <span class="material-symbols-outlined text-[12px]">zoom_in</span>
+                    </div>
+                </div>`;
+            });
+
+            html += `
+                </div>
+            </div>`;
+        }
+
+        let btnPrioridade = "";
+        let btnCancelarReverter = "";
+        if (currentUserRole === 'admin') {
+            if (isFechadaOuCancelada) {
+                btnCancelarReverter = `<button type="button" onclick="solicitarReversaoOS('${os.protocolo}')" class="w-full py-1.5 rounded-lg font-bold text-xs bg-secondary/10 text-secondary border border-secondary/30 hover:bg-secondary/20 transition-colors cursor-pointer">🔄 Reabrir / Reverter OS</button>`;
+            } else {
+                btnPrioridade = (os.prioridade === "Urgente")
+                    ? `<button type="button" onclick="solicitarTrocaPrioridade('${os.protocolo}', 'Normal')" class="w-full py-1.5 rounded-lg font-bold text-xs bg-amber-500/10 text-amber-700 border border-amber-500/30 hover:bg-amber-500/20 transition-colors cursor-pointer">🟢 Reverter para Normal</button>`
+                    : `<button type="button" onclick="solicitarTrocaPrioridade('${os.protocolo}', 'Urgente')" class="w-full py-1.5 rounded-lg font-bold text-xs bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors cursor-pointer">⚡ Priorizar para Urgente</button>`;
+
+                btnCancelarReverter = `<button type="button" onclick="solicitarCancelamentoOS('${os.protocolo}')" class="w-full py-1.5 rounded-lg font-bold text-xs bg-error/10 text-error border border-error/30 hover:bg-error/20 transition-colors cursor-pointer">❌ Cancelar OS</button>`;
+            }
+        }
+
+        html += `
+        <div class="mt-4 flex flex-col gap-1.5">
+            ${btnPrioridade}
+            ${btnCancelarReverter}
+            <a href="${linkGmaps}" target="_blank" class="w-full py-1.5 text-center rounded-lg font-bold text-xs bg-secondary text-white no-underline hover:bg-secondary-container transition-colors">MAPS / WAZE 🗺️</a>
+        </div>`;
+
+        painel.innerHTML = html;
+    }
+
+    let osReversaoPendente = null;
+
+    function solicitarReversaoOS(protocolo) {
+        osReversaoPendente = protocolo;
+        const elProt = document.getElementById('protModalReversao');
+        if (elProt) elProt.innerText = '#' + protocolo;
+        const obsEl = document.getElementById('obsModalReversao');
+        if (obsEl) obsEl.value = '';
+        document.getElementById('modalConfirmacaoReversao').style.display = 'flex';
+    }
+
+    function fecharModalReversao() {
+        document.getElementById('modalConfirmacaoReversao').style.display = 'none';
+        osReversaoPendente = null;
+    }
+
+    async function executarReversaoOSConfirmado() {
+        if (!osReversaoPendente) return;
+        if (currentUserRole !== 'admin') {
+            alert("Apenas administradores possuem permissão para realizar esta alteração.");
+            fecharModalReversao();
+            return;
+        }
+        const prot = osReversaoPendente;
+        const obs = document.getElementById('obsModalReversao').value.trim();
+        fecharModalReversao();
+
+        const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
+
+        // Atualização Otimista da Interface
+        if (osEncontrada) {
+            osEncontrada.status = "Aberta";
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const logLinha = `${dataHora} - Reaberta: ${obs || "Sem justificativa"}`;
+            osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
+        }
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        renderizarMapaOSs(filtradas);
+        const painelLat = document.getElementById('painelLateralOS');
+        if (painelLat) painelLat.style.display = 'none';
+
+        // Atualização no Supabase via ChamadosService
+        try {
+            if (osEncontrada && osEncontrada.id) {
+                await chamadosService.changeChamadoStatus(osEncontrada.id, 'aberto', obs);
+            }
+        } catch(e) {
+            console.warn("⚠️ Falha ao sincronizar reabertura no Supabase:", e);
+        }
+    }
+
+    let osPrioridadePendente = null;
+
+    function solicitarTrocaPrioridade(protocolo, novaPrioridade) {
+        osPrioridadePendente = { protocolo: protocolo, prioridade: novaPrioridade };
+        const modal = document.getElementById('modalConfirmacaoPrioridade');
+        const icon = document.getElementById('iconModalPrioridade');
+        const titulo = document.getElementById('tituloModalPrioridade');
+        const msg = document.getElementById('msgModalPrioridade');
+        const btn = document.getElementById('btnConfirmarPrioridadeModal');
+
+        if (novaPrioridade === "Urgente") {
+            icon.innerHTML = "⚡";
+            titulo.innerText = "Priorizar para Urgente";
+            titulo.className = "text-lg font-bold text-error mb-2";
+            msg.innerHTML = `Tem certeza que deseja alterar a <b>OS #${protocolo}</b> para prioridade <span class="text-error font-bold">URGENTE</span>?`;
+            btn.className = "flex-1 py-2 px-4 rounded-xl bg-error text-white font-semibold shadow-md hover:bg-error/90 transition-all";
+            btn.innerText = "Sim, Urgente!";
+        } else {
+            icon.innerHTML = "🟢";
+            titulo.innerText = "Reverter para Normal";
+            titulo.className = "text-lg font-bold text-[#188038] mb-2";
+            msg.innerHTML = `Deseja reverter a <b>OS #${protocolo}</b> para a prioridade <span class="text-[#188038] font-bold">NORMAL</span>?`;
+            btn.className = "flex-1 py-2 px-4 rounded-xl bg-[#188038] text-white font-semibold shadow-md hover:bg-[#188038]/90 transition-all";
+            btn.innerText = "Confirmar Normal";
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    function fecharModalConfirmacaoPrioridade() {
+        document.getElementById('modalConfirmacaoPrioridade').style.display = 'none';
+        osPrioridadePendente = null;
+    }
+
+    async function executarTrocaPrioridadeConfirmada() {
+        if (!osPrioridadePendente) return;
+        if (currentUserRole !== 'admin') {
+            alert("Apenas administradores possuem permissão para realizar esta alteração.");
+            fecharModalConfirmacaoPrioridade();
+            return;
+        }
+        const prot = osPrioridadePendente.protocolo;
+        const prio = osPrioridadePendente.prioridade;
+        fecharModalConfirmacaoPrioridade();
+
+        const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
+
+        if (osEncontrada) {
+            osEncontrada.prioridade = prio;
+        }
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        renderizarMapaOSs(filtradas);
+        const painelLat = document.getElementById('painelLateralOS');
+        if (painelLat) painelLat.style.display = 'none';
+
+        try {
+            if (osEncontrada && osEncontrada.id && chamadosService.repository) {
+                const client = chamadosService.repository.getClient();
+                await client.from('chamados').update({ prioridade: prio }).eq('id', osEncontrada.id);
+            }
+        } catch(e) {
+            console.warn("⚠️ Falha ao sincronizar prioridade no Supabase:", e);
+        }
+    }
+
+    window.setModalJustification = function(text, targetId = 'modal-justification-input') {
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        if (input.value.trim() === text) {
+            input.value = '';
+        } else {
+            input.value = text;
+        }
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    let osCancelamentoPendente = null;
+
+    function solicitarCancelamentoOS(protocolo) {
+        osCancelamentoPendente = protocolo;
+        const elProt = document.getElementById('protModalCancelamento');
+        if (elProt) elProt.innerText = '#' + protocolo;
+        const obsEl = document.getElementById('obsModalCancelamento');
+        if (obsEl) obsEl.value = '';
+        document.getElementById('modalConfirmacaoCancelamento').style.display = 'flex';
+    }
+
+    function fecharModalCancelamento() {
+        document.getElementById('modalConfirmacaoCancelamento').style.display = 'none';
+        osCancelamentoPendente = null;
+    }
+
+    async function executarCancelamentoOSConfirmado() {
+        if (!osCancelamentoPendente) return;
+        if (currentUserRole !== 'admin') {
+            alert("Apenas administradores possuem permissão para realizar esta alteração.");
+            fecharModalCancelamento();
+            return;
+        }
+        const prot = osCancelamentoPendente;
+        const obs = document.getElementById('obsModalCancelamento').value.trim();
+        fecharModalCancelamento();
+
+        const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
+
+        if (osEncontrada) {
+            osEncontrada.status = "Cancelada";
+            const dataHora = new Date().toLocaleString('pt-BR');
+            const logLinha = `${dataHora} - Cancelada: ${obs || "Sem justificativa"}`;
+            osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
+        }
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        renderizarMapaOSs(filtradas);
+        const painelLat = document.getElementById('painelLateralOS');
+        if (painelLat) painelLat.style.display = 'none';
+
+        try {
+            if (osEncontrada && osEncontrada.id) {
+                await chamadosService.changeChamadoStatus(osEncontrada.id, 'cancelada', obs);
+            }
+        } catch(e) {
+            console.warn("⚠️ Falha ao sincronizar cancelamento no Supabase:", e);
+        }
+    }
+
+
+
+    // =========================================================================
+    // CONTROLADOR DA GALERIA DE FOTOS CLOUDINARY (LIGHTBOX)
+    // =========================================================================
+    var galeriaFotosAtualList = [];
+    var galeriaFotosIndexAtual = 0;
+    var galeriaProtocoloAtual = "";
+
+    function abrirGaleriaFotosModal(protocolo, indexInicial) {
+        const osObj = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase()) : null;
+        if (!osObj || !osObj.fotos || osObj.fotos.length === 0) {
+            alert("Nenhuma foto disponível para esta Ordem de Serviço.");
+            return;
+        }
+
+        galeriaFotosAtualList = osObj.fotos;
+        galeriaFotosIndexAtual = indexInicial || 0;
+        galeriaProtocoloAtual = protocolo;
+
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (!elModal) return;
+
+        const elProt = document.getElementById('galeriaModalProtocolo');
+        if (elProt) elProt.innerText = `Fotos da OS #${protocolo}`;
+
+        renderizarFotoModalAtual();
+
+        elModal.classList.remove('hidden');
+        elModal.classList.add('flex');
+    }
+
+    function renderizarFotoModalAtual() {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        if (galeriaFotosIndexAtual < 0) galeriaFotosIndexAtual = 0;
+        if (galeriaFotosIndexAtual >= galeriaFotosAtualList.length) galeriaFotosIndexAtual = galeriaFotosAtualList.length - 1;
+
+        const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+
+        const imgEl = document.getElementById('galeriaModalImgPrincipal');
+        const tituloEl = document.getElementById('galeriaModalTituloFoto');
+        const counterEl = document.getElementById('galeriaModalCounter');
+        const linkCloudinaryEl = document.getElementById('galeriaModalLinkCloudinary');
+        const stripEl = document.getElementById('galeriaModalThumbnailsStrip');
+
+        if (imgEl) imgEl.src = foto.url;
+        if (tituloEl) tituloEl.innerText = foto.titulo || `Evidência Fotográfica ${galeriaFotosIndexAtual + 1}`;
+        if (counterEl) counterEl.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+        if (linkCloudinaryEl) linkCloudinaryEl.href = foto.url;
+
+        // Renderiza tira de miniaturas
+        if (stripEl) {
+            stripEl.innerHTML = '';
+            galeriaFotosAtualList.forEach((f, idx) => {
+                const isSelected = idx === galeriaFotosIndexAtual;
+                const thumbDiv = document.createElement('div');
+                thumbDiv.className = `w-14 h-10 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 ${isSelected ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'}`;
+                thumbDiv.onclick = () => {
+                    galeriaFotosIndexAtual = idx;
+                    renderizarFotoModalAtual();
+                };
+                thumbDiv.innerHTML = `<img src="${f.url}" class="w-full h-full object-cover" alt="Thumb ${idx+1}" />`;
+                stripEl.appendChild(thumbDiv);
+            });
+        }
+
+        // Alterna botões anterior / próximo
+        const btnPrev = document.getElementById('btnGaleriaPrev');
+        const btnNext = document.getElementById('btnGaleriaNext');
+        if (btnPrev && btnNext) {
+            if (galeriaFotosAtualList.length <= 1) {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+            } else {
+                btnPrev.style.display = 'flex';
+                btnNext.style.display = 'flex';
+            }
+        }
+    }
+
+    function navegarGaleriaFotos(delta) {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length <= 1) return;
+        galeriaFotosIndexAtual = (galeriaFotosIndexAtual + delta + galeriaFotosAtualList.length) % galeriaFotosAtualList.length;
+        renderizarFotoModalAtual();
+    }
+
+    function fecharGaleriaFotosModal() {
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (elModal) {
+            elModal.classList.add('hidden');
+            elModal.classList.remove('flex');
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        const modalGaleria = document.getElementById('modalGaleriaFotosCloudinary');
+        if (modalGaleria && !modalGaleria.classList.contains('hidden')) {
+            if (e.key === 'Escape') fecharGaleriaFotosModal();
+            if (e.key === 'ArrowLeft') navegarGaleriaFotos(-1);
+            if (e.key === 'ArrowRight') navegarGaleriaFotos(1);
+        }
+    });
+</script>
+
+</body>
+</html>

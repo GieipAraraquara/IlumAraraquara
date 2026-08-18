@@ -1,0 +1,1913 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="h-full">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Finalizar Ordem de Serviço - Sistema OS Manager</title>
+    <meta name="description" content="Interface de Finalização e Auditoria de Ordens de Serviço de Iluminação Viária e Praças Públicas." />
+
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Supabase JS Client & Auth Guard Layer -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+
+    <!-- Cloudinary Integration Service -->
+    <script src="js/config/cloudinaryConfig.js"></script>
+    <script src="js/services/CloudinaryService.js"></script>
+
+    <!-- Offline & PWA Sync Engine -->
+    <script src="js/services/OfflineSyncService.js"></script>
+
+    <script>
+      // Registro do Service Worker PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').then(function(reg) {
+            console.log('⚡ [PWA] Service Worker registrado com sucesso:', reg.scope);
+          }).catch(function(err) {
+            console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
+          });
+        });
+      }
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <!-- Mapbox GL JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+
+    <!-- Leaflet Fallback -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Google Fonts & Material Symbols -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+
+    <script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#000000",
+              "secondary": "#0051d5",
+              "background": "#f8fafc",
+              "surface": "#ffffff",
+              "surface-container": "#f1f5f9",
+              "on-surface": "#0f172a",
+              "on-surface-variant": "#475569",
+              "outline": "#94a3b8",
+              "outline-variant": "#e2e8f0",
+              "error": "#dc2626"
+            },
+            fontFamily: {
+              sans: ["Inter", "sans-serif"]
+            }
+          }
+        }
+      }
+    </script>
+
+    <style>
+      html.in-iframe, body.in-iframe {
+        background-color: transparent !important;
+      }
+      html.in-iframe header, body.in-iframe header,
+      .in-iframe header {
+        display: none !important;
+      }
+      html.in-iframe body, body.in-iframe {
+        padding: 0.75rem !important;
+      }
+      .custom-scrollbar::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-track {
+        background: #f1f5f9;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 9999px;
+      }
+      .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+      .dropdown-lista {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.5rem;
+        max-height: 200px;
+        overflow-y: auto;
+        z-index: 50;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+      }
+      .dropdown-item {
+        padding: 0.625rem 0.875rem;
+        cursor: pointer;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 0.875rem;
+        color: #1e293b;
+        transition: background-color 0.15s ease;
+      }
+      .dropdown-item:hover {
+        background-color: #eff6ff;
+        color: #2563eb;
+      }
+    </style>
+
+    <script>
+      // Checagem de modo iframe
+      if (window.self !== window.top) {
+        document.documentElement.classList.add('in-iframe');
+        document.addEventListener('DOMContentLoaded', function() {
+          document.body.classList.add('in-iframe');
+        });
+      }
+    </script>
+</head>
+
+<body class="bg-slate-50 text-slate-900 font-sans antialiased min-h-full p-3 sm:p-6 custom-scrollbar">
+
+    <!-- CONTAINER PRINCIPAL DA APLICAÇÃO -->
+    <div class="max-w-4xl mx-auto space-y-6">
+
+        <!-- CABEÇALHO SUPERIOR DESIGN EXECUTIVE PRECISION -->
+        <header class="bg-white border border-slate-200 shadow-sm rounded-2xl p-3.5 sm:p-4 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-600/10 border border-blue-200 flex items-center justify-center text-blue-600 shadow-sm flex-shrink-0">
+                    <span class="material-symbols-outlined text-xl">task_alt</span>
+                </div>
+                <div class="min-w-0">
+                    <h1 class="text-lg sm:text-xl font-bold tracking-tight text-slate-900 truncate">
+                        Finalizar
+                    </h1>
+                </div>
+            </div>
+
+            <!-- PERFIL / AÇÕES DO USUÁRIO -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+                <div id="userInfoContainer" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-medium text-slate-700">
+                    <span class="material-symbols-outlined text-[16px] text-blue-600">account_circle</span>
+                    <span id="userEmailLabel">Servidor Autenticado</span>
+                </div>
+
+                <button type="button" 
+                        onclick="if(window.AuthGuard) window.AuthGuard.logout(); else window.location.href='Login.html';"
+                        class="px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+                    <span class="material-symbols-outlined text-[16px]">logout</span>
+                    <span>Sair</span>
+                </button>
+
+                <button type="button" 
+                        id="btnFecharModalIframe"
+                        onclick="fecharJanelaIframe()"
+                        class="hidden px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg transition-colors items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                    <span>Fechar</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- SELETOR DE TIPO DE OS (VIÁRIA VS PRAÇA) -->
+        <div class="bg-white border border-slate-200 rounded-xl p-1.5 shadow-sm flex gap-2">
+            <button type="button" 
+                    id="tabBtnIluminacao"
+                    onclick="alternarTipoOS('iluminacao')"
+                    class="flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm">
+                <span>💡 Viária</span>
+            </button>
+
+            <button type="button" 
+                    id="tabBtnPraca"
+                    onclick="alternarTipoOS('praca')"
+                    class="flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-100">
+                <span>🌳 Praça</span>
+            </button>
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- ABA 1: ILUMINAÇÃO VIÁRIA                                                  -->
+        <!-- ========================================================================= -->
+        <div id="abaIluminacao" class="space-y-6">
+
+            <!-- CARD PRINCIPAL: IDENTIFICAÇÃO E REPARO -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-5">
+                <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600 text-[20px]">assignment</span>
+                    <span>Dados do Atendimento</span>
+                </h2>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <!-- PROTOCOLO DA OS -->
+                    <div class="md:col-span-1">
+                        <label for="protocolo" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Protocolo da OS <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               id="protocolo" 
+                               placeholder="Ex: IP5NKJG120826" 
+                               uppercase
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-900 uppercase transition-all" 
+                               required />
+                    </div>
+
+                    <!-- DATA DO REPARO -->
+                    <div>
+                        <label for="dataReparo" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Data do Reparo <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               id="dataReparo" 
+                               placeholder="DD/MM/AAAA" 
+                               maxlength="10" 
+                               oninput="mascaraData(this)"
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-900 transition-all" 
+                               required />
+                    </div>
+
+                    <!-- QUANTIDADE DE PONTOS -->
+                    <div>
+                        <label for="quantidade" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Qtd. de Pontos <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" 
+                               id="quantidade" 
+                               value="1" 
+                               min="1" 
+                               onchange="ajustarPontos()" 
+                               oninput="this.value = this.value.replace(/[^0-9]/g, ''); ajustarPontos();"
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-bold text-blue-600 transition-all" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTAINER DINÂMICO DE PONTOS -->
+            <div id="pontosContainer" class="space-y-6"></div>
+
+            <!-- CARD DE MATERIAIS UTILIZADOS -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-blue-600 text-[20px]">inventory_2</span>
+                    <span>Materiais Utilizados no Atendimento</span>
+                </h2>
+
+                <div class="flex flex-col sm:flex-row gap-3 items-end">
+                    <div class="flex-1 w-full relative custom-combobox">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Buscar Material</label>
+                        <input type="text" 
+                               id="inputMaterial" 
+                               placeholder="Digite para buscar material..." 
+                               autocomplete="off" 
+                               oninput="filtrarMateriais()" 
+                               onclick="mostrarTodosMateriais()"
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-900 transition-all" />
+                        <div id="dropdownMateriais" class="dropdown-lista"></div>
+                    </div>
+
+                    <div class="w-full sm:w-32">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Quantidade</label>
+                        <input type="number" 
+                               id="inputQtd" 
+                               min="0.1" 
+                               step="0.1" 
+                               value="1"
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-bold text-slate-900 transition-all" />
+                    </div>
+
+                    <button type="button" 
+                            onclick="adicionarMaterial()"
+                            class="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-semibold text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                        <span>Adicionar</span>
+                    </button>
+                </div>
+
+                <!-- TABELA DE MATERIAIS ADICIONADOS -->
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-100 text-slate-600 font-semibold uppercase border-b border-slate-200">
+                            <tr>
+                                <th class="py-3 px-4 w-24">Qtd</th>
+                                <th class="py-3 px-4">Material / Item</th>
+                                <th class="py-3 px-4 w-20 text-center">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyMateriais" class="divide-y divide-slate-100 bg-white">
+                            <tr>
+                                <td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium">Nenhum material adicionado ainda.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- OBSERVAÇÕES GERAIS DA OS -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+                <label for="descricao" class="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                    Observações Gerais da Conclusão (Opcional)
+                </label>
+                <textarea id="descricao" 
+                          rows="3" 
+                          placeholder="Insira observações relevantes sobre o serviço realizado..."
+                          class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg p-3 text-sm text-slate-900 transition-all resize-none"></textarea>
+            </div>
+
+            <!-- BOTÃO DE FINALIZAÇÃO DA OS -->
+            <div class="space-y-3">
+                <button type="button" 
+                        id="btnSalvar" 
+                        onclick="validarEEnviar()"
+                        class="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-bold text-base rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer">
+                    <span class="material-symbols-outlined text-[22px]">check_circle</span>
+                    <span id="btnSalvarTexto">Finalizar Ordem de Serviço</span>
+                </button>
+                <div id="mensagem" class="text-center font-semibold text-sm"></div>
+            </div>
+
+        </div>
+
+        <!-- ========================================================================= -->
+        <!-- ABA 2: PRAÇA PÚBLICA                                                     -->
+        <!-- ========================================================================= -->
+        <div id="abaPraca" class="space-y-6 hidden">
+
+            <!-- BUSCA E VALIDAÇÃO DE PROTOCOLO DA PRAÇA -->
+            <div class="bg-white border border-emerald-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-emerald-600 text-[20px]">park</span>
+                    <span>Localizar OS da Praça Pública</span>
+                </h2>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <div class="flex-1">
+                        <label for="protocoloPraca" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Protocolo da OS da Praça <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" 
+                               id="protocoloPraca" 
+                               placeholder="Digite o protocolo Ex: PC304KQ120826" 
+                               uppercase
+                               onkeypress="if(event.key==='Enter'){event.preventDefault();validarProtocoloPraca();}"
+                               class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-semibold text-slate-900 uppercase transition-all" />
+                    </div>
+
+                    <div class="sm:self-end">
+                        <button type="button" 
+                                id="btnValidarPraca" 
+                                onclick="validarProtocoloPraca()"
+                                class="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-2">
+                            <span class="material-symbols-outlined text-[18px]">search</span>
+                            <span>Validar Protocolo</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div id="msgValidaPraca" class="text-sm font-medium"></div>
+
+                <!-- CARTÃO INFORMATIVO DA PRAÇA VALIDADA -->
+                <div id="boxInfoPraca" class="hidden bg-emerald-50/60 border border-emerald-200 rounded-xl p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div id="infoPracaNome" class="font-bold text-emerald-900 text-sm flex items-center gap-1.5">
+                            🌳 Nome da Praça
+                        </div>
+                        <span id="badgeStatusPraca" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                            Aberta
+                        </span>
+                    </div>
+                    <div id="infoPracaEndereco" class="text-xs text-slate-600 flex items-center gap-1">
+                        📍 Endereço da praça
+                    </div>
+                </div>
+            </div>
+
+            <!-- CORPO DO FORMULÁRIO DE PRAÇA (LIBERADO APÓS VALIDAÇÃO) -->
+            <div id="corpoFormPraca" class="space-y-6 hidden">
+
+                <!-- FOTO DE ENTRADA DO LOCAL + QTD ELETRICISTAS -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            1. Foto de Entrada do Local <span class="text-red-500">*</span>
+                        </label>
+                        <div id="boxFotoEntradaPraca">
+                            <input type="file" id="fotoEntradaPraca" accept="image/*" capture="environment" class="hidden" onchange="previewFotoEntradaPraca(event)">
+                            <button type="button" 
+                                    onclick="document.getElementById('fotoEntradaPraca').click()"
+                                    class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined text-[18px]">photo_camera</span>
+                                <span>Anexar Foto de Entrada</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            Qtd. de Eletricistas na Equipe
+                        </label>
+                        <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-slate-50">
+                            <button type="button" onclick="alterarQtdEletricista(-1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">−</button>
+                            <input type="number" id="qtdEletricistaPraca" min="1" value="1" readonly class="w-full border-none bg-transparent text-center font-bold text-sm text-blue-600 focus:ring-0" />
+                            <button type="button" onclick="alterarQtdEletricista(1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PREVIEW DA FOTO DE ENTRADA DA PRAÇA -->
+                <div id="previewEntradaPracaContainer" class="hidden bg-white border border-slate-200 rounded-2xl p-4 text-center">
+                    <img id="imgPreviewEntradaPraca" class="max-h-48 mx-auto rounded-lg border border-slate-200 shadow-sm" />
+                    <button type="button" onclick="removerFotoEntradaPraca()" class="mt-2 text-xs font-semibold text-red-600 hover:text-red-700 flex items-center justify-center gap-1 mx-auto">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                        <span>Remover Foto</span>
+                    </button>
+                </div>
+
+                <!-- GPS E MAPA DE LOCALIZAÇÃO DO TÉCNICO NA PRAÇA -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-blue-600 text-[18px]">location_on</span>
+                            <span>2. Sinal de GPS do Dispositivo</span>
+                        </label>
+                        <span id="gpsBadgePraca" class="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
+                            📡 Buscando...
+                        </span>
+                    </div>
+
+                    <div id="mapaCanvasPraca" class="w-full h-44 rounded-xl border border-slate-200 relative overflow-hidden bg-slate-100"></div>
+                    <div id="coordsTextPraca" class="text-xs text-center font-medium text-slate-500">Obtendo coordenadas GPS...</div>
+                </div>
+
+                <!-- MATERIAIS PRAÇA -->
+                <div id="blocoMateriaisPraca" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 hidden">
+                    <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-emerald-600 text-[20px]">inventory_2</span>
+                        <span>Materiais Utilizados na Praça</span>
+                    </h2>
+
+                    <div class="flex flex-col sm:flex-row gap-3 items-end">
+                        <div class="flex-1 w-full relative custom-combobox">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Buscar Material</label>
+                            <input type="text" 
+                                   id="inputMaterialPraca" 
+                                   placeholder="Digite para buscar material..." 
+                                   autocomplete="off" 
+                                   oninput="filtrarMateriaisPraca()" 
+                                   onclick="mostrarTodosMateriaisPraca()"
+                                   class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-900 transition-all" />
+                            <div id="dropdownMateriaisPraca" class="dropdown-lista"></div>
+                        </div>
+
+                        <div class="w-full sm:w-32">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">Qtd</label>
+                            <input type="number" 
+                                   id="inputQtdPraca" 
+                                   min="0.1" 
+                                   step="0.1" 
+                                   value="1"
+                                   class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-bold text-slate-900 transition-all" />
+                        </div>
+
+                        <button type="button" 
+                                onclick="adicionarMaterialPraca()"
+                                class="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-semibold text-sm rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[18px]">add</span>
+                            <span>Adicionar</span>
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                        <table class="w-full text-left text-xs">
+                            <thead class="bg-slate-100 text-slate-600 font-semibold uppercase border-b border-slate-200">
+                                <tr>
+                                    <th class="py-3 px-4 w-24">Qtd</th>
+                                    <th class="py-3 px-4">Material</th>
+                                    <th class="py-3 px-4 w-20 text-center">Ação</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbodyMateriaisPraca" class="divide-y divide-slate-100 bg-white">
+                                <tr>
+                                    <td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium">Nenhum material adicionado ainda.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- BOTÕES DE AÇÃO DINÂMICOS PARA PRAÇA -->
+                <div class="flex flex-col sm:flex-row gap-3 pt-2">
+                    <button type="button" 
+                            id="btnSessaoPraca" 
+                            onclick="executarAcaoSessaoPraca()"
+                            class="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                        <span>▶️ Iniciar Sessão</span>
+                    </button>
+
+                    <button type="button" 
+                            id="btnConcluirPraca" 
+                            onclick="executarConcluirPraca()"
+                            class="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-md transition-all flex items-center justify-center gap-2">
+                        <span>✅ Concluir OS Praça</span>
+                    </button>
+                </div>
+                <div id="mensagemPraca" class="text-center font-semibold text-sm"></div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- MODAIS DE DIÁLOGO E ALERTA                                                -->
+    <!-- ========================================================================= -->
+
+    <!-- MODAL DE SUCESSO -->
+    <div id="modalSucesso" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100 animate-fade-in">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+                ✓
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">Ordem de Serviço Finalizada!</h3>
+            <p id="msgSucessoTexto" class="text-xs text-slate-600 leading-relaxed">Os dados foram gravados com sucesso no banco de dados.</p>
+            <button type="button" 
+                    onclick="fecharSucesso()"
+                    class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow-sm transition-all">
+                OK, Entendido
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL OS JÁ CONCLUÍDA -->
+    <div id="modalOSConcluida" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100">
+            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-3xl">
+                ⚠️
+            </div>
+            <h3 class="text-lg font-bold text-slate-900">OS Já Finalizada</h3>
+            <p id="msgAlertaOSConcluidaTexto" class="text-xs text-slate-600 leading-relaxed">Esta Ordem de Serviço já consta como concluída no sistema.</p>
+            <button type="button" 
+                    onclick="fecharModalOSConcluida()"
+                    class="w-full py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-xl shadow-sm transition-all">
+                Limpar Formulário
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL CONFIRMAR CONCLUSÃO PRAÇA -->
+    <div id="modalConcluirPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 border border-slate-100">
+            <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
+                <span class="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
+                <h3 class="text-base font-bold text-slate-900">Concluir Ordem de Serviço da Praça</h3>
+            </div>
+            <p class="text-xs text-slate-600 leading-relaxed">
+                Deseja confirmar a conclusão do atendimento para esta praça? Você pode informar observações adicionais abaixo:
+            </p>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Observações da Conclusão (Opcional):</label>
+                <textarea id="obsModalConcluirPraca" rows="3" placeholder="Escreva observações adicionais..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2.5 text-xs text-slate-900 focus:ring-2 focus:ring-emerald-600 focus:border-transparent outline-none resize-none"></textarea>
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button type="button" onclick="fecharModalConcluirPraca()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors">Cancelar</button>
+                <button type="button" onclick="confirmarConclusaoPracaNoModal()" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors">Confirmar Conclusão</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL ALERTA DE VALIDAÇÃO -->
+    <div id="modalAlertaValidacaoPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full text-center space-y-4 border border-slate-100">
+            <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl">
+                ⚠️
+            </div>
+            <h3 id="modalAlertaTitulo" class="text-base font-bold text-slate-900">Atenção!</h3>
+            <p id="modalAlertaTexto" class="text-xs text-slate-600 leading-relaxed whitespace-pre-line text-left bg-slate-50 p-3 rounded-lg border border-slate-200">Por favor, preencha os campos obrigatórios.</p>
+            <button type="button" onclick="fecharModalAlertaValidacao()" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-xl transition-all shadow-sm">
+                Entendido
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- SCRIPT DE LÓGICA E INTEGRAÇÃO SUPABASE                                    -->
+    <!-- ========================================================================= -->
+    <script>
+      // Telemetria Mapbox
+      if (window.mapboxgl) {
+        mapboxgl.accessToken = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbTdoZm01dDQwOHk0MmpzYnd5bWQ3YjZqIn0.fC4X5P74vP7f0qSgX-90rA';
+        if (mapboxgl.config) mapboxgl.config.SEND_EVENTS = false;
+      }
+
+      // Supabase Client Reference
+      function obterSupabaseClient() {
+        if (window.supabaseClient) return window.supabaseClient;
+        if (typeof supabase !== 'undefined') {
+          try {
+            window.supabaseClient = supabase.createClient('https://bqkfqedxlyipjftdhgse.supabase.co', 'sb_publishable_nyPJfTBioOI5QEdzjKzKLw_AHYWy60R');
+          } catch(e) {
+            console.warn('⚠️ Erro ao instanciar Supabase Client:', e);
+          }
+        }
+        return window.supabaseClient;
+      }
+
+      // Lista Dinâmica de Materiais
+      var opcoesMateriais = [];
+      try {
+        var cachedMat = localStorage.getItem('os_cached_materiais');
+        if (cachedMat) {
+          var parsedCache = JSON.parse(cachedMat);
+          if (Array.isArray(parsedCache) && parsedCache.length > 0 && typeof parsedCache[0] === 'string' && !parsedCache[0].startsWith('{')) {
+            opcoesMateriais = parsedCache;
+          }
+        }
+      } catch(e) {}
+
+      var carrinhoMateriais = [];
+      var qtdAtual = 0;
+      var pontosData = {};
+
+      // Praça Pública States
+      var dadosPracaAtual = null;
+      var fotoEntradaPracaBase64 = null;
+      var fotoEntradaPracaNome = "";
+      var carrinhoMateriaisPraca = [];
+      var mapPraca = null;
+      var markerPraca = null;
+      var coordsGpsPracaAtual = null;
+
+      // Inicialização da Página
+      document.addEventListener('DOMContentLoaded', async function() {
+        // Preenche data atual no campo de data do reparo
+        var hoje = new Date();
+        var dd = String(hoje.getDate()).padStart(2, '0');
+        var mm = String(hoje.getMonth() + 1).padStart(2, '0');
+        var yyyy = hoje.getFullYear();
+        document.getElementById('dataReparo').value = dd + '/' + mm + '/' + yyyy;
+
+        // Exibe botão fechar se estiver em iframe
+        if (window.self !== window.top) {
+          var btnClose = document.getElementById('btnFecharModalIframe');
+          if (btnClose) btnClose.classList.remove('hidden');
+        }
+
+        // Verifica autenticação de servidor via AuthGuard
+        if (window.AuthGuard) {
+          const auth = await window.AuthGuard.requireAuth();
+          if (auth && auth.user) {
+            const userLabel = document.getElementById('userEmailLabel');
+            if (userLabel) userLabel.innerText = auth.profile?.nome || auth.user.email || 'Servidor';
+          }
+        }
+
+        ajustarPontos();
+        configurarEventosCombobox();
+        carregarMateriaisDinamicos();
+
+        // Auto-carregar dados da OS se vier pelo sessionStorage ou parâmetros da URL
+        window.carregarOSParaFinalizar();
+      });
+
+      window.carregarOSParaFinalizar = function(recordInput) {
+        let osData = recordInput;
+
+        if (!osData) {
+          try {
+            const stored = sessionStorage.getItem('os_para_finalizar');
+            if (stored) {
+              osData = JSON.parse(stored);
+            }
+          } catch(e) {
+            console.warn('⚠️ Erro ao ler os_para_finalizar do sessionStorage:', e);
+          }
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const protUrl = urlParams.get('protocolo') || urlParams.get('prot');
+
+        let protocolo = (osData && osData.protocolo) ? osData.protocolo : (protUrl || '');
+        if (!protocolo && typeof osData === 'string') protocolo = osData;
+
+        if (!protocolo) return;
+
+        protocolo = String(protocolo).trim().toUpperCase();
+        const isPraca = protocolo.startsWith('PC') || (osData && osData.tipo === 'praca');
+
+        if (isPraca) {
+          alternarTipoOS('praca');
+          const inputPraca = document.getElementById('protocoloPraca');
+          if (inputPraca) {
+            inputPraca.value = protocolo;
+            validarProtocoloPraca();
+          }
+        } else {
+          alternarTipoOS('iluminacao');
+          const inputProtocolo = document.getElementById('protocolo');
+          if (inputProtocolo) {
+            inputProtocolo.value = protocolo;
+          }
+        }
+      };
+
+      function fecharJanelaIframe() {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ action: 'FECHAR_MODAL_FINALIZAR' }, '*');
+        }
+      }
+
+      function alternarTipoOS(tipo) {
+        var abaIlum = document.getElementById('abaIluminacao');
+        var abaPraca = document.getElementById('abaPraca');
+        var tabBtnIlum = document.getElementById('tabBtnIluminacao');
+        var tabBtnPraca = document.getElementById('tabBtnPraca');
+
+        if (tipo === 'iluminacao') {
+          abaIlum.classList.remove('hidden');
+          abaPraca.classList.add('hidden');
+
+          tabBtnIlum.className = "flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 bg-blue-600 text-white shadow-sm";
+          tabBtnPraca.className = "flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-100";
+        } else {
+          abaIlum.classList.add('hidden');
+          abaPraca.classList.remove('hidden');
+
+          tabBtnPraca.className = "flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 bg-emerald-600 text-white shadow-sm";
+          tabBtnIlum.className = "flex-1 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all duration-200 flex items-center justify-center gap-2 text-slate-600 hover:bg-slate-100";
+        }
+      }
+
+      function mascaraData(i) {
+        var v = i.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.substring(0, 8);
+        if (v.length >= 5) {
+          i.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4);
+        } else if (v.length >= 3) {
+          i.value = v.substring(0, 2) + '/' + v.substring(2);
+        } else {
+          i.value = v;
+        }
+      }
+
+      // =========================================================================
+      // GERADOR DINÂMICO DE CARDS DE PONTOS (ILUMINAÇÃO VIÁRIA)
+      // =========================================================================
+      function ajustarPontos() {
+        var novaQtd = parseInt(document.getElementById('quantidade').value);
+        if (isNaN(novaQtd) || novaQtd < 1) novaQtd = 1;
+        var container = document.getElementById('pontosContainer');
+
+        if (novaQtd > qtdAtual) {
+          for (var i = qtdAtual; i < novaQtd; i++) {
+            inicializarStatePonto(i);
+            container.insertAdjacentHTML('beforeend', gerarHTMLPonto(i));
+          }
+        } else if (novaQtd < qtdAtual) {
+          for (var j = qtdAtual - 1; j >= novaQtd; j--) {
+            var ptDiv = document.getElementById('ponto_' + j);
+            if (ptDiv) ptDiv.remove();
+            delete pontosData[j];
+          }
+        }
+        qtdAtual = novaQtd;
+      }
+
+      function inicializarStatePonto(idx) {
+        pontosData[idx] = {
+          usarMesmoEndereco: false,
+          fotosEstagios: { 'Problema Encontrado': null, 'Reparo Efetuado': null, 'Plaqueta': null },
+          textoAuditoriaOCR: "Nenhuma leitura realizada"
+        };
+      }
+
+      function gerarHTMLPonto(idx) {
+        var num = idx + 1;
+        var html = '<div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4" id="ponto_' + idx + '">';
+        html += '  <div class="flex items-center justify-between border-b border-slate-100 pb-3">';
+        html += '    <h3 class="text-sm font-bold text-blue-600 flex items-center gap-1.5">';
+        html += '      <span class="material-symbols-outlined text-[18px]">location_on</span> Ponto #' + num;
+        html += '    </h3>';
+        if (idx > 0) {
+          html += '  <label class="flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">';
+          html += '    <input type="checkbox" onchange="copiarPontoUm(' + idx + ', this.checked)" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500"> Usar dados do Ponto 1';
+          html += '  </label>';
+        }
+        html += '  </div>';
+
+        html += '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
+        html += '    <div>';
+        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Nº Plaqueta do Poste <span class="text-red-500 font-bold">*</span></label>';
+        html += '      <input type="text" id="plaqueta_' + idx + '" placeholder="Ex: U8162" maxlength="5" oninput="mascaraPlaqueta(this)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:ring-2 focus:ring-blue-600 outline-none" />';
+        html += '    </div>';
+
+        html += '    <div>';
+        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Tipo de Problema Encontrado</label>';
+        html += '      <select id="tipoProblema_' + idx + '" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none">';
+        html += '        <option value="Lâmpada queimada">Lâmpada queimada</option>';
+        html += '        <option value="Intermitente">Lâmpada acendendo e apagando (Intermitente)</option>';
+        html += '        <option value="Acesa ao dia">Lâmpada acesa durante o dia</option>';
+        html += '        <option value="Braço caído/quebrado">Braço caído ou quebrado</option>';
+        html += '        <option value="Problema na rede (Acionar CPFL)">Problema na rede (Acionar CPFL)</option>';
+        html += '        <option value="Necessário poda de árvore (Acionar CPFL)">Necessário poda de árvore (Acionar CPFL)</option>';
+        html += '        <option value="Outros">Outros problemas</option>';
+        html += '      </select>';
+        html += '    </div>';
+        html += '  </div>';
+
+        // COORDENADAS GPS E BOTÃO DE CAPTURA DO PONTO
+        html += '  <div class="space-y-1.5 border-t border-slate-100 pt-3">';
+        html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) <span class="text-red-500 font-bold">*</span></label>';
+        html += '    <div class="flex flex-col sm:flex-row gap-2 items-center">';
+        html += '      <input type="text" id="lat_' + idx + '" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
+        html += '      <input type="text" id="lng_' + idx + '" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
+        html += '      <button type="button" onclick="capturarLocalizacaoGPS(' + idx + ')" class="w-full sm:w-auto px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-all flex items-center justify-center gap-1 shadow-sm">';
+        html += '        <span class="material-symbols-outlined text-[16px]">my_location</span>';
+        html += '        <span>Puxar GPS</span>';
+        html += '      </button>';
+        html += '    </div>';
+        html += '    <div id="mapaCanvasPonto_' + idx + '" class="w-full h-36 rounded-xl border border-slate-200 mt-2 hidden relative overflow-hidden bg-slate-100"></div>';
+        html += '  </div>';
+
+        // UPLOAD DE FOTOS E EVIDÊNCIAS
+        html += '  <div class="border-t border-slate-100 pt-3">';
+        html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Fotos de Evidência e Auditoria <span class="text-red-500 font-bold">* (Obrigatório anexar as 3 fotos)</span></label>';
+        html += '    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">';
+
+        var estagios = ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'];
+        estagios.forEach(function(estagio) {
+          var idFile = 'foto_' + idx + '_' + estagio.replace(/ /g, '_');
+          var idPreview = 'previewContainer_' + idx + '_' + estagio.replace(/ /g, '_');
+          var idImg = 'img_' + idx + '_' + estagio.replace(/ /g, '_');
+          var idBox = 'boxFoto_' + idx + '_' + estagio.replace(/ /g, '_');
+
+          html += '      <div id="' + idBox + '" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center space-y-2 transition-all">';
+          html += '        <span class="text-xs font-bold text-slate-700 block">' + estagio + ' <span class="text-red-500">*</span></span>';
+          html += '        <div id="' + idPreview + '" class="hidden relative inline-block">';
+          html += '          <img id="' + idImg + '" class="h-24 w-auto rounded-lg border border-slate-300 mx-auto object-cover" />';
+          html += '          <button type="button" onclick="removerFotoEstagio(' + idx + ', \'' + estagio + '\')" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-md">✕</button>';
+          html += '        </div>';
+          html += '        <input type="file" id="' + idFile + '" accept="image/*" capture="environment" class="hidden" onchange="processarFotoEstagio(' + idx + ', \'' + estagio + '\', event)" />';
+          html += '        <button type="button" onclick="document.getElementById(\'' + idFile + '\').click()" class="w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center justify-center gap-1">';
+          html += '          <span class="material-symbols-outlined text-[16px]">photo_camera</span> Anexar Foto';
+          html += '        </button>';
+          html += '      </div>';
+        });
+
+        html += '    </div>';
+        html += '  </div>';
+
+        html += '</div>';
+        return html;
+      }
+
+      function mascaraPlaqueta(i) {
+        if (!i) return;
+        i.value = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 5);
+      }
+
+      function mascaraCoord(i) {
+        i.value = i.value.replace(/[^0-9.-]/g, '');
+        var parts = i.value.split('.');
+        if (parts.length > 2) i.value = parts[0] + '.' + parts.slice(1).join('');
+        if (i.value.indexOf('-') > 0) i.value = i.value.replace('-', '');
+      }
+
+      var mapsPontos = {};
+      var markersPontos = {};
+
+      function atualizarMapaPonto(idx) {
+        var latInput = document.getElementById('lat_' + idx);
+        var lngInput = document.getElementById('lng_' + idx);
+        if (!latInput || !lngInput) return;
+
+        var latVal = parseFloat(latInput.value.replace(',', '.'));
+        var lngVal = parseFloat(lngInput.value.replace(',', '.'));
+        var container = document.getElementById('mapaCanvasPonto_' + idx);
+        if (!container) return;
+
+        if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0 && Math.abs(latVal) <= 90 && Math.abs(lngVal) <= 180) {
+          container.classList.remove('hidden');
+          if (typeof L !== 'undefined') {
+            if (!mapsPontos[idx]) {
+              mapsPontos[idx] = L.map('mapaCanvasPonto_' + idx).setView([latVal, lngVal], 17);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+              }).addTo(mapsPontos[idx]);
+              markersPontos[idx] = L.marker([latVal, lngVal]).addTo(mapsPontos[idx]);
+            } else {
+              mapsPontos[idx].setView([latVal, lngVal], 17);
+              markersPontos[idx].setLatLng([latVal, lngVal]);
+            }
+            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 100);
+            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 400);
+          }
+        } else {
+          container.classList.add('hidden');
+        }
+      }
+
+      function capturarLocalizacaoGPS(idx) {
+        var latInput = document.getElementById('lat_' + idx);
+        var lngInput = document.getElementById('lng_' + idx);
+        var msg = document.getElementById('mensagem');
+        if (msg) msg.innerHTML = "";
+
+        if (!navigator.geolocation) {
+          if (msg) msg.innerHTML = '<span class="text-red-600 font-bold">GPS indisponível neste dispositivo.</span>';
+          return;
+        }
+
+        if (latInput) latInput.value = "Buscando...";
+        if (lngInput) lngInput.value = "Buscando...";
+
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            var lat = pos.coords.latitude.toFixed(6);
+            var lng = pos.coords.longitude.toFixed(6);
+
+            if (latInput) latInput.value = lat;
+            if (lngInput) lngInput.value = lng;
+            atualizarMapaPonto(idx);
+          }, 
+          function(err) {
+            if (latInput) latInput.value = "";
+            if (lngInput) lngInput.value = "";
+            if (msg) msg.innerHTML = '<span class="text-red-600 font-bold">Falha ao buscar GPS do Ponto ' + (idx + 1) + '. Certifique-se de que a localização está habilitada no celular.</span>';
+          }, 
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+        );
+      }
+
+      function copiarPontoUm(targetIdx, checado) {
+        if (!checado) return;
+        var plaq1 = document.getElementById('plaqueta_0') ? document.getElementById('plaqueta_0').value : '';
+        var prob1 = document.getElementById('tipoProblema_0') ? document.getElementById('tipoProblema_0').value : '';
+        var lat1 = document.getElementById('lat_0') ? document.getElementById('lat_0').value : '';
+        var lng1 = document.getElementById('lng_0') ? document.getElementById('lng_0').value : '';
+
+        if (document.getElementById('plaqueta_' + targetIdx)) document.getElementById('plaqueta_' + targetIdx).value = plaq1;
+        if (document.getElementById('tipoProblema_' + targetIdx)) document.getElementById('tipoProblema_' + targetIdx).value = prob1;
+        if (document.getElementById('lat_' + targetIdx)) document.getElementById('lat_' + targetIdx).value = lat1;
+        if (document.getElementById('lng_' + targetIdx)) document.getElementById('lng_' + targetIdx).value = lng1;
+
+        atualizarMapaPonto(targetIdx);
+      }
+
+      function processarFotoEstagio(pontoIdx, estagio, event) {
+        var file = event.target.files[0];
+        if (!file) return;
+
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          var base64 = e.target.result;
+          if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
+          pontosData[pontoIdx].fotosEstagios[estagio] = base64;
+
+          var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+          var idImg = 'img_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+          var idBox = 'boxFoto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+
+          var containerEl = document.getElementById(idPreview);
+          var imgEl = document.getElementById(idImg);
+          var boxEl = document.getElementById(idBox);
+
+          if (containerEl && imgEl) {
+            imgEl.src = base64;
+            containerEl.classList.remove('hidden');
+          }
+          if (boxEl) {
+            boxEl.classList.remove('border-slate-200', 'bg-slate-50');
+            boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function removerFotoEstagio(pontoIdx, estagio) {
+        if (pontosData[pontoIdx]) {
+          pontosData[pontoIdx].fotosEstagios[estagio] = null;
+        }
+        var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idFile = 'foto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idBox = 'boxFoto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+
+        var containerEl = document.getElementById(idPreview);
+        var fileEl = document.getElementById(idFile);
+        var boxEl = document.getElementById(idBox);
+
+        if (containerEl) containerEl.classList.add('hidden');
+        if (fileEl) fileEl.value = '';
+        if (boxEl) {
+          boxEl.classList.remove('border-emerald-400', 'bg-emerald-50/50');
+          boxEl.classList.add('border-slate-200', 'bg-slate-50');
+        }
+      }
+
+      // =========================================================================
+      // GERENCIAMENTO DE MATERIAIS (SUPABASE: materiais_contrato)
+      // =========================================================================
+      var materiaisPadraoFallback = [
+        "INTRAL - LÂMPADA LED 50W (UN)",
+        "INTRAL - LÂMPADA LED 100W (UN)",
+        "INTRAL - LÂMPADA LED 150W (UN)",
+        "PHILIPS - LÂMPADA VAPOR DE SÓDIO 70W (UN)",
+        "PHILIPS - LÂMPADA VAPOR DE SÓDIO 150W (UN)",
+        "PHILIPS - LÂMPADA VAPOR DE SÓDIO 250W (UN)",
+        "SYLVANIA - LÂMPADA VAPOR METÁLICO 150W (UN)",
+        "EXATRON - RELÊ FOTOELÉTRICO (UN)",
+        "EXATRON - BASE PARA RELÊ (UN)",
+        "MAGNETRON - REATOR VAPOR SÓDIO 70W (UN)",
+        "MAGNETRON - REATOR VAPOR SÓDIO 150W (UN)",
+        "COOPER - BRAÇO DE ILUMINAÇÃO 1.5M (UN)",
+        "SIL - CABO FLEXÍVEL 2.5MM (M)",
+        "SIL - CABO FLEXÍVEL 4.0MM (M)",
+        "3M - CONECTOR PERFURANTE (UN)",
+        "3M - FITA ISOLANTE (UN)"
+      ];
+
+      async function carregarMateriaisDinamicos() {
+        console.log("🔍 [MATERIAIS CONTRATO] Solicitando lista da tabela 'materiais_contrato' no Supabase...");
+        try {
+          var client = obterSupabaseClient();
+          if (!client) {
+            console.warn("⚠️ [MATERIAIS CONTRATO] Supabase client indisponível.");
+            usarFallbackMateriais();
+            return;
+          }
+
+          let { data, error } = await client.from('materiais_contrato').select('*');
+          console.log("📋 [MATERIAIS CONTRATO] Resposta do Supabase:", { data, error });
+
+          if (error) {
+            console.error("❌ [MATERIAIS CONTRATO] Erro Supabase ao buscar materiais:", error.message || error, error);
+            usarFallbackMateriais();
+            return;
+          }
+
+          if (data && Array.isArray(data) && data.length > 0) {
+            console.log("✅ [MATERIAIS CONTRATO] Registros encontrados no Supabase:", data.length, "Exemplo 1º item:", data[0]);
+
+            opcoesMateriais = data.map(function(row) {
+              if (typeof row === 'string') return row;
+              
+              var marca = row["Marca"] || row.marca || row.fabricante || row["Fabricante"] || "";
+              var desc = row["Material/Serviço"] || row["Material"] || row["Serviço"] || row.descricao || row.nome || row.material || row.item || row.descricao_material || row.nome_material || row.valor || row.codigo || "";
+              var unidade = row["Unidade de Medida"] || row["Unidade"] || row.unidade || row.und || row.medida || "";
+
+              marca = (marca || "").trim();
+              desc = (desc || "").trim();
+              unidade = (unidade || "").trim();
+
+              var valFinal = "";
+              if (marca && desc && !desc.toLowerCase().startsWith(marca.toLowerCase())) {
+                valFinal = marca + " - " + desc;
+              } else {
+                valFinal = desc || JSON.stringify(row);
+              }
+
+              if (unidade && !valFinal.includes('(')) {
+                valFinal += " (" + unidade + ")";
+              }
+
+              return valFinal.trim();
+            }).filter(Boolean).sort();
+
+            console.log("🎉 [MATERIAIS CONTRATO] Lista final processada (" + opcoesMateriais.length + " itens):", opcoesMateriais);
+            localStorage.setItem('os_cached_materiais', JSON.stringify(opcoesMateriais));
+          } else {
+            console.warn("⚠️ [MATERIAIS CONTRATO] Tabela retornou array vazio ([]). Isso ocorre quando a tabela não possui linhas inseridas ou a política de RLS (Row Level Security) impede a leitura.");
+            usarFallbackMateriais();
+          }
+        } catch (err) {
+          console.error("💥 [MATERIAIS CONTRATO] Exceção ao carregar materiais:", err);
+          usarFallbackMateriais();
+        }
+      }
+
+      function usarFallbackMateriais() {
+        var cache = localStorage.getItem('os_cached_materiais');
+        if (cache) {
+          try {
+            var parsed = JSON.parse(cache);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              opcoesMateriais = parsed;
+              return;
+            }
+          } catch(e) {}
+        }
+        opcoesMateriais = materiaisPadraoFallback;
+      }
+
+      function formatarMaterialHTML(item) {
+        if (!item) return "";
+        var valStr = (typeof item === 'object') ? (item.valor || item.nome || item.material || "") : String(item);
+        
+        if (typeof item === 'object' && item.html) {
+          return item.html;
+        }
+
+        var html = valStr;
+        var matchUnidade = valStr.match(/\s*\(([^)]+)\)$/);
+        var unidadeHTML = "";
+        var baseStr = valStr;
+        if (matchUnidade) {
+          unidadeHTML = " <b style='font-weight: 700; color: #2563eb;'>(" + matchUnidade[1] + ")</b>";
+          baseStr = valStr.replace(/\s*\(([^)]+)\)$/, '');
+        }
+
+        var partes = baseStr.split(" - ");
+        if (partes.length >= 2) {
+          var marca = partes[0].trim();
+          var material = partes.slice(1).join(" - ").trim();
+          html = "<b style='font-weight: 700; color: #0f172a;'>" + marca + "</b> - " + material + unidadeHTML;
+        } else {
+          html = baseStr + unidadeHTML;
+        }
+
+        return html;
+      }
+
+      function configurarEventosCombobox() {
+        document.addEventListener('click', function(e) {
+          var combo1 = document.getElementById('inputMaterial')?.closest('.custom-combobox');
+          var drop1 = document.getElementById('dropdownMateriais');
+          if (combo1 && drop1 && !combo1.contains(e.target)) {
+            drop1.style.display = 'none';
+          }
+
+          var combo2 = document.getElementById('inputMaterialPraca')?.closest('.custom-combobox');
+          var drop2 = document.getElementById('dropdownMateriaisPraca');
+          if (combo2 && drop2 && !combo2.contains(e.target)) {
+            drop2.style.display = 'none';
+          }
+        });
+      }
+
+      function mostrarTodosMateriais() { renderListaMateriais(opcoesMateriais, 'dropdownMateriais', 'inputMaterial'); }
+      function filtrarMateriais() {
+        var val = document.getElementById('inputMaterial').value.toLowerCase().trim();
+        var list = opcoesMateriais.filter(function(i) {
+          var texto = (typeof i === 'object') ? (i.valor || i.nome || i.material || '') : String(i);
+          return texto.toLowerCase().includes(val);
+        });
+        renderListaMateriais(list, 'dropdownMateriais', 'inputMaterial');
+      }
+
+      function mostrarTodosMateriaisPraca() { renderListaMateriais(opcoesMateriais, 'dropdownMateriaisPraca', 'inputMaterialPraca'); }
+      function filtrarMateriaisPraca() {
+        var val = document.getElementById('inputMaterialPraca').value.toLowerCase().trim();
+        var list = opcoesMateriais.filter(function(i) {
+          var texto = (typeof i === 'object') ? (i.valor || i.nome || i.material || '') : String(i);
+          return texto.toLowerCase().includes(val);
+        });
+        renderListaMateriais(list, 'dropdownMateriaisPraca', 'inputMaterialPraca');
+      }
+
+      function renderListaMateriais(lista, dropdownId, inputId) {
+        var drop = document.getElementById(dropdownId);
+        if (!drop) return;
+        drop.innerHTML = '';
+        if (!lista || lista.length === 0) { drop.style.display = 'none'; return; }
+
+        lista.forEach(function(item) {
+          var d = document.createElement('div');
+          d.className = 'dropdown-item';
+          var valStr = (typeof item === 'object') ? (item.valor || item.nome || item.material || '') : String(item);
+          d.innerHTML = formatarMaterialHTML(item);
+          d.onclick = function(e) {
+            e.stopPropagation();
+            document.getElementById(inputId).value = valStr;
+            drop.style.display = 'none';
+          };
+          drop.appendChild(d);
+        });
+        drop.style.display = 'block';
+      }
+
+      function adicionarMaterial() {
+        var inputMat = document.getElementById('inputMaterial');
+        var inputQtd = document.getElementById('inputQtd');
+        var nome = inputMat.value.trim();
+        var qtd = parseFloat(inputQtd.value);
+
+        if (!nome || isNaN(qtd) || qtd <= 0) {
+          alert('Por favor, informe um material e quantidade válida.');
+          return;
+        }
+
+        carrinhoMateriais.push({ nome: nome, qtd: qtd });
+        inputMat.value = '';
+        inputQtd.value = '1';
+        renderizarTabelaMateriais();
+      }
+
+      function removerMaterial(idx) {
+        carrinhoMateriais.splice(idx, 1);
+        renderizarTabelaMateriais();
+      }
+
+      function renderizarTabelaMateriais() {
+        var tbody = document.getElementById('tbodyMateriais');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (carrinhoMateriais.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium">Nenhum material adicionado ainda.</td></tr>';
+          return;
+        }
+
+        carrinhoMateriais.forEach(function(m, idx) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td class="py-2.5 px-4 font-bold text-blue-600">' + m.qtd + '</td>' +
+                         '<td class="py-2.5 px-4 font-medium text-slate-800">' + m.nome + '</td>' +
+                         '<td class="py-2.5 px-4 text-center"><button type="button" onclick="removerMaterial(' + idx + ')" class="text-red-600 hover:text-red-700 font-bold p-1 rounded">✕</button></td>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      function adicionarMaterialPraca() {
+        var inputMat = document.getElementById('inputMaterialPraca');
+        var inputQtd = document.getElementById('inputQtdPraca');
+        var nome = inputMat.value.trim();
+        var qtd = parseFloat(inputQtd.value);
+
+        if (!nome || isNaN(qtd) || qtd <= 0) {
+          alert('Por favor, informe um material e quantidade válida.');
+          return;
+        }
+
+        carrinhoMateriaisPraca.push({ nome: nome, qtd: qtd });
+        inputMat.value = '';
+        inputQtd.value = '1';
+        renderizarTabelaMateriaisPraca();
+      }
+
+      function removerMaterialPraca(idx) {
+        carrinhoMateriaisPraca.splice(idx, 1);
+        renderizarTabelaMateriaisPraca();
+      }
+
+      function renderizarTabelaMateriaisPraca() {
+        var tbody = document.getElementById('tbodyMateriaisPraca');
+        if (!tbody) return;
+        tbody.innerHTML = '';
+
+        if (carrinhoMateriaisPraca.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium">Nenhum material adicionado ainda.</td></tr>';
+          return;
+        }
+
+        carrinhoMateriaisPraca.forEach(function(m, idx) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td class="py-2.5 px-4 font-bold text-emerald-600">' + m.qtd + '</td>' +
+                         '<td class="py-2.5 px-4 font-medium text-slate-800">' + m.nome + '</td>' +
+                         '<td class="py-2.5 px-4 text-center"><button type="button" onclick="removerMaterialPraca(' + idx + ')" class="text-red-600 hover:text-red-700 font-bold p-1 rounded">✕</button></td>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      // =========================================================================
+      // ENVIO E FINALIZAÇÃO DE OS VIÁRIA NO SUPABASE
+      // =========================================================================
+      async function validarEEnviar() {
+        var protInput = document.getElementById('protocolo');
+        var prot = protInput ? protInput.value.trim().toUpperCase() : '';
+        var dataReparo = document.getElementById('dataReparo').value.trim();
+        var btn = document.getElementById('btnSalvar');
+        var btnTexto = document.getElementById('btnSalvarTexto');
+        var msg = document.getElementById('mensagem');
+
+        if (!prot) {
+          msg.innerHTML = '<span class="text-red-600 font-bold">Por favor, informe o protocolo da Ordem de Serviço.</span>';
+          protInput.focus();
+          return;
+        }
+
+        // Validação obrigatória por ponto: Plaqueta (texto), Coordenadas GPS e 3 fotos de evidência
+        var estagiosObrigatorios = ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'];
+        var pontosComPendencia = [];
+
+        for (var i = 0; i < qtdAtual; i++) {
+          var stObj = pontosData[i] || {};
+          var fotos = stObj.fotosEstagios || {};
+          var faltantesPonto = [];
+
+          // 1. Validação da Plaqueta (texto)
+          var plaqInput = document.getElementById('plaqueta_' + i);
+          var plaqVal = plaqInput ? plaqInput.value.trim() : '';
+          if (!plaqVal) {
+            faltantesPonto.push('Nº da Plaqueta');
+          }
+
+          // 2. Validação das Coordenadas GPS (Lat / Lng)
+          var latInput = document.getElementById('lat_' + i);
+          var lngInput = document.getElementById('lng_' + i);
+          var latVal = latInput ? latInput.value.trim() : '';
+          var lngVal = lngInput ? lngInput.value.trim() : '';
+
+          var latNum = parseFloat(latVal.replace(',', '.'));
+          var lngNum = parseFloat(lngVal.replace(',', '.'));
+
+          if (!latVal || !lngVal || latVal === 'Buscando...' || lngVal === 'Buscando...' || isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
+            faltantesPonto.push('Coordenadas GPS');
+          }
+
+          // 3. Validação das 3 Fotos
+          estagiosObrigatorios.forEach(function(estagio) {
+            if (!fotos[estagio]) {
+              faltantesPonto.push('Foto (' + estagio + ')');
+            }
+          });
+
+          if (faltantesPonto.length > 0) {
+            pontosComPendencia.push({
+              ponto: i + 1,
+              faltantes: faltantesPonto
+            });
+          }
+        }
+
+        if (pontosComPendencia.length > 0) {
+          var detalheErros = pontosComPendencia.map(function(item) {
+            return '• Ponto #' + item.ponto + ': falta ' + item.faltantes.join(', ');
+          }).join('\n');
+
+          var mensagemErro = 'Para finalizar a Ordem de Serviço, é obrigatório preencher a Plaqueta, as Coordenadas GPS e anexar as 3 fotos de evidência para cada ponto:\n\n' + detalheErros;
+
+          exibirModalAlertaValidacao("Campos Obrigatórios Pendentes", mensagemErro);
+          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ É obrigatório preencher Plaqueta, Coordenadas GPS e anexar as 3 fotos para cada ponto.</span>';
+          return;
+        }
+
+        var client = obterSupabaseClient();
+        if (!client) {
+          msg.innerHTML = '<span class="text-red-600 font-bold">Erro: Supabase Client não está disponível.</span>';
+          return;
+        }
+
+        btn.disabled = true;
+        btnTexto.innerText = "Auditando e salvando no Supabase...";
+        msg.innerHTML = "";
+
+        try {
+          let rows = [];
+          let searchErr = null;
+          
+          if (!navigator.onLine) {
+            var cached = window.offlineSyncService ? await window.offlineSyncService.getCachedOSRecord(prot) : null;
+            if (cached) {
+              rows = [cached];
+            } else {
+              rows = [{ protocolo: prot, status: "Aberta" }];
+            }
+          } else {
+            let resOS = await client
+              .from('ordens_servico')
+              .select('*')
+              .eq('protocolo', prot);
+
+            searchErr = resOS.error;
+            let resRows = resOS.data;
+
+            if (!resRows || resRows.length === 0) {
+              let resLeg = await client.from('chamados').select('*').eq('protocolo', prot);
+              rows = resLeg.data || [];
+              if ((!rows || rows.length === 0) && resLeg.error) {
+                searchErr = resLeg.error;
+              }
+            } else {
+              rows = resRows;
+            }
+          }
+
+          if (searchErr && (!rows || rows.length === 0)) {
+            btn.disabled = false;
+            btnTexto.innerText = "Finalizar Ordem de Serviço";
+            msg.innerHTML = '<span class="text-red-600 font-bold">Erro ao pesquisar protocolo no banco de dados.</span>';
+            return;
+          }
+
+          if (!rows || rows.length === 0) {
+            btn.disabled = false;
+            btnTexto.innerText = "Finalizar Ordem de Serviço";
+            msg.innerHTML = '<span class="text-red-600 font-bold">Protocolo "' + prot + '" não foi localizado no sistema.</span>';
+            return;
+          }
+
+          var osAtual = rows[0];
+          var stLower = (osAtual.status || '').toLowerCase();
+          if (stLower.includes('resolv') || stLower.includes('conclu')) {
+            btn.disabled = false;
+            btnTexto.innerText = "Finalizar Ordem de Serviço";
+            document.getElementById('msgAlertaOSConcluidaTexto').innerText = "O protocolo " + prot + " já consta como finalizado no sistema.";
+            document.getElementById('modalOSConcluida').classList.remove('hidden');
+            return;
+          }
+
+          // Build pontos payload with Cloudinary upload for evidences
+          var arrPontosPayload = [];
+          for (var i = 0; i < qtdAtual; i++) {
+            var plaq = document.getElementById('plaqueta_' + i) ? document.getElementById('plaqueta_' + i).value.toUpperCase().trim() : '';
+            var prob = document.getElementById('tipoProblema_' + i) ? document.getElementById('tipoProblema_' + i).value : '';
+            var latVal = document.getElementById('lat_' + i) ? document.getElementById('lat_' + i).value.trim() : '';
+            var lngVal = document.getElementById('lng_' + i) ? document.getElementById('lng_' + i).value.trim() : '';
+            var coordStr = (latVal && lngVal && latVal !== 'Buscando...') ? (latVal + ', ' + lngVal) : null;
+            var stObj = pontosData[i] || {};
+            var evidenciasUrls = {};
+
+            if (stObj.fotosEstagios) {
+              for (var estagio in stObj.fotosEstagios) {
+                var rawFoto = stObj.fotosEstagios[estagio];
+                if (rawFoto) {
+                  if (rawFoto.startsWith('http://') || rawFoto.startsWith('https://')) {
+                    evidenciasUrls[estagio] = rawFoto;
+                  } else if (window.cloudinaryService) {
+                    btnTexto.innerText = `☁️ Enviando foto Ponto #${i + 1} (${estagio})...`;
+                    try {
+                      var nomeFoto = window.cloudinaryService.gerarNomePadraoFoto(prot, plaq, estagio);
+                      var cdnUrl = await window.cloudinaryService.uploadImage(rawFoto, 'viaria_fotos', nomeFoto);
+                      evidenciasUrls[estagio] = cdnUrl;
+                    } catch (uploadErr) {
+                      console.warn(`⚠️ Erro ao enviar foto do Ponto ${i + 1} para Cloudinary:`, uploadErr);
+                      evidenciasUrls[estagio] = rawFoto;
+                    }
+                  } else {
+                    evidenciasUrls[estagio] = rawFoto;
+                  }
+                }
+              }
+            }
+
+            arrPontosPayload.push({
+              ponto: i + 1,
+              plaqueta: plaq,
+              problema: prob,
+              lat: latVal,
+              lng: lngVal,
+              coordenada: coordStr,
+              data_reparo: dataReparo,
+              evidencias: evidenciasUrls
+            });
+          }
+
+          var firstPoint = arrPontosPayload[0] || {};
+
+          var payloadUpdate = {
+            status: "Concluída",
+            data_fechamento: new Date().toISOString(),
+            materiais: carrinhoMateriais,
+            descricao: document.getElementById('descricao').value.trim() || null,
+            pontos: arrPontosPayload,
+            status_auditoria: "Pendente"
+          };
+
+          if (firstPoint.plaqueta) {
+            payloadUpdate.plaqueta_final = firstPoint.plaqueta;
+          }
+          if (firstPoint.coordenada || (firstPoint.lat && firstPoint.lng)) {
+            payloadUpdate.coordenada_reparo = firstPoint.coordenada || (firstPoint.lat + ', ' + firstPoint.lng);
+          }
+
+          // Se estiver OFFLINE, salva o envio na fila local para sincronização posterior
+          if (!navigator.onLine) {
+            if (window.offlineSyncService) {
+              await window.offlineSyncService.savePendingSubmission('viaria', prot, payloadUpdate);
+            }
+            btn.disabled = false;
+            btnTexto.innerText = "Finalizar Ordem de Serviço";
+            document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: O protocolo <strong class='text-amber-600 font-bold'>" + prot + "</strong> (" + qtdAtual + " ponto/s) foi <strong class='text-amber-600 font-bold'>SALVO LOCALMENTE</strong>!<br><br>Ele será enviado e auditado no servidor automaticamente assim que sua conexão retornar.";
+            document.getElementById('modalSucesso').classList.remove('hidden');
+            limparFormularioTotal();
+            return;
+          }
+
+          // Executa atualização online no Supabase
+          let updateRes = await client.from('ordens_servico').update(payloadUpdate).eq('protocolo', prot);
+          if (updateRes.error) {
+            // Tenta fallback em chamados
+            await client.from('chamados').update(payloadUpdate).eq('protocolo', prot);
+          }
+
+          if (window.offlineSyncService) {
+            window.offlineSyncService.cacheOSRecord(prot, osAtual);
+          }
+
+          btn.disabled = false;
+          btnTexto.innerText = "Finalizar Ordem de Serviço";
+
+          document.getElementById('msgSucessoTexto').innerHTML = "O protocolo <strong class='text-blue-600 font-bold'>" + prot + "</strong> (" + qtdAtual + " ponto/s) foi finalizado e enviado para auditoria com sucesso!";
+          document.getElementById('modalSucesso').classList.remove('hidden');
+
+          limparFormularioTotal();
+
+        } catch(err) {
+          btn.disabled = false;
+          btnTexto.innerText = "Finalizar Ordem de Serviço";
+
+          // Fallback de contingência caso a rede caia durante o envio
+          if (window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))) {
+            try {
+              var fallbackPayload = {
+                status: "Concluída",
+                data_fechamento: new Date().toISOString(),
+                materiais: carrinhoMateriais,
+                descricao: document.getElementById('descricao').value.trim() || null,
+                pontos: arrPontosPayload || [],
+                status_auditoria: "Pendente"
+              };
+              await window.offlineSyncService.savePendingSubmission('viaria', prot, fallbackPayload);
+              document.getElementById('msgSucessoTexto').innerHTML = "📱 Sinal instável. O protocolo <strong class='text-amber-600 font-bold'>" + prot + "</strong> foi <strong class='text-amber-600 font-bold'>salvo no dispositivo</strong> e será sincronizado assim que a conexão retornar!";
+              document.getElementById('modalSucesso').classList.remove('hidden');
+              limparFormularioTotal();
+              return;
+            } catch(e) {}
+          }
+
+          msg.innerHTML = '<span class="text-red-600 font-bold">Falha ao salvar no servidor: ' + err.message + '</span>';
+          console.error(err);
+        }
+      }
+
+      function limparFormularioTotal() {
+        document.getElementById('protocolo').value = '';
+        document.getElementById('descricao').value = '';
+        document.getElementById('quantidade').value = 1;
+        carrinhoMateriais = [];
+        renderizarTabelaMateriais();
+
+        qtdAtual = 0;
+        pontosData = {};
+        document.getElementById('pontosContainer').innerHTML = '';
+        ajustarPontos();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function fecharSucesso() {
+        document.getElementById('modalSucesso').classList.add('hidden');
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ action: 'OS_CONCLUIDA_SUCESSO' }, '*');
+        }
+      }
+      function fecharModalOSConcluida() {
+        document.getElementById('modalOSConcluida').classList.add('hidden');
+        limparFormularioTotal();
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({ action: 'FECHAR_MODAL_FINALIZAR' }, '*');
+        }
+      }
+
+      // =========================================================================
+      // PRAÇA PÚBLICA LOGIC & SUPABASE INTEGRATION
+      // =========================================================================
+      async function validarProtocoloPraca() {
+        var input = document.getElementById('protocoloPraca');
+        var prot = input.value.trim().toUpperCase();
+        var msg = document.getElementById('msgValidaPraca');
+        var btn = document.getElementById('btnValidarPraca');
+
+        if (!prot) {
+          msg.innerHTML = '<span class="text-red-600 font-bold">Digite o protocolo da praça.</span>';
+          return;
+        }
+
+        var client = obterSupabaseClient();
+        if (!client) {
+          msg.innerHTML = '<span class="text-red-600 font-bold">Erro: Supabase Client não disponível.</span>';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = "Buscando...";
+        msg.innerHTML = "";
+
+        if (!navigator.onLine) {
+          btn.disabled = false;
+          btn.innerText = "Validar Protocolo";
+          var cachedPraca = window.offlineSyncService ? await window.offlineSyncService.getCachedOSRecord(prot) : null;
+          if (cachedPraca) {
+            dadosPracaAtual = cachedPraca;
+          } else {
+            dadosPracaAtual = {
+              protocolo: prot,
+              praca_nome: "Praça Pública (Modo Offline)",
+              endereco: "Dados salvos em modo offline",
+              status: "Aberta"
+            };
+          }
+          document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
+          document.getElementById('infoPracaEndereco').innerText = "📍 " + (dadosPracaAtual.endereco || "Modo Offline");
+          document.getElementById('badgeStatusPraca').innerText = dadosPracaAtual.status || "Aberta";
+          document.getElementById('boxInfoPraca').classList.remove('hidden');
+          document.getElementById('corpoFormPraca').classList.remove('hidden');
+          iniciarGpsPracaComMapa();
+          msg.innerHTML = '<span class="text-amber-600 font-bold">📡 Modo Offline ativado. Protocolo liberado para preenchimento.</span>';
+          return;
+        }
+
+        try {
+          let { data: rows, error } = await client
+            .from('ordens_servico_pracas')
+            .select('*')
+            .eq('protocolo', prot);
+
+          btn.disabled = false;
+          btn.innerText = "Validar Protocolo";
+
+          if (error || !rows || rows.length === 0) {
+            msg.innerHTML = '<span class="text-red-600 font-bold">Protocolo de Praça não encontrado no sistema.</span>';
+            document.getElementById('boxInfoPraca').classList.add('hidden');
+            document.getElementById('corpoFormPraca').classList.add('hidden');
+            return;
+          }
+
+          dadosPracaAtual = rows[0];
+
+          document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
+          document.getElementById('infoPracaEndereco').innerText = "📍 " + (dadosPracaAtual.endereco || "Endereço registrado");
+
+          var stBadge = document.getElementById('badgeStatusPraca');
+          var stNorm = (dadosPracaAtual.status || "Aberta").trim();
+          stBadge.innerText = stNorm;
+
+          document.getElementById('boxInfoPraca').classList.remove('hidden');
+          var corpoForm = document.getElementById('corpoFormPraca');
+
+          var stLower = stNorm.toLowerCase();
+          if (stLower.includes('conclu') || stLower.includes('resolv')) {
+            corpoForm.classList.add('hidden');
+            msg.innerHTML = '<div class="p-3 bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-300 font-bold text-center mt-2">✅ Esta Ordem de Serviço da Praça Pública já está CONCLUÍDA. Nenhuma alteração é permitida.</div>';
+          } else {
+            corpoForm.classList.remove('hidden');
+            iniciarGpsPracaComMapa();
+            msg.innerHTML = '<span class="text-emerald-700 font-bold">✅ Protocolo localizado e campos liberados!</span>';
+            setTimeout(() => { msg.innerHTML = ''; }, 4000);
+          }
+
+        } catch(err) {
+          btn.disabled = false;
+          btn.innerText = "Validar Protocolo";
+          msg.innerHTML = '<span class="text-red-600 font-bold">Falha na consulta ao banco: ' + err.message + '</span>';
+        }
+      }
+
+      function previewFotoEntradaPraca(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        fotoEntradaPracaNome = file.name || "foto_entrada.jpg";
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          fotoEntradaPracaBase64 = e.target.result;
+          document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+          document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function removerFotoEntradaPraca() {
+        fotoEntradaPracaBase64 = null;
+        fotoEntradaPracaNome = "";
+        document.getElementById('fotoEntradaPraca').value = "";
+        document.getElementById('imgPreviewEntradaPraca').src = "";
+        document.getElementById('previewEntradaPracaContainer').classList.add('hidden');
+      }
+
+      function alterarQtdEletricista(delta) {
+        var el = document.getElementById('qtdEletricistaPraca');
+        if (el) {
+          var val = parseInt(el.value) || 1;
+          val += delta;
+          if (val < 1) val = 1;
+          el.value = val;
+        }
+      }
+
+      function iniciarGpsPracaComMapa() {
+        var badge = document.getElementById('gpsBadgePraca');
+        var coordsText = document.getElementById('coordsTextPraca');
+
+        if (!navigator.geolocation) {
+          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800'; badge.innerText = '❌ Indisponível'; }
+          if (coordsText) coordsText.innerText = 'GPS não suportado neste dispositivo.';
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          var lat = pos.coords.latitude.toFixed(6);
+          var lng = pos.coords.longitude.toFixed(6);
+          var acc = Math.round(pos.coords.accuracy);
+
+          coordsGpsPracaAtual = lat + ", " + lng;
+          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800'; badge.innerText = '🎯 ±' + acc + 'm'; }
+          if (coordsText) coordsText.innerText = 'Lat: ' + lat + ' | Lng: ' + lng;
+
+          if (typeof L !== 'undefined') {
+            var latNum = parseFloat(lat);
+            var lngNum = parseFloat(lng);
+            if (!mapPraca) {
+              mapPraca = L.map('mapaCanvasPraca').setView([latNum, lngNum], 17);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+              }).addTo(mapPraca);
+              markerPraca = L.marker([latNum, lngNum]).addTo(mapPraca);
+            } else {
+              mapPraca.setView([latNum, lngNum], 17);
+              markerPraca.setLatLng([latNum, lngNum]);
+            }
+            setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 100);
+            setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
+          }
+        }, function(err) {
+          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800'; badge.innerText = '⚠️ Sem sinal'; }
+          if (coordsText) coordsText.innerText = 'Ative a localização e permissão de GPS no seu aparelho.';
+        }, { enableHighAccuracy: true, timeout: 10000 });
+      }
+
+      function exibirModalAlertaValidacao(titulo, mensagem) {
+        document.getElementById('modalAlertaTitulo').innerText = titulo || "Atenção!";
+        document.getElementById('modalAlertaTexto').innerText = mensagem || "";
+        document.getElementById('modalAlertaValidacaoPraca').classList.remove('hidden');
+      }
+
+      function fecharModalAlertaValidacao() {
+        document.getElementById('modalAlertaValidacaoPraca').classList.add('hidden');
+      }
+
+      function executarAcaoSessaoPraca() {
+        if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
+          exibirModalAlertaValidacao("Protocolo Não Validado", "Busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
+          return;
+        }
+
+        if (!fotoEntradaPracaBase64) {
+          exibirModalAlertaValidacao("Foto de Entrada Obrigatoriedade", "É obrigatório anexar a Foto de Entrada do local antes de registrar a sessão.");
+          return;
+        }
+
+        enviarAtualizacaoStatusPraca("Em Andamento");
+      }
+
+      function executarConcluirPraca() {
+        if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
+          exibirModalAlertaValidacao("Protocolo Não Validado", "Busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
+          return;
+        }
+        if (!fotoEntradaPracaBase64) {
+          exibirModalAlertaValidacao("Foto de Entrada Obrigatória", "É obrigatório anexar a Foto de Entrada do local antes de concluir a OS.");
+          return;
+        }
+        if (!coordsGpsPracaAtual) {
+          exibirModalAlertaValidacao("Sinal GPS Obrigatório", "É obrigatório obter a localização GPS do dispositivo para concluir a OS da Praça.");
+          return;
+        }
+        document.getElementById('modalConcluirPraca').classList.remove('hidden');
+      }
+
+      function fecharModalConcluirPraca() {
+        document.getElementById('modalConcluirPraca').classList.add('hidden');
+      }
+
+      function confirmarConclusaoPracaNoModal() {
+        var obsModal = document.getElementById('obsModalConcluirPraca')?.value.trim() || '';
+        fecharModalConcluirPraca();
+        enviarAtualizacaoStatusPraca("Concluído", obsModal);
+      }
+
+      async function enviarAtualizacaoStatusPraca(novoStatus, obsAdicionalModal) {
+        var msgPraca = document.getElementById('mensagemPraca');
+        var btnSessao = document.getElementById('btnSessaoPraca');
+        var btnConcluir = document.getElementById('btnConcluirPraca');
+
+        var client = obterSupabaseClient();
+        if (!client) {
+          msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro: Supabase Client indisponível.</span>';
+          return;
+        }
+
+        btnSessao.disabled = true;
+        btnConcluir.disabled = true;
+        msgPraca.innerHTML = "";
+
+        try {
+          var statusFinal = (novoStatus === "Concluído" || novoStatus === "Concluida" || novoStatus === "Resolvida") ? "Concluída" : novoStatus;
+
+          // Upload foto de entrada para Cloudinary se presente
+          var fotoEntradaUrl = null;
+          if (fotoEntradaPracaBase64) {
+            if (fotoEntradaPracaBase64.startsWith('http://') || fotoEntradaPracaBase64.startsWith('https://')) {
+              fotoEntradaUrl = fotoEntradaPracaBase64;
+            } else if (window.cloudinaryService) {
+              msgPraca.innerHTML = '<span class="text-blue-600 font-bold">☁️ Enviando foto de entrada para o Cloudinary...</span>';
+              try {
+                var nomeFotoPraca = window.cloudinaryService.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', 'FOTO ENTRADA');
+                fotoEntradaUrl = await window.cloudinaryService.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
+              } catch (uploadErr) {
+                console.warn('⚠️ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
+                fotoEntradaUrl = fotoEntradaPracaBase64;
+              }
+            } else {
+              fotoEntradaUrl = fotoEntradaPracaBase64;
+            }
+          }
+
+          var payload = {
+            status: statusFinal,
+            materiais: carrinhoMateriaisPraca,
+            status_auditoria: "Pendente"
+          };
+
+          if (fotoEntradaUrl) {
+            payload.foto_entrada = fotoEntradaUrl;
+            payload.evidencias = { 'Foto de Entrada': fotoEntradaUrl };
+          }
+
+          if (statusFinal === "Concluída") {
+            payload.data_fechamento = new Date().toISOString();
+            if (coordsGpsPracaAtual) {
+              payload.coordenada_reparo = coordsGpsPracaAtual;
+            }
+          }
+
+          if (obsAdicionalModal) {
+            payload.descricao = (dadosPracaAtual.descricao ? dadosPracaAtual.descricao + "\n" : "") + "Obs Conclusão: " + obsAdicionalModal;
+          }
+
+          // Se estiver OFFLINE, salva atualização da praça localmente
+          if (!navigator.onLine) {
+            if (window.offlineSyncService) {
+              await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
+            }
+            btnSessao.disabled = false;
+            btnConcluir.disabled = false;
+            dadosPracaAtual.status = novoStatus;
+            document.getElementById('badgeStatusPraca').innerText = novoStatus;
+            document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi <strong class='text-amber-600 font-bold'>SALVA LOCALMENTE</strong>!<br><br>Ela será enviada ao servidor automaticamente assim que a conexão retornar.";
+            document.getElementById('modalSucesso').classList.remove('hidden');
+            removerFotoEntradaPraca();
+            carrinhoMateriaisPraca = [];
+            renderizarTabelaMateriaisPraca();
+            return;
+          }
+
+          let { error } = await client
+            .from('ordens_servico_pracas')
+            .update(payload)
+            .eq('protocolo', dadosPracaAtual.protocolo);
+
+          btnSessao.disabled = false;
+          btnConcluir.disabled = false;
+
+          if (error) {
+            msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro ao atualizar status: ' + error.message + '</span>';
+            return;
+          }
+
+          dadosPracaAtual.status = novoStatus;
+          document.getElementById('badgeStatusPraca').innerText = novoStatus;
+
+          document.getElementById('msgSucessoTexto').innerHTML = "A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi atualizada para <strong>" + novoStatus + "</strong> com sucesso!";
+          document.getElementById('modalSucesso').classList.remove('hidden');
+
+          removerFotoEntradaPraca();
+          carrinhoMateriaisPraca = [];
+          renderizarTabelaMateriaisPraca();
+
+        } catch(err) {
+          btnSessao.disabled = false;
+          btnConcluir.disabled = false;
+
+          if (window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network'))) {
+            try {
+              await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
+              document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: Atualização da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> salva localmente para envio automático.";
+              document.getElementById('modalSucesso').classList.remove('hidden');
+              removerFotoEntradaPraca();
+              carrinhoMateriaisPraca = [];
+              renderizarTabelaMateriaisPraca();
+              return;
+            } catch(e) {}
+          }
+
+          msgPraca.innerHTML = '<span class="text-red-600 font-bold">Falha ao processar requisição: ' + err.message + '</span>';
+        }
+      }
+    </script>
+</body>
+</html>

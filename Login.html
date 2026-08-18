@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Login - Sistema OS Manager</title>
+    <meta name="description" content="Portal de Acesso e Autenticação do Sistema OS Manager. Entra via gov.br ou Acesso Administrativo." />
+
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <!-- Scripts & Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+      // Registro do Service Worker PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').then(function(reg) {
+            console.log('⚡ [PWA] Service Worker registrado a partir do Login:', reg.scope);
+          }).catch(function(err) {
+            console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
+          });
+        });
+      }
+    </script>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "background": "#fcf8fa",
+                        "on-surface": "#1b1b1d",
+                        "on-surface-variant": "#45464d",
+                        "primary": "#131b2e",
+                        "secondary": "#0051d5",
+                        "secondary-container": "#316bf3",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "surface-container-high": "#eae7e9",
+                        "outline-variant": "#c6c6cd",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "govbr": "#1351B4"
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"]
+                    },
+                    animation: {
+                        "fade-in": "fadeIn 0.4s ease-out forwards",
+                        "shake": "shake 0.4s ease-in-out"
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            "0%": { opacity: "0", transform: "translateY(12px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        },
+                        shake: {
+                            "0%, 100%": { transform: "translateX(0)" },
+                            "20%, 60%": { transform: "translateX(-6px)" },
+                            "40%, 80%": { transform: "translateX(6px)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background font-sans text-on-surface antialiased min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+
+    <!-- Background WebGL Ambient Canvas -->
+    <canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const geometry = new THREE.PlaneGeometry(2, 2);
+
+        const vertexShader = `
+            varying vec2 v_texCoord;
+            void main() {
+                v_texCoord = uv;
+                gl_Position = vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            precision highp float;
+            uniform float u_time;
+            uniform vec2 u_resolution;
+            varying vec2 v_texCoord;
+
+            void main() {
+                vec2 uv = v_texCoord;
+                float t = u_time * 0.15;
+                vec3 color1 = vec3(0.988, 0.973, 0.98);
+                vec3 color2 = vec3(0.945, 0.933, 0.96);
+                vec3 accent = vec3(0.075, 0.106, 0.18);
+
+                float w1 = sin(uv.x * 2.5 + t) * 0.5 + 0.5;
+                float w2 = sin(uv.y * 2.0 - t * 1.2) * 0.5 + 0.5;
+                vec3 base = mix(color1, color2, w1 * w2);
+
+                float edge = smoothstep(0.6, 1.0, length(uv - 0.5));
+                vec3 finalColor = mix(base, accent, edge * 0.03);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        const uniforms = {
+            u_time: { value: 0 },
+            u_resolution: { value: new THREE.Vector2() }
+        };
+
+        const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        function resize() {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function animate(time) {
+            uniforms.u_time.value = time * 0.001;
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+    </script>
+
+    <!-- Main Auth Card -->
+    <main class="w-full max-w-md bg-surface-container-lowest/90 backdrop-blur-xl border border-outline-variant/80 rounded-2xl shadow-2xl p-8 relative z-10 animate-fade-in" id="login-card">
+        
+        <!-- Header & Logo -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-white mb-4 shadow-md">
+                <span class="material-symbols-outlined text-[32px]">lightbulb</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-on-surface">Iluminação Araraquara</h1>
+            <p class="text-xs font-medium text-on-surface-variant mt-1">Portal de Acesso e Gestão Operacional</p>
+        </div>
+
+        <!-- Alert Message Container -->
+        <div id="auth-alert" class="hidden mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 transition-all duration-300">
+            <span class="material-symbols-outlined text-[20px]" id="alert-icon">error</span>
+            <span id="alert-text">Mensagem de erro...</span>
+        </div>
+
+        <!-- Opção Única: Autenticação via gov.br (Padrão Oficial DSgov) -->
+        <div class="mb-4">
+            <button type="button" 
+                    id="btn-govbr"
+                    onclick="fazerLoginGovBr()"
+                    class="w-full py-3.5 px-5 bg-[#1351B4] hover:bg-[#0C326F] active:scale-[0.98] text-white font-bold rounded-lg text-sm shadow-md hover:shadow-lg transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer border border-[#1351B4] group">
+                <!-- Logo Oficial Estruturado gov.br -->
+                <div class="flex items-center gap-0.5 bg-white/10 px-2.5 py-1 rounded border border-white/20 group-hover:bg-white/20 transition-colors">
+                    <span class="text-white font-extrabold text-base tracking-tight leading-none">gov</span>
+                    <span class="text-[#FFCD07] font-extrabold text-base tracking-tight leading-none">.br</span>
+                </div>
+                <span class="font-bold text-white text-base tracking-tight">Entrar com gov.br</span>
+            </button>
+            <p class="text-[11px] text-center text-on-surface-variant/70 mt-2">Acesso Oficial para Cidadãos</p>
+        </div>
+
+        <!-- Texto Singelo de Acesso para Servidores -->
+        <div class="mt-8 pt-4 border-t border-outline-variant/60 text-center">
+            <p class="text-xs text-on-surface-variant">
+                Você é um servidor? 
+                <a href="Login-Servidor.html" class="font-semibold text-secondary hover:underline cursor-pointer ml-1 inline-flex items-center gap-0.5">
+                    Acesse por aqui
+                    <span class="material-symbols-outlined text-[14px]">arrow_forward</span>
+                </a>
+            </p>
+        </div>
+
+    </main>
+
+    <!-- Script de Autenticação Supabase & gov.br (Homologação) -->
+    <script>
+        // Configurações do Ambiente de Homologação do gov.br
+        const GOVBR_CONFIG = {
+            clientId: 'h-iluminacaoararaquara.netlify.app',
+            authorizeUrl: 'https://sso.staging.acesso.gov.br/authorize',
+            tokenUrl: 'https://sso.staging.acesso.gov.br/token',
+            userInfoUrl: 'https://sso.staging.acesso.gov.br/userinfo',
+            logoutUrl: 'https://sso.staging.acesso.gov.br/logout',
+            scopes: 'openid profile email phone',
+            
+            // Retorna a URL de retorno cadastrada ou compatível com a porta atual
+            getRedirectUri: function() {
+                const origin = window.location.origin;
+                // Se o servidor local estiver rodando na porta 5300 (conforme cadastro no gov.br):
+                if (window.location.port === '5300') {
+                    return 'http://localhost:5300/callback-govbr';
+                }
+                // Se estiver rodando em localhost em outra porta (ex: 3000):
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                    return `${origin}/callback-govbr.html`;
+                }
+                // Em ambiente de produção / Netlify:
+                return 'https://h-iluminacaoararaquara.netlify.app/callback-govbr.html';
+            }
+        };
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 1. Se o cidadão estiver autenticado via gov.br, redireciona estritamente para Abrir.html
+            const isGovBrAuth = sessionStorage.getItem('govbr_user_authenticated') === 'true' || localStorage.getItem('govbr_user_authenticated') === 'true';
+            if (isGovBrAuth) {
+                window.location.href = 'Abrir.html';
+                return;
+            }
+
+            if (window.supabaseClient) {
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                if (session) {
+                    let targetUrl = 'Painel.html';
+                    if (window.AuthGuard) {
+                        const authData = await window.AuthGuard.requireAuth();
+                        targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: session.user });
+                    }
+                    window.location.href = targetUrl;
+                    return;
+                }
+            }
+
+            // 2. Verificar se esta página recebeu os parâmetros de retorno OAuth do gov.br (?code=...)
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            const error = urlParams.get('error');
+
+            if (error) {
+                exibirAlerta(`Autenticação gov.br cancelada ou falhou: ${error}`);
+                return;
+            }
+
+            if (code) {
+                processarRetornoGovBr(code, state);
+            }
+        });
+
+        // Alternar visibilidade da senha
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('admin-password');
+            const toggleIcon = document.getElementById('password-toggle-icon');
+            if (!passwordInput || !toggleIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = 'visibility';
+            }
+        }
+
+        // Mostrar Alertas na Interface
+        function exibirAlerta(mensagem, tipo = 'erro') {
+            const alertContainer = document.getElementById('auth-alert');
+            const alertText = document.getElementById('alert-text');
+            const alertIcon = document.getElementById('alert-icon');
+            const card = document.getElementById('login-card');
+
+            if (!alertContainer || !alertText) return;
+
+            alertText.textContent = mensagem;
+
+            if (tipo === 'erro') {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-error-container text-on-error-container border border-error/20 animate-fade-in';
+                alertIcon.textContent = 'error';
+                
+                if (card) {
+                    card.classList.remove('animate-shake');
+                    void card.offsetWidth; // Forçar reflow
+                    card.classList.add('animate-shake');
+                }
+            } else {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-emerald-100 text-emerald-800 border border-emerald-300 animate-fade-in';
+                alertIcon.textContent = 'check_circle';
+            }
+
+            alertContainer.classList.remove('hidden');
+        }
+
+        // 1. Ação de Login via gov.br (Ambiente de Homologação)
+        function fazerLoginGovBr() {
+            const btnGov = document.getElementById('btn-govbr');
+            if (btnGov) {
+                btnGov.disabled = true;
+                btnGov.classList.add('opacity-75', 'cursor-not-allowed');
+            }
+
+            exibirAlerta('Redirecionando para o portal de login do gov.br (Homologação)...', 'sucesso');
+
+            // Gerar state e nonce para segurança OAuth 2.0
+            const state = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            const nonce = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            
+            sessionStorage.setItem('govbr_oauth_state', state);
+            sessionStorage.setItem('govbr_oauth_nonce', nonce);
+
+            const redirectUri = GOVBR_CONFIG.getRedirectUri();
+
+            const params = new URLSearchParams({
+                response_type: 'code',
+                client_id: GOVBR_CONFIG.clientId,
+                scope: GOVBR_CONFIG.scopes,
+                redirect_uri: redirectUri,
+                state: state,
+                nonce: nonce
+            });
+
+            const targetUrl = `${GOVBR_CONFIG.authorizeUrl}?${params.toString()}`;
+            console.log('⚡ [GovBr Auth Homologação] Redirecionando para:', targetUrl);
+
+            setTimeout(() => {
+                window.location.href = targetUrl;
+            }, 800);
+        }
+
+        // Trocar o código de autorização pelos dados reais do usuário (OpenID Connect / OIDC)
+        async function obterDadosUsuarioGovBr(code, redirectUri) {
+            const tokenUrl = 'https://sso.staging.acesso.gov.br/token';
+            const userInfoUrl = 'https://sso.staging.acesso.gov.br/userinfo';
+
+            try {
+                const bodyParams = new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code: code,
+                    redirect_uri: redirectUri
+                });
+
+                const credentials = btoa(`${GOVBR_CONFIG.clientId}:51XS5NyjnroVlBEjEVgtsXoVEbVOqDAohd6VHQGGs0J_bi3ciqkNEeFxsF1p8PUtPlZIBUT6lhfSWfGC21klLg`);
+
+                const response = await fetch(tokenUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Authorization': `Basic ${credentials}`
+                    },
+                    body: bodyParams.toString()
+                });
+
+                if (response.ok) {
+                    const tokenData = await response.json();
+                    let userData = {};
+
+                    // Decodificar payload do id_token (JWT)
+                    if (tokenData.id_token) {
+                        try {
+                            const payloadBase64 = tokenData.id_token.split('.')[1];
+                            if (payloadBase64) {
+                                const decodedJson = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+                                if (decodedJson.name || decodedJson.full_name) {
+                                    userData.nome = decodedJson.name || decodedJson.full_name;
+                                }
+                                if (decodedJson.email) userData.email = decodedJson.email;
+                                if (decodedJson.sub) userData.cpf = decodedJson.sub;
+                            }
+                        } catch (e) {
+                            console.warn('Erro ao decodificar ID Token no gov.br:', e);
+                        }
+                    }
+
+                    // Tentar /userinfo se necessário
+                    if (tokenData.access_token && (!userData.nome || !userData.email)) {
+                        try {
+                            const userResponse = await fetch(userInfoUrl, {
+                                headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+                            });
+                            if (userResponse.ok) {
+                                const userInfo = await userResponse.json();
+                                if (userInfo.name) userData.nome = userInfo.name;
+                                if (userInfo.email) userData.email = userInfo.email;
+                                if (userInfo.sub) userData.cpf = userInfo.sub;
+                            }
+                        } catch (userErr) {
+                            console.warn('Erro na consulta /userinfo:', userErr);
+                        }
+                    }
+
+                    if (userData.nome || userData.email) {
+                        return userData;
+                    }
+                }
+            } catch (err) {
+                console.warn('Erro na requisição /token do gov.br:', err);
+            }
+            return null;
+        }
+
+        // Processar retorno quando redirecionado do gov.br
+        async function processarRetornoGovBr(code, state) {
+            exibirAlerta('Buscando dados do perfil no gov.br...', 'sucesso');
+
+            const redirectUri = GOVBR_CONFIG.getRedirectUri();
+            const realUserData = await obterDadosUsuarioGovBr(code, redirectUri);
+
+            const nomeFinal = realUserData?.nome || 'Cidadão Autenticado (gov.br)';
+            const emailFinal = realUserData?.email || 'cidadao@araraquara.sp.gov.br';
+
+            const userPayload = JSON.stringify({
+                nome: nomeFinal,
+                email: emailFinal,
+                cpf: realUserData?.cpf || '',
+                role: 'cidadao',
+                provider: 'govbr_homologacao',
+                code: code,
+                auth_time: new Date().toISOString()
+            });
+
+            sessionStorage.setItem('govbr_user_authenticated', 'true');
+            sessionStorage.setItem('govbr_user_data', userPayload);
+            localStorage.setItem('govbr_user_authenticated', 'true');
+            localStorage.setItem('govbr_user_data', userPayload);
+
+            exibirAlerta(`Bem-vindo(a), ${nomeFinal}! Redirecionando...`, 'sucesso');
+
+            setTimeout(() => {
+                window.location.href = 'Abrir.html';
+            }, 1000);
+        }
+
+        // 2. Ação de Login Administrador (E-mail / Senha)
+        async function fazerLoginAdmin(event) {
+            event.preventDefault();
+
+            const emailInput = document.getElementById('admin-email');
+            const passwordInput = document.getElementById('admin-password');
+            const btnSubmit = document.getElementById('btn-admin-submit');
+            const btnText = document.getElementById('btn-submit-text');
+            const btnIcon = document.getElementById('btn-submit-icon');
+
+            const email = emailInput?.value.trim();
+            const password = passwordInput?.value;
+
+            if (!email || !password) {
+                exibirAlerta('Por favor, preencha o e-mail e a senha.');
+                return;
+            }
+
+            if (!window.supabaseClient) {
+                exibirAlerta('Serviço Supabase não está inicializado.');
+                return;
+            }
+
+            if (btnSubmit) btnSubmit.disabled = true;
+            if (btnText) btnText.textContent = 'Autenticando...';
+            if (btnIcon) btnIcon.textContent = 'sync';
+            if (btnIcon) btnIcon.classList.add('animate-spin');
+
+            try {
+                sessionStorage.removeItem('govbr_user_authenticated');
+                sessionStorage.removeItem('govbr_user_data');
+                localStorage.removeItem('govbr_user_authenticated');
+                localStorage.removeItem('govbr_user_data');
+
+                const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    let msg = 'E-mail ou senha incorretos.';
+                    if (error.message.includes('Invalid login credentials')) {
+                        msg = 'E-mail ou senha incorretos. Verifique os dados digitados.';
+                    } else if (error.message.includes('Email not confirmed')) {
+                        msg = 'Endereço de e-mail ainda não confirmado.';
+                    }
+                    exibirAlerta(msg);
+                } else if (data.session) {
+                    console.log('🚀 [Login DEBUG] Sessão criada com sucesso para:', data.session.user.email);
+                    console.log('🚀 [Login DEBUG] Raw user_metadata:', data.session.user.user_metadata);
+                    console.log('🚀 [Login DEBUG] Raw app_metadata:', data.session.user.app_metadata);
+
+                    // Verificar se a conta aguarda liberação manual no Supabase
+                    let profile = null;
+                    try {
+                        const { data: profData } = await window.supabaseClient
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', data.session.user.id)
+                            .maybeSingle();
+                        profile = profData;
+                    } catch (e) {
+                        console.warn('Obs ao verificar perfil:', e);
+                    }
+
+                    // O perfil na tabela 'profiles' é a Fonte da Verdade para liberação do acesso
+                    let isPending = false;
+                    if (profile) {
+                        isPending = (profile.role === 'pendente') || 
+                                    (profile.status === 'pendente') || 
+                                    (profile.ativo === false);
+                    } else {
+                        isPending = (data.session.user.user_metadata?.status === 'pendente') || 
+                                    (data.session.user.user_metadata?.role === 'pendente') || 
+                                    (data.session.user.user_metadata?.ativo === false);
+                    }
+
+                    if (isPending) {
+                        await window.supabaseClient.auth.signOut();
+                        exibirAlerta('Sua conta foi registrada, porém aguarda liberação manual pelo administrador.');
+                        return;
+                    }
+
+                    let targetUrl = 'Abrir.html';
+                    if (window.AuthGuard) {
+                        const authData = await window.AuthGuard.requireAuth();
+                        targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: data.session.user, profile: profile });
+                        console.log('🚀 [Login DEBUG] authData resolvido pelo AuthGuard:', authData);
+                        console.log('🚀 [Login DEBUG] targetUrl resultante:', targetUrl);
+                    } else {
+                        targetUrl = (profile?.role === 'ouvidoria' || profile?.cargo_solicitado === 'ouvidoria') ? 'Abrir.html' : 'Painel.html';
+                    }
+                    exibirAlerta('Login efetuado com sucesso! Redirecionando...', 'sucesso');
+                    setTimeout(() => {
+                        window.location.href = targetUrl;
+                    }, 800);
+                }
+            } catch (err) {
+                exibirAlerta('Falha na conexão com o servidor de autenticação.');
+            } finally {
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (btnText) btnText.textContent = 'Entrar como Servidor';
+                if (btnIcon) btnIcon.textContent = 'arrow_forward';
+                if (btnIcon) btnIcon.classList.remove('animate-spin');
+            }
+        }
+    </script>
+</body>
+</html>

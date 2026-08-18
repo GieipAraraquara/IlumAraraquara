@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <base target="_top">
+    <title>OS Iluminação - Araraquara</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- API do Google Maps e Leaflet para Mapas -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDvWCKGkxjTNltaMxP-ODaVcBVLpKknoSc&libraries=places"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Supabase JS Client para gravação direta no navegador -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    
+    <style>
+      body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 15px; background-color: #f8f9fa; color: #333; line-height: 1.4; }
+      .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: relative; }
+      
+      h2 { color: #1a73e8; font-size: 1.2rem; margin: 0; padding-bottom: 0; }
+      .form-group { margin-bottom: 15px; }
+      .row { display: flex; gap: 10px; }
+      .col { flex: 1; min-width: 0; }
+      
+      label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; color: #5f6368; }
+      
+      input, select, textarea { 
+        width: 100%; padding: 10px; box-sizing: border-box; 
+        border: 1px solid #dadce0; border-radius: 4px; font-size: 14px;
+        transition: all 0.2s;
+      }
+      
+      /* Correção da Checkbox para não usar as regras globais de input */
+      input[type="checkbox"] { width: auto; padding: 0; margin: 0; cursor: pointer; box-shadow: none; border: none; }
+      
+      textarea { resize: none; }
+      input:focus, select:focus, textarea:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+      
+      .input-validado { background-color: #e6ffed !important; border-color: #34d399 !important; }
+      .input-invalido { background-color: #fce8e6 !important; border-color: #d93025 !important; }
+      .btn-validado { background-color: #34d399 !important; color: white !important; border: none !important; }
+      .btn-invalido { background-color: #d93025 !important; color: white !important; border: none !important; }
+      
+      .obrigatorio::after { content: " *"; color: #d93025; }
+      
+      button { border: none; border-radius: 4px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
+      .btn-primario { background-color: #1a73e8; color: white; padding: 12px; width: 100%; font-size: 16px; margin-top: 10px; }
+      .btn-primario:hover { background-color: #1557b0; }
+      .btn-primario:disabled { background-color: #ccc; cursor: not-allowed; color: #666; }
+      
+      .btn-secundario { background-color: #f1f3f4; color: #3c4043; padding: 8px 12px; font-size: 13px; border: 1px solid #dadce0; }
+      .btn-secundario:hover { background-color: #e8eaed; }
+      
+      #mensagem { margin-top: 15px; font-size: 14px; text-align: center; }
+      .erro { color: #d93025; font-weight: bold; }
+      
+      /* Modais de Sobreposição */
+      .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 20000; justify-content: center; align-items: center; }
+      .modal-content { background: white; padding: 20px; border-radius: 8px; max-width: 95%; width: 450px; box-shadow: 0 4px 25px rgba(0,0,0,0.4); max-height: 90vh; overflow-y: auto; }
+      .modal-header { color: #d93025; font-weight: bold; font-size: 16px; margin-bottom: 10px; display: flex; align-items: center; }
+      .modal-body { font-size: 13px; margin-bottom: 15px; }
+      .modal-footer { display: flex; gap: 10px; justify-content: flex-end; border-top: 1px solid #eee; padding-top: 15px; }
+      
+      /* Cartão Dinâmico de Ponto */
+      .card-ponto { border: 2px solid #e8f0fe; padding: 15px; border-radius: 8px; margin-bottom: 20px; background: #fff; position: relative; }
+      .card-ponto-header { background: #e8f0fe; margin: -15px -15px 15px -15px; padding: 10px 15px; font-weight: bold; color: #1a73e8; border-radius: 6px 6px 0 0; }
+
+      /* Estágios Fotos */
+      .estagio-wrapper { display: flex; flex-direction: column; gap: 15px; margin-top: 5px; margin-bottom: 15px; }
+      .estagio-item { border: 1px solid #dadce0; border-radius: 6px; padding: 10px; background-color: #fff; }
+      .estagio-header { font-size: 13px; font-weight: bold; color: #1a73e8; margin-bottom: 8px; }
+      .estagio-upload-area { border: 2px dashed #dadce0; padding: 12px; text-align: center; border-radius: 4px; background-color: #f8f9fa; cursor: pointer; transition: 0.3s; font-size: 13px; color: #5f6368; }
+      .estagio-upload-area:hover { border-color: #1a73e8; background-color: #e8f0fe; }
+      .preview-container { margin-top: 10px; display: flex; justify-content: center; position: relative; }
+      .miniatura-foto { width: 100%; max-width: 150px; height: auto; object-fit: cover; border-radius: 4px; border: 1px solid #ccc; }
+      .btn-remover-foto { position: absolute; top: -10px; right: -10px; background: red; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+
+      /* Materiais */
+      .bloco-materiais { border: 1px solid #ddd; padding: 15px; border-radius: 5px; background-color: #f8f9fa; margin-top: 10px; }
+      .add-material-row { display: flex; gap: 5px; align-items: flex-end; margin-bottom: 10px; }
+      .btn-add { background-color: #0f9d58; color: white; padding: 10px; border-radius: 4px; font-size: 12px; }
+      .lista-materiais { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+      .lista-materiais th { text-align: left; border-bottom: 2px solid #ddd; padding: 5px; }
+      .lista-materiais td { padding: 8px 5px; border-bottom: 1px solid #eee; }
+      .btn-remover { background-color: #d93025; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px; }
+      .custom-combobox { position: relative; width: 100%; }
+      .dropdown-lista { display: none; position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ccc; max-height: 180px; overflow-y: auto; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .dropdown-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 13px; }
+      .dropdown-item:hover { background-color: #e8f0fe; }
+
+      .pac-container { z-index: 10000 !important; }
+
+      /* Tela de Login */
+      #telaLogin { display: flex; flex-direction: column; justify-content: center; align-items: center; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: #f8f9fa; z-index: 30000; }
+      .login-box { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); width: 100%; max-width: 350px; text-align: center; }
+      .login-box h2 { color: #1a73e8; margin-top: 0; border-bottom: none; padding-bottom: 0; }
+      #appPrincipal { display: none; } 
+      .loader-login { border: 4px solid #f3f3f3; border-top: 4px solid #1a73e8; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin: 0 auto; display: none; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      /* Tabs Principais Tipo OS */
+      .tab-tipo-os { display: flex; background: #e8f0fe; border-radius: 8px; padding: 4px; margin-bottom: 20px; gap: 4px; border: 1px solid #d2e3fc; }
+      .tab-tipo-os input { display: none; }
+      .tab-tipo-os label {
+        flex: 1; text-align: center; padding: 10px 8px; cursor: pointer; border-radius: 6px; margin: 0;
+        font-size: 13px; font-weight: bold; color: #1a73e8; transition: all 0.2s ease;
+      }
+      .tab-tipo-os input:checked + label {
+        background: #1a73e8; color: white; box-shadow: 0 2px 6px rgba(26,115,232,0.3);
+      }
+      /* Correção de renderização de tiles do Leaflet */
+      .leaflet-container img { max-width: none !important; max-height: none !important; }
+      .leaflet-container { font-family: inherit; z-index: 1; }
+    </style>
+  </head>
+  <body>
+
+    <!-- TELA DE LOGIN -->
+    <div id="telaLogin">
+      <div class="login-box">
+        <h2>Acesso ao Sistema</h2>
+        <p style="font-size: 13px; color: #666; margin-bottom: 20px;">Insira suas credenciais para Finalização</p>
+        <div class="form-group" style="text-align: left;">
+          <label>Usuário:</label>
+          <input type="text" id="loginUsuario" placeholder="Seu usuário" onkeypress="if(event.key === 'Enter') realizarLogin()">
+        </div>
+        <div class="form-group" style="text-align: left;">
+          <label>Senha:</label>
+          <input type="password" id="loginSenha" placeholder="Sua senha" onkeypress="if(event.key === 'Enter') realizarLogin()">
+        </div>
+        <button type="button" id="btnFazerLogin" class="btn-primario" onclick="realizarLogin()">Entrar</button>
+        <div class="loader-login" id="loaderLogin"></div>
+        <div id="msgLogin" style="margin-top: 15px; font-size: 13px; color: #d93025; font-weight: bold;"></div>
+      </div>
+    </div>
+
+    <div id="modalAlertaLogin" class="modal-overlay" style="z-index: 40000;">
+      <div class="modal-content" style="text-align: center; width: 320px; padding: 30px;">
+        <div style="font-size: 50px; line-height: 1; margin-bottom: 15px;">🚫</div>
+        <h3 style="color: #d93025; margin-top: 0; margin-bottom: 10px;">Acesso Negado</h3>
+        <p id="msgAlertaLoginTexto" style="font-size: 14px; color: #555; margin-bottom: 25px;"></p>
+        <button type="button" class="btn-primario" style="background-color: #d93025;" onclick="document.getElementById('modalAlertaLogin').style.display='none'">OK, Entendi</button>
+      </div>
+    </div>
+
+    <!-- MODAL DE OS JÁ CONCLUÍDA -->
+    <div id="modalOSConcluida" class="modal-overlay" style="z-index: 40000;">
+      <div class="modal-content" style="text-align: center; width: 320px; padding: 30px;">
+        <div style="font-size: 50px; line-height: 1; margin-bottom: 15px;">⚠️</div>
+        <h3 style="color: #B45F06; margin-top: 0; margin-bottom: 10px;">OS Já Finalizada</h3>
+        <p id="msgAlertaOSConcluidaTexto" style="font-size: 14px; color: #555; margin-bottom: 25px;"></p>
+        <button type="button" class="btn-primario" style="background-color: #B45F06;" onclick="fecharModalOSConcluida()">OK, Limpar OS</button>
+      </div>
+    </div>
+
+    <div id="modalSucesso" class="modal-overlay">
+      <div class="modal-content" style="text-align: center; width: 320px; padding: 30px;">
+        <div style="font-size: 60px; line-height: 1; margin-bottom: 15px;">✅</div>
+        <h3 style="color: #188038; margin-top: 0; margin-bottom: 10px;">OS Finalizada!</h3>
+        <p id="msgSucessoTexto" style="font-size: 14px; color: #555; margin-bottom: 25px;">A Ordem de Serviço foi concluída com sucesso e os dados foram auditados.</p>
+        <button type="button" class="btn-primario" onclick="fecharSucesso()">OK, Fechar</button>
+      </div>
+    </div>
+
+    <div id="appPrincipal">
+    <div class="container">
+      
+      <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #e8f0fe; padding-bottom: 10px; margin-bottom: 15px;">
+        <h2>Finalizar</h2>
+        <button type="button" class="btn-secundario" onclick="sairApp()" style="color: #d93025; font-weight: bold; border-color: #fce8e6; background-color: #fce8e6; padding: 6px 12px; margin: 0;">Sair 🚪</button>
+      </div>
+
+      <!-- SELETOR DE TIPO DE OS (ILUMINAÇÃO VIÁRIA VS PRAÇA PÚBLICA) -->
+      <div class="tab-tipo-os">
+        <input type="radio" name="tipoOS" id="tabIluminacao" value="iluminacao" checked onchange="alternarTipoOS()">
+        <label for="tabIluminacao">💡 Viária</label>
+        
+        <input type="radio" name="tipoOS" id="tabPraca" value="praca" onchange="alternarTipoOS()">
+        <label for="tabPraca">🌳 Praça</label>
+      </div>
+
+      <!-- ABA 1: ILUMINAÇÃO VIÁRIA -->
+      <div id="abaIluminacao">
+        <div class="form-group destaque-obrigatorio">
+          <label for="protocolo" class="obrigatorio">Protocolo da OS ou Nome:</label>
+          <input type="text" id="protocolo" class="limpar-erro" placeholder="Protocolo ou IGOR, FERNANDO..." style="text-transform: uppercase;" required>
+        </div>
+
+        <div class="row">
+          <div class="form-group col destaque-obrigatorio">
+            <label for="dataReparo" class="obrigatorio">Data do Reparo:</label>
+            <input type="text" id="dataReparo" class="limpar-erro" placeholder="DD/MM/AAAA" maxlength="10" oninput="mascaraData(this)" required>
+          </div>
+          <div class="form-group col destaque-obrigatorio">
+            <label class="obrigatorio">Qtd. Pontos:</label>
+            <input type="number" id="quantidade" value="1" min="1" onchange="ajustarPontos()" oninput="this.value = this.value.replace(/[^0-9]/g, ''); ajustarPontos();">
+          </div>
+        </div>
+
+        <!-- CONTAINER ONDE OS PONTOS SÃO GERADOS -->
+        <div id="pontosContainer"></div>
+
+        <div class="bloco-materiais">
+          <label>Materiais Utilizados:</label>
+          <div class="add-material-row">
+            <div style="flex: 3;" class="custom-combobox">
+              <input type="text" id="inputMaterial" placeholder="Buscar material..." autocomplete="off" oninput="filtrarMateriais()" onclick="mostrarTodosMateriais()">
+              <div id="dropdownMateriais" class="dropdown-lista"></div>
+            </div>
+            <div style="flex: 1;">
+              <input type="number" id="inputQtd" min="0.1" step="0.1" value="1">
+            </div>
+            <button type="button" class="btn-add" onclick="adicionarMaterial()">+ Add</button>
+          </div>
+          <table class="lista-materiais">
+            <thead><tr><th>Qtd</th><th>Material</th><th>Ação</th></tr></thead>
+            <tbody id="tbodyMateriais"></tbody>
+          </table>
+        </div>
+
+        <div class="form-group" style="margin-top: 15px;">
+          <label>Observações Gerais da OS:</label>
+          <textarea id="descricao" rows="2" placeholder="Detalhes adicionais..."></textarea>
+        </div>
+
+        <button type="button" id="btnSalvar" class="btn-primario" onclick="validarEEnviar()">Finalizar</button>
+        <div id="mensagem"></div>
+      </div>
+
+      <!-- ABA 2: PRAÇA PÚBLICA -->
+      <div id="abaPraca" style="display: none;">
+        <div class="card-ponto" style="border-color: #c8e6c9;">
+          <div class="form-group destaque-obrigatorio">
+            <label for="protocoloPraca" class="obrigatorio">Protocolo da Praça:</label>
+            <div class="row">
+              <div style="flex: 3;">
+                <input type="text" id="protocoloPraca" placeholder="Digite o protocolo PC..." style="text-transform: uppercase;" onkeypress="if(event.key==='Enter'){event.preventDefault();validarProtocoloPraca();}">
+              </div>
+              <div style="flex: 1;">
+                <button type="button" id="btnValidarPraca" class="btn-secundario" style="width: 100%; height: 38px; font-weight: bold; background: #e8f0fe; color: #1a73e8;" onclick="validarProtocoloPraca()">Validar</button>
+              </div>
+            </div>
+          </div>
+          <div id="msgValidaPraca"></div>
+
+          <!-- RESUMO DO PROTOCOLO APÓS VALIDAÇÃO -->
+          <div id="boxInfoPraca" style="display: none; background: #f8f9fa; border: 1px solid #c8e6c9; border-radius: 6px; padding: 12px; margin-top: 10px; margin-bottom: 15px;">
+            <div style="font-size: 13px; font-weight: bold; color: #2e7d32; margin-bottom: 4px;" id="infoPracaNome">Praça...</div>
+            <div style="font-size: 12px; color: #555; margin-bottom: 6px;" id="infoPracaEndereco">Endereço...</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span style="font-size: 12px; font-weight: bold;">Status Atual:</span>
+              <span id="badgeStatusPraca" style="padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; background: #fff3cd; color: #856404;">Aberto</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CORPO DO FORMULÁRIO DE PRAÇA (BLOQUEADO ATÉ VALIDAR PROTOCOLO) -->
+        <div id="corpoFormPraca" style="display: none;">
+          
+          <!-- FOTO DE ENTRADA DO LOCAL + QTD ELETRICISTA -->
+          <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px;">
+            <div class="form-group destaque-obrigatorio" style="flex: 1; margin: 0;">
+              <label class="obrigatorio" style="font-size: 12px; font-weight: bold; color: #3c4043; display: block; margin-bottom: 6px; line-height: 1.2;">1. Entrada do local:</label>
+              <div id="boxFotoEntradaPraca">
+                <input type="file" id="fotoEntradaPraca" accept="image/*" capture="environment" style="display: none;" onchange="previewFotoEntradaPraca(event)">
+                <button type="button" class="btn-secundario" onclick="document.getElementById('fotoEntradaPraca').click()" style="width: 100%; height: 42px; padding: 0 12px; font-size: 13px; font-weight: bold; display: flex; align-items: center; justify-content: center; border-radius: 8px; gap: 6px; box-sizing: border-box; margin: 0; border: 1px solid #dadce0;">📷 Foto</button>
+              </div>
+            </div>
+            <div id="blocoQtdEletricista" class="form-group destaque-obrigatorio" style="width: 135px; margin: 0; min-width: 120px;">
+              <label style="font-size: 12px; font-weight: bold; color: #3c4043; display: block; margin-bottom: 6px; line-height: 1.2; white-space: nowrap;">QTD. Eletricista:</label>
+              <div style="display: flex; align-items: center; border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; background: #fff; height: 42px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); box-sizing: border-box;">
+                <button type="button" onclick="alterarQtdEletricista(-1)" style="width: 38px; height: 40px; background: #f1f3f4; border: none; border-right: 1px solid #dadce0; font-size: 18px; font-weight: bold; color: #3c4043; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0;">−</button>
+                <input type="number" id="qtdEletricistaPraca" min="1" value="1" readonly style="width: 100%; height: 40px; border: none; font-size: 15px; text-align: center; font-weight: bold; color: #1a73e8; background: transparent; -moz-appearance: textfield; padding: 0; margin: 0;">
+                <button type="button" onclick="alterarQtdEletricista(1)" style="width: 38px; height: 40px; background: #f1f3f4; border: none; border-left: 1px solid #dadce0; font-size: 18px; font-weight: bold; color: #3c4043; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; margin: 0; padding: 0;">+</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- CONTAINER SEPARADO PARA O PREVIEW DA FOTO (NÃO DESLOCA OS CAMPOS DA LINHA) -->
+          <div id="previewEntradaPracaContainer" style="display: none; margin-bottom: 15px; text-align: center; background: #fafafa; padding: 10px; border: 1px dashed #dadce0; border-radius: 8px;">
+            <img id="imgPreviewEntradaPraca" style="max-width: 100%; max-height: 160px; border-radius: 6px; border: 1px solid #ccc;">
+            <br>
+            <button type="button" class="btn-secundario" style="color: #d93025; font-size: 11px; margin-top: 5px; background: #fff;" onclick="removerFotoEntradaPraca()">✕ Remover Foto</button>
+          </div>
+
+          <!-- 2. LOCALIZAÇÃO ATUAL DO TÉCNICO NA PRAÇA (GPS + MAPA INTERATIVO) -->
+          <div class="form-group destaque-obrigatorio" style="margin-top: 15px;">
+            <label class="obrigatorio">2. Localização Atual (GPS):</label>
+            <div style="background: #f8f9fa; border: 1px solid #dadce0; border-radius: 8px; padding: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 12px; font-weight: bold; color: #1a73e8;">Sinal do Celular:</span>
+                <span id="gpsBadgePraca" style="padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; background: #fef7e0; color: #b45f06;">📡 Buscando...</span>
+              </div>
+              <div id="mapaCanvasPraca" style="width: 100%; height: 170px; border-radius: 6px; border: 1px solid #ccc; position: relative; z-index: 1;"></div>
+              <div id="coordsTextPraca" style="font-size: 11px; color: #555; margin-top: 6px; text-align: center; font-weight: 500;">Obtendo coordenadas do dispositivo...</div>
+            </div>
+          </div>
+
+          <!-- MATERIAIS UTILIZADOS (EXIBIDO SE EM ANDAMENTO OU INICIADO) -->
+          <div id="blocoMateriaisPraca" class="bloco-materiais" style="display: none; margin-top: 15px;">
+            <label>Materiais Utilizados:</label>
+            <div class="add-material-row">
+              <div style="flex: 3;" class="custom-combobox">
+                <input type="text" id="inputMaterialPraca" placeholder="Buscar material..." autocomplete="off" oninput="filtrarMateriaisPraca()" onclick="mostrarTodosMateriaisPraca()">
+                <div id="dropdownMateriaisPraca" class="dropdown-lista"></div>
+              </div>
+              <div style="flex: 1;">
+                <input type="number" id="inputQtdPraca" min="0.1" step="0.1" value="1">
+              </div>
+              <button type="button" class="btn-add" onclick="adicionarMaterialPraca()">+ Add</button>
+            </div>
+            <table class="lista-materiais">
+              <thead><tr><th>Qtd</th><th>Material</th><th>Ação</th></tr></thead>
+              <tbody id="tbodyMateriaisPraca"></tbody>
+            </table>
+          </div>
+
+          <!-- BOTÕES DE AÇÃO DINÂMICOS PARA PRAÇA -->
+          <div style="display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
+            <button type="button" id="btnSessaoPraca" class="btn-primario" style="flex: 1; margin-top: 0; background-color: #1a73e8;" onclick="executarAcaoSessaoPraca()">Iniciar</button>
+            <button type="button" id="btnConcluirPraca" class="btn-primario" style="flex: 1; margin-top: 0; background-color: #1e8e3e;" onclick="executarConcluirPraca()">✅ Concluir</button>
+          </div>
+          <div id="mensagemPraca" style="margin-top: 15px; text-align: center;"></div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- MODAL DE CONFIRMAÇÃO DE CONCLUSÃO DE OS DA PRAÇA -->
+    <div id="modalConcluirPraca" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999; justify-content: center; align-items: center; padding: 15px;">
+      <div style="background: white; width: 100%; max-width: 420px; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); font-family: sans-serif;">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+          <span style="font-size: 24px;">✅</span>
+          <h3 style="margin: 0; color: #1e8e3e; font-size: 18px;">Concluir Ordem de Serviço</h3>
+        </div>
+        <p style="font-size: 13px; color: #444; margin-bottom: 15px; line-height: 1.4;">
+          Deseja realmente concluir a Ordem de Serviço da Praça Pública? Insira observações adicionais caso necessário:
+        </p>
+        <div style="margin-bottom: 15px;">
+          <label style="font-size: 12px; font-weight: bold; color: #555; display: block; margin-bottom: 5px;">Observações da Conclusão (Opcional):</label>
+          <textarea id="obsModalConcluirPraca" rows="3" placeholder="Escreva aqui observações adicionais sobre o serviço finalizado..." style="width: 100%; border: 1px solid #ccc; border-radius: 6px; padding: 8px; font-size: 13px; box-sizing: border-box; resize: vertical;"></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+          <button type="button" onclick="fecharModalConcluirPraca()" style="background: #f1f3f4; border: 1px solid #dadce0; color: #3c4043; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;">Cancelar</button>
+          <button type="button" id="btnConfirmarConcluirPracaModal" onclick="confirmarConclusaoPracaNoModal()" style="background: #1e8e3e; border: none; color: white; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;">Sim, Concluir!</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL BLOQUEIO SESSÃO EM ANDAMENTO -->
+    <div id="modalSessaoAbertaBloqueio" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999999; justify-content: center; align-items: center; padding: 15px;">
+      <div style="background: white; width: 100%; max-width: 420px; border-radius: 12px; padding: 22px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); font-family: sans-serif; border-top: 5px solid #d93025; text-align: center;">
+        <div style="font-size: 38px; margin-bottom: 8px;">⚠️</div>
+        <h3 style="margin: 0 0 10px 0; color: #d93025; font-size: 18px;">Sessão em Andamento!</h3>
+        <p style="font-size: 13px; color: #444; margin-bottom: 15px; line-height: 1.4; text-align: left;">
+          Não é possível concluir esta Ordem de Serviço pois existe uma sessão de trabalho em andamento:
+        </p>
+        <div style="background: #fce8e6; border: 1px solid #fad2cf; padding: 12px; border-radius: 8px; text-align: left; margin-bottom: 18px; font-size: 13px; color: #b31412;">
+          <div><strong>📌 Sessão:</strong> <span id="bloqueioSessaoNum">#1</span></div>
+          <div style="margin-top: 4px;"><strong>👤 Técnico:</strong> <span id="bloqueioSessaoTecnico">Técnico</span></div>
+          <div style="margin-top: 4px;"><strong>⏱️ Aberta em:</strong> <span id="bloqueioSessaoInicio">--/--/---- --:--:--</span></div>
+        </div>
+        <p style="font-size: 12px; color: #666; margin-bottom: 18px; text-align: left;">
+          Solicite ao técnico o encerramento da sessão ou encerre-a antes de concluir a Ordem de Serviço.
+        </p>
+        <button type="button" onclick="fecharModalSessaoAbertaBloqueio()" style="width: 100%; background: #d93025; border: none; color: white; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;">
+          Entendido
+        </button>
+      </div>
+    </div>
+
+    <!-- MODAL DE ALERTA DE VALIDAÇÃO (FOTO / GPS / PROTOCOLO) -->
+    <div id="modalAlertaValidacaoPraca" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 999999; justify-content: center; align-items: center; padding: 15px;">
+      <div style="background: white; width: 100%; max-width: 400px; border-radius: 12px; padding: 22px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); font-family: sans-serif; border-top: 5px solid #d93025; text-align: center;">
+        <div style="font-size: 38px; margin-bottom: 8px;">⚠️</div>
+        <h3 id="modalAlertaTitulo" style="margin: 0 0 10px 0; color: #d93025; font-size: 18px;">Atenção!</h3>
+        <p id="modalAlertaTexto" style="font-size: 13px; color: #444; margin-bottom: 18px; line-height: 1.5; text-align: center;">
+          É necessário preencher os campos obrigatórios.
+        </p>
+        <button type="button" onclick="fecharModalAlertaValidacao()" style="width: 100%; background: #d93025; border: none; color: white; padding: 10px 16px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer;">
+          Entendido
+        </button>
+      </div>
+    </div>
+
+    <script>
+      // =========================================================================
+      // SUPABASE CLIENT DIRECT FRONTEND INTEGRATION
+      // =========================================================================
+      var SUPABASE_URL = "https://SEU_PROJETO.supabase.co"; // Substitua com sua URL
+      var SUPABASE_KEY = "SUA_ANON_KEY"; // Substitua com sua Anon Key pública
+      var supabaseClient = null;
+
+      function obterSupabaseClient() {
+        if (supabaseClient) return supabaseClient;
+        if (typeof supabase !== 'undefined' && SUPABASE_URL.indexOf("SEU_PROJETO") === -1 && SUPABASE_KEY.indexOf("SUA_ANON_KEY") === -1) {
+          try {
+            supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            console.log("⚡ [Supabase Direct Frontend] Cliente inicializado no navegador!");
+          } catch(e) {
+            console.warn("⚠️ [Supabase Direct Frontend] Falha ao inicializar client:", e);
+          }
+        }
+        return supabaseClient;
+      }
+
+      function atualizarSupabaseDiretoFrontend(tabela, protocolo, dadosUpdate) {
+        var client = obterSupabaseClient();
+        if (!client) return Promise.resolve(null);
+        console.log("⚡ [Supabase Direct Frontend] Atualizando protocol '" + protocolo + "' em '" + tabela + "':", dadosUpdate);
+        return client.from(tabela).update(dadosUpdate).eq('protocolo', protocolo)
+          .then(function(res) {
+            if (res.error) console.error("❌ [Supabase Direct Error]:", res.error);
+            else console.log("✅ [Supabase Direct Success]:", res.data);
+            return res;
+          })
+          .catch(function(err) {
+            console.error("❌ [Supabase Direct Exception]:", err);
+          });
+      }
+
+      var opcoesMateriais = [];
+
+      var cacheMateriais = localStorage.getItem('os_cached_materiais');
+      if (cacheMateriais) {
+        try { opcoesMateriais = JSON.parse(cacheMateriais); } catch(e) {}
+      }
+
+      var nomesDiretosAdmitidos = ["IGOR", "FERNANDO", "CARLOS", "ANA", "ERNESTO", "VALTER"];
+      var carrinhoMateriais = [];
+      var qtdAtual = 0;
+      var pontosData = {}; 
+      var configGlobal = { verificarTelegram: false, abaLog: "Telegram_Log" };
+      var timeoutMensagemErro;
+
+      // VARIÁVEIS E GESTÃO DE PRAÇA PÚBLICA
+      var dadosPracaAtual = null;
+      var fotoEntradaPracaBase64 = null;
+      var fotoEntradaPracaNome = "";
+      var carrinhoMateriaisPraca = [];
+      var mapPraca = null;
+      var markerPraca = null;
+      var coordsGpsPracaAtual = null;
+
+      function iniciarGpsPracaComMapa() {
+        var badge = document.getElementById('gpsBadgePraca');
+        var coordsText = document.getElementById('coordsTextPraca');
+
+        if (!navigator.geolocation) {
+          if (badge) { badge.style.background = '#fce8e6'; badge.style.color = '#d93025'; badge.innerText = '❌ Indisponível'; }
+          if (coordsText) coordsText.innerText = 'GPS não suportado neste dispositivo.';
+          return;
+        }
+
+        if (badge) { badge.style.background = '#fef7e0'; badge.style.color = '#b45f06'; badge.innerText = '📡 Buscando...'; }
+
+        navigator.geolocation.getCurrentPosition(function(pos) {
+          var lat = pos.coords.latitude.toFixed(6);
+          var lng = pos.coords.longitude.toFixed(6);
+          var acc = Math.round(pos.coords.accuracy);
+
+          coordsGpsPracaAtual = lat + ", " + lng;
+          if (badge) { badge.style.background = '#e6ffed'; badge.style.color = '#137333'; badge.innerText = '🎯 ±' + acc + 'm'; }
+          if (coordsText) coordsText.innerText = 'Lat: ' + lat + ' | Lng: ' + lng;
+
+          if (typeof L !== 'undefined') {
+            var container = document.getElementById('mapaCanvasPraca');
+            if (container) {
+              if (!mapPraca) {
+                mapPraca = L.map('mapaCanvasPraca').setView([lat, lng], 17);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                  maxZoom: 19,
+                  attribution: '© OpenStreetMap'
+                }).addTo(mapPraca);
+                markerPraca = L.marker([lat, lng]).addTo(mapPraca);
+              } else {
+                mapPraca.setView([lat, lng], 17);
+                markerPraca.setLatLng([lat, lng]);
+              }
+              setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 100);
+              setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
+            }
+          }
+        }, function(err) {
+          if (badge) { badge.style.background = '#fce8e6'; badge.style.color = '#d93025'; badge.innerText = '⚠️ Sem sinal'; }
+          if (coordsText) coordsText.innerText = 'Ative a localização / permissão de GPS no celular.';
+        }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+      }
+
+      function alterarQtdEletricista(delta) {
+        var el = document.getElementById('qtdEletricistaPraca');
+        if (el) {
+          var val = parseInt(el.value) || 1;
+          val += delta;
+          if (val < 1) val = 1;
+          el.value = val;
+        }
+      }
+
+      function alternarTipoOS() {
+        var tipo = document.querySelector('input[name="tipoOS"]:checked').value;
+        var abaIlum = document.getElementById('abaIluminacao');
+        var abaPraca = document.getElementById('abaPraca');
+
+        if (tipo === 'iluminacao') {
+          abaIlum.style.display = 'block';
+          abaPraca.style.display = 'none';
+        } else {
+          abaIlum.style.display = 'none';
+          abaPraca.style.display = 'block';
+        }
+      }
+
+      function validarProtocoloPraca() {
+        var token = localStorage.getItem('os_token');
+        var input = document.getElementById('protocoloPraca');
+        var prot = input.value.trim().toUpperCase();
+        var msg = document.getElementById('msgValidaPraca');
+        var btn = document.getElementById('btnValidarPraca');
+
+        if (!prot) {
+          msg.innerHTML = '<span class="erro">Digite o protocolo da praça.</span>';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.innerText = "Buscando...";
+        msg.innerHTML = "";
+
+        var processarResultadoPraca = function(res) {
+          btn.disabled = false;
+          btn.innerText = "Validar";
+
+          if (res && res.sucesso) {
+            dadosPracaAtual = res;
+            
+            try {
+              localStorage.setItem('os_praca_cache_' + prot, JSON.stringify(res));
+            } catch(e) {}
+
+            document.getElementById('infoPracaNome').innerText = "🌳 " + (res.pracaNome || "Praça sem nome");
+            document.getElementById('infoPracaEndereco').innerText = "📍 " + (res.endereco || "Endereço não informado");
+            
+            var stBadge = document.getElementById('badgeStatusPraca');
+            var statusNormalizado = (res.status || "Aberta").trim();
+            stBadge.innerText = statusNormalizado;
+
+            if (statusNormalizado.toLowerCase().indexOf('andamento') !== -1) {
+              stBadge.style.background = '#e8f0fe'; stBadge.style.color = '#1a73e8';
+            } else if (statusNormalizado.toLowerCase().indexOf('iniciado') !== -1) {
+              stBadge.style.background = '#feefc3'; stBadge.style.color = '#b06000';
+            } else if (statusNormalizado.toLowerCase().indexOf('conclu') !== -1) {
+              stBadge.style.background = '#e6f4ea'; stBadge.style.color = '#137333';
+            } else {
+              stBadge.style.background = '#fff3cd'; stBadge.style.color = '#856404';
+            }
+
+            document.getElementById('boxInfoPraca').style.display = 'block';
+            var corpoForm = document.getElementById('corpoFormPraca');
+
+            var btnSessao = document.getElementById('btnSessaoPraca');
+            var btnConcluir = document.getElementById('btnConcluirPraca');
+            var blocoMat = document.getElementById('blocoMateriaisPraca');
+
+            var stLower = statusNormalizado.toLowerCase();
+            var isConcluida = (stLower.indexOf('conclu') !== -1 || stLower.indexOf('resolv') !== -1);
+
+            if (isConcluida) {
+              if (corpoForm) corpoForm.style.display = 'none';
+              var msgVal = document.getElementById('msgValidaPraca');
+              if (msgVal) {
+                msgVal.innerHTML = '<div style="color:#137333; font-weight:bold; font-size:1.05em; padding:12px; background:#e6f4ea; border-radius:8px; border:1px solid #ceead6; margin-top:10px; text-align:center;">✅ Esta Ordem de Serviço da Praça Pública já está CONCLUÍDA. Nenhuma alteração é permitida.</div>';
+              }
+            } else {
+              if (corpoForm) corpoForm.style.display = 'block';
+              
+              // Inicia mapa e GPS da praça
+              iniciarGpsPracaComMapa();
+
+              if (btnSessao) btnSessao.style.display = 'inline-block';
+              if (btnConcluir) btnConcluir.style.display = 'inline-block';
+
+              document.querySelectorAll('#corpoFormPraca input, #corpoFormPraca select, #corpoFormPraca textarea, #corpoFormPraca button').forEach(function(el) {
+                el.disabled = false;
+              });
+
+              var blocoQtdElet = document.getElementById('blocoQtdEletricista');
+
+              if (res && res.temSessaoAbertaUsuario) {
+                if (btnSessao) {
+                  btnSessao.innerText = "⏹️ Encerrar";
+                  btnSessao.style.backgroundColor = "#d93025";
+                }
+                if (blocoMat) blocoMat.style.display = 'block';
+                if (blocoQtdElet) blocoQtdElet.style.display = 'none';
+              } else if (stLower.indexOf('iniciado') !== -1 || stLower.indexOf('andamento') !== -1) {
+                if (btnSessao) {
+                  btnSessao.innerText = "▶️ Continuar";
+                  btnSessao.style.backgroundColor = "#1a73e8";
+                }
+                if (blocoMat) blocoMat.style.display = 'none';
+                if (blocoQtdElet) blocoQtdElet.style.display = 'block';
+              } else {
+                if (btnSessao) {
+                  btnSessao.innerText = "▶️ Iniciar";
+                  btnSessao.style.backgroundColor = "#1a73e8";
+                }
+                if (blocoMat) blocoMat.style.display = 'none';
+                if (blocoQtdElet) blocoQtdElet.style.display = 'block';
+              }
+
+              var msgVal = document.getElementById('msgValidaPraca');
+              if (msgVal) {
+                msgVal.innerHTML = '<span style="color:#137333; font-weight:bold;">✅ Protocolo localizado e campos liberados!</span>';
+                setTimeout(function(){ msgVal.innerHTML = ''; }, 4000);
+              }
+            }
+
+          } else {
+            msg.innerHTML = '<span class="erro">' + (res ? res.mensagem : "Protocolo de Praça não encontrado.") + '</span>';
+            document.getElementById('boxInfoPraca').style.display = 'none';
+            document.getElementById('corpoFormPraca').style.display = 'none';
+          }
+        };
+
+        if (!navigator.onLine) {
+          var cachePraca = localStorage.getItem('os_praca_cache_' + prot);
+          if (cachePraca) {
+            try { processarResultadoPraca(JSON.parse(cachePraca)); return; } catch(e) {}
+          }
+          processarResultadoPraca({
+            sucesso: true,
+            protocolo: prot,
+            status: "Aberta",
+            pracaNome: "Praça (Modo Offline)",
+            endereco: "Informações salvas offline"
+          });
+          return;
+        }
+
+        callServer('obterDadosProtocoloPraca', [prot, token])
+          .then(processarResultadoPraca)
+          .catch(function(err) {
+            console.warn("⚠️ Não foi possível validar online, buscando cache:", err);
+            var cachePraca = localStorage.getItem('os_praca_cache_' + prot);
+            if (cachePraca) {
+              try { processarResultadoPraca(JSON.parse(cachePraca)); return; } catch(e){}
+            }
+            processarResultadoPraca({
+              sucesso: true,
+              protocolo: prot,
+              status: "Aberta",
+              pracaNome: "Praça (Offline)",
+              endereco: "Sem conexão no momento"
+            });
+          });
+      }
+
+      function previewFotoEntradaPraca(event) {
+        var file = event.target.files[0];
+        if (!file) return;
+        fotoEntradaPracaNome = file.name || "foto_entrada.jpg";
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          fotoEntradaPracaBase64 = e.target.result;
+          document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+          document.getElementById('previewEntradaPracaContainer').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function removerFotoEntradaPraca() {
+        fotoEntradaPracaBase64 = null;
+        fotoEntradaPracaNome = "";
+        document.getElementById('fotoEntradaPraca').value = "";
+        document.getElementById('imgPreviewEntradaPraca').src = "";
+        document.getElementById('previewEntradaPracaContainer').style.display = 'none';
+      }
+
+      function mostrarTodosMateriaisPraca() {
+        renderListaPraca(opcoesMateriais);
+      }
+
+      function filtrarMateriaisPraca() {
+        var input = document.getElementById('inputMaterialPraca').value.toLowerCase().trim();
+        var filtrados = opcoesMateriais.filter(function(i) {
+          var texto = (typeof i === 'object') ? (i.valor || "") : String(i);
+          return texto.toLowerCase().indexOf(input) !== -1;
+        });
+        renderListaPraca(filtrados);
+      }
+
+      function renderListaPraca(lista) {
+        var dropdown = document.getElementById('dropdownMateriaisPraca');
+        dropdown.innerHTML = "";
+
+        if (!lista || lista.length === 0) {
+          dropdown.style.display = "none";
+          return;
+        }
+
+        lista.forEach(function(item) {
+          var d = document.createElement('div');
+          d.className = "dropdown-item";
+          var valStr = (typeof item === 'object') ? (item.valor || "") : String(item);
+          var htmlStr = formatarMaterialHTML(item);
+          d.innerHTML = htmlStr;
+          d.onclick = function(e) {
+            e.stopPropagation();
+            document.getElementById('inputMaterialPraca').value = valStr;
+            dropdown.style.display = "none";
+          };
+          dropdown.appendChild(d);
+        });
+        dropdown.style.display = "block";
+      }
+
+      function adicionarMaterialPraca() {
+        var matInput = document.getElementById('inputMaterialPraca');
+        var qtdInput = document.getElementById('inputQtdPraca');
+        var nome = matInput.value.trim();
+        var qtd = parseFloat(qtdInput.value);
+
+        if (!nome) { alert("Selecione ou digite o nome do material."); return; }
+        if (isNaN(qtd) || qtd <= 0) { alert("Informe uma quantidade válida."); return; }
+
+        carrinhoMateriaisPraca.push({ nome: nome, qtd: qtd });
+        matInput.value = "";
+        qtdInput.value = "1";
+        renderizarMateriaisPraca();
+      }
+
+      function removerMaterialPraca(idx) {
+        carrinhoMateriaisPraca.splice(idx, 1);
+        renderizarMateriaisPraca();
+      }
+
+      function renderizarMateriaisPraca() {
+        var tbody = document.getElementById('tbodyMateriaisPraca');
+        tbody.innerHTML = "";
+        carrinhoMateriaisPraca.forEach(function(m, idx) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td><b>' + m.qtd + '</b></td><td>' + m.nome + '</td><td><button type="button" class="btn-remover" onclick="removerMaterialPraca(' + idx + ')">✕</button></td>';
+          tbody.appendChild(tr);
+        });
+      }
+
+      function exibirModalAlertaValidacao(titulo, mensagem, elParaScroll) {
+        var m = document.getElementById('modalAlertaValidacaoPraca');
+        var elTit = document.getElementById('modalAlertaTitulo');
+        var elTxt = document.getElementById('modalAlertaTexto');
+        if (elTit) elTit.innerText = titulo || "Atenção!";
+        if (elTxt) elTxt.innerText = mensagem || "";
+        if (m) m.style.display = 'flex';
+        if (elParaScroll) {
+          elParaScroll.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+
+      function fecharModalAlertaValidacao() {
+        var m = document.getElementById('modalAlertaValidacaoPraca');
+        if (m) m.style.display = 'none';
+      }
+
+      function executarAcaoSessaoPraca() {
+        if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
+          exibirModalAlertaValidacao("Protocolo Não Validado", "Por favor, busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
+          return;
+        }
+
+        var ehEncerrar = !!dadosPracaAtual.temSessaoAbertaUsuario;
+
+        // Se a ação for INICIAR ou CONTINUAR (não é encerrar), exige Foto de Entrada e GPS funcionando!
+        if (!ehEncerrar) {
+          if (!fotoEntradaPracaBase64) {
+            exibirModalAlertaValidacao(
+              "Foto de Entrada Obrigatoriedade",
+              "É obrigatório tirar ou anexar a Foto de Entrada do local antes de iniciar ou continuar a sessão de trabalho.",
+              document.getElementById('boxFotoEntradaPraca')
+            );
+            return;
+          }
+
+          var badgeGps = document.getElementById('gpsBadgePraca');
+          var txtGps = badgeGps ? badgeGps.innerText : "";
+
+          if (!coordsGpsPracaAtual || txtGps.indexOf('Sem sinal') !== -1 || txtGps.indexOf('Indisponível') !== -1 || txtGps.indexOf('Buscando') !== -1) {
+            exibirModalAlertaValidacao(
+              "Sinal de GPS Necessário",
+              "Por favor, aguarde a captura da localização por GPS do seu aparelho com sinal ativo antes de iniciar ou continuar a sessão de trabalho.",
+              document.getElementById('gpsBadgePraca')
+            );
+            return;
+          }
+        }
+
+        var stAtual = (dadosPracaAtual.status || "Aberta").trim().toLowerCase();
+        var novoStatus = "Em Andamento";
+
+        if (stAtual.indexOf('andamento') !== -1) {
+          novoStatus = "Iniciado";
+        } else if (stAtual.indexOf('iniciado') !== -1) {
+          novoStatus = "Em Andamento";
+        } else {
+          novoStatus = "Em Andamento";
+        }
+
+        enviarAtualizacaoStatusPraca(novoStatus);
+      }
+
+      function executarConcluirPraca() {
+        if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
+          exibirModalAlertaValidacao("Protocolo Não Validado", "Por favor, busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
+          return;
+        }
+        var obsEl = document.getElementById('obsModalConcluirPraca');
+        if (obsEl) obsEl.value = "";
+        document.getElementById('modalConcluirPraca').style.display = 'flex';
+      }
+
+      function fecharModalConcluirPraca() {
+        document.getElementById('modalConcluirPraca').style.display = 'none';
+      }
+
+      function exibirModalSessaoAbertaBloqueio(detalhes) {
+        if (detalhes) {
+          var elNum = document.getElementById('bloqueioSessaoNum');
+          var elTec = document.getElementById('bloqueioSessaoTecnico');
+          var elIni = document.getElementById('bloqueioSessaoInicio');
+          if (elNum) elNum.innerText = '#' + (detalhes.numero || '1');
+          if (elTec) elTec.innerText = detalhes.tecnico || 'Técnico';
+          if (elIni) elIni.innerText = detalhes.inicioStr || 'Em aberto';
+        }
+        var m = document.getElementById('modalSessaoAbertaBloqueio');
+        if (m) m.style.display = 'flex';
+      }
+
+      function fecharModalSessaoAbertaBloqueio() {
+        var m = document.getElementById('modalSessaoAbertaBloqueio');
+        if (m) m.style.display = 'none';
+      }
+
+      function confirmarConclusaoPracaNoModal() {
+        var obsModal = document.getElementById('obsModalConcluirPraca') ? document.getElementById('obsModalConcluirPraca').value.trim() : "";
+        fecharModalConcluirPraca();
+        enviarAtualizacaoStatusPraca("Concluído", obsModal);
+      }
+
+      function enviarAtualizacaoStatusPraca(novoStatus, obsAdicionalModal) {
+        var token = localStorage.getItem('os_token');
+        var msgPraca = document.getElementById('mensagemPraca');
+        var btnSessao = document.getElementById('btnSessaoPraca');
+        var btnConcluir = document.getElementById('btnConcluirPraca');
+
+        var btnAlvo = (novoStatus === "Concluído") ? btnConcluir : btnSessao;
+        var txtOrigSessao = btnSessao.innerText;
+        var txtOrigConcluir = btnConcluir.innerText;
+        btnSessao.disabled = true;
+        btnConcluir.disabled = true;
+        btnAlvo.innerText = "⏳ Processando...";
+        msgPraca.innerHTML = "";
+
+        var descText = obsAdicionalModal || "";
+        var qtdEletEl = document.getElementById('qtdEletricistaPraca');
+        var qtdElet = qtdEletEl ? (parseInt(qtdEletEl.value) || 1) : 1;
+        var tagSessao = (novoStatus === 'Em Andamento') ? 'ENTRADA' : 'SAIDA';
+
+        var payload = {
+          tipoOS: 'praca',
+          protocolo: dadosPracaAtual.protocolo,
+          novoStatus: novoStatus,
+          tagSessao: tagSessao,
+          fotoEntrada: fotoEntradaPracaBase64,
+          fotoEntradaNome: fotoEntradaPracaNome,
+          materiais: carrinhoMateriaisPraca,
+          coordenadasGps: coordsGpsPracaAtual,
+          descricao: descText,
+          qtdEletricista: qtdElet
+        };
+
+        console.log("🚀 [F12 PRACA] Solicitando alteração de status para:", novoStatus);
+        console.log("📋 [F12 PRACA] Payload:", payload);
+
+        var resetBotoesPraca = function() {
+          btnSessao.disabled = false;
+          btnConcluir.disabled = false;
+          btnSessao.innerText = txtOrigSessao;
+          btnConcluir.innerText = txtOrigConcluir;
+        };
+
+        var callbackSucessoPraca = function(sucessoMsg) {
+          resetBotoesPraca();
+          dadosPracaAtual.status = novoStatus;
+          msgPraca.innerHTML = "";
+          
+          try {
+            localStorage.setItem('os_praca_cache_' + dadosPracaAtual.protocolo, JSON.stringify(dadosPracaAtual));
+          } catch(e) {}
+
+          var isConclusao = (novoStatus === "Concluído");
+          var tituloModal = isConclusao ? "Ordem de Serviço Concluída" : "Sessão de Trabalho Registrada";
+          
+          var msgFinal = sucessoMsg;
+          if (!msgFinal || msgFinal.indexOf('alterado para') !== -1 || msgFinal.indexOf('sucesso') !== -1) {
+            if (novoStatus === 'Em Andamento') {
+              msgFinal = "▶️ Sessão de trabalho iniciada com sucesso para o protocolo " + dadosPracaAtual.protocolo + ".";
+            } else if (novoStatus === 'Iniciado') {
+              msgFinal = "⏸️ Sessão de trabalho encerrada e horas acumuladas com sucesso!";
+            } else if (novoStatus === 'Concluído') {
+              msgFinal = "✅ Ordem de Serviço da Praça " + dadosPracaAtual.protocolo + " foi concluída com sucesso!";
+            }
+          }
+
+          var elTitulo = document.querySelector('#modalSucesso h3') || document.querySelector('#modalSucesso h2');
+          if (elTitulo) elTitulo.innerText = tituloModal;
+
+          document.getElementById('msgSucessoTexto').innerText = msgFinal;
+          document.getElementById('modalSucesso').style.display = 'flex';
+          
+          removerFotoEntradaPraca();
+          carrinhoMateriaisPraca = [];
+          renderizarMateriaisPraca();
+          var elDesc = document.getElementById('descricaoPraca');
+          if (elDesc) elDesc.value = "";
+          
+          validarProtocoloPraca();
+        };
+
+        callServer('atualizarStatusOSPraca', [payload, token])
+          .then(function(res) {
+            console.log("✅ [F12 PRACA SERVIDOR]: Resposta completa recebida:", res);
+            if (res && res.debug) {
+              console.log("🔍 [F12 DEBUG BACKEND] Linha Encontrada:", res.debug.linhaEncontrada);
+              console.log("🔍 [F12 DEBUG BACKEND] Status Anterior:", res.debug.statusAnterior);
+              console.log("🔍 [F12 DEBUG BACKEND] Novo Status:", res.debug.novoStatus);
+              console.log("🔍 [F12 DEBUG BACKEND] Texto ANTIGO lido da Coluna Q:\n", res.debug.sessoesTextoAntigo);
+              console.log("🔍 [F12 DEBUG BACKEND] Novo Texto GRAVADO na Coluna Q:\n", res.debug.novoTextoColunaQ);
+              console.log("🔍 [F12 DEBUG BACKEND] Coordenada Teórica (Coluna O):", res.debug.coordsTeorica);
+              console.log("🔍 [F12 DEBUG BACKEND] Novo Texto GRAVADO na Coluna R:\n", res.debug.novoTextoColunaR);
+              console.log("🔍 [F12 DEBUG BACKEND] Novo Texto GRAVADO na Coluna S:\n", res.debug.novoTextoColunaS);
+            }
+            if (res && res.sucesso) {
+              callbackSucessoPraca(res.mensagem);
+            } else {
+              resetBotoesPraca();
+              if (res && res.sessaoAbertaBloqueio) {
+                exibirModalSessaoAbertaBloqueio(res.detalhesSessao);
+              } else {
+                msgPraca.innerHTML = '<span class="erro">' + (res ? res.mensagem : "Erro ao atualizar status.") + '</span>';
+              }
+            }
+          })
+          .catch(function(err) {
+            resetBotoesPraca();
+            msgPraca.innerHTML = '<span class="erro">Erro ao enviar: ' + err.message + '</span>';
+          });
+      }
+
+      var API_URL = "https://script.google.com/macros/s/AKfycbzmvAoE8F8kHXq0C4jWwhur6IstaKfgjcSnG7yHOq6eujxlBA-lp2nf1NiOh_2n5XIWHw/exec"; // ID BASE PLAN IGOR
+      //var API_URL = "https://script.google.com/macros/s/AKfycbwJh2xKyG0JGDMOdXycyAv4nFhci9jSPV6MarLcnWrf1qxJM6kM9vXQkpgnjlozPxlRVA/exec"; // ID BASE PLAN ILUMINAÇÃO
+	  
+      function callServer(action, args) {
+        return fetch(API_URL, {
+          method: "POST",
+          body: JSON.stringify({ action: action, args: args || [] })
+        })
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
+          if (data && data.sucesso !== undefined) {
+            if (data.sucesso) return data.result;
+            else throw new Error(data.mensagem || "Erro na requisição.");
+          }
+          return data;
+        });
+      }
+
+      function carregarMateriaisDinamicos() {
+        if (!navigator.onLine) {
+          var cache = localStorage.getItem('os_cached_materiais');
+          if (cache) {
+            try { opcoesMateriais = JSON.parse(cache); } catch(e) {}
+          }
+          return;
+        }
+
+        callServer('obterListaMateriais', [])
+          .then(function(lista) {
+            if (lista && Array.isArray(lista) && lista.length > 0) {
+              opcoesMateriais = lista.sort();
+              localStorage.setItem('os_cached_materiais', JSON.stringify(opcoesMateriais));
+            }
+          })
+          .catch(function(err) {
+            console.warn("⚠️ Usando cache local de materiais:", err);
+            var cache = localStorage.getItem('os_cached_materiais');
+            if (cache) {
+              try { opcoesMateriais = JSON.parse(cache); } catch(e) {}
+            }
+          });
+      }
+
+      function mascaraData(i) {
+        var v = i.value.replace(/\D/g, '');
+        if (v.length > 8) v = v.substring(0, 8);
+        if (v.length >= 5) {
+          i.value = v.substring(0, 2) + '/' + v.substring(2, 4) + '/' + v.substring(4);
+        } else if (v.length >= 3) {
+          i.value = v.substring(0, 2) + '/' + v.substring(2);
+        } else {
+          i.value = v;
+        }
+      }
+
+      window.onload = function() {
+        var hoje = new Date();
+        var dd = String(hoje.getDate()).padStart(2, '0');
+        var mm = String(hoje.getMonth() + 1).padStart(2, '0');
+        var yyyy = hoje.getFullYear();
+        document.getElementById('dataReparo').value = dd + '/' + mm + '/' + yyyy;
+
+        ajustarPontos(); // Inicia desenhando o 1º Ponto
+        carregarMateriaisDinamicos();
+
+        // Oculta as listas de materiais ao clicar fora
+        document.addEventListener('click', function(e) {
+          var input1 = document.getElementById('inputMaterial');
+          var combo1 = input1 ? input1.closest('.custom-combobox') : null;
+          var dropdown1 = document.getElementById('dropdownMateriais');
+          if (combo1 && dropdown1 && !combo1.contains(e.target)) {
+            dropdown1.style.display = 'none';
+          }
+          var input2 = document.getElementById('inputMaterialPraca');
+          var combo2 = input2 ? input2.closest('.custom-combobox') : null;
+          var dropdown2 = document.getElementById('dropdownMateriaisPraca');
+          if (combo2 && dropdown2 && !combo2.contains(e.target)) {
+            dropdown2.style.display = 'none';
+          }
+        });
+
+        var tokenCache = localStorage.getItem('os_token');
+        if (tokenCache) {
+          document.getElementById('btnFazerLogin').style.display = "none";
+          document.getElementById('loaderLogin').style.display = "block";
+          var msg = document.getElementById('msgLogin');
+          msg.style.color = "#d93025";
+          msg.innerText = "Validando sessão...";
+
+          callServer('validarSessao', [tokenCache, 'finalizacao'])
+            .then(function(sessao) {
+              if (sessao && sessao.valido) {
+                liberarAcesso();
+              } else {
+                localStorage.removeItem('os_token');
+                document.getElementById('btnFazerLogin').style.display = "block";
+                document.getElementById('loaderLogin').style.display = "none";
+                msg.innerText = (sessao && sessao.mensagem) ? sessao.mensagem : "Sessão expirada. Faça login novamente.";
+              }
+            })
+            .catch(function(err) {
+              localStorage.removeItem('os_token');
+              document.getElementById('btnFazerLogin').style.display = "block";
+              document.getElementById('loaderLogin').style.display = "none";
+              msg.innerText = "Sessão expirada. Faça login novamente.";
+            });
+        }
+      };
+
+      // =========================================================================
+      // GERADOR DINÂMICO DE UI
+      // =========================================================================
+      function ajustarPontos() {
+        var novaQtd = parseInt(document.getElementById('quantidade').value);
+        if (isNaN(novaQtd) || novaQtd < 1) novaQtd = 1;
+        var container = document.getElementById('pontosContainer');
+
+        if (novaQtd > qtdAtual) {
+            for (var i = qtdAtual; i < novaQtd; i++) {
+                inicializarStatePonto(i);
+                container.insertAdjacentHTML('beforeend', gerarHTMLPonto(i));
+            }
+        } else if (novaQtd < qtdAtual) {
+            for (var j = qtdAtual - 1; j >= novaQtd; j--) {
+                var ptDiv = document.getElementById('ponto_' + j);
+                if (ptDiv) ptDiv.remove();
+                delete pontosData[j];
+            }
+        }
+        qtdAtual = novaQtd;
+        ativarLimpezaErros();
+      }
+
+      function inicializarStatePonto(idx) {
+        pontosData[idx] = {
+            usarMesmoEndereco: false, 
+            fotosEstagios: { 'Problema Encontrado': null, 'Reparo Efetuado': null, 'Plaqueta': null },
+            textoAuditoriaOCR: "Nenhuma leitura realizada"
+        };
+      }
+
+      function ativarLimpezaErros() {
+        var campos = document.querySelectorAll('.limpar-erro');
+        campos.forEach(function(c) {
+           c.addEventListener('input', function() { this.classList.remove('input-invalido'); });
+           c.addEventListener('change', function() { this.classList.remove('input-invalido'); });
+        });
+      }
+
+      function gerarHTMLPonto(idx) {
+        var num = idx + 1;
+        var h = '<div class="card-ponto" id="ponto_' + idx + '">';
+        h += '<div class="card-ponto-header">⚙️ Ponto ' + num + '</div>';
+        
+        if (idx > 0) {
+            h += '<div style="margin-bottom: 15px; margin-top: 5px;">';
+            h += '  <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: #1a73e8; font-size: 13px; font-weight: normal;">';
+            h += '    <input type="checkbox" id="mesmoEnd_' + idx + '" onchange="toggleMesmoEndereco(' + idx + ')">';
+            h += '    Usar a mesma localização do Ponto 1';
+            h += '  </label>';
+            h += '</div>';
+        }
+
+        h += '<div id="blocoLocalizacao_' + idx + '">';
+        h += '  <div class="form-group destaque-obrigatorio">';
+        h += '    <label class="obrigatorio">Plaqueta do Ponto:</label>';
+        h += '    <input type="text" id="plaqueta_' + idx + '" class="limpar-erro" maxlength="5" placeholder="Ex: U8162" style="text-transform: uppercase;" required>';
+        h += '  </div>';
+
+        h += '  <div class="form-group destaque-obrigatorio">';
+        h += '    <label class="obrigatorio">Coordenadas:</label>';
+        h += '    <div class="row row-coords">';
+        h += '      <input type="text" id="lat_' + idx + '" class="col limpar-erro" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')">';
+        h += '      <input type="text" id="lng_' + idx + '" class="col limpar-erro" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')">';
+        h += '      <button type="button" class="btn-icon" onclick="capturarLocalizacaoGPS(' + idx + ')" title="Obter GPS do Ponto">📍</button>';
+        h += '    </div>';
+        h += '    <div id="mapaCanvasPonto_' + idx + '" style="width: 100%; height: 160px; border-radius: 6px; border: 1px solid #ccc; margin-top: 8px; display: none; position: relative; z-index: 1;"></div>';
+        h += '  </div>';
+        h += '</div>';
+
+        h += '<div class="form-group destaque-obrigatorio">';
+        h += '  <label class="obrigatorio">Problema Resolvido:</label>';
+        h += '  <select id="tipoProblema_' + idx + '" class="limpar-erro" onchange="verificarProblemaOutros(' + idx + ')">';
+        h += '    <option value="" disabled selected>Selecione...</option>';
+        h += '    <optgroup label="Problemas Resolvidos">';
+        h += '      <option value="Lâmpada queimada">Lâmpada queimada</option>';
+        h += '      <option value="Intermitente">Intermitente</option>';
+        h += '      <option value="Acesa ao dia">Acesa ao dia</option>';
+        h += '      <option value="Braço caído/quebrado">Braço caído/quebrado</option>';
+        h += '    </optgroup>';
+        h += '    <optgroup label="Problemas Externos">';
+        h += '      <option value="Problema na rede (Acionar CPFL)">Problema na rede (Acionar CPFL)</option>';
+        h += '      <option value="Necessário poda de árvore (Acionar CPFL)">Necessário poda de árvore (Acionar CPFL)</option>';
+        h += '    </optgroup>';
+        h += '    <option value="Outros">Outros</option>';
+        h += '  </select>';
+        h += '  <input type="text" id="problemaOutros_' + idx + '" placeholder="Especifique..." style="display: none; margin-top: 5px;">';
+        h += '</div>';
+
+        h += '<div class="form-group" style="margin-top: 15px;">';
+        h += '  <label>Anexos deste Ponto:</label>';
+        h += '  <div class="estagio-wrapper">';
+        
+        h += '    <div class="estagio-item">';
+        h += '      <div class="estagio-header">1. Problema</div>';
+        h += '      <input type="file" id="inFileProb_' + idx + '" accept="image/*" capture="environment" style="display:none" onchange="processarFotoEstagio(event, \'Problema Encontrado\', \'previewProb_' + idx + '\', ' + idx + ')">';
+        h += '      <div class="estagio-upload-area" onclick="document.getElementById(\'inFileProb_' + idx + '\').click()">📷 Tirar foto</div>';
+        h += '      <div id="previewProb_' + idx + '" class="preview-container" style="display: none;"></div>';
+        h += '    </div>';
+
+        h += '    <div class="estagio-item">';
+        h += '      <div class="estagio-header">2. Reparo</div>';
+        h += '      <input type="file" id="inFileRep_' + idx + '" accept="image/*" capture="environment" style="display:none" onchange="processarFotoEstagio(event, \'Reparo Efetuado\', \'previewRep_' + idx + '\', ' + idx + ')">';
+        h += '      <div class="estagio-upload-area" onclick="document.getElementById(\'inFileRep_' + idx + '\').click()">📷 Tirar foto</div>';
+        h += '      <div id="previewRep_' + idx + '" class="preview-container" style="display: none;"></div>';
+        h += '    </div>';
+
+        h += '    <div class="estagio-item">';
+        h += '      <div class="estagio-header">3. Plaqueta</div>';
+        h += '      <input type="file" id="inFilePlaq_' + idx + '" accept="image/*" capture="environment" style="display:none" onchange="processarFotoPlaqueta(event, \'Plaqueta\', \'previewPlaq_' + idx + '\', ' + idx + ')">';
+        h += '      <div class="estagio-upload-area" onclick="document.getElementById(\'inFilePlaq_' + idx + '\').click()">📷 Tirar foto</div>';
+        h += '      <div id="previewPlaq_' + idx + '" class="preview-container" style="display: none;"></div>';
+        h += '      <div id="progressoOCR_' + idx + '" style="font-size: 11px; color: #1a73e8; margin-top: 8px; font-weight: bold; display: none; text-align: center;"></div>';
+        h += '    </div>';
+
+        h += '  </div>';
+        h += '</div>';
+        h += '<div id="msgErroPonto_' + idx + '" class="erro" style="font-size:12px;"></div>';
+        
+        h += '</div>'; 
+        return h;
+      }
+
+      function toggleMesmoEndereco(idx) {
+        var chk = document.getElementById('mesmoEnd_' + idx).checked;
+        var bloco = document.getElementById('blocoLocalizacao_' + idx);
+        pontosData[idx].usarMesmoEndereco = chk;
+        bloco.style.display = chk ? 'none' : 'block';
+      }
+
+      function verificarProblemaOutros(idx) {
+        var s = document.getElementById('tipoProblema_' + idx);
+        document.getElementById('problemaOutros_' + idx).style.display = (s.value === "Outros") ? "block" : "none";
+      }
+
+      function mascaraCoord(i) { i.value = i.value.replace(/[^0-9.-]/g, ''); var parts = i.value.split('.'); if (parts.length > 2) i.value = parts[0] + '.' + parts.slice(1).join(''); if (i.value.indexOf('-') > 0) i.value = i.value.replace('-', ''); }
+
+      var mapsPontos = {};
+      var markersPontos = {};
+
+      function atualizarMapaPonto(idx) {
+        var latInput = document.getElementById('lat_' + idx);
+        var lngInput = document.getElementById('lng_' + idx);
+        if (!latInput || !lngInput) return;
+
+        var latVal = parseFloat(latInput.value.replace(',', '.'));
+        var lngVal = parseFloat(lngInput.value.replace(',', '.'));
+        var container = document.getElementById('mapaCanvasPonto_' + idx);
+        if (!container) return;
+
+        if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0 && Math.abs(latVal) <= 90 && Math.abs(lngVal) <= 180) {
+          container.style.display = 'block';
+          if (typeof L !== 'undefined') {
+            if (!mapsPontos[idx]) {
+              mapsPontos[idx] = L.map('mapaCanvasPonto_' + idx).setView([latVal, lngVal], 17);
+              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+              }).addTo(mapsPontos[idx]);
+              markersPontos[idx] = L.marker([latVal, lngVal]).addTo(mapsPontos[idx]);
+            } else {
+              mapsPontos[idx].setView([latVal, lngVal], 17);
+              markersPontos[idx].setLatLng([latVal, lngVal]);
+            }
+            setTimeout(function() {
+              if (mapsPontos[idx]) mapsPontos[idx].invalidateSize();
+            }, 100);
+            setTimeout(function() {
+              if (mapsPontos[idx]) mapsPontos[idx].invalidateSize();
+            }, 400);
+          }
+        } else {
+          container.style.display = 'none';
+        }
+      }
+
+      function capturarLocalizacaoGPS(idx) {
+        var latInput = document.getElementById('lat_' + idx);
+        var lngInput = document.getElementById('lng_' + idx);
+        var msg = document.getElementById('mensagem');
+        if (msg) msg.innerHTML = "";
+
+        if (!navigator.geolocation) {
+          if (msg) msg.innerHTML = '<span class="erro">GPS indisponível neste dispositivo.</span>';
+          return;
+        }
+
+        if (latInput) latInput.value = "Buscando...";
+        if (lngInput) lngInput.value = "Buscando...";
+
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            var lat = pos.coords.latitude.toFixed(6);
+            var lng = pos.coords.longitude.toFixed(6);
+
+            if (latInput) latInput.value = lat;
+            if (lngInput) lngInput.value = lng;
+            atualizarMapaPonto(idx);
+          }, 
+          function(err) {
+            if (latInput) latInput.value = "";
+            if (lngInput) lngInput.value = "";
+            if (msg) msg.innerHTML = '<span class="erro">Falha ao buscar GPS do Ponto ' + (idx + 1) + '.</span>';
+          }, 
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+
+      // =========================================================================
+      // MATERIAIS
+      // =========================================================================
+      function formatarMaterialHTML(item) {
+        if (!item) return "";
+        var valStr = (typeof item === 'object') ? (item.valor || "") : String(item);
+        
+        if (typeof item === 'object' && item.html) {
+          return item.html;
+        }
+
+        var html = valStr;
+        var matchUnidade = valStr.match(/\s*\(([^)]+)\)$/);
+        var unidadeHTML = "";
+        var baseStr = valStr;
+        if (matchUnidade) {
+          unidadeHTML = " <b style='font-weight: 700; color: #1a73e8;'>(" + matchUnidade[1] + ")</b>";
+          baseStr = valStr.replace(/\s*\(([^)]+)\)$/, '');
+        }
+
+        var partes = baseStr.split(" - ");
+        if (partes.length >= 2) {
+          var marca = partes[0].trim();
+          var material = partes.slice(1).join(" - ").trim();
+          html = "<b style='font-weight: 700; color: #202124;'>" + marca + "</b> - " + material + unidadeHTML;
+        } else {
+          html = baseStr + unidadeHTML;
+        }
+
+        return html;
+      }
+
+      function filtrarMateriais() {
+        var termo = document.getElementById('inputMaterial').value.toLowerCase();
+        var filtrados = opcoesMateriais.filter(function(i) {
+          var texto = (typeof i === 'object') ? i.valor : i;
+          return texto.toLowerCase().indexOf(termo) !== -1;
+        });
+        renderLista(filtrados);
+      }
+      function mostrarTodosMateriais() { renderLista(opcoesMateriais); }
+      function renderLista(lista) {
+        var div = document.getElementById('dropdownMateriais');
+        div.innerHTML = '';
+        if (!lista || lista.length === 0) {
+          div.style.display = 'none';
+          return;
+        }
+        lista.forEach(function(item) {
+          var d = document.createElement('div');
+          d.className = 'dropdown-item';
+          
+          var valStr = (typeof item === 'object') ? item.valor : item;
+          var htmlStr = formatarMaterialHTML(item);
+          
+          d.innerHTML = htmlStr;
+          d.onclick = function(e) {
+            e.stopPropagation();
+            document.getElementById('inputMaterial').value = valStr;
+            div.style.display = 'none';
+          };
+          div.appendChild(d);
+        });
+        div.style.display = 'block';
+      }
+      function adicionarMaterial() {
+        var nome = document.getElementById('inputMaterial').value.toUpperCase();
+        var qtd = parseFloat(document.getElementById('inputQtd').value.replace(',', '.'));
+        if (!nome || isNaN(qtd)) return;
+        carrinhoMateriais.push({ nome: nome, qtd: qtd });
+        document.getElementById('inputMaterial').value = '';
+        document.getElementById('inputQtd').value = 1;
+        atualizarTabela();
+      }
+      function atualizarTabela() {
+        var html = '';
+        carrinhoMateriais.forEach(function(item, i) {
+          html += '<tr><td>' + item.qtd + '</td><td>' + item.nome + '</td><td><button class="btn-remover" onclick="removerMat(' + i + ')">X</button></td></tr>';
+        });
+        document.getElementById('tbodyMateriais').innerHTML = html;
+      }
+      function removerMat(i) { carrinhoMateriais.splice(i, 1); atualizarTabela(); }
+
+      // =========================================================================
+      // FOTOS & OCR SILENCIOSO
+      // =========================================================================
+      function comprimirImagem(file, max_width, callback) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+              var img = new Image();
+              img.onload = function() {
+                  var canvas = document.createElement('canvas'); var ctx = canvas.getContext('2d');
+                  var ratio = max_width / img.width; var width = max_width; var height = img.height * ratio;
+                  if (img.width < max_width) { width = img.width; height = img.height; }
+                  canvas.width = width; canvas.height = height; ctx.drawImage(img, 0, 0, width, height);
+                  callback(canvas.toDataURL('image/jpeg', 0.7));
+              };
+              img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+      }
+
+      function comprimirImagemParaIA(file, callback) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+              var img = new Image();
+              img.onload = function() {
+                  var canvas = document.createElement('canvas'); var ctx = canvas.getContext('2d');
+                  var max_width = 1200; var ratio = max_width / img.width; var width = max_width; var height = img.height * ratio;
+                  if (img.width < max_width) { width = img.width; height = img.height; }
+                  canvas.width = width; canvas.height = height; ctx.drawImage(img, 0, 0, width, height);
+                  callback(canvas.toDataURL('image/jpeg', 0.95)); 
+              };
+              img.src = e.target.result;
+          };
+          reader.readAsDataURL(file);
+      }
+
+      function processarFotoEstagio(event, estagioNome, previewId, idx) {
+          var file = event.target.files[0];
+          if (!file) return;
+          comprimirImagem(file, 800, function(dataUrl) {
+              pontosData[idx].fotosEstagios[estagioNome] = dataUrl.split(',')[1];
+              exibirPreview(dataUrl, estagioNome, previewId, idx);
+          });
+          event.target.value = ""; 
+      }
+
+      function processarFotoPlaqueta(event, estagioNome, previewId, idx) {
+          var file = event.target.files[0];
+          if (!file) return;
+
+          var progresso = document.getElementById('progressoOCR_' + idx);
+          progresso.style.display = 'block';
+          progresso.innerText = "Processando imagem...";
+          progresso.style.color = '#5f6368';
+
+          var btnSalvar = document.getElementById('btnSalvar');
+          btnSalvar.disabled = true;
+          btnSalvar.innerText = "Validando imagens...";
+
+          comprimirImagem(file, 800, function(dataUrl) {
+              pontosData[idx].fotosEstagios[estagioNome] = dataUrl.split(',')[1];
+              exibirPreview(dataUrl, estagioNome, previewId, idx);
+          });
+          
+          comprimirImagemParaIA(file, function(dataUrlPremium) {
+              var base64ImgIA = dataUrlPremium.split(',')[1];
+
+              callServer('lerPlaquetaComGeminiAPI', [base64ImgIA])
+                .then(function(textoLido) {
+                    pontosData[idx].textoAuditoriaOCR = textoLido;
+                    
+                    progresso.innerText = "✔️ Imagem anexada.";
+                    progresso.style.color = '#188038';
+                    setTimeout(function() { progresso.style.display = 'none'; }, 3000);
+                    
+                    btnSalvar.disabled = false;
+                    btnSalvar.innerText = "Finalizar";
+                })
+                .catch(function(err) {
+                    pontosData[idx].textoAuditoriaOCR = "Erro de conexão";
+                    progresso.innerText = "⚠️ Imagem anexada (offline mode).";
+                    progresso.style.color = '#d93025';
+                    setTimeout(function() { progresso.style.display = 'none'; }, 3000);
+                    
+                    btnSalvar.disabled = false;
+                    btnSalvar.innerText = "Finalizar";
+                }); 
+          });
+          event.target.value = ""; 
+      }
+
+      function exibirPreview(dataUrl, estagioNome, previewId, idx) {
+          var areaPreview = document.getElementById(previewId);
+          var areaUpload = areaPreview.previousElementSibling; 
+          areaPreview.style.display = 'flex';
+          areaPreview.innerHTML = '<div style="position: relative; display: inline-block;">' +
+              '<img src="' + dataUrl + '" class="miniatura-foto">' +
+              '<div class="btn-remover-foto" onclick="removerFotoEstagio(\'' + estagioNome + '\', \'' + previewId + '\', ' + idx + ')">X</div>' +
+          '</div>';
+          areaUpload.style.display = 'none';
+      }
+
+      function removerFotoEstagio(estagioNome, previewId, idx) {
+          pontosData[idx].fotosEstagios[estagioNome] = null;
+          var areaPreview = document.getElementById(previewId);
+          areaPreview.style.display = 'none';
+          areaPreview.innerHTML = "";
+          areaPreview.previousElementSibling.style.display = 'block';
+          if (estagioNome === 'Plaqueta') {
+              pontosData[idx].textoAuditoriaOCR = "Nenhuma leitura realizada";
+          }
+      }
+
+      function formatarDataHora() {
+          var data = new Date();
+          var dia = ("0" + data.getDate()).slice(-2);
+          var mes = ("0" + (data.getMonth() + 1)).slice(-2);
+          var ano = data.getFullYear();
+          var hora = ("0" + data.getHours()).slice(-2);
+          var min = ("0" + data.getMinutes()).slice(-2);
+          var sec = ("0" + data.getSeconds()).slice(-2);
+          return dia + "-" + mes + "-" + ano + "_" + hora + "-" + min + "-" + sec;
+      }
+
+      // =========================================================================
+      // VALIDAÇÃO E ENVIO MULTI-PONTOS
+      // =========================================================================
+      function validarEEnviar() {
+        var btn = document.getElementById('btnSalvar');
+        if (btn.disabled) return; 
+        
+        var msg = document.getElementById('mensagem');
+        if (timeoutMensagemErro) clearTimeout(timeoutMensagemErro); 
+
+        var elProt = document.getElementById('protocolo');
+        var elData = document.getElementById('dataReparo');
+        var elQtd = document.getElementById('quantidade');
+
+        var protocoloV = elProt.value.trim().toUpperCase();
+        var dataRaw = elData.value.trim();
+        var dataV = dataRaw;
+        if (dataRaw.indexOf('/') !== -1) {
+          var pData = dataRaw.split('/');
+          if (pData.length === 3) {
+            dataV = pData[2] + '-' + pData[1] + '-' + pData[0];
+          }
+        }
+        var qtdV = parseInt(elQtd.value) || 1;
+
+        var temErro = false;
+        if (!protocoloV) { elProt.classList.add('input-invalido'); temErro = true; }
+        if (!dataRaw) { elData.classList.add('input-invalido'); temErro = true; }
+        if (!elQtd.value) { elQtd.classList.add('input-invalido'); temErro = true; }
+
+        var pontosArray = [];
+        var dataAtual = new Date();
+        var meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
+        var mesEscrito = meses[dataAtual.getMonth()];
+        var ano4Digitos = dataAtual.getFullYear();
+        var dataHoraFormatada = formatarDataHora();
+
+        for (var i = 0; i < qtdAtual; i++) {
+           var ptState = pontosData[i];
+           
+           var pPlaq = "";
+           var pLat = "";
+           var pLng = "";
+
+           if (ptState.usarMesmoEndereco && i > 0) {
+               pPlaq = document.getElementById('plaqueta_0').value.toUpperCase().trim();
+               pLat = document.getElementById('lat_0').value.trim();
+               pLng = document.getElementById('lng_0').value.trim();
+           } else {
+               pPlaq = document.getElementById('plaqueta_' + i).value.toUpperCase().trim();
+               pLat = document.getElementById('lat_' + i).value.trim();
+               pLng = document.getElementById('lng_' + i).value.trim();
+               if (!pPlaq) { document.getElementById('plaqueta_' + i).classList.add('input-invalido'); temErro = true; }
+               if (!pLat || !pLng) { document.getElementById('lat_' + i).classList.add('input-invalido'); document.getElementById('lng_' + i).classList.add('input-invalido'); temErro = true; }
+           }
+
+           var elProbSel = document.getElementById('tipoProblema_' + i);
+           var pProb = elProbSel.value;
+           if (pProb === "Outros") pProb = document.getElementById('problemaOutros_' + i).value.trim();
+           if (!elProbSel.value) { elProbSel.classList.add('input-invalido'); temErro = true; }
+
+           var ptFotos = [];
+           ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'].forEach(function(est) {
+              if (ptState.fotosEstagios[est]) {
+                 ptFotos.push({
+                     nomeArquivo: "[" + protocoloV + "] [" + pPlaq + "] [" + est.toUpperCase() + "] [" + mesEscrito + "] [" + ano4Digitos + "] " + dataHoraFormatada + ".jpg",
+                     base64Data: ptState.fotosEstagios[est]
+                 });
+              }
+           });
+
+           pontosArray.push({
+              plaqueta: pPlaq,
+              coordenada: pLat + ", " + pLng,
+              problema: pProb,
+              ocrPlaquetaAuditoria: ptState.textoAuditoriaOCR,
+              fotosEvidencia: ptFotos
+           });
+        }
+
+        if (qtdAtual > 1) {
+            for (var m = 1; m < qtdAtual; m++) {
+               if (pontosData[m].usarMesmoEndereco) {
+                   var p0P = document.getElementById('plaqueta_0').value.trim();
+                   var p0L = document.getElementById('lat_0').value.trim();
+                   if (!p0P || !p0L) { temErro = true; }
+               }
+            }
+        }
+
+        if (temErro) {
+          msg.innerHTML = '<span class="erro">Preencha todos os campos obrigatórios em vermelho de todos os pontos.</span>';
+          timeoutMensagemErro = setTimeout(function() { msg.innerHTML = ''; }, 5000);
+          return;
+        }
+
+        var dados = {
+          protocolo: protocoloV,
+          dataReparo: dataV,
+          qtdTotal: qtdV,
+          pontos: pontosArray,
+          materiais: carrinhoMateriais,
+          observacao: document.getElementById('descricao').value
+        };
+
+        var token = localStorage.getItem('os_token');
+        btn.disabled = true;
+
+        var isDireto = nomesDiretosAdmitidos.indexOf(protocoloV) !== -1;
+
+        if (configGlobal.verificarTelegram && !isDireto) {
+            btn.innerText = "Procurando na aba " + configGlobal.abaLog + "...";
+            callServer('verificarProtocoloTelegram', [dados.protocolo])
+              .then(function(encontrou) {
+                if (encontrou) {
+                  executarSalvamentoBackend(dados, token, btn, msg);
+                } else {
+                  btn.disabled = false;
+                  btn.innerText = "Finalizar";
+                  msg.innerHTML = '<span class="erro">Protocolo não encontrado na aba de Log.</span>';
+                  timeoutMensagemErro = setTimeout(function() { msg.innerHTML = ''; }, 5000);
+                }
+              })
+              .catch(function(err) {
+                  btn.disabled = false;
+                  btn.innerText = "Finalizar";
+                  msg.innerHTML = '<span class="erro">Erro ao verificar protocolo.</span>';
+              });
+        } else {
+            executarSalvamentoBackend(dados, token, btn, msg);
+        }
+      }
+
+      function executarSalvamentoBackend(dados, token, btn, msg) {
+          btn.innerText = "Auditando e guardando (Pode demorar devido às fotos)...";
+          msg.innerHTML = "";
+          
+          callServer('salvarFinalizacaoOS', [dados, token])
+            .then(function(res) {
+              btn.disabled = false;
+              btn.innerText = "Finalizar";
+              if (res.sucesso) {
+                // Dispara atualização no Supabase Client no navegador (Gravação Direta Frontend)
+                atualizarSupabaseDiretoFrontend('ordens_servico', dados.protocolo, {
+                  status: "Resolvida",
+                  data_fechamento: new Date().toISOString(),
+                  materiais: dados.materiais
+                });
+
+                document.getElementById('msgSucessoTexto').innerText = "O protocolo " + dados.protocolo + " (" + dados.qtdTotal + " pt) foi finalizado com sucesso!";
+                document.getElementById('modalSucesso').style.display = 'flex';
+                limparFormularioTotal();
+              } else {
+                if (res.osConcluida) {
+                   document.getElementById('msgAlertaOSConcluidaTexto').innerText = res.mensagem;
+                   document.getElementById('modalOSConcluida').style.display = 'flex';
+                } else {
+                   msg.innerHTML = '<span class="erro">' + res.mensagem + '</span>';
+                   timeoutMensagemErro = setTimeout(function() { msg.innerHTML = ''; }, 7000);
+                }
+              }
+            })
+            .catch(function(err) {
+              btn.disabled = false;
+              btn.innerText = "Finalizar";
+              msg.innerHTML = '<span class="erro">Erro no servidor ao tentar salvar.</span>';
+              console.error(err);
+            });
+      }
+
+      function limparFormularioTotal() {
+          document.getElementById('protocolo').value = '';
+          document.getElementById('descricao').value = '';
+          document.getElementById('quantidade').value = 1;
+          carrinhoMateriais = [];
+          atualizarTabela();
+          
+          qtdAtual = 0;
+          pontosData = {};
+          document.getElementById('pontosContainer').innerHTML = '';
+          ajustarPontos(); 
+          
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function fecharSucesso() { document.getElementById('modalSucesso').style.display = 'none'; }
+      function fecharModalOSConcluida() { document.getElementById('modalOSConcluida').style.display = 'none'; limparFormularioTotal(); }
+
+      function realizarLogin() {
+        var user = document.getElementById('loginUsuario').value.trim();
+        var pass = document.getElementById('loginSenha').value;
+        var msg = document.getElementById('msgLogin');
+        var btn = document.getElementById('btnFazerLogin');
+        var loader = document.getElementById('loaderLogin');
+
+        if (!user || !pass) { msg.style.color = "#d93025"; msg.innerText = "Preencha usuário e senha."; return; }
+        btn.style.display = "none"; loader.style.display = "block"; msg.innerText = "";
+
+        callServer('fazerLogin', [user, pass, 'finalizacao'])
+          .then(function(res) {
+            if (res.sucesso) {
+              localStorage.setItem('os_token', res.token);
+              liberarAcesso();
+            } else {
+              btn.style.display = "block"; loader.style.display = "none";
+              if (res.bloqueioCargo) {
+                document.getElementById('msgAlertaLoginTexto').innerText = res.mensagem;
+                document.getElementById('modalAlertaLogin').style.display = 'flex';
+                msg.innerText = ""; 
+              } else {
+                msg.style.color = "#d93025"; msg.innerText = res.mensagem;
+              }
+            }
+          })
+          .catch(function(err) {
+            btn.style.display = "block"; loader.style.display = "none";
+            msg.style.color = "#d93025"; msg.innerText = err.message || "Erro de comunicação com o servidor.";
+          });
+      }
+
+      function liberarAcesso() {
+        document.getElementById('telaLogin').style.display = 'none';
+        document.getElementById('appPrincipal').style.display = 'block';
+        carregarMateriaisDinamicos();
+        callServer('obterConfiguracoesApp', [])
+          .then(function(config) { if(config) configGlobal = config; })
+          .catch(function(err) {});
+      }
+
+      function sairApp() {
+        var token = localStorage.getItem('os_token');
+        if (token) callServer('fazerLogout', [token]);
+        localStorage.removeItem('os_token');
+        document.getElementById('appPrincipal').style.display = 'none';
+        document.getElementById('telaLogin').style.display = 'flex';
+        document.getElementById('loginSenha').value = '';
+        document.getElementById('btnFazerLogin').style.display = 'block';
+        document.getElementById('loaderLogin').style.display = 'none';
+      }
+    </script>
+  </body>
+</html>

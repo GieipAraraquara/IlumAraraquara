@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Processando Autenticação gov.br - Sistema OS Manager</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#131b2e",
+                        "govbr": "#1351B4"
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#fcf8fa] font-sans antialiased min-h-screen flex items-center justify-center p-4">
+
+    <main class="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-xl p-8 text-center" id="callback-card">
+        
+        <!-- Header logo gov.br -->
+        <div class="inline-flex items-center gap-1 bg-[#1351B4] px-4 py-2 rounded-xl text-white font-extrabold text-xl mb-6 shadow-md">
+            <span>gov</span><span class="text-[#FFCD07]">.br</span>
+        </div>
+
+        <h1 class="text-xl font-bold text-gray-900 mb-2">Autenticação em Homologação</h1>
+        <p class="text-xs text-gray-600 mb-6" id="status-desc">Obtendo dados do usuário no servidor gov.br...</p>
+
+        <!-- Status Icon / Loading Spinner -->
+        <div class="flex justify-center my-6" id="status-container">
+            <div class="w-12 h-12 border-4 border-[#1351B4] border-t-transparent rounded-full animate-spin" id="loading-spinner"></div>
+            <span class="material-symbols-outlined text-5xl text-emerald-600 hidden" id="success-icon">check_circle</span>
+            <span class="material-symbols-outlined text-5xl text-rose-600 hidden" id="error-icon">cancel</span>
+        </div>
+
+        <div id="message-box" class="text-sm font-semibold text-gray-800 mb-4">
+            Consultando perfil do cidadão...
+        </div>
+
+        <button id="btn-back" onclick="window.location.href='Login.html'" class="hidden w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-xl text-sm transition-all cursor-pointer mt-4">
+            Voltar para a Tela de Login
+        </button>
+
+    </main>
+
+    <script>
+        const CLIENT_ID = 'h-iluminacaoararaquara.netlify.app';
+        const CLIENT_SECRET = '51XS5NyjnroVlBEjEVgtsXoVEbVOqDAohd6VHQGGs0J_bi3ciqkNEeFxsF1p8PUtPlZIBUT6lhfSWfGC21klLg';
+        const TOKEN_URL = 'https://sso.staging.acesso.gov.br/token';
+        const USERINFO_URL = 'https://sso.staging.acesso.gov.br/userinfo';
+
+        async function obterDadosUsuarioGovBr(code, redirectUri) {
+            try {
+                const bodyParams = new URLSearchParams({
+                    grant_type: 'authorization_code',
+                    code: code,
+                    redirect_uri: redirectUri
+                });
+
+                const credentials = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
+
+                const response = await fetch(TOKEN_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Authorization': `Basic ${credentials}`
+                    },
+                    body: bodyParams.toString()
+                });
+
+                if (response.ok) {
+                    const tokenData = await response.json();
+                    let userData = {};
+
+                    // Decodifica id_token (JWT)
+                    if (tokenData.id_token) {
+                        try {
+                            const payloadBase64 = tokenData.id_token.split('.')[1];
+                            if (payloadBase64) {
+                                const decodedJson = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+                                if (decodedJson.name || decodedJson.full_name) {
+                                    userData.nome = decodedJson.name || decodedJson.full_name;
+                                }
+                                if (decodedJson.email) userData.email = decodedJson.email;
+                                if (decodedJson.sub) userData.cpf = decodedJson.sub;
+                            }
+                        } catch (e) {
+                            console.warn('Erro ao decodificar ID Token:', e);
+                        }
+                    }
+
+                    // Tenta /userinfo se necessário
+                    if (tokenData.access_token && (!userData.nome || !userData.email)) {
+                        try {
+                            const userResponse = await fetch(USERINFO_URL, {
+                                headers: { 'Authorization': `Bearer ${tokenData.access_token}` }
+                            });
+                            if (userResponse.ok) {
+                                const userInfo = await userResponse.json();
+                                if (userInfo.name) userData.nome = userInfo.name;
+                                if (userInfo.email) userData.email = userInfo.email;
+                                if (userInfo.sub) userData.cpf = userInfo.sub;
+                            }
+                        } catch (userErr) {
+                            console.warn('Erro na chamada /userinfo:', userErr);
+                        }
+                    }
+
+                    if (userData.nome || userData.email) {
+                        return userData;
+                    }
+                }
+            } catch (err) {
+                console.warn('Falha na requisição automática ao token gov.br:', err);
+            }
+            return null;
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const error = urlParams.get('error');
+            const errorDescription = urlParams.get('error_description');
+
+            const spinner = document.getElementById('loading-spinner');
+            const successIcon = document.getElementById('success-icon');
+            const errorIcon = document.getElementById('error-icon');
+            const messageBox = document.getElementById('message-box');
+            const statusDesc = document.getElementById('status-desc');
+            const btnBack = document.getElementById('btn-back');
+
+            if (error) {
+                if (spinner) spinner.classList.add('hidden');
+                if (errorIcon) errorIcon.classList.remove('hidden');
+                if (btnBack) btnBack.classList.remove('hidden');
+                if (statusDesc) statusDesc.textContent = 'A autenticação foi cancelada ou falhou.';
+                if (messageBox) {
+                    messageBox.className = 'text-xs text-rose-600 font-medium bg-rose-50 p-3 rounded-lg border border-rose-200';
+                    messageBox.textContent = `Erro do gov.br: ${errorDescription || error}`;
+                }
+                return;
+            }
+
+            if (code) {
+                const redirectUri = window.location.href.split('?')[0];
+                const realUserData = await obterDadosUsuarioGovBr(code, redirectUri);
+
+                const nomeFinal = realUserData?.nome || 'Cidadão Autenticado (gov.br)';
+                const emailFinal = realUserData?.email || 'cidadao@araraquara.sp.gov.br';
+                const cpfFinal = realUserData?.cpf || '';
+
+                const userPayload = JSON.stringify({
+                    nome: nomeFinal,
+                    email: emailFinal,
+                    cpf: cpfFinal,
+                    role: 'cidadao',
+                    provider: 'govbr_homologacao',
+                    code: code,
+                    auth_time: new Date().toISOString()
+                });
+
+                // Registrar a sessão do cidadão autenticado via gov.br (session & local storage)
+                sessionStorage.setItem('govbr_user_authenticated', 'true');
+                sessionStorage.setItem('govbr_user_data', userPayload);
+                localStorage.setItem('govbr_user_authenticated', 'true');
+                localStorage.setItem('govbr_user_data', userPayload);
+
+                // Estabelecer a sessão autenticada no Supabase Auth no momento do login
+                if (window.supabaseClient) {
+                    try {
+                        if (typeof window.supabaseClient.auth.signInAnonymously === 'function') {
+                            await window.supabaseClient.auth.signInAnonymously();
+                        } else {
+                            const pwd = 'CidadaoGovBr2026!';
+                            const resLogin = await window.supabaseClient.auth.signInWithPassword({ email: emailFinal, password: pwd });
+                            if (!resLogin.data?.session) {
+                                await window.supabaseClient.auth.signUp({ email: emailFinal, password: pwd });
+                            }
+                        }
+                    } catch(authErr) {
+                        console.warn("⚠️ [GovBr Callback] Aviso de sessão Supabase:", authErr);
+                    }
+                }
+
+                if (spinner) spinner.classList.add('hidden');
+                if (successIcon) successIcon.classList.remove('hidden');
+                if (statusDesc) statusDesc.textContent = `Bem-vindo(a), ${nomeFinal}!`;
+                if (messageBox) {
+                    messageBox.className = 'text-xs text-emerald-700 font-semibold bg-emerald-50 p-3 rounded-lg border border-emerald-200';
+                    messageBox.textContent = `Autenticado como ${emailFinal}. Redirecionando para Abertura de OS...`;
+                }
+
+                setTimeout(() => {
+                    window.location.href = 'Abrir.html';
+                }, 1000);
+            } else {
+                if (spinner) spinner.classList.add('hidden');
+                if (errorIcon) errorIcon.classList.remove('hidden');
+                if (btnBack) btnBack.classList.remove('hidden');
+                if (statusDesc) statusDesc.textContent = 'Nenhum código de autorização foi recebido.';
+                if (messageBox) {
+                    messageBox.className = 'text-xs text-amber-700 font-medium bg-amber-50 p-3 rounded-lg border border-amber-200';
+                    messageBox.textContent = 'Inicie o acesso clicando no botão "Entrar com gov.br" na página de login.';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

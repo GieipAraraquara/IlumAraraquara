@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Acesso do Servidor - Sistema OS Manager</title>
+    <meta name="description" content="Portal de Acesso Administrativo e Operacional para Servidores Públicos." />
+
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <!-- Scripts & Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+      // Registro do Service Worker PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').then(function(reg) {
+            console.log('⚡ [PWA] Service Worker registrado a partir do Login Servidor:', reg.scope);
+          }).catch(function(err) {
+            console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
+          });
+        });
+      }
+    </script>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "background": "#fcf8fa",
+                        "on-surface": "#1b1b1d",
+                        "on-surface-variant": "#45464d",
+                        "primary": "#131b2e",
+                        "secondary": "#0051d5",
+                        "secondary-container": "#316bf3",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "surface-container-high": "#eae7e9",
+                        "outline-variant": "#c6c6cd",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "govbr": "#1351B4"
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"]
+                    },
+                    animation: {
+                        "fade-in": "fadeIn 0.4s ease-out forwards",
+                        "shake": "shake 0.4s ease-in-out"
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            "0%": { opacity: "0", transform: "translateY(12px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        },
+                        shake: {
+                            "0%, 100%": { transform: "translateX(0)" },
+                            "20%, 60%": { transform: "translateX(-6px)" },
+                            "40%, 80%": { transform: "translateX(6px)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background font-sans text-on-surface antialiased min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+
+    <!-- Background WebGL Ambient Canvas -->
+    <canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const geometry = new THREE.PlaneGeometry(2, 2);
+
+        const vertexShader = `
+            varying vec2 v_texCoord;
+            void main() {
+                v_texCoord = uv;
+                gl_Position = vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            precision highp float;
+            uniform float u_time;
+            uniform vec2 u_resolution;
+            varying vec2 v_texCoord;
+
+            void main() {
+                vec2 uv = v_texCoord;
+                float t = u_time * 0.15;
+                vec3 color1 = vec3(0.988, 0.973, 0.98);
+                vec3 color2 = vec3(0.945, 0.933, 0.96);
+                vec3 accent = vec3(0.075, 0.106, 0.18);
+
+                float w1 = sin(uv.x * 2.5 + t) * 0.5 + 0.5;
+                float w2 = sin(uv.y * 2.0 - t * 1.2) * 0.5 + 0.5;
+                vec3 base = mix(color1, color2, w1 * w2);
+
+                float edge = smoothstep(0.6, 1.0, length(uv - 0.5));
+                vec3 finalColor = mix(base, accent, edge * 0.03);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        const uniforms = {
+            u_time: { value: 0 },
+            u_resolution: { value: new THREE.Vector2() }
+        };
+
+        const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        function resize() {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function animate(time) {
+            uniforms.u_time.value = time * 0.001;
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+    </script>
+
+    <!-- Main Auth Card -->
+    <main class="w-full max-w-md bg-surface-container-lowest/90 backdrop-blur-xl border border-outline-variant/80 rounded-2xl shadow-2xl p-8 relative z-10 animate-fade-in" id="login-card">
+        
+        <!-- Header & Logo -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-white mb-4 shadow-md">
+                <span class="material-symbols-outlined text-[32px]">admin_panel_settings</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-on-surface">Acesso do Servidor</h1>
+            <p class="text-xs font-medium text-on-surface-variant mt-1">Portal Operacional - Prefeitura de Araraquara</p>
+        </div>
+
+        <!-- Alert Message Container -->
+        <div id="auth-alert" class="hidden mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 transition-all duration-300">
+            <span class="material-symbols-outlined text-[20px]" id="alert-icon">error</span>
+            <span id="alert-text">Mensagem de erro...</span>
+        </div>
+
+        <!-- Formulário de Acesso do Servidor (E-mail e Senha) -->
+        <form id="admin-login-form" onsubmit="fazerLoginServidor(event)" class="space-y-4">
+            
+            <!-- Campo E-mail -->
+            <div>
+                <label for="admin-email" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">E-mail do Servidor</label>
+                <div class="relative">
+                    <input type="email" 
+                           id="admin-email" 
+                           required 
+                           placeholder="servidor@araraquara.sp.gov.br"
+                           class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">mail</span>
+                </div>
+            </div>
+
+            <!-- Campo Senha -->
+            <div>
+                <label for="admin-password" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Senha</label>
+                <div class="relative">
+                    <input type="password" 
+                           id="admin-password" 
+                           required 
+                           placeholder="••••••••"
+                           class="w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">lock</span>
+                    
+                    <button type="button" 
+                            onclick="togglePasswordVisibility()" 
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer p-1">
+                        <span class="material-symbols-outlined text-[20px]" id="password-toggle-icon">visibility</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Botão Submit Servidor -->
+            <button type="submit" 
+                    id="btn-admin-submit"
+                    class="w-full mt-2 py-3 px-4 bg-secondary hover:bg-secondary-container active:scale-[0.98] text-white font-semibold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <span id="btn-submit-text">Entrar como Servidor</span>
+                <span class="material-symbols-outlined text-[20px]" id="btn-submit-icon">arrow_forward</span>
+            </button>
+
+        </form>
+
+        <!-- Botão para Solicitação de Cadastro de Novo Servidor -->
+        <div class="mt-6 pt-4 border-t border-outline-variant/60 text-center">
+            <p class="text-xs text-on-surface-variant mb-2">Novo servidor na prefeitura?</p>
+            <a href="Cadastro.html" 
+               id="btn-goto-cadastro"
+               class="w-full py-2.5 px-4 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-secondary font-semibold rounded-xl text-xs shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer mb-3">
+                <span class="material-symbols-outlined text-[18px]">person_add</span>
+                <span>Solicitar Cadastro de Servidor</span>
+            </a>
+            
+            <p class="text-xs text-on-surface-variant mt-3">
+                É um cidadão? 
+                <a href="Login.html" class="font-semibold text-secondary hover:underline cursor-pointer ml-1 inline-flex items-center gap-0.5">
+                    Entrar via gov.br
+                </a>
+            </p>
+        </div>
+
+    </main>
+
+    <!-- Script de Autenticação do Servidor (Supabase) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            if (window.supabaseClient) {
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                if (session) {
+                    let targetUrl = 'Painel.html';
+                    if (window.AuthGuard) {
+                        const authData = await window.AuthGuard.requireAuth();
+                        targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: session.user });
+                    }
+                    window.location.href = targetUrl;
+                    return;
+                }
+            }
+        });
+
+        // Alternar visibilidade da senha
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('admin-password');
+            const toggleIcon = document.getElementById('password-toggle-icon');
+            if (!passwordInput || !toggleIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = 'visibility';
+            }
+        }
+
+        // Mostrar Alertas na Interface
+        function exibirAlerta(mensagem, tipo = 'erro') {
+            const alertContainer = document.getElementById('auth-alert');
+            const alertText = document.getElementById('alert-text');
+            const alertIcon = document.getElementById('alert-icon');
+            const card = document.getElementById('login-card');
+
+            if (!alertContainer || !alertText) return;
+
+            alertText.textContent = mensagem;
+
+            if (tipo === 'erro') {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-error-container text-on-error-container border border-error/20 animate-fade-in';
+                alertIcon.textContent = 'error';
+                
+                if (card) {
+                    card.classList.remove('animate-shake');
+                    void card.offsetWidth; // Reflow
+                    card.classList.add('animate-shake');
+                }
+            } else {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-emerald-100 text-emerald-800 border border-emerald-300 animate-fade-in';
+                alertIcon.textContent = 'check_circle';
+            }
+
+            alertContainer.classList.remove('hidden');
+        }
+
+        // Ação de Login do Servidor (E-mail / Senha)
+        async function fazerLoginServidor(event) {
+            event.preventDefault();
+
+            const emailInput = document.getElementById('admin-email');
+            const passwordInput = document.getElementById('admin-password');
+            const btnSubmit = document.getElementById('btn-admin-submit');
+            const btnText = document.getElementById('btn-submit-text');
+            const btnIcon = document.getElementById('btn-submit-icon');
+
+            const email = emailInput?.value.trim();
+            const password = passwordInput?.value;
+
+            if (!email || !password) {
+                exibirAlerta('Por favor, preencha o e-mail e a senha.');
+                return;
+            }
+
+            if (!window.supabaseClient) {
+                exibirAlerta('Serviço Supabase não está inicializado.');
+                return;
+            }
+
+            if (btnSubmit) btnSubmit.disabled = true;
+            if (btnText) btnText.textContent = 'Autenticando...';
+            if (btnIcon) btnIcon.textContent = 'sync';
+            if (btnIcon) btnIcon.classList.add('animate-spin');
+
+            try {
+                sessionStorage.removeItem('govbr_user_authenticated');
+                sessionStorage.removeItem('govbr_user_data');
+                localStorage.removeItem('govbr_user_authenticated');
+                localStorage.removeItem('govbr_user_data');
+
+                const { data, error } = await window.supabaseClient.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+
+                if (error) {
+                    let msg = 'E-mail ou senha incorretos.';
+                    if (error.message.includes('Invalid login credentials')) {
+                        msg = 'E-mail ou senha incorretos. Verifique os dados digitados.';
+                    } else if (error.message.includes('Email not confirmed')) {
+                        msg = 'Endereço de e-mail ainda não confirmado.';
+                    }
+                    exibirAlerta(msg);
+                } else if (data.session) {
+                    console.log('🚀 [Login Servidor DEBUG] Sessão criada para:', data.session.user.email);
+
+                    // Verificar se a conta aguarda liberação manual no Supabase
+                    let profile = null;
+                    try {
+                        const { data: profData } = await window.supabaseClient
+                            .from('profiles')
+                            .select('*')
+                            .eq('id', data.session.user.id)
+                            .maybeSingle();
+                        profile = profData;
+                    } catch (e) {
+                        console.warn('Obs ao verificar perfil:', e);
+                    }
+
+                    // O perfil na tabela 'profiles' é a Fonte da Verdade para liberação do acesso
+                    let isPending = false;
+                    if (profile) {
+                        isPending = (profile.role === 'pendente') || 
+                                    (profile.status === 'pendente') || 
+                                    (profile.ativo === false);
+                    } else {
+                        isPending = (data.session.user.user_metadata?.status === 'pendente') || 
+                                    (data.session.user.user_metadata?.role === 'pendente') || 
+                                    (data.session.user.user_metadata?.ativo === false);
+                    }
+
+                    if (isPending) {
+                        await window.supabaseClient.auth.signOut();
+                        exibirAlerta('Sua conta foi registrada, porém aguarda liberação manual pelo administrador.');
+                        return;
+                    }
+
+                    let targetUrl = 'Abrir.html';
+                    if (window.AuthGuard) {
+                        const authData = await window.AuthGuard.requireAuth();
+                        targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: data.session.user, profile: profile });
+                    } else {
+                        targetUrl = (profile?.role === 'ouvidoria' || profile?.cargo_solicitado === 'ouvidoria') ? 'Abrir.html' : 'Painel.html';
+                    }
+                    exibirAlerta('Login efetuado com sucesso! Redirecionando...', 'sucesso');
+                    setTimeout(() => {
+                        window.location.href = targetUrl;
+                    }, 800);
+                }
+            } catch (err) {
+                exibirAlerta('Falha na conexão com o servidor de autenticação.');
+            } finally {
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (btnText) btnText.textContent = 'Entrar como Servidor';
+                if (btnIcon) btnIcon.textContent = 'arrow_forward';
+                if (btnIcon) btnIcon.classList.remove('animate-spin');
+            }
+        }
+    </script>
+</body>
+</html>

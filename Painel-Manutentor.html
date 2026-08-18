@@ -1,0 +1,1701 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Painel do Manutentor - OS Manager</title>
+    
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+    <script src="js/domain/ChamadoModel.js?v=9"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
+    <script>window.isManutentorView = true;</script>
+    <script src="js/services/ChamadosService.js?v=12"></script>
+    <script src="js/services/MapService.js?v=9"></script>
+    <script src="js/controllers/PainelController.js?v=13"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        /* Sidebar collapse mechanics */
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { ml: 80px; width: calc(100% - 80px); left: 80px; margin-left: 0;}
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+        
+        /* Fixed Resizer CSS */
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px; /* Área clicável maior */
+            cursor: col-resize;
+            user-select: none;
+            height: 100%;
+            z-index: 10;
+            transform: translateX(50%); /* Centraliza o puxador em cima da borda */
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* Pseudo-elemento para desenhar a linha azul sem afetar o layout com borders */
+        .resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+        }
+
+        .resizer:hover::after,
+        .resizer.resizing::after {
+            background-color: #0051d5; /* Azul Secundário */
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed manutentor-view">
+
+<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    const vertexShader = `
+        varying vec2 v_texCoord;
+        void main() {
+            v_texCoord = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float t = u_time * 0.2;
+            vec3 color1 = vec3(0.988, 0.973, 0.98); 
+            vec3 color2 = vec3(0.957, 0.941, 0.953);
+            vec3 accent = vec3(0.059, 0.09, 0.165); 
+            
+            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
+            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
+            vec3 base = mix(color1, color2, w1 * w2);
+            
+            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
+            vec3 finalColor = mix(base, accent, edge * 0.02);
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `;
+    
+    const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() }
+    };
+    
+    const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    function animate(time) {
+        uniforms.u_time.value = time * 0.001;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+</script>
+
+<app-sidebar active="painel-manutentor" mode="manutentor"></app-sidebar>
+
+<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+
+<main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto w-[calc(100%-260px)] mx-auto overflow-visible transition-all duration-300 relative z-0" id="main-content">
+
+    <div class="flex justify-between items-end mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
+        <div>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">Visão Geral do Manutentor</h2>
+            <p class="font-body-md text-body-md text-on-surface-variant">Acompanhamento e finalização de ordens de serviço</p>
+        </div>
+        <button onclick="abrirModalFinalizarOS()" class="bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-label-md text-label-md font-semibold flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-sm active:scale-95 cursor-pointer" title="Finalizar Ordem de Serviço">
+            <span class="material-symbols-outlined text-[20px]">task_alt</span>
+            <span>Finalizar Ordem de Serviço</span>
+        </button>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-12 gap-card-gap mb-card-gap max-w-max-width-content mx-auto">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de OS</div>
+            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
+            <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+12% vs mês anterior</span></div>
+        </div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Aberto</div>
+            <div class="font-headline-lg text-headline-lg text-error overflow-visible"><div class="h-8 w-16 bg-surface-container-high animate-pulse rounded my-1"></div></div>
+            <div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Requer atenção</span></div>
+        </div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Concluídas</div>
+            <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
+            <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm"><div class="h-3.5 w-28 bg-surface-container-high animate-pulse rounded inline-block"></div></span></div>
+        </div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
+            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Tempo Médio de Resolução</div>
+            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div>
+            <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_down</span><span class="font-label-sm text-label-sm">-0.5 dias vs mês anterior</span></div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+                <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
+            </div>
+            
+            <div class="w-full min-h-[300px] overflow-visible">
+                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="os-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                            <!-- Column 1: Protocolo com Filtro -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
+                                <div class="relative inline-block text-left group/protocol-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="protocol-filter-trigger" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="protocol-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                            <div class="relative">
+                                                <input type="text" id="protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left cursor-pointer" onclick="clearProtocolFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 2 (Date Filter) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 120px; min-width: 120px;" data-col="1">
+                                <div class="relative inline-block text-left group/date-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="date-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="filter-active-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-4 animate-fade-in-up hidden" id="date-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('hoje')">Hoje</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('ontem')">Ontem</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('7dias')">Últimos 7 dias</button>
+                                            
+                                            <div class="border-t border-outline-variant my-2 pt-2">
+                                                <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
+                                                <div class="grid grid-cols-2 gap-3 mt-2 px-1">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Início</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="range-start" type="date"/>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Fim</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="range-end" type="date"/>
+                                                    </div>
+                                                </div>
+                                                <button class="w-full mt-4 bg-secondary text-on-secondary py-2 rounded font-label-md hover:bg-secondary-container transition-colors cursor-pointer" onclick="applyCustomRange()">Aplicar</button>
+                                            </div>
+                                            <button class="text-error font-label-md mt-2 hover:underline cursor-pointer text-left" onclick="clearDateFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3 -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" data-col="2">
+                                <div class="flex items-center gap-1">Ponto / Localização</div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 4 (Problema Filter) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 200px; min-width: 200px;" data-col="3">
+                                <div class="relative inline-block text-left">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="problem-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="problem-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-3 animate-fade-in-up hidden" id="problem-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Problema</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="problem-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todos os problemas</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="problem-filter" value="lampada-queimada" checked class="problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Queimada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="problem-filter" value="acesa-dia" checked class="problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Acesa Dia</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="problem-filter" value="lampada-quebrada" checked class="problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Quebrada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="problem-filter" value="outro" checked class="problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Outro</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearProblemFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 5 (Status Filter) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative z-20 overflow-visible" style="width: 200px; min-width: 200px;" data-col="4">
+                                <div class="relative inline-block text-left">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="status-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Status</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="status-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-3 animate-fade-in-up hidden" id="status-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Status</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="status-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todos os status</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="status-filter" value="aberto" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Em aberto</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="status-filter" value="concluida" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Concluída</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="status-filter" value="cancelada" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Cancelada</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearStatusFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 6 -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 120px; min-width: 120px;" data-col="5">
+                                Ações
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <!-- Empty State Row -->
+                        <tr id="no-audit-results" class="hidden">
+                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                                    <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
+                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Skeleton Loading Rows -->
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-48 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-24 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-56 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-32 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-40 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-52 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-24 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-4 w-36 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                            <td class="py-3.5 px-5 align-middle text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                    <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    // Confirmation Modal System
+    let pendingActionCallback = null;
+
+    window.setModalJustification = function(text, targetId = 'modal-justification-input') {
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        if (input.value.trim() === text) {
+            input.value = '';
+        } else {
+            input.value = text;
+        }
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        const modalIconBg = document.getElementById('modal-icon-bg');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalJustificationInput = document.getElementById('modal-justification-input');
+
+        if (!modal || !modalBox) return;
+
+        modalTitle.textContent = title || 'Confirmar Ação';
+        modalMessage.innerHTML = message || 'Deseja prosseguir?';
+        modalIcon.textContent = icon || 'help';
+        modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
+        modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+        modalConfirmBtn.textContent = confirmText || 'Confirmar';
+
+        if (modalJustificationInput) {
+            modalJustificationInput.value = '';
+        }
+
+        modalConfirmBtn.onclick = () => {
+            const justification = modalJustificationInput ? modalJustificationInput.value.trim() : '';
+            if (typeof pendingActionCallback === 'function') {
+                pendingActionCallback(justification);
+            }
+            closeConfirmModal();
+        };
+
+        pendingActionCallback = onConfirm;
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+            if (modalJustificationInput) modalJustificationInput.focus();
+        }, 10);
+    };
+
+    window.closeConfirmModal = function() {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        if (!modal || !modalBox) return;
+
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        modalBox.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            pendingActionCallback = null;
+        }, 200);
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('modal-confirm-btn')?.addEventListener('click', () => {
+            const justification = document.getElementById('modal-justification-input')?.value.trim() || '';
+            if (typeof pendingActionCallback === 'function') {
+                pendingActionCallback(justification);
+            }
+            closeConfirmModal();
+        });
+
+        // Initialize row lock state for rows loaded with Concluída
+        document.querySelectorAll('#os-table tbody tr').forEach(row => {
+            const badge = row.querySelector('.status-badge');
+            const isConcluded = badge && badge.getAttribute('data-status') === 'concluida';
+            setRowLockState(row, isConcluded);
+        });
+    });
+
+    // Helper to lock/unlock row editing controls based on Concluded status
+    function setRowLockState(row, isConcluded) {
+        const btnEdit = row.querySelector('.btn-edit');
+        const problemSelect = row.querySelector('.problem-select');
+
+        if (btnEdit) {
+            btnEdit.classList.add('hidden');
+        }
+
+        if (problemSelect) {
+            problemSelect.disabled = true;
+            problemSelect.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+        }
+    }
+
+    // Action Handlers for Status Transitions with Modal Confirmation
+    window.approveRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const osId = row ? row.getAttribute('data-id') : null;
+        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+
+        if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
+            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            return;
+        }
+
+        showConfirmModal({
+            title: 'Aprovar OS',
+            message: `Deseja aprovar o protocolo <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status mudará para <strong class="text-error font-semibold">Em aberto</strong>.`,
+            icon: 'check',
+            iconBgClass: 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: 'Aprovar',
+            onConfirm: async () => {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    if (window.painelController && typeof window.painelController.loadData === 'function') {
+                        window.painelController.loadData();
+                    } else {
+                        window.location.reload();
+                    }
+                } catch(err) {
+                    alert('Erro ao atualizar banco de dados: ' + err.message);
+                }
+            }
+        });
+    };
+
+    window.rejectRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const osId = row ? row.getAttribute('data-id') : null;
+        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+
+        if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
+            window.painelController.handleStatusAction(osId || protocol, 'cancelada', event);
+            return;
+        }
+
+        showConfirmModal({
+            title: 'Cancelar Ordem de Serviço',
+            message: `Deseja realmente cancelar o protocolo <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status mudará para <strong class="text-slate-700 font-semibold">Cancelada</strong>.`,
+            icon: 'close',
+            iconBgClass: 'bg-rose-100 text-rose-700',
+            confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+            confirmText: 'Cancelar OS',
+            onConfirm: async () => {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    await repo.updateStatus(osId || protocol, 'Cancelada');
+                    if (window.painelController && typeof window.painelController.loadData === 'function') {
+                        window.painelController.loadData();
+                    } else {
+                        window.location.reload();
+                    }
+                } catch(err) {
+                    alert('Erro ao atualizar banco de dados: ' + err.message);
+                }
+            }
+        });
+    };
+
+    window.completeRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const osId = row ? row.getAttribute('data-id') : null;
+        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+
+        let item = null;
+        if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
+            item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(protocol));
+        }
+
+        if (typeof window.abrirModalFinalizarOS === 'function') {
+            window.abrirModalFinalizarOS(item || { id: osId, protocolo: protocol });
+        }
+    };
+
+    window.revertRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const osId = row ? row.getAttribute('data-id') : null;
+        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+
+        if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
+            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            return;
+        }
+
+        showConfirmModal({
+            title: 'Reverter OS',
+            message: `Deseja reverter a ordem de serviço <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status voltará para <strong class="text-error font-semibold">Em aberto</strong>.`,
+            icon: 'undo',
+            iconBgClass: 'bg-blue-100 text-blue-700',
+            confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+            confirmText: 'Reverter',
+            onConfirm: async () => {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    if (window.painelController && typeof window.painelController.loadData === 'function') {
+                        window.painelController.loadData();
+                    } else {
+                        window.location.reload();
+                    }
+                } catch(err) {
+                    alert('Erro ao atualizar banco de dados: ' + err.message);
+                }
+            }
+        });
+    };
+</script>
+
+<script>
+    // Inline multi-point toggle (+N / -N)
+    window.toggleInlinePoints = function(btn, count, event) {
+        if (event) event.stopPropagation();
+        const cell = btn.closest('td');
+        const container = cell.querySelector('.extra-points');
+        const textSpan = btn.querySelector('.btn-text');
+        const iconSpan = btn.querySelector('.btn-icon');
+        
+        if (!container) return;
+        
+        const isHidden = container.classList.contains('hidden');
+        if (isHidden) {
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+            if (textSpan) textSpan.textContent = `-${count}`;
+            if (iconSpan) iconSpan.textContent = 'expand_less';
+            btn.classList.remove('bg-secondary/10', 'text-secondary', 'hover:bg-secondary/20');
+            btn.classList.add('bg-secondary/20', 'text-secondary', 'hover:bg-secondary/30');
+        } else {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+            if (textSpan) textSpan.textContent = `+${count}`;
+            if (iconSpan) iconSpan.textContent = 'expand_more';
+            btn.classList.remove('bg-secondary/20', 'text-secondary', 'hover:bg-secondary/30');
+            btn.classList.add('bg-secondary/10', 'text-secondary', 'hover:bg-secondary/20');
+        }
+    };
+</script>
+
+<script>
+    // Problem Select Color Updater
+    window.updateProblemColor = function(select) {
+        select.classList.remove('bg-[#fef3c7]', 'text-[#92400e]', 'bg-[#dbeafe]', 'text-[#1e40af]', 'bg-[#ffedd5]', 'text-[#9a3412]', 'bg-[#f3f4f6]', 'text-[#374151]', 'bg-surface-container-high', 'text-on-surface');
+        if (select.value === 'lampada-queimada') {
+            select.classList.add('bg-[#fef3c7]', 'text-[#92400e]');
+        } else if (select.value === 'acesa-dia') {
+            select.classList.add('bg-[#dbeafe]', 'text-[#1e40af]');
+        } else if (select.value === 'lampada-quebrada') {
+            select.classList.add('bg-[#ffedd5]', 'text-[#9a3412]');
+        } else if (select.value === 'outro') {
+            select.classList.add('bg-[#f3f4f6]', 'text-[#374151]');
+        }
+    };
+
+    // Status Select Color Updater
+    window.updateSelectColor = function(select) {
+        select.classList.remove('bg-error-container', 'text-on-error-container', 'bg-[#dcfce7]', 'text-[#166534]', 'bg-surface-container-high', 'text-on-surface');
+        if (select.value === 'aberto') {
+            select.classList.add('bg-error-container', 'text-on-error-container');
+        } else if (select.value === 'concluida') {
+            select.classList.add('bg-[#dcfce7]', 'text-[#166534]');
+        } else if (select.value === 'pendente') {
+            select.classList.add('bg-surface-container-high', 'text-on-surface');
+        }
+    };
+
+    // Initialize colors on load
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.problem-select').forEach(updateProblemColor);
+        document.querySelectorAll('.status-select').forEach(updateSelectColor);
+    });
+
+    // Sort Functionality
+    let sortDirection = true;
+    window.sortTable = function(colIndex) {
+        const table = document.getElementById("os-table");
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        
+        rows.sort((a, b) => {
+            const valA = a.cells[colIndex].textContent.trim();
+            const valB = b.cells[colIndex].textContent.trim();
+            
+            const partsA = valA.split('/');
+            const partsB = valB.split('/');
+            if(partsA.length === 2 && partsB.length === 2) {
+                const dateA = new Date(new Date().getFullYear(), parseInt(partsA[1])-1, parseInt(partsA[0]));
+                const dateB = new Date(new Date().getFullYear(), parseInt(partsB[1])-1, parseInt(partsB[0]));
+                return sortDirection ? dateA - dateB : dateB - dateA;
+            }
+            return sortDirection ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        });
+        
+        sortDirection = !sortDirection;
+        rows.forEach(row => tbody.appendChild(row));
+    };
+</script>
+
+<script>
+    // Column Resizing Logic with Neighbor Push-Pull & Strict Bounds
+    document.addEventListener('DOMContentLoaded', function () {
+        const table = document.getElementById('os-table');
+        if (!table) return;
+
+        const cols = table.querySelectorAll('th');
+
+        // Limites estritamente seguros de largura (min/max em px) por coluna
+        const minWidths = { '0': 120, '1': 100, '2': 160, '3': 150, '4': 150, '5': 120 };
+        const maxWidths = { '0': 300, '1': 220, '2': 600, '3': 350, '4': 300, '5': 220 };
+
+        // Carrega larguras salvas e valida contra limites
+        const savedWidths = JSON.parse(localStorage.getItem('tableColWidths')) || {};
+        cols.forEach((col) => {
+            const dataCol = col.getAttribute('data-col');
+            if (dataCol !== null) {
+                const minW = minWidths[dataCol] || 100;
+                const maxW = maxWidths[dataCol] || 400;
+                let w = savedWidths[dataCol] ? parseInt(savedWidths[dataCol], 10) : col.offsetWidth;
+                if (isNaN(w) || w < minW) w = minW;
+                if (w > maxW) w = maxW;
+
+                col.style.width = w + 'px';
+                col.style.minWidth = w + 'px';
+                col.style.maxWidth = w + 'px';
+            }
+        });
+
+        const resizers = table.querySelectorAll('.resizer');
+        let startX, startWA, startWB, currentResizer, colA, colB, colAIndex, colBIndex;
+        let minWA, maxWA, minWB, maxWB;
+
+        const mouseMoveHandler = function (e) {
+            if (!colA || !colB) return;
+            const dx = e.clientX - startX;
+            
+            let delta = dx;
+
+            // Restringe delta para não violar os limites de colA
+            if (startWA + delta < minWA) delta = minWA - startWA;
+            if (startWA + delta > maxWA) delta = maxWA - startWA;
+
+            // Restringe delta para não violar os limites de colB (ao expandir colA, colB encolhe)
+            if (startWB - delta < minWB) delta = startWB - minWB;
+            if (startWB - delta > maxWB) delta = startWB - maxWB;
+
+            const newWA = startWA + delta;
+            const newWB = startWB - delta;
+
+            colA.style.width = `${newWA}px`;
+            colA.style.minWidth = `${newWA}px`;
+            colA.style.maxWidth = `${newWA}px`;
+
+            colB.style.width = `${newWB}px`;
+            colB.style.minWidth = `${newWB}px`;
+            colB.style.maxWidth = `${newWB}px`;
+
+            // Salva no localStorage
+            const widths = JSON.parse(localStorage.getItem('tableColWidths')) || {};
+            widths[colAIndex] = newWA;
+            widths[colBIndex] = newWB;
+            localStorage.setItem('tableColWidths', JSON.stringify(widths));
+        };
+
+        const mouseUpHandler = function () {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            if (currentResizer) currentResizer.classList.remove('resizing');
+            colA = null;
+            colB = null;
+            currentResizer = null;
+            document.body.style.cursor = 'default';
+        };
+
+        resizers.forEach(function (resizer) {
+            resizer.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                currentResizer = e.target;
+                colA = currentResizer.parentElement;
+                colAIndex = parseInt(colA.getAttribute('data-col'), 10);
+                
+                // Pega a próxima coluna adjacente (à direita)
+                colB = table.querySelector(`th[data-col="${colAIndex + 1}"]`);
+                if (!colB) return;
+
+                colBIndex = colAIndex + 1;
+
+                minWA = minWidths[colAIndex] || 100;
+                maxWA = maxWidths[colAIndex] || 400;
+                minWB = minWidths[colBIndex] || 100;
+                maxWB = maxWidths[colBIndex] || 400;
+
+                startX = e.clientX;
+                startWA = colA.offsetWidth;
+                startWB = colB.offsetWidth;
+
+                currentResizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            });
+        });
+    });
+</script>
+
+<script>
+    // Unified Filtering Logic (Date, Protocol, Status, Problema, and Search)
+    (function() {
+        let activeDatePredicate = null;
+        let activeStatusFilter = ['all'];
+        let activeProblemFilter = ['all'];
+        let protocolSearchQuery = '';
+        let searchQuery = '';
+
+        const searchInput = document.getElementById('search-input');
+
+        // Date Filter Elements
+        const dateTrigger = document.getElementById('date-filter-trigger');
+        const dateDropdown = document.getElementById('date-filter-dropdown');
+        const dateIndicator = document.getElementById('filter-active-indicator');
+
+        // Protocol Filter Elements
+        const protocolTrigger = document.getElementById('protocol-filter-trigger');
+        const protocolDropdown = document.getElementById('protocol-filter-dropdown');
+        const protocolIndicator = document.getElementById('protocol-filter-indicator');
+        const protocolSearchInput = document.getElementById('protocol-search-input');
+
+        // Status Filter Elements
+        const statusTrigger = document.getElementById('status-filter-trigger');
+        const statusDropdown = document.getElementById('status-filter-dropdown');
+        const statusIndicator = document.getElementById('status-filter-indicator');
+
+        // Problem Filter Elements
+        const problemTrigger = document.getElementById('problem-filter-trigger');
+        const problemDropdown = document.getElementById('problem-filter-dropdown');
+        const problemIndicator = document.getElementById('problem-filter-indicator');
+
+        function initFilterPortals() {
+            [
+                dateDropdown, protocolDropdown, statusDropdown, problemDropdown
+            ].forEach(d => {
+                if (d && d.parentElement !== document.body) {
+                    document.body.appendChild(d);
+                }
+            });
+        }
+        initFilterPortals();
+
+        function closeAllFilterDropdowns() {
+            [
+                dateDropdown, protocolDropdown, statusDropdown, problemDropdown
+            ].forEach(d => {
+                if (d) {
+                    d.classList.add('hidden');
+                    d.style.display = 'none';
+                }
+            });
+        }
+
+        function openFloatingDropdown(triggerBtn, dropdownEl, alignRight = false) {
+            if (!triggerBtn || !dropdownEl) return;
+
+            // Ensure dropdown is attached to document.body (out of table containing block)
+            if (dropdownEl.parentElement !== document.body) {
+                document.body.appendChild(dropdownEl);
+            }
+
+            const isCurrentlyHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+
+            closeAllFilterDropdowns();
+
+            if (isCurrentlyHidden) {
+                dropdownEl.style.position = 'fixed';
+                dropdownEl.style.zIndex = '99999';
+                dropdownEl.style.display = 'block';
+                dropdownEl.classList.remove('hidden');
+
+                const rect = triggerBtn.getBoundingClientRect();
+                const dropdownHeight = dropdownEl.offsetHeight || 300;
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                // Auto vertical flip positioning if not enough space below
+                if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                    dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 4)}px`;
+                } else {
+                    dropdownEl.style.top = `${rect.bottom + 4}px`;
+                }
+
+                if (alignRight) {
+                    dropdownEl.style.left = 'auto';
+                    dropdownEl.style.right = `${Math.max(12, window.innerWidth - rect.right)}px`;
+                } else {
+                    dropdownEl.style.left = `${Math.max(12, rect.left)}px`;
+                    dropdownEl.style.right = 'auto';
+                }
+
+                if (dropdownEl.id === 'protocol-filter-dropdown') {
+                    setTimeout(() => protocolSearchInput?.focus(), 50);
+                }
+            }
+        }
+
+        // Close dropdowns on outside click
+        document.addEventListener('click', (e) => {
+            if (dateDropdown && !dateDropdown.contains(e.target) && !dateTrigger?.contains(e.target)) {
+                dateDropdown.classList.add('hidden');
+                dateDropdown.style.display = 'none';
+            }
+            if (protocolDropdown && !protocolDropdown.contains(e.target) && !protocolTrigger?.contains(e.target)) {
+                protocolDropdown.classList.add('hidden');
+                protocolDropdown.style.display = 'none';
+            }
+            if (statusDropdown && !statusDropdown.contains(e.target) && !statusTrigger?.contains(e.target)) {
+                statusDropdown.classList.add('hidden');
+                statusDropdown.style.display = 'none';
+            }
+            if (problemDropdown && !problemDropdown.contains(e.target) && !problemTrigger?.contains(e.target)) {
+                problemDropdown.classList.add('hidden');
+                problemDropdown.style.display = 'none';
+            }
+
+            if (!e.target.closest('.group\\/points') && !e.target.closest('.points-expand-trigger')) {
+                document.querySelectorAll('.points-dropdown').forEach(d => d.classList.add('hidden'));
+                document.querySelectorAll('.icon-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
+            }
+        });
+
+        // Toggle dropdowns with floating positioning
+        dateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(dateTrigger, dateDropdown, false);
+        });
+
+        protocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(protocolTrigger, protocolDropdown, false);
+        });
+
+        statusTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(statusTrigger, statusDropdown, false);
+        });
+
+        problemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(problemTrigger, problemDropdown, false);
+        });
+
+        // Close open dropdown popups on window scroll or resize, unless user is typing inside a filter input
+        window.addEventListener('scroll', (e) => {
+            const activeEl = document.activeElement;
+            if (activeEl && (
+                activeEl.id === 'protocol-search-input' ||
+                activeEl.closest('#date-filter-dropdown') ||
+                activeEl.closest('#protocol-filter-dropdown') ||
+                activeEl.closest('#status-filter-dropdown') ||
+                activeEl.closest('#problem-filter-dropdown')
+            )) {
+                return;
+            }
+            closeAllFilterDropdowns();
+        }, true);
+        window.addEventListener('resize', closeAllFilterDropdowns);
+
+        function parseTableDate(dateStr) {
+            const [day, month] = dateStr.split('/').map(Number);
+            const year = new Date().getFullYear();
+            return new Date(year, month - 1, day);
+        }
+
+        // Modular Text Search Helpers
+        function removeAccents(str) {
+            return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        /**
+         * Checks if a specific column cell text matches a search query.
+         * Insensitive to accents, case, and leading/trailing whitespace.
+         */
+        function matchColumnText(row, colIndex, query) {
+            if (!query || query.trim() === '') return true;
+            const text = removeAccents((row.cells[colIndex]?.textContent || '').trim().toLowerCase());
+            const q = removeAccents(query.trim().toLowerCase());
+            return text.includes(q);
+        }
+
+        /**
+         * Checks if any content within a row matches a global search query.
+         * Insensitive to accents, case, and leading/trailing whitespace.
+         */
+        function matchRowGlobalText(row, query) {
+            if (!query || query.trim() === '') return true;
+            const text = removeAccents((row.textContent || '').toLowerCase());
+            const q = removeAccents(query.trim().toLowerCase());
+            return text.includes(q);
+        }
+
+        // Modular Date Predicate Builder
+        function buildDatePredicate(type, customStart, customEnd) {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            if (type === 'hoje') {
+                return d => d && d.getTime() === now.getTime();
+            } else if (type === 'ontem') {
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                return d => d && d.getTime() === yesterday.getTime();
+            } else if (type === '7dias') {
+                const weekAgo = new Date(now);
+                weekAgo.setDate(now.getDate() - 7);
+                return d => d && d >= weekAgo && d <= now;
+            } else if (type === 'custom' && customStart && customEnd) {
+                const start = new Date(customStart + 'T00:00:00');
+                const end = new Date(customEnd + 'T23:59:59');
+                return d => d && d >= start && d <= end;
+            }
+            return null;
+        }
+
+        function applyCombinedFilters() {
+            const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // 1. Date Filter (Col 1)
+                if (activeDatePredicate) {
+                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const rowDate = parseTableDate(dateStr);
+                    if (!rowDate || !activeDatePredicate(rowDate)) {
+                        showRow = false;
+                    }
+                }
+
+                // 2. Protocol Specific Search Filter (Column 0)
+                if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
+                    showRow = false;
+                }
+
+                // 3. Status Filter
+                const statusBadge = row.querySelector('.status-badge');
+                const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
+                
+                // Manutentor view never shows pendente
+                if (rowStatus === 'pendente') {
+                    showRow = false;
+                }
+
+                if (showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+                    if (!activeStatusFilter.includes(rowStatus)) {
+                        showRow = false;
+                    }
+                }
+
+                // 4. Problem Filter
+                if (showRow && activeProblemFilter.length > 0 && !activeProblemFilter.includes('all')) {
+                    const problemSelect = row.querySelector('.problem-select');
+                    const rowProblem = problemSelect ? problemSelect.value : '';
+                    if (!activeProblemFilter.includes(rowProblem)) {
+                        showRow = false;
+                    }
+                }
+
+                // 5. Global Text Search Filter
+                if (showRow && !matchRowGlobalText(row, searchQuery)) {
+                    showRow = false;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visibleCount++;
+            });
+
+            // Toggle No Results Row
+            const noResultsRow = document.getElementById('no-audit-results');
+            if (noResultsRow) {
+                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            }
+
+            // Indicators update
+            if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
+            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '');
+            if (statusIndicator) statusIndicator.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 3);
+            if (problemIndicator) problemIndicator.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4);
+        }
+
+        // Protocol Search Input handler
+        protocolSearchInput?.addEventListener('input', (e) => {
+            protocolSearchQuery = e.target.value;
+            applyCombinedFilters();
+        });
+
+        // Checkbox change handlers for status filter
+        const inlineStatusFilterAll = document.getElementById('status-filter-all');
+        const inlineStatusCheckboxes = document.querySelectorAll('input[name="status-filter"].status-checkbox');
+
+        function updateInlineStatusFilter() {
+            const checkedBoxes = document.querySelectorAll('input[name="status-filter"].status-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const total = inlineStatusCheckboxes.length;
+
+            if (inlineStatusFilterAll) {
+                inlineStatusFilterAll.checked = (checkedValues.length === total && total > 0);
+            }
+
+            if (checkedValues.length === total || (checkedValues.length === 0 && inlineStatusFilterAll && inlineStatusFilterAll.checked)) {
+                activeStatusFilter = ['all'];
+            } else {
+                activeStatusFilter = checkedValues;
+            }
+            applyCombinedFilters();
+        }
+
+        inlineStatusFilterAll?.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            inlineStatusCheckboxes.forEach(cb => cb.checked = isChecked);
+            updateInlineStatusFilter();
+        });
+
+        inlineStatusCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updateInlineStatusFilter();
+            });
+        });
+
+        // Checkbox change handlers for problem filter
+        const inlineProblemFilterAll = document.getElementById('problem-filter-all');
+        const inlineProblemCheckboxes = document.querySelectorAll('input[name="problem-filter"].problem-checkbox');
+
+        function updateInlineProblemFilter() {
+            const checkedBoxes = document.querySelectorAll('input[name="problem-filter"].problem-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const total = inlineProblemCheckboxes.length;
+
+            if (inlineProblemFilterAll) {
+                inlineProblemFilterAll.checked = (checkedValues.length === total && total > 0);
+            }
+
+            if (checkedValues.length === total || (checkedValues.length === 0 && inlineProblemFilterAll && inlineProblemFilterAll.checked)) {
+                activeProblemFilter = ['all'];
+            } else {
+                activeProblemFilter = checkedValues;
+            }
+            applyCombinedFilters();
+        }
+
+        inlineProblemFilterAll?.addEventListener('change', (e) => {
+            const isChecked = e.target.checked;
+            inlineProblemCheckboxes.forEach(cb => cb.checked = isChecked);
+            updateInlineProblemFilter();
+        });
+
+        inlineProblemCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updateInlineProblemFilter();
+            });
+        });
+
+        // Search input handler
+        searchInput?.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            applyCombinedFilters();
+        });
+
+        // Dynamic change on row selects
+        document.getElementById('os-table')?.addEventListener('change', (e) => {
+            if (e.target.classList.contains('status-select') || e.target.classList.contains('problem-select')) {
+                applyCombinedFilters();
+            }
+        });
+
+        window.applyCombinedFilters = applyCombinedFilters;
+
+        // Quick date filter global functions for OS Table
+        window.applyQuickFilter = function(type) {
+            activeDatePredicate = buildDatePredicate(type);
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.applyCustomRange = function() {
+            const startVal = document.getElementById('range-start')?.value;
+            const endVal = document.getElementById('range-end')?.value;
+            if (!startVal || !endVal) return;
+            activeDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearAllFilters = function() {
+            activeDatePredicate = null;
+            protocolSearchQuery = '';
+            activeStatusFilter = ['all'];
+            activeProblemFilter = ['all'];
+            searchQuery = '';
+
+            const start = document.getElementById('range-start');
+            const end = document.getElementById('range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            if (protocolSearchInput) protocolSearchInput.value = '';
+            if (searchInput) searchInput.value = '';
+
+            const statusAll = document.getElementById('status-filter-all');
+            if (statusAll) statusAll.checked = true;
+            document.querySelectorAll('input[name="status-filter"].status-checkbox').forEach(cb => cb.checked = true);
+
+            const problemAll = document.getElementById('problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="problem-filter"].problem-checkbox').forEach(cb => cb.checked = true);
+
+            if (window.painelController) {
+                window.painelController.activeFilters.status = ['all'];
+                window.painelController.activeFilters.problem = ['all'];
+                window.painelController.renderTable();
+            }
+
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearProtocolFilter = function() {
+            protocolSearchQuery = '';
+            if (protocolSearchInput) protocolSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearDateFilter = function() {
+            activeDatePredicate = null;
+            const start = document.getElementById('range-start');
+            const end = document.getElementById('range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearStatusFilter = function() {
+            activeStatusFilter = ['all'];
+            const statusAll = document.getElementById('status-filter-all');
+            if (statusAll) statusAll.checked = true;
+            document.querySelectorAll('input[name="status-filter"].status-checkbox').forEach(cb => cb.checked = true);
+
+            if (window.painelController) {
+                window.painelController.activeFilters.status = ['all'];
+                window.painelController.renderTable();
+            }
+
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearProblemFilter = function() {
+            activeProblemFilter = ['all'];
+            const problemAll = document.getElementById('problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="problem-filter"].problem-checkbox').forEach(cb => cb.checked = true);
+
+            if (window.painelController) {
+                window.painelController.activeFilters.problem = ['all'];
+                window.painelController.renderTable();
+            }
+
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+    })();
+</script>
+
+<!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->
+<div id="confirm-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
+        <div class="flex items-start gap-4">
+            <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700">
+                <span id="modal-icon" class="material-symbols-outlined text-[24px]">check</span>
+            </div>
+            <div class="flex-1">
+                <h3 id="modal-title" class="text-title-md font-title-md font-bold text-on-surface mb-1">Confirmar Ação</h3>
+                <p id="modal-message" class="text-body-md text-on-surface-variant leading-relaxed">Deseja prosseguir com essa alteração de status?</p>
+            </div>
+        </div>
+        
+        <!-- Campo de Justificativa / Observação -->
+        <div class="mt-4">
+            <label for="modal-justification-input" class="block text-label-sm font-medium text-on-surface-variant mb-1.5">
+                Justificativa / Observação <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+
+            <textarea id="modal-justification-input" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors text-xs" placeholder="Informe o motivo ou observação sobre esta alteração..."></textarea>
+
+            <!-- Botões de Mensagens Padrão (Quick Presets) -->
+            <div class="mt-2.5">
+                <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
+                    <span class="material-symbols-outlined text-[14px] text-primary">chat_bubble_outline</span>
+                    <span>Mensagens Padrão:</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" 
+                            onclick="setModalJustification('Identificada duplicidade de protocolo.')" 
+                            title="Identificada duplicidade de protocolo."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Identificada duplicidade</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Resolvido em outro protocolo.')" 
+                            title="Resolvido em outro protocolo."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Resolvido em outro protocolo</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Atendimento cancelado pela equipe.')" 
+                            title="Atendimento cancelado pela equipe."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Cancelado pela equipe</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Endereço não localizado.')" 
+                            title="Endereço não localizado."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Endereço não localizado</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Abertura de Nova Ordem de Serviço -->
+<div id="modal-abertura-os" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-abertura-os-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full h-[92vh] max-h-[850px] overflow-hidden flex flex-col text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[22px]">add_task</span>
+                </div>
+                <div>
+                    <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Nova Ordem de Serviço</h3>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant">Abertura e registro de novo chamado</p>
+                </div>
+            </div>
+            <button onclick="closeNovaOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar Modal">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+        <div class="flex-1 min-h-0 w-full h-full bg-slate-50 relative overflow-y-auto">
+            <iframe id="iframe-abertura-os" src="Abrir.html" class="w-full h-full border-0"></iframe>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts de Gerenciamento do Modal de Nova OS -->
+<script>
+    window.abrirModalNovaOS = function() {
+        const modal = document.getElementById('modal-abertura-os');
+        const modalBox = document.getElementById('modal-abertura-os-box');
+        const iframe = document.getElementById('iframe-abertura-os');
+        if (!modal || !modalBox) return;
+
+        // Limpa estado de edição residual
+        try { sessionStorage.removeItem('os_para_edicao'); } catch(e) {}
+
+        if (iframe) {
+            if (iframe.contentWindow && typeof iframe.contentWindow.carregarModoEdicaoOuReset === 'function') {
+                iframe.contentWindow.carregarModoEdicaoOuReset();
+            } else if (!iframe.src || iframe.src === 'about:blank' || !iframe.src.includes('Abrir.html')) {
+                iframe.src = 'Abrir.html';
+            }
+        }
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    };
+
+    window.abrirModalEditarOS = function(osRecord) {
+        const modal = document.getElementById('modal-abertura-os');
+        const modalBox = document.getElementById('modal-abertura-os-box');
+        const iframe = document.getElementById('iframe-abertura-os');
+        if (!modal || !modalBox || !iframe || !osRecord) return;
+
+        // Armazena no sessionStorage ANTES de carregar o iframe para pré-preenchimento síncrono e instantâneo
+        try {
+            sessionStorage.setItem('os_para_edicao', JSON.stringify(osRecord));
+        } catch(e) {
+            console.warn('⚠️ Erro ao gravar os_para_edicao no sessionStorage:', e);
+        }
+
+        if (iframe.contentWindow && typeof iframe.contentWindow.carregarModoEdicaoOuReset === 'function') {
+            iframe.contentWindow.carregarModoEdicaoOuReset();
+        } else {
+            iframe.src = 'Abrir.html';
+        }
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+        }, 10);
+    };
+
+    window.closeNovaOSModal = function() {
+        const modal = document.getElementById('modal-abertura-os');
+        const modalBox = document.getElementById('modal-abertura-os-box');
+        if (!modal || !modalBox) return;
+
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        modalBox.classList.add('scale-95', 'opacity-0');
+
+        try { sessionStorage.removeItem('os_para_edicao'); } catch(e) {}
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    // Auto-open modal se o parâmetro ?openNovaOS=true estiver na URL
+    document.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('openNovaOS') === 'true') {
+            setTimeout(() => {
+                if (typeof window.abrirModalNovaOS === 'function') {
+                    window.abrirModalNovaOS();
+                }
+            }, 50);
+            const sidebarParam = urlParams.get('sidebar');
+            const cleanUrl = window.location.pathname + (sidebarParam ? `?sidebar=${sidebarParam}` : '');
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+    });
+
+    // Escuta mensagens vindas do Abrir (iframe)
+    window.addEventListener('message', (event) => {
+        if (event.data) {
+            if (event.data.action === 'FECHAR_MODAL_ABERTURA') {
+                window.closeNovaOSModal();
+            } else if (event.data.action === 'OS_CRIADA_SUCESSO') {
+                window.closeNovaOSModal();
+                if (typeof window.carregarChamados === 'function') {
+                    window.carregarChamados();
+                } else if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                } else {
+                    location.reload();
+                }
+            } else if (event.data.action === 'OS_CRIADA_SILENCIOSO') {
+                if (typeof window.carregarChamados === 'function') {
+                    window.carregarChamados();
+                } else if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        }
+    });
+</script>
+
+<!-- Modal de Visualização do Ponto no Mapbox -->
+<div id="modal-mapa-ponto" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-ponto-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-4xl w-full h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header do Modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">location_on</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="modal-mapa-protocolo">Protocolo #---</h3>
+                        <span id="modal-mapa-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container">Em aberto</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md" id="modal-mapa-endereco-sub">Carregando endereço...</p>
+                </div>
+            </div>
+            <button onclick="window.closeMapaPontoModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar Modal (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+        
+        <!-- Canvas do Mapa & Card Informativo Flutuante -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-ponto-canvas" class="w-full h-full"></div>
+
+            <!-- Card Informativo Glassmorphism -->
+            <div class="absolute bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-sm bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/60 p-4 rounded-xl shadow-xl text-xs space-y-2 z-10">
+                <div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+                    <span class="font-semibold text-on-surface flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px] text-secondary">pin_drop</span>
+                        <span>Detalhes da Localização</span>
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-secondary/10 text-secondary" id="modal-mapa-card-tipo">Endereço</span>
+                </div>
+                <div class="space-y-1.5 text-on-surface">
+                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-on-surface-variant">---</span></p>
+                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-on-surface-variant font-medium">---</span></p>
+                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-on-surface-variant font-medium">---</span></p>
+                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-secondary font-semibold">---</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Lógica de Controle do Mapa Mapbox no Modal (Gerenciada pelo MapService Singleton) -->
+<script>
+    // Fechar modal ao pressionar ESC ou clicar fora do conteúdo
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (typeof window.closeMapaPontoModal === 'function') {
+                window.closeMapaPontoModal();
+            }
+        }
+    });
+
+    document.getElementById('modal-mapa-ponto')?.addEventListener('click', (e) => {
+        if (e.target.id === 'modal-mapa-ponto') {
+            if (typeof window.closeMapaPontoModal === 'function') {
+                window.closeMapaPontoModal();
+            }
+        }
+    });
+</script>
+
+<!-- Helper de Testes Supabase (DevTools Console) -->
+<script>
+    window.testSupabaseConnection = async function(tableName = 'chamados') {
+        if (!window.supabaseClient) {
+            console.error('❌ Supabase Client não está configurado.');
+            return;
+        }
+
+        console.log(`📡 [DevTools] Testando consulta na tabela "${tableName}"...`);
+        const { data, error } = await window.supabaseClient.from(tableName).select('*').limit(5);
+
+        if (error) {
+            console.error('❌ Erro na consulta do Supabase:', error);
+        } else {
+            console.log('⚡ Conexão bem-sucedida! Amostra de registros:', data);
+        }
+    };
+</script>
+</body>
+</html>

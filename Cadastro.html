@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Solicitar Cadastro - Sistema OS Manager</title>
+    <meta name="description" content="Solicitação de Cadastro de Servidores para o Sistema de Gestão de Iluminação Pública de Araraquara." />
+
+    <!-- Scripts & Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "background": "#fcf8fa",
+                        "on-surface": "#1b1b1d",
+                        "on-surface-variant": "#45464d",
+                        "primary": "#131b2e",
+                        "secondary": "#0051d5",
+                        "secondary-container": "#316bf3",
+                        "on-secondary": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "surface-container-high": "#eae7e9",
+                        "outline-variant": "#c6c6cd",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "govbr": "#1351B4"
+                    },
+                    fontFamily: {
+                        sans: ["Inter", "sans-serif"]
+                    },
+                    animation: {
+                        "fade-in": "fadeIn 0.4s ease-out forwards",
+                        "shake": "shake 0.4s ease-in-out"
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            "0%": { opacity: "0", transform: "translateY(12px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        },
+                        shake: {
+                            "0%, 100%": { transform: "translateX(0)" },
+                            "20%, 60%": { transform: "translateX(-6px)" },
+                            "40%, 80%": { transform: "translateX(6px)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background font-sans text-on-surface antialiased min-h-screen flex items-center justify-center relative overflow-hidden p-4">
+
+    <!-- Background WebGL Ambient Canvas (Design idêntico ao Login.html) -->
+    <canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+    <script>
+        const canvas = document.getElementById('bg-canvas');
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+        const geometry = new THREE.PlaneGeometry(2, 2);
+
+        const vertexShader = `
+            varying vec2 v_texCoord;
+            void main() {
+                v_texCoord = uv;
+                gl_Position = vec4(position, 1.0);
+            }
+        `;
+
+        const fragmentShader = `
+            precision highp float;
+            uniform float u_time;
+            uniform vec2 u_resolution;
+            varying vec2 v_texCoord;
+
+            void main() {
+                vec2 uv = v_texCoord;
+                float t = u_time * 0.15;
+                vec3 color1 = vec3(0.988, 0.973, 0.98);
+                vec3 color2 = vec3(0.945, 0.933, 0.96);
+                vec3 accent = vec3(0.075, 0.106, 0.18);
+
+                float w1 = sin(uv.x * 2.5 + t) * 0.5 + 0.5;
+                float w2 = sin(uv.y * 2.0 - t * 1.2) * 0.5 + 0.5;
+                vec3 base = mix(color1, color2, w1 * w2);
+
+                float edge = smoothstep(0.6, 1.0, length(uv - 0.5));
+                vec3 finalColor = mix(base, accent, edge * 0.03);
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        const uniforms = {
+            u_time: { value: 0 },
+            u_resolution: { value: new THREE.Vector2() }
+        };
+
+        const material = new THREE.ShaderMaterial({ vertexShader, fragmentShader, uniforms });
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+
+        function resize() {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function animate(time) {
+            uniforms.u_time.value = time * 0.001;
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+        requestAnimationFrame(animate);
+    </script>
+
+    <!-- Main Auth Card -->
+    <main class="w-full max-w-md bg-surface-container-lowest/90 backdrop-blur-xl border border-outline-variant/80 rounded-2xl shadow-2xl p-8 relative z-10 animate-fade-in my-8" id="cadastro-card">
+        
+        <!-- Header & Logo -->
+        <div class="text-center mb-6">
+            <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-secondary text-white mb-3 shadow-md">
+                <span class="material-symbols-outlined text-[32px]">person_add</span>
+            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-on-surface">Solicitar Cadastro</h1>
+            <p class="text-xs font-medium text-on-surface-variant mt-1">Servidores da Prefeitura (@araraquara.sp.gov.br)</p>
+        </div>
+
+        <!-- Alert Message Container -->
+        <div id="auth-alert" class="hidden mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 transition-all duration-300">
+            <span class="material-symbols-outlined text-[20px]" id="alert-icon">error</span>
+            <span id="alert-text">Mensagem de alerta...</span>
+        </div>
+
+        <!-- Feedback Container de Sucesso (Oculto por padrão) -->
+        <div id="success-box" class="hidden text-center py-6 animate-fade-in">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-200">
+                <span class="material-symbols-outlined text-[36px]">verified</span>
+            </div>
+            <h2 class="text-lg font-bold text-on-surface mb-2">Solicitação Enviada!</h2>
+            <p class="text-xs text-on-surface-variant leading-relaxed mb-6">
+                Seu cadastro foi registrado com sucesso! O acesso precisa ser <strong class="text-on-surface font-semibold">liberado manualmente pelo administrador</strong> antes de realizar o primeiro login.
+            </p>
+            <a href="Login-Servidor.html" class="w-full py-3 px-4 bg-secondary hover:bg-secondary-container text-white font-semibold rounded-xl text-sm shadow-md transition-all inline-flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+                <span>Ir para o Login do Servidor</span>
+            </a>
+        </div>
+
+        <!-- Formulário de Cadastro -->
+        <form id="cadastro-form" onsubmit="processarCadastro(event)" class="space-y-4">
+            
+            <!-- Campo Nome Completo -->
+            <div>
+                <label for="reg-nome" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Nome Completo</label>
+                <div class="relative">
+                    <input type="text" 
+                           id="reg-nome" 
+                           required 
+                           placeholder="Digite seu nome completo"
+                           class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">person</span>
+                </div>
+            </div>
+
+            <!-- Campo E-mail Institucional -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label for="reg-email" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">E-mail Institucional</label>
+                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full">Exclusivo Prefeitura</span>
+                </div>
+                <div class="relative">
+                    <input type="email" 
+                           id="reg-email" 
+                           required 
+                           placeholder="nome@araraquara.sp.gov.br"
+                           class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">mail</span>
+                </div>
+                <p class="text-[11px] text-on-surface-variant/70 mt-1">Obrigatório terminar com <strong class="text-on-surface">@araraquara.sp.gov.br</strong></p>
+            </div>
+
+            <!-- Campo Senha -->
+            <div>
+                <label for="reg-password" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Senha</label>
+                <div class="relative">
+                    <input type="password" 
+                           id="reg-password" 
+                           required 
+                           minlength="6"
+                           placeholder="Mínimo 6 caracteres"
+                           class="w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">lock</span>
+                    
+                    <button type="button" 
+                            onclick="togglePasswordVisibility('reg-password', 'pass-icon-1')" 
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer p-1">
+                        <span class="material-symbols-outlined text-[20px]" id="pass-icon-1">visibility</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Campo Confirmar Senha -->
+            <div>
+                <label for="reg-confirm-password" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Confirmar Senha</label>
+                <div class="relative">
+                    <input type="password" 
+                           id="reg-confirm-password" 
+                           required 
+                           minlength="6"
+                           placeholder="Repita a senha criada"
+                           class="w-full pl-10 pr-10 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
+                    <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">lock_reset</span>
+                    
+                    <button type="button" 
+                            onclick="togglePasswordVisibility('reg-confirm-password', 'pass-icon-2')" 
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface transition-colors cursor-pointer p-1">
+                        <span class="material-symbols-outlined text-[20px]" id="pass-icon-2">visibility</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Botão Submit Cadastro -->
+            <button type="submit" 
+                    id="btn-register-submit"
+                    class="w-full mt-2 py-3 px-4 bg-secondary hover:bg-secondary-container active:scale-[0.98] text-white font-semibold rounded-xl text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <span id="btn-submit-text">Solicitar Cadastro</span>
+                <span class="material-symbols-outlined text-[20px]" id="btn-submit-icon">how_to_reg</span>
+            </button>
+
+        </form>
+
+        <!-- Divisor Visual & Botão Voltar para o Login -->
+        <div class="mt-6 pt-4 border-t border-outline-variant/60 text-center" id="footer-login-link">
+            <p class="text-xs text-on-surface-variant mb-2">Já possui uma conta de servidor?</p>
+            <a href="Login-Servidor.html" 
+               class="w-full py-2.5 px-4 bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-secondary font-semibold rounded-xl text-xs shadow-sm hover:shadow transition-all flex items-center justify-center gap-2 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                <span>Voltar para o Login de Servidor</span>
+            </a>
+        </div>
+
+    </main>
+
+    <!-- Script de Validação e Cadastro no Supabase -->
+    <script>
+        // Validação estrita do domínio institucional @araraquara.sp.gov.br
+        function validarEmailAraraquara(email) {
+            if (!email) return false;
+            const cleanEmail = email.trim().toLowerCase();
+            return cleanEmail.endsWith('@araraquara.sp.gov.br') && 
+                   cleanEmail.indexOf('@') === cleanEmail.lastIndexOf('@') && 
+                   cleanEmail.split('@')[0].length > 0;
+        }
+
+        // Alternar visibilidade de senhas
+        function togglePasswordVisibility(inputId, iconId) {
+            const passwordInput = document.getElementById(inputId);
+            const toggleIcon = document.getElementById(iconId);
+            if (!passwordInput || !toggleIcon) return;
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.textContent = 'visibility';
+            }
+        }
+
+        // Mostrar Alertas na Interface
+        function exibirAlerta(mensagem, tipo = 'erro') {
+            const alertContainer = document.getElementById('auth-alert');
+            const alertText = document.getElementById('alert-text');
+            const alertIcon = document.getElementById('alert-icon');
+            const card = document.getElementById('cadastro-card');
+
+            if (!alertContainer || !alertText) return;
+
+            alertText.textContent = mensagem;
+
+            if (tipo === 'erro') {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-error-container text-on-error-container border border-error/20 animate-fade-in';
+                alertIcon.textContent = 'error';
+                
+                if (card) {
+                    card.classList.remove('animate-shake');
+                    void card.offsetWidth; // Reflow
+                    card.classList.add('animate-shake');
+                }
+            } else {
+                alertContainer.className = 'mb-6 p-4 rounded-xl text-xs font-medium flex items-center gap-3 bg-emerald-100 text-emerald-800 border border-emerald-300 animate-fade-in';
+                alertIcon.textContent = 'check_circle';
+            }
+
+            alertContainer.classList.remove('hidden');
+        }
+
+        // Processar Cadastro do Usuário
+        async function processarCadastro(event) {
+            event.preventDefault();
+
+            const alertContainer = document.getElementById('auth-alert');
+            if (alertContainer) alertContainer.classList.add('hidden');
+
+            const nomeInput = document.getElementById('reg-nome');
+            const emailInput = document.getElementById('reg-email');
+            const passwordInput = document.getElementById('reg-password');
+            const confirmPasswordInput = document.getElementById('reg-confirm-password');
+
+            const btnSubmit = document.getElementById('btn-register-submit');
+            const btnText = document.getElementById('btn-submit-text');
+            const btnIcon = document.getElementById('btn-submit-icon');
+
+            const nome = nomeInput?.value.trim();
+            const email = emailInput?.value.trim().toLowerCase();
+            const roleSolicitada = 'ouvidoria';
+            const password = passwordInput?.value;
+            const confirmPassword = confirmPasswordInput?.value;
+
+            // 1. Validação de preenchimento
+            if (!nome || !email || !password || !confirmPassword) {
+                exibirAlerta('Por favor, preencha todos os campos obrigatórios.');
+                return;
+            }
+
+            // 2. Validação estrita do E-mail (@araraquara.sp.gov.br)
+            if (!validarEmailAraraquara(email)) {
+                exibirAlerta('O cadastro é permitido EXCLUSIVAMENTE para e-mails oficiais terminados em @araraquara.sp.gov.br');
+                return;
+            }
+
+            // 3. Validação de Senha
+            if (password.length < 6) {
+                exibirAlerta('A senha deve ter no mínimo 6 caracteres.');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                exibirAlerta('As senhas digitadas não coincidem. Verifique a confirmação.');
+                return;
+            }
+
+            if (!window.supabaseClient) {
+                exibirAlerta('Serviço Supabase não está inicializado.');
+                return;
+            }
+
+            // Ativar estado de carregamento no botão
+            if (btnSubmit) btnSubmit.disabled = true;
+            if (btnText) btnText.textContent = 'Registrando...';
+            if (btnIcon) btnIcon.textContent = 'sync';
+            if (btnIcon) btnIcon.classList.add('animate-spin');
+
+            try {
+                // Registrar usuário no Supabase Auth com role 'ouvidoria' e status 'pendente'
+                const { data, error } = await window.supabaseClient.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        data: {
+                            nome: nome,
+                            full_name: nome,
+                            role: 'ouvidoria',
+                            cargo_solicitado: 'ouvidoria',
+                            status: 'pendente',
+                            ativo: false
+                        }
+                    }
+                });
+
+                if (error) {
+                    let msg = error.message;
+                    if (msg.includes('User already registered') || msg.includes('already been registered')) {
+                        msg = 'Este e-mail já possui cadastro registrado no sistema.';
+                    } else if (msg.includes('Password should be at least')) {
+                        msg = 'A senha informada não atende aos requisitos mínimos de segurança.';
+                    }
+                    exibirAlerta(msg);
+                } else if (data) {
+                    console.log('✅ [Cadastro DEBUG] Usuário cadastrado no Supabase Auth:', data.user);
+
+                    // Tentar upsert na tabela profiles com role 'ouvidoria', status 'pendente' e ativo = false
+                    if (data.user) {
+                        try {
+                            const { error: profileErr } = await window.supabaseClient
+                                .from('profiles')
+                                .upsert({
+                                    id: data.user.id,
+                                    email: email,
+                                    nome: nome,
+                                    role: 'ouvidoria',
+                                    cargo_solicitado: 'ouvidoria',
+                                    status: 'pendente',
+                                    ativo: false
+                                });
+                            if (profileErr) {
+                                console.warn('⚠️ [Cadastro DEBUG] Registro em profiles retornou aviso:', profileErr);
+                            }
+                        } catch (pErr) {
+                            console.warn('⚠️ [Cadastro DEBUG] Exceção ao gravar em profiles:', pErr);
+                        }
+                    }
+
+                    // Exibir tela de confirmação de cadastro pendente
+                    document.getElementById('cadastro-form').classList.add('hidden');
+                    document.getElementById('footer-login-link').classList.add('hidden');
+                    document.getElementById('success-box').classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error('❌ Error no cadastro:', err);
+                exibirAlerta('Ocorreu uma falha ao comunicar com o serviço de autenticação.');
+            } finally {
+                if (btnSubmit) btnSubmit.disabled = false;
+                if (btnText) btnText.textContent = 'Solicitar Cadastro';
+                if (btnIcon) btnIcon.textContent = 'how_to_reg';
+                if (btnIcon) btnIcon.classList.remove('animate-spin');
+            }
+        }
+    </script>
+</body>
+</html>

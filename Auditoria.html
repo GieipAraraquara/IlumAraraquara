@@ -1,0 +1,2820 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Dashboard - OS Manager</title>
+    
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=9"></script>
+    <script src="js/domain/ChamadoModel.js?v=9"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
+    <script src="js/services/ChamadosService.js?v=9"></script>
+    <script src="js/services/MapService.js?v=9"></script>
+    <script src="js/controllers/AuditoriaController.js?v=9"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Mapbox GL JS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+        }
+        #main-content {
+            overflow-x: hidden !important;
+        }
+        .th-vertical .header-tooltip {
+            display: none !important;
+        }
+        /* Sidebar collapse mechanics */
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { width: calc(100% - 80px); left: 80px; margin-left: 0; }
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+        
+        /* Fixed Resizer CSS */
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px; /* Área clicável maior */
+            cursor: col-resize;
+            user-select: none;
+            height: 100%;
+            z-index: 10;
+            transform: translateX(50%); /* Centraliza o puxador em cima da borda */
+            display: flex;
+            justify-content: center;
+        }
+        
+        /* Pseudo-elemento para desenhar a linha azul sem afetar o layout com borders */
+        .resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+        }
+
+        .resizer:hover::after,
+        .resizer.resizing::after {
+            background-color: #0051d5; /* Azul Secundário */
+        }
+
+        /* Vertical Table Header Styling (2-Line Support) */
+        .th-vertical {
+            height: 115px;
+            vertical-align: bottom;
+            padding-bottom: 10px;
+            padding-top: 8px;
+            padding-left: 2px;
+            padding-right: 2px;
+            text-align: center;
+            position: relative;
+            z-index: 10;
+        }
+        .th-vertical:hover {
+            z-index: 100;
+        }
+        .th-vertical .vertical-header-text {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            display: inline-block;
+            font-size: 10.5px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            text-transform: uppercase;
+            color: #45464d;
+            line-height: 1.25;
+            max-height: 100px;
+            text-align: left;
+        }
+        .th-vertical .vertical-header-text div {
+            white-space: nowrap;
+        }
+
+        /* Header Tooltip Styling (Opening DOWN over table rows, matching dropdown filter layer behavior) */
+        .th-vertical .header-tooltip {
+            position: absolute;
+            top: calc(100% + 4px);
+            bottom: auto;
+            left: 50%;
+            transform: translateX(-50%) translateY(-4px);
+            writing-mode: horizontal-tb !important;
+            white-space: normal;
+            text-transform: none;
+            letter-spacing: normal;
+            font-size: 11px;
+            line-height: 1.4;
+            font-weight: 400;
+            color: #f8fafc;
+            background-color: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 8px;
+            padding: 8px 12px;
+            width: 220px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 100;
+            text-align: left;
+        }
+        .th-vertical:hover .header-tooltip {
+            opacity: 1;
+            visibility: visible;
+            transform: translateX(-50%) translateY(0);
+        }
+        .th-vertical .header-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            top: auto;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px;
+            border-style: solid;
+            border-color: transparent transparent #0f172a transparent;
+        }
+
+        /* Tooltip Left-Aligned (for leftmost audit columns: Col 3 & 4) */
+        .th-vertical.tooltip-left .header-tooltip {
+            left: -8px;
+            right: auto;
+            transform: translateY(-4px);
+        }
+        .th-vertical.tooltip-left:hover .header-tooltip {
+            transform: translateY(0);
+        }
+        .th-vertical.tooltip-left .header-tooltip::after {
+            left: 20px;
+            right: auto;
+            transform: none;
+        }
+
+        /* Tooltip Right-Aligned (for rightmost audit columns: Col 9, 10, 11, 12) */
+        .th-vertical.tooltip-right .header-tooltip {
+            right: -8px;
+            left: auto;
+            transform: translateY(-4px);
+        }
+        .th-vertical.tooltip-right:hover .header-tooltip {
+            transform: translateY(0);
+        }
+        .th-vertical.tooltip-right .header-tooltip::after {
+            right: 20px;
+            left: auto;
+            transform: none;
+        }
+
+        /* Audit S / N Badges (Read-Only) */
+        .audit-badge {
+            font-size: 11px;
+            font-weight: 700;
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            user-select: none;
+            cursor: default;
+        }
+        .audit-badge.audit-s {
+            background-color: rgba(244, 63, 94, 0.12);
+            color: #e11d48;
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            box-shadow: 0 1px 2px rgba(225, 29, 72, 0.08);
+        }
+        .audit-badge.audit-n {
+            background-color: rgba(241, 245, 249, 0.8);
+            color: #94a3b8;
+            border: 1px solid rgba(203, 213, 225, 0.4);
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
+
+<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    const vertexShader = `
+        varying vec2 v_texCoord;
+        void main() {
+            v_texCoord = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float t = u_time * 0.2;
+            vec3 color1 = vec3(0.988, 0.973, 0.98); 
+            vec3 color2 = vec3(0.957, 0.941, 0.953);
+            vec3 accent = vec3(0.059, 0.09, 0.165); 
+            
+            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
+            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
+            vec3 base = mix(color1, color2, w1 * w2);
+            
+            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
+            vec3 finalColor = mix(base, accent, edge * 0.02);
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `;
+    
+    const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() }
+    };
+    
+    const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    function animate(time) {
+        uniforms.u_time.value = time * 0.001;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+</script>
+
+<app-sidebar active="auditoria"></app-sidebar>
+
+<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+
+<main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
+    
+    <div class="flex justify-between items-end mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
+        <div>
+            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">Painel de Auditoria</h2>
+            <p class="font-body-md text-body-md text-on-surface-variant">Conformidade e verificação detalhada das Ordens de Serviço</p>
+        </div>
+    </div>
+
+    <!-- KPI Grid -->
+    <div class="grid grid-cols-12 gap-card-gap mb-card-gap max-w-max-width-content mx-auto">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total Auditadas</div><div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-total-auditadas"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+12% vs mês anterior</span></div></div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Com Divergências</div><div class="font-headline-lg text-headline-lg text-error overflow-visible" id="kpi-com-divergencias"><div class="h-8 w-16 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Requer atenção</span></div></div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Conformidade</div><div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible" id="kpi-em-conformidade"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm">Total sem falhas</span></div></div>
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Taxa de Conformidade</div><div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-taxa-conformidade"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+1.2% vs mês anterior</span></div></div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+                <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Tabela de Auditoria de OS</h3>
+                <div class="flex gap-3 items-center">
+                    <button class="text-secondary font-label-md text-label-md hover:underline transition-colors active:scale-95">Ver Tudo</button>
+                </div>
+            </div>
+            
+            <div class="w-full max-w-full overflow-visible">
+                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="os-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-30 relative">
+                            <!-- Column 1 (Protocolo com Filtro de Busca) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible align-bottom pb-3" style="width: 120px; min-width: 105px;" data-col="0">
+                                <div class="relative inline-block text-left group/protocol-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="protocol-filter-trigger" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="protocol-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                            <div class="relative">
+                                                <input type="text" id="protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearProtocolFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 2 (Date Filter) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible align-bottom pb-3" style="width: 75px; min-width: 65px;" data-col="1">
+                                <div class="relative inline-block text-left group/date-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="date-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="filter-active-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="date-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('hoje')">Hoje</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('ontem')">Ontem</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('7dias')">Últimos 7 dias</button>
+                                            
+                                            <div class="border-t border-outline-variant my-2 pt-2">
+                                                <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
+                                                <div class="grid grid-cols-2 gap-3 mt-2 px-1">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Início</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="range-start" type="date"/>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Fim</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="range-end" type="date"/>
+                                                    </div>
+                                                </div>
+                                                <button class="w-full mt-4 bg-secondary text-on-secondary py-2 rounded font-label-md hover:bg-secondary-container transition-colors" onclick="applyCustomRange()">Aplicar</button>
+                                            </div>
+                                            <button class="text-error font-label-md mt-2 hover:underline" onclick="clearAllFilters()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3 (Ponto / Localização) -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-4" style="width: 180px; min-width: 130px;" data-col="2">
+                                <div class="flex items-center gap-1">Ponto / Localização</div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 1 -->
+                            <th class="th-vertical tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="3" title="Aponta SIM quando: O problema encontrada é diferente do problema da abertura do protocolo.">
+                                <div class="vertical-header-text">
+                                    <div>Problema</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>O problema encontrada é diferente do problema da abertura do protocolo.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 2 -->
+                            <th class="th-vertical tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="4" title="Aponta SIM quando: A plaqueta que foi indicada na abertura do processo, não foi citada na finalização.">
+                                <div class="vertical-header-text">
+                                    <div>Plaqueta</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A plaqueta que foi indicada na abertura do processo, não foi citada na finalização.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 3 -->
+                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="5" title="Aponta SIM quando: A quantidade de pontos da abertura do protocolo é diferente da quantidade de finalização.">
+                                <div class="vertical-header-text">
+                                    <div>Quantidade</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A quantidade de pontos da abertura do protocolo é diferente da quantidade de finalização.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 4 -->
+                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="6" title="Aponta SIM quando: A coordenada de abertura da ordem de serviço tem uma distância superior a 100m da coordenada do serviço realizado">
+                                <div class="vertical-header-text">
+                                    <div>Distância</div>
+                                    <div>acima 100m?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A coordenada de abertura da ordem de serviço tem uma distância superior a 100m da coordenada do serviço realizado.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 5 -->
+                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="7" title="Aponta SIM quando: Uma nova plaqueta é cadastrada no banco de dados, e existe outra plaqueta cadastrada em menos de 20m">
+                                <div class="vertical-header-text">
+                                    <div>Outra plaqueta</div>
+                                    <div>próxima?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>Uma nova plaqueta é cadastrada no banco de dados, e existe outra plaqueta cadastrada em menos de 20m.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 6 -->
+                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="8" title="Aponta SIM quando: A plaqueta está duplicada na base de dados">
+                                <div class="vertical-header-text">
+                                    <div>Plaqueta</div>
+                                    <div>Problemática?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A plaqueta está duplicada na base de dados.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 7 -->
+                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="9" title="Aponta SIM quando: A imagem anexa da plaqueta tem um texto divergente da plaqueta informada na finalização. Veja o texto identificado pela IA na nota da célula.">
+                                <div class="vertical-header-text">
+                                    <div>Anexo Plaqueta</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A imagem anexa da plaqueta tem um texto divergente da plaqueta informada na finalização.<br/><span class="text-slate-300 italic text-[10.5px]">Veja o texto identificado pela IA na nota da célula.</span></div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 8 -->
+                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="10" title="Aponta SIM quando: Algum dos 3 anexos não foram enviados">
+                                <div class="vertical-header-text">
+                                    <div>Anexo</div>
+                                    <div>Faltante?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>Algum dos 3 anexos não foram enviados.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 9 -->
+                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="11" title="Aponta SIM quando: Foi solicita mais que um serviço de manutenção no material.">
+                                <div class="vertical-header-text">
+                                    <div>Material</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>Foi solicitada mais que um serviço de manutenção no material.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Audit Column 10 -->
+                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="12" title="Aponta SIM quando: O problema selecionado pela empresa prestadora de serviço necessita de intervenção da CPFL.">
+                                <div class="vertical-header-text">
+                                    <div>Problema</div>
+                                    <div>Externo?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>O problema selecionado pela empresa prestadora de serviço necessita de intervenção da CPFL.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 14 (Ações com Filtro Pendentes/Concluídas) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="13">
+                                <div class="relative inline-block text-left group/action-filter">
+                                    <button class="flex items-center justify-center gap-1 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary mx-auto" id="action-filter-trigger" title="Filtrar por Status de Conclusão">
+                                        <span class="font-label-md uppercase tracking-wider">Ações</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary" id="action-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute right-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden text-left" id="action-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Status de Conclusão</span>
+                                            
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="action-filter-all" value="all" class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todas as ações</span>
+                                            </label>
+                                            
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="action-filter" value="pendente" checked class="action-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Pendentes</span>
+                                            </label>
+                                            
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="action-filter" value="concluida" class="action-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Concluídas</span>
+                                            </label>
+                                            
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearActionFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <!-- Empty Filter State Row -->
+                        <tr id="no-audit-results" class="hidden">
+                            <td colspan="14" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                                    <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
+                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Row 1 -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-003" onclick="window.abrirDetalhesOSModal('OS-2023-003')">
+                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-003</td>
+                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">09/08</td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-003', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="C0045 - Av. Principal">C0045 - Av. Principal</span>
+                                </button>
+                            </td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
+                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Row 2 -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-002" onclick="window.abrirDetalhesOSModal('OS-2023-002')">
+                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-002</td>
+                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">06/08</td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-002', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="Rua das Flores, 123">Rua das Flores, 123</span>
+                                </button>
+                            </td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
+                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Row 3 -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="IP1SBV0270726" onclick="window.abrirDetalhesOSModal('IP1SBV0270726')">
+                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">IP1SBV0270726</td>
+                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">12/10</td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <button onclick="window.abrirMapaPonto('IP1SBV0270726', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="C0011 - Praça Central">C0011 - Praça Central</span>
+                                </button>
+                            </td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
+                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
+                            </td>
+                        </tr>
+
+                        <!-- Row 4 (Multi-Ponto) -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-004" onclick="window.abrirDetalhesOSModal('OS-2023-004')">
+                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-004</td>
+                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">10/08</td>
+                            <td class="py-3 px-4 align-middle">
+                                <div class="flex flex-col gap-1 w-full text-left">
+                                    <div class="flex items-center gap-1 min-w-0 w-full">
+                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir no mapa Mapbox">
+                                            <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                            <span class="font-medium truncate group-hover/loc:underline" title="C0010 - Av. Brasil, 500">C0010 - Av. Brasil, 500</span>
+                                        </button>
+                                        <button class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all flex-shrink-0 cursor-pointer border border-secondary/20" onclick="toggleInlinePoints(this, 3, event)" title="Expandir/Recolher pontos">
+                                            <span class="btn-text">+3</span>
+                                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                                        </button>
+                                    </div>
+                                    <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 text-on-surface-variant font-normal text-xs transition-all w-full">
+                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 1, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                            <span class="font-medium truncate group-hover/loc:underline" title="C0011 - Av. Brasil, 520">C0011 - Av. Brasil, 520</span>
+                                        </button>
+                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 2, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                            <span class="font-medium truncate group-hover/loc:underline" title="C0012 - Av. Brasil, 580">C0012 - Av. Brasil, 580</span>
+                                        </button>
+                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 3, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                            <span class="font-medium truncate group-hover/loc:underline" title="C0013 - Rua das Palmeiras, 12">C0013 - Rua das Palmeiras, 12</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
+                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
+                            </td>
+                        </tr>
+
+                        <!-- Row 5 -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-001">
+                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-001</td>
+                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">05/08</td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-001', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="Rua São José, 45">Rua São José, 45</span>
+                                </button>
+                            </td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
+                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
+                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela de Serviços Finalizados -->
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-8 overflow-visible">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+                <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px] text-emerald-600">task_alt</span>
+                    <span>Serviços Finalizados</span>
+                </h3>
+                <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
+                    4 Registros
+                </span>
+            </div>
+            
+            <div class="w-full min-h-[250px] overflow-visible">
+                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="completed-services-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                            <!-- Column 1: Protocolo com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 140px; min-width: 140px;" data-col="0">
+                                <div class="relative inline-block text-left group/comp-protocol-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="comp-protocol-filter-trigger" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="comp-protocol-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="comp-protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                            <div class="relative">
+                                                <input type="text" id="comp-protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearCompProtocolFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 2: Data da Conclusão com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 110px; min-width: 100px;" data-col="1">
+                                <div class="relative inline-block text-left group/comp-date-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="comp-date-filter-trigger" title="Filtrar por Data">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="comp-date-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="comp-date-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('hoje')">Hoje</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('ontem')">Ontem</button>
+                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('7dias')">Últimos 7 dias</button>
+                                            
+                                            <div class="border-t border-outline-variant my-2 pt-2">
+                                                <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
+                                                <div class="grid grid-cols-2 gap-3 mt-2 px-1">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Início</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="comp-range-start" type="date"/>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Fim</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="comp-range-end" type="date"/>
+                                                    </div>
+                                                </div>
+                                                <button class="w-full mt-4 bg-secondary text-on-secondary py-2 rounded font-label-md hover:bg-secondary-container transition-colors cursor-pointer" onclick="applyCompCustomRange()">Aplicar</button>
+                                            </div>
+                                            <button class="text-error font-label-md mt-2 hover:underline text-left cursor-pointer" onclick="clearCompDateFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3: Plaqueta com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 130px; min-width: 130px;" data-col="2">
+                                <div class="relative inline-block text-left group/comp-plaqueta-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="comp-plaqueta-filter-trigger" title="Filtrar por Plaqueta">
+                                        <span class="font-label-md uppercase tracking-wider">Plaqueta</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="comp-plaqueta-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="comp-plaqueta-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Plaqueta</span>
+                                            <div class="relative">
+                                                <input type="text" id="comp-plaqueta-search-input" placeholder="Digite a plaqueta..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearCompPlaquetaFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 4: Coordenada de Reparo -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 170px; min-width: 170px;" data-col="3">
+                                Coordenada de Reparo<div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 5: Problema com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 180px; min-width: 180px;" data-col="4">
+                                <div class="relative inline-block text-left group/comp-problem-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="comp-problem-filter-trigger" title="Filtrar por Problema">
+                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="comp-problem-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden text-left" id="comp-problem-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Problema</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="comp-problem-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todos os problemas</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="comp-problem-filter" value="lampada-queimada" checked class="comp-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Queimada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="comp-problem-filter" value="acesa-dia" checked class="comp-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Acesa Dia</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="comp-problem-filter" value="lampada-quebrada" checked class="comp-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Quebrada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="comp-problem-filter" value="outro" checked class="comp-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Outro</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearCompProblemFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 6: QTD. -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative align-bottom pb-3" style="width: 70px; min-width: 70px;" data-col="5">
+                                QTD.<div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 7: Material Utilizado com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 300px; min-width: 260px;" data-col="6">
+                                <div class="relative inline-block text-left group/comp-material-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="comp-material-filter-trigger" title="Filtrar por Material">
+                                        <span class="font-label-md uppercase tracking-wider">Material Utilizado</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="comp-material-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="comp-material-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Material</span>
+                                            <div class="relative">
+                                                <input type="text" id="comp-material-search-input" placeholder="Digite o material..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearCompMaterialFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <!-- Empty State Row for Completed Services -->
+                        <tr id="no-completed-results" class="hidden">
+                            <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                                    <span class="text-xs">Nenhum serviço finalizado encontrado para os filtros selecionados.</span>
+                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllCompFilters()">Limpar filtros de serviços</button>
+                                </div>
+                            </td>
+                        </tr>
+                        
+                        <!-- Row 1 (Single material) -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-003" onclick="window.abrirDetalhesOSModal('OS-2023-003')">
+                            <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">OS-2023-003</td>
+                            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">10/08</td>
+                            <td class="py-3 px-4 font-semibold text-primary whitespace-nowrap truncate align-middle">PLQ-88492</td>
+                            <td class="py-3 px-4 align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-003', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <div class="flex flex-col text-xs font-mono text-on-surface-variant group-hover/loc:text-secondary leading-tight min-w-0">
+                                        <span class="font-medium group-hover/loc:underline" title="-21.81607">-21.81607</span>
+                                        <span class="text-on-surface-variant/70 group-hover/loc:text-secondary/80 group-hover/loc:underline" title="-48.139191">-48.139191</span>
+                                    </div>
+                                </button>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] bg-[#fef3c7] text-[#92400e]">
+                                    Lâmpada Queimada
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center font-bold text-on-surface align-middle">1</td>
+                            <td class="py-3 px-4 align-middle">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-800 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] max-w-full" title="Lâmpada LED 50W">
+                                    <span class="material-symbols-outlined text-[15px] text-slate-500 flex-shrink-0">inventory_2</span>
+                                    <span class="truncate">Lâmpada LED 50W</span>
+                                </span>
+                            </td>
+                        </tr>
+
+                        <!-- Row 2 (Multi-Material with +3 expand/collapse) -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-002" onclick="window.abrirDetalhesOSModal('OS-2023-002')">
+                            <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">OS-2023-002</td>
+                            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">10/08</td>
+                            <td class="py-3 px-4 font-semibold text-primary whitespace-nowrap truncate align-middle">PLQ-88401</td>
+                            <td class="py-3 px-4 align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-002', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <div class="flex flex-col text-xs font-mono text-on-surface-variant group-hover/loc:text-secondary leading-tight min-w-0">
+                                        <span class="font-medium group-hover/loc:underline" title="-21.81590">-21.81590</span>
+                                        <span class="text-on-surface-variant/70 group-hover/loc:text-secondary/80 group-hover/loc:underline" title="-48.138402">-48.138402</span>
+                                    </div>
+                                </button>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] bg-[#ffedd5] text-[#9a3412]">
+                                    Lâmpada Quebrada
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center font-bold text-on-surface align-middle">4</td>
+                            <td class="py-3 px-4 align-middle">
+                                <div class="flex flex-col gap-1 w-full text-left">
+                                    <!-- Main Item (Visible) -->
+                                    <div class="flex items-center gap-1.5 min-w-0 w-full">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-800 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] min-w-0 flex-1" title="Lâmpada LED 50W (x2)">
+                                            <span class="material-symbols-outlined text-[15px] text-slate-500 flex-shrink-0">inventory_2</span>
+                                            <span class="truncate">Lâmpada LED 50W (x2)</span>
+                                        </span>
+                                        <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 flex-shrink-0 border border-secondary/20" onclick="toggleInlinePoints(this, 3, event)" title="Expandir/Recolher materiais">
+                                            <span class="btn-text">+3</span>
+                                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                                        </button>
+                                    </div>
+                                    <!-- Extra Items (Expandable) -->
+                                    <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 transition-all w-full">
+                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11.5px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200/60 w-full min-w-0" title="Relé Fotoelétrico (x1)">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400 flex-shrink-0">build</span>
+                                            <span class="truncate">Relé Fotoelétrico (x1)</span>
+                                        </div>
+                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11.5px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200/60 w-full min-w-0" title="Braço Curvo 2m (x1)">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400 flex-shrink-0">build</span>
+                                            <span class="truncate">Braço Curvo 2m (x1)</span>
+                                        </div>
+                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11.5px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200/60 w-full min-w-0" title="Cabo Cobre 10mm (15m)">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400 flex-shrink-0">build</span>
+                                            <span class="truncate">Cabo Cobre 10mm (15m)</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Row 3 (Single material) -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="IP1SBV0270726" onclick="window.abrirDetalhesOSModal('IP1SBV0270726')">
+                            <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">IP1SBV0270726</td>
+                            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">09/08</td>
+                            <td class="py-3 px-4 font-semibold text-primary whitespace-nowrap truncate align-middle">PLQ-77210</td>
+                            <td class="py-3 px-4 align-middle">
+                                <button onclick="window.abrirMapaPonto('IP1SBV0270726', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <div class="flex flex-col text-xs font-mono text-on-surface-variant group-hover/loc:text-secondary leading-tight min-w-0">
+                                        <span class="font-medium group-hover/loc:underline" title="-21.81722">-21.81722</span>
+                                        <span class="text-on-surface-variant/70 group-hover/loc:text-secondary/80 group-hover/loc:underline" title="-48.140510">-48.140510</span>
+                                    </div>
+                                </button>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] bg-[#dbeafe] text-[#1e40af]">
+                                    Acesa Dia
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center font-bold text-on-surface align-middle">1</td>
+                            <td class="py-3 px-4 align-middle">
+                                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-800 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] max-w-full" title="Relé Fotoelétrico 1000W">
+                                    <span class="material-symbols-outlined text-[15px] text-slate-500 flex-shrink-0">inventory_2</span>
+                                    <span class="truncate">Relé Fotoelétrico 1000W</span>
+                                </span>
+                            </td>
+                        </tr>
+
+                        <!-- Row 4 (Multi-Material with +2 expand/collapse) -->
+                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-004" onclick="window.abrirDetalhesOSModal('OS-2023-004')">
+                            <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">OS-2023-004</td>
+                            <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">08/08</td>
+                            <td class="py-3 px-4 font-semibold text-primary whitespace-nowrap truncate align-middle">PLQ-66105</td>
+                            <td class="py-3 px-4 align-middle">
+                                <button onclick="window.abrirMapaPonto('OS-2023-004', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <div class="flex flex-col text-xs font-mono text-on-surface-variant group-hover/loc:text-secondary leading-tight min-w-0">
+                                        <span class="font-medium group-hover/loc:underline" title="-21.81433">-21.81433</span>
+                                        <span class="text-on-surface-variant/70 group-hover/loc:text-secondary/80 group-hover/loc:underline" title="-48.136881">-48.136881</span>
+                                    </div>
+                                </button>
+                            </td>
+                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
+                                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] bg-[#f3f4f6] text-[#374151]">
+                                    Outro
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-center font-bold text-on-surface align-middle">3</td>
+                            <td class="py-3 px-4 align-middle">
+                                <div class="flex flex-col gap-1 w-full text-left">
+                                    <!-- Main Item (Visible) -->
+                                    <div class="flex items-center gap-1.5 min-w-0 w-full">
+                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-800 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] min-w-0 flex-1" title="Lâmpada Vapor de Sódio 250W">
+                                            <span class="material-symbols-outlined text-[15px] text-slate-500 flex-shrink-0">inventory_2</span>
+                                            <span class="truncate">Lâmpada Vapor de Sódio 250W</span>
+                                        </span>
+                                        <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 flex-shrink-0 border border-secondary/20" onclick="toggleInlinePoints(this, 2, event)" title="Expandir/Recolher materiais">
+                                            <span class="btn-text">+2</span>
+                                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                                        </button>
+                                    </div>
+                                    <!-- Extra Items (Expandable) -->
+                                    <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 transition-all w-full">
+                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11.5px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200/60 w-full min-w-0" title="Reator 250W Externo">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400 flex-shrink-0">build</span>
+                                            <span class="truncate">Reator 250W Externo</span>
+                                        </div>
+                                        <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11.5px] font-medium bg-slate-100/90 text-slate-700 border border-slate-200/60 w-full min-w-0" title="Ignitor Para Lâmpada VS">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400 flex-shrink-0">build</span>
+                                            <span class="truncate">Ignitor Para Lâmpada VS</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->
+<div id="confirm-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
+        <div class="flex items-start gap-4">
+            <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700">
+                <span id="modal-icon" class="material-symbols-outlined text-[24px]">check</span>
+            </div>
+            <div class="flex-1">
+                <h3 id="modal-title" class="text-title-md font-title-md font-bold text-on-surface mb-1">Confirmar Ação</h3>
+                <p id="modal-message" class="text-body-md text-on-surface-variant leading-relaxed">Deseja prosseguir com essa alteração de status?</p>
+            </div>
+        </div>
+        
+        <!-- Campo de Justificativa / Observação -->
+        <div class="mt-4">
+            <label for="modal-justification-input" class="block text-label-sm font-medium text-on-surface-variant mb-1.5">
+                Justificativa / Observação <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+
+            <textarea id="modal-justification-input" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors text-xs" placeholder="Informe o motivo ou observação sobre esta alteração..."></textarea>
+
+            <!-- Botões de Mensagens Padrão (Quick Presets) -->
+            <div class="mt-2.5">
+                <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
+                    <span class="material-symbols-outlined text-[14px] text-primary">chat_bubble_outline</span>
+                    <span>Mensagens Padrão:</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" 
+                            onclick="setModalJustification('Identificada duplicidade de protocolo.')" 
+                            title="Identificada duplicidade de protocolo."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Identificada duplicidade</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Resolvido em outro protocolo.')" 
+                            title="Resolvido em outro protocolo."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Resolvido em outro protocolo</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Atendimento cancelado pela equipe.')" 
+                            title="Atendimento cancelado pela equipe."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Cancelado pela equipe</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Endereço não localizado.')" 
+                            title="Endereço não localizado."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Endereço não localizado</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Visualização do Ponto no Mapbox -->
+<div id="modal-mapa-ponto" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-ponto-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-4xl w-full h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header do Modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">location_on</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="modal-mapa-protocolo">Protocolo #---</h3>
+                        <span id="modal-mapa-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container">Em aberto</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md" id="modal-mapa-endereco-sub">Carregando endereço...</p>
+                </div>
+            </div>
+            <button onclick="window.closeMapaPontoModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar Modal (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+        
+        <!-- Canvas do Mapa & Card Informativo Flutuante -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-ponto-canvas" class="w-full h-full"></div>
+
+            <!-- Card Informativo Glassmorphism -->
+            <div class="absolute bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-sm bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/60 p-4 rounded-xl shadow-xl text-xs space-y-2 z-10">
+                <div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+                    <span class="font-semibold text-on-surface flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px] text-secondary">pin_drop</span>
+                        <span>Detalhes da Localização</span>
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-secondary/10 text-secondary" id="modal-mapa-card-tipo">Endereço</span>
+                </div>
+                <div class="space-y-1.5 text-on-surface">
+                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-on-surface-variant">---</span></p>
+                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-on-surface-variant font-medium">---</span></p>
+                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-on-surface-variant font-medium">---</span></p>
+                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-secondary font-semibold">---</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalhes da Ordem de Serviço (Auditoria & Evidências) -->
+<div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) fecharDetalhesOSModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modalDetalhesOSBox" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">assignment</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="detalheModalProtocolo">Protocolo #---</h3>
+                        <span id="detalheModalStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Concluída</span>
+                        <span id="detalheModalAuditBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">Auditoria Pendente</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md mt-0.5" id="detalheModalDataSub">Abertura: --/--/---- | Conclusão: --/--/----</p>
+                </div>
+            </div>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5" id="detalheModalConteudo">
+            <div class="flex items-center justify-center py-12 text-on-surface-variant text-sm">
+                Carregando detalhes do protocolo...
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
+            <span class="text-[11px] text-on-surface-variant/70 font-medium hidden sm:inline">Clique em qualquer foto para visualizar em tela cheia na galeria</span>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Galeria de Fotos Cloudinary (Lightbox) -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[70000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Principal -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Thumbnails geradas via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    // Confirmation Modal System
+    let pendingActionCallback = null;
+
+    window.setModalJustification = function(text, targetId = 'modal-justification-input') {
+        const input = document.getElementById(targetId);
+        if (!input) return;
+        if (input.value.trim() === text) {
+            input.value = '';
+        } else {
+            input.value = text;
+        }
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        const modalIconBg = document.getElementById('modal-icon-bg');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalJustificationInput = document.getElementById('modal-justification-input');
+
+        if (!modal || !modalBox) return;
+
+        modalTitle.textContent = title || 'Confirmar Ação';
+        modalMessage.innerHTML = message || 'Deseja prosseguir?';
+        modalIcon.textContent = icon || 'help';
+        modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
+        modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+        modalConfirmBtn.textContent = confirmText || 'Confirmar';
+
+        if (modalJustificationInput) {
+            modalJustificationInput.value = '';
+        }
+
+        pendingActionCallback = onConfirm;
+
+        modal.classList.remove('hidden');
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+            if (modalJustificationInput) modalJustificationInput.focus();
+        }, 10);
+    };
+
+    window.closeConfirmModal = function() {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        if (!modal || !modalBox) return;
+
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        modalBox.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            pendingActionCallback = null;
+        }, 200);
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('modal-confirm-btn')?.addEventListener('click', () => {
+            const justification = document.getElementById('modal-justification-input')?.value.trim() || '';
+            if (typeof pendingActionCallback === 'function') {
+                pendingActionCallback(justification);
+            }
+            closeConfirmModal();
+        });
+
+        // Initialize row lock state for rows loaded with Concluída
+        document.querySelectorAll('#os-table tbody tr').forEach(row => {
+            const badge = row.querySelector('.status-badge');
+            const isConcluded = badge && badge.getAttribute('data-status') === 'concluida';
+            setRowLockState(row, isConcluded);
+        });
+    });
+
+    // Helper to lock/unlock row editing controls based on Concluded status
+    function setRowLockState(row, isConcluded) {
+        const btnEdit = row.querySelector('.btn-edit');
+        const problemSelect = row.querySelector('.problem-select');
+
+        if (btnEdit) {
+            if (isConcluded) {
+                btnEdit.classList.add('hidden');
+            } else {
+                btnEdit.classList.remove('hidden');
+            }
+        }
+
+        if (problemSelect) {
+            problemSelect.disabled = isConcluded;
+            if (isConcluded) {
+                problemSelect.classList.add('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            } else {
+                problemSelect.classList.remove('opacity-50', 'cursor-not-allowed', 'pointer-events-none');
+            }
+        }
+    }
+
+    // Action Handlers for Status Transitions with Modal Confirmation
+    window.approveRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const protocol = row.cells[0]?.textContent.trim() || 'esta OS';
+
+        showConfirmModal({
+            title: 'Aprovar OS',
+            message: `Deseja aprovar o protocolo <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status mudará para <strong class="text-error font-semibold">Em aberto</strong>.`,
+            icon: 'check',
+            iconBgClass: 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: 'Aprovar',
+            onConfirm: () => {
+                const badge = row.querySelector('.status-badge');
+                if (badge) {
+                    badge.setAttribute('data-status', 'aberto');
+                    badge.textContent = 'Em aberto';
+                    badge.className = 'status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] transition-colors bg-error-container text-on-error-container';
+                }
+                row.classList.remove('opacity-70');
+                setRowLockState(row, false);
+                const btnApprove = row.querySelector('.btn-approve');
+                const btnReject = row.querySelector('.btn-reject');
+                const btnComplete = row.querySelector('.btn-complete');
+                const btnRevert = row.querySelector('.btn-revert');
+                if (btnApprove) btnApprove.classList.add('hidden');
+                if (btnReject) btnReject.classList.remove('hidden');
+                if (btnComplete) btnComplete.classList.remove('hidden');
+                if (btnRevert) btnRevert.classList.add('hidden');
+
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        });
+    };
+
+    window.rejectRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const protocol = row.cells[0]?.textContent.trim() || 'esta OS';
+
+        showConfirmModal({
+            title: 'Cancelar Ordem de Serviço',
+            message: `Deseja realmente cancelar o protocolo <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status mudará para <strong class="text-slate-700 font-semibold">Cancelada</strong>.`,
+            icon: 'close',
+            iconBgClass: 'bg-rose-100 text-rose-700',
+            confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+            confirmText: 'Cancelar OS',
+            onConfirm: () => {
+                const badge = row.querySelector('.status-badge');
+                if (badge) {
+                    badge.setAttribute('data-status', 'cancelada');
+                    badge.textContent = 'Cancelada';
+                    badge.className = 'status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] transition-colors bg-slate-200 text-slate-700';
+                }
+                row.classList.add('opacity-70');
+                setRowLockState(row, false);
+                const btnApprove = row.querySelector('.btn-approve');
+                const btnReject = row.querySelector('.btn-reject');
+                const btnComplete = row.querySelector('.btn-complete');
+                const btnRevert = row.querySelector('.btn-revert');
+                if (btnApprove) btnApprove.classList.add('hidden');
+                if (btnReject) btnReject.classList.add('hidden');
+                if (btnComplete) btnComplete.classList.add('hidden');
+                if (btnRevert) btnRevert.classList.remove('hidden');
+
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        });
+    };
+
+    window.completeRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const protocol = row.cells[0]?.textContent.trim() || 'esta OS';
+
+        showConfirmModal({
+            title: 'Concluir Ordem de Serviço',
+            message: `Deseja concluir a ordem de serviço <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status mudará para <strong class="text-[#166534] font-semibold">Concluída</strong>.`,
+            icon: 'task_alt',
+            iconBgClass: 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: 'Concluir OS',
+            onConfirm: () => {
+                const badge = row.querySelector('.status-badge');
+                if (badge) {
+                    badge.setAttribute('data-status', 'concluida');
+                    badge.textContent = 'Concluída';
+                    badge.className = 'status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] transition-colors bg-[#dcfce7] text-[#166534]';
+                }
+                row.classList.remove('opacity-70');
+                setRowLockState(row, true);
+                const btnApprove = row.querySelector('.btn-approve');
+                const btnReject = row.querySelector('.btn-reject');
+                const btnComplete = row.querySelector('.btn-complete');
+                const btnRevert = row.querySelector('.btn-revert');
+                if (btnApprove) btnApprove.classList.add('hidden');
+                if (btnReject) btnReject.classList.add('hidden');
+                if (btnComplete) btnComplete.classList.add('hidden');
+                if (btnRevert) btnRevert.classList.remove('hidden');
+
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        });
+    };
+
+    window.revertRow = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        const protocol = row.cells[0]?.textContent.trim() || 'esta OS';
+
+        showConfirmModal({
+            title: 'Reverter OS',
+            message: `Deseja reverter a ordem de serviço <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Seu status voltará para <strong class="text-error font-semibold">Em aberto</strong>.`,
+            icon: 'undo',
+            iconBgClass: 'bg-blue-100 text-blue-700',
+            confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+            confirmText: 'Reverter',
+            onConfirm: () => {
+                const badge = row.querySelector('.status-badge');
+                if (badge) {
+                    badge.setAttribute('data-status', 'aberto');
+                    badge.textContent = 'Em aberto';
+                    badge.className = 'status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] transition-colors bg-error-container text-on-error-container';
+                }
+                row.classList.remove('opacity-70');
+                setRowLockState(row, false);
+                const btnApprove = row.querySelector('.btn-approve');
+                const btnReject = row.querySelector('.btn-reject');
+                const btnComplete = row.querySelector('.btn-complete');
+                const btnRevert = row.querySelector('.btn-revert');
+                if (btnApprove) btnApprove.classList.add('hidden');
+                if (btnReject) btnReject.classList.remove('hidden');
+                if (btnComplete) btnComplete.classList.remove('hidden');
+                if (btnRevert) btnRevert.classList.add('hidden');
+
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        });
+    };
+</script>
+
+<script>
+    // Inline multi-point toggle (+N / -N)
+    window.toggleInlinePoints = function(btn, count, event) {
+        if (event) event.stopPropagation();
+        const cell = btn.closest('td');
+        const container = cell.querySelector('.extra-points');
+        const textSpan = btn.querySelector('.btn-text');
+        const iconSpan = btn.querySelector('.btn-icon');
+        
+        if (!container) return;
+        
+        const isHidden = container.classList.contains('hidden');
+        if (isHidden) {
+            container.classList.remove('hidden');
+            container.classList.add('flex');
+            if (textSpan) textSpan.textContent = `-${count}`;
+            if (iconSpan) iconSpan.textContent = 'expand_less';
+            btn.classList.remove('bg-secondary/10', 'text-secondary', 'hover:bg-secondary/20');
+            btn.classList.add('bg-secondary/20', 'text-secondary', 'hover:bg-secondary/30');
+        } else {
+            container.classList.add('hidden');
+            container.classList.remove('flex');
+            if (textSpan) textSpan.textContent = `+${count}`;
+            if (iconSpan) iconSpan.textContent = 'expand_more';
+            btn.classList.remove('bg-secondary/20', 'text-secondary', 'hover:bg-secondary/30');
+            btn.classList.add('bg-secondary/10', 'text-secondary', 'hover:bg-secondary/20');
+        }
+    };
+</script>
+
+<script>
+    // Problem Select Color Updater
+    window.updateProblemColor = function(select) {
+        select.classList.remove('bg-[#fef3c7]', 'text-[#92400e]', 'bg-[#dbeafe]', 'text-[#1e40af]', 'bg-[#ffedd5]', 'text-[#9a3412]', 'bg-[#f3f4f6]', 'text-[#374151]', 'bg-surface-container-high', 'text-on-surface');
+        if (select.value === 'lampada-queimada') {
+            select.classList.add('bg-[#fef3c7]', 'text-[#92400e]');
+        } else if (select.value === 'acesa-dia') {
+            select.classList.add('bg-[#dbeafe]', 'text-[#1e40af]');
+        } else if (select.value === 'lampada-quebrada') {
+            select.classList.add('bg-[#ffedd5]', 'text-[#9a3412]');
+        } else if (select.value === 'outro') {
+            select.classList.add('bg-[#f3f4f6]', 'text-[#374151]');
+        }
+    };
+
+    // Status Select Color Updater
+    window.updateSelectColor = function(select) {
+        select.classList.remove('bg-error-container', 'text-on-error-container', 'bg-[#dcfce7]', 'text-[#166534]', 'bg-surface-container-high', 'text-on-surface');
+        if (select.value === 'aberto') {
+            select.classList.add('bg-error-container', 'text-on-error-container');
+        } else if (select.value === 'concluida') {
+            select.classList.add('bg-[#dcfce7]', 'text-[#166534]');
+        } else if (select.value === 'pendente') {
+            select.classList.add('bg-surface-container-high', 'text-on-surface');
+        }
+    };
+
+    // Initialize colors on load
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.problem-select').forEach(updateProblemColor);
+        document.querySelectorAll('.status-select').forEach(updateSelectColor);
+    });
+
+    // Sort Functionality
+    let sortDirection = true;
+    window.sortTable = function(colIndex) {
+        const table = document.getElementById("os-table");
+        const tbody = table.querySelector("tbody");
+        const rows = Array.from(tbody.querySelectorAll("tr"));
+        
+        rows.sort((a, b) => {
+            const valA = a.cells[colIndex].textContent.trim();
+            const valB = b.cells[colIndex].textContent.trim();
+            
+            const partsA = valA.split('/');
+            const partsB = valB.split('/');
+            if(partsA.length === 2 && partsB.length === 2) {
+                const dateA = new Date(new Date().getFullYear(), parseInt(partsA[1])-1, parseInt(partsA[0]));
+                const dateB = new Date(new Date().getFullYear(), parseInt(partsB[1])-1, parseInt(partsB[0]));
+                return sortDirection ? dateA - dateB : dateB - dateA;
+            }
+            return sortDirection ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        });
+        
+        sortDirection = !sortDirection;
+        rows.forEach(row => tbody.appendChild(row));
+    };
+</script>
+
+<script>
+    // Helper functions for action buttons
+    function renderConcluirBtn(container) {
+        if (!container) return;
+        container.innerHTML = `
+            <button class="btn-concluir text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 p-1.5 rounded-lg transition-all duration-200 active:scale-90 cursor-pointer flex items-center justify-center" onclick="concluirAuditoria(this, event)" title="Concluir Auditoria">
+                <span class="material-symbols-outlined text-[20px]">check_circle</span>
+            </button>
+        `;
+    }
+
+    function renderDesfazerBtn(container) {
+        if (!container) return;
+        container.innerHTML = `
+            <button class="btn-desfazer text-amber-600 hover:text-amber-700 hover:bg-amber-50 p-1.5 rounded-lg transition-all duration-200 active:scale-90 cursor-pointer flex items-center justify-center" onclick="desfazerAuditoria(this, event)" title="Desfazer Conclusão">
+                <span class="material-symbols-outlined text-[20px]">undo</span>
+            </button>
+        `;
+    }
+
+    // Concluir Auditoria Action (Direct with Supabase persistence)
+    window.concluirAuditoria = async function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const id = row.getAttribute('data-id');
+
+        // Reduz a opacidade geral da linha para 70% de forma imediata
+        row.classList.add('opacity-70', 'transition-opacity', 'duration-300');
+        row.setAttribute('data-completed', 'true');
+
+        const actionCell = row.cells[row.cells.length - 1];
+        const actionContainer = actionCell ? (actionCell.querySelector('.action-buttons') || actionCell) : null;
+        renderDesfazerBtn(actionContainer);
+
+        if (id && window.auditoriaController) {
+            await window.auditoriaController.concluirAuditoria(id);
+        }
+
+        if (typeof window.applyCombinedFilters === 'function') {
+            window.applyCombinedFilters();
+        }
+    };
+
+    // Desfazer Conclusão Action (Requires Confirmation Modal & Supabase update)
+    window.desfazerAuditoria = function(btn, event) {
+        if (event) event.stopPropagation();
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        const id = row.getAttribute('data-id');
+        const actionCell = row.cells[row.cells.length - 1];
+        const actionContainer = actionCell ? (actionCell.querySelector('.action-buttons') || actionCell) : null;
+
+        // Exibe modal de confirmação para Desfazer
+        showConfirmModal({
+            title: 'Desfazer Conclusão',
+            message: 'Tem certeza que deseja desfazer a conclusão desta auditoria e reabrir os apontamentos?',
+            icon: 'undo',
+            iconBgClass: 'bg-amber-500/10 text-amber-600',
+            confirmBtnClass: 'bg-amber-600 text-white hover:bg-amber-700',
+            confirmText: 'Sim, Desfazer',
+            onConfirm: async () => {
+                row.classList.remove('opacity-70');
+                row.setAttribute('data-completed', 'false');
+                renderConcluirBtn(actionContainer);
+                closeConfirmModal();
+
+                if (id && window.auditoriaController) {
+                    await window.auditoriaController.desfazerAuditoria(id);
+                }
+
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            }
+        });
+    };
+
+    window.updateAuditActionButtons = function() {
+        const rows = document.querySelectorAll('#os-table tbody tr');
+        rows.forEach(row => {
+            const isCompleted = row.getAttribute('data-completed') === 'true' || row.classList.contains('opacity-70');
+            const actionCell = row.cells[row.cells.length - 1];
+            if (!actionCell) return;
+
+            let actionContainer = actionCell.querySelector('.action-buttons');
+            if (!actionContainer) actionContainer = actionCell;
+
+            if (isCompleted) {
+                row.classList.add('opacity-70');
+                renderDesfazerBtn(actionContainer);
+                return;
+            }
+
+            // Verifica se alguma coluna de auditoria possui "S"
+            const sBadges = row.querySelectorAll('.audit-badge.audit-s');
+            const hasS = sBadges.length > 0;
+
+            if (hasS) {
+                renderConcluirBtn(actionContainer);
+            } else {
+                actionContainer.innerHTML = `
+                    <span class="text-[11px] text-on-surface-variant/40 font-medium">—</span>
+                `;
+            }
+        });
+    };
+
+    // Column Resizing Logic with Strict Container Bounds & Neighbor Push-Pull
+    function initTableResizer(tableId, minWidths, maxWidths, storageKey) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+
+        const parent = table.parentElement;
+        if (parent) {
+            parent.style.overflowX = 'hidden';
+            parent.style.maxWidth = '100%';
+        }
+
+        const cols = Array.from(table.querySelectorAll('th[data-col]'));
+        if (!cols.length) return;
+
+        const containerWidth = parent ? parent.clientWidth : window.innerWidth;
+        let savedWidths = {};
+        try {
+            savedWidths = JSON.parse(localStorage.getItem(storageKey)) || {};
+        } catch (e) {
+            savedWidths = {};
+        }
+
+        // 1. Calculate target width for each column
+        let widths = {};
+        let totalWidth = 0;
+        cols.forEach(col => {
+            const idx = col.getAttribute('data-col');
+            const minW = minWidths[idx] || 30;
+            const maxW = maxWidths[idx] || 400;
+            let w = savedWidths[idx] ? parseInt(savedWidths[idx], 10) : (col.offsetWidth || minW);
+            if (isNaN(w) || w < minW) w = minW;
+            if (w > maxW) w = maxW;
+            widths[idx] = w;
+            totalWidth += w;
+        });
+
+        // 2. Normalize widths if total exceeds containerWidth
+        if (containerWidth > 0 && totalWidth > containerWidth) {
+            const ratio = containerWidth / totalWidth;
+            totalWidth = 0;
+            cols.forEach(col => {
+                const idx = col.getAttribute('data-col');
+                const minW = minWidths[idx] || 30;
+                let normW = Math.floor(widths[idx] * ratio);
+                if (normW < minW) normW = minW;
+                widths[idx] = normW;
+                totalWidth += normW;
+            });
+        }
+
+        // 3. Apply width styles to headers using minW / maxW bounds
+        cols.forEach(col => {
+            const idx = col.getAttribute('data-col');
+            const minW = minWidths[idx] || 30;
+            const maxW = maxWidths[idx] || 400;
+            const w = widths[idx];
+
+            col.style.width = w + 'px';
+            col.style.minWidth = minW + 'px';
+            col.style.maxWidth = maxW + 'px';
+        });
+
+        // 4. Set up interactive resizers with strict push-pull redistribution
+        const resizers = table.querySelectorAll('.resizer');
+        let startX, startWA, startWB, currentResizer, colA, colB, colAIndex, colBIndex;
+        let minWA, maxWA, minWB, maxWB;
+
+        const mouseMoveHandler = function (e) {
+            if (!colA || !colB) return;
+            const dx = e.clientX - startX;
+            let delta = dx;
+
+            if (startWA + delta < minWA) delta = minWA - startWA;
+            if (startWA + delta > maxWA) delta = maxWA - startWA;
+
+            if (startWB - delta < minWB) delta = startWB - minWB;
+            if (startWB - delta > maxWB) delta = startWB - maxWB;
+
+            const newWA = startWA + delta;
+            const newWB = startWB - delta;
+
+            colA.style.width = `${newWA}px`;
+            colA.style.minWidth = `${minWA}px`;
+            colA.style.maxWidth = `${maxWA}px`;
+
+            colB.style.width = `${newWB}px`;
+            colB.style.minWidth = `${minWB}px`;
+            colB.style.maxWidth = `${maxWB}px`;
+
+            try {
+                const currentSaved = JSON.parse(localStorage.getItem(storageKey)) || {};
+                currentSaved[colAIndex] = newWA;
+                currentSaved[colBIndex] = newWB;
+                localStorage.setItem(storageKey, JSON.stringify(currentSaved));
+            } catch (e) {}
+        };
+
+        const mouseUpHandler = function () {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            if (currentResizer) currentResizer.classList.remove('resizing');
+            colA = null;
+            colB = null;
+            currentResizer = null;
+            document.body.style.cursor = 'default';
+        };
+
+        resizers.forEach(function (resizer) {
+            resizer.addEventListener('mousedown', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                currentResizer = e.target;
+                colA = currentResizer.parentElement;
+                colAIndex = parseInt(colA.getAttribute('data-col'), 10);
+                colB = table.querySelector(`th[data-col="${colAIndex + 1}"]`);
+                if (!colB) return;
+
+                colBIndex = colAIndex + 1;
+
+                minWA = minWidths[colAIndex] || 30;
+                maxWA = maxWidths[colAIndex] || 400;
+                minWB = minWidths[colBIndex] || 30;
+                maxWB = maxWidths[colBIndex] || 400;
+
+                startX = e.clientX;
+                startWA = colA.offsetWidth;
+                startWB = colB.offsetWidth;
+
+                currentResizer.classList.add('resizing');
+                document.body.style.cursor = 'col-resize';
+
+                document.addEventListener('mousemove', mouseMoveHandler);
+                document.addEventListener('mouseup', mouseUpHandler);
+            });
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        // Inicializa redimensionamento da Tabela de Auditoria
+        initTableResizer('os-table', {
+            '0': 90, '1': 60, '2': 120, 
+            '3': 30, '4': 30, '5': 30, '6': 30, '7': 30, '8': 30, '9': 30, '10': 30, '11': 30, '12': 30,
+            '13': 60 
+        }, { 
+            '0': 200, '1': 120, '2': 400, 
+            '3': 70, '4': 70, '5': 70, '6': 70, '7': 70, '8': 70, '9': 70, '10': 70, '11': 70, '12': 70,
+            '13': 130 
+        }, 'tableColWidths');
+
+        // Inicializa redimensionamento da Tabela de Serviços Finalizados
+        initTableResizer('completed-services-table', {
+            '0': 100, '1': 70, '2': 100, '3': 130, '4': 140, '5': 50, '6': 200
+        }, {
+            '0': 220, '1': 150, '2': 220, '3': 300, '4': 300, '5': 120, '6': 600
+        }, 'completedTableColWidths');
+
+        // Inicializa botões de ação de auditoria com base nos indicadores S/N
+        updateAuditActionButtons();
+    });
+</script>
+
+<script>
+    // Unified Filtering Logic (Date, Protocol, Action, Status, Problema, and Search)
+    (function() {
+        let activeDatePredicate = null;
+        let activeStatusFilter = 'all';
+        let activeProblemFilter = 'all';
+        let activeActionFilter = ['pendente']; // Default pre-selected: 'pendente'
+        let protocolSearchQuery = '';
+        let searchQuery = '';
+
+        // Completed Services filters
+        let compProtocolSearchQuery = '';
+        let compPlaquetaSearchQuery = '';
+        let compMaterialSearchQuery = '';
+
+        const searchInput = document.getElementById('search-input');
+
+        // Date Filter Elements
+        const dateTrigger = document.getElementById('date-filter-trigger');
+        const dateDropdown = document.getElementById('date-filter-dropdown');
+        const dateIndicator = document.getElementById('filter-active-indicator');
+
+        // Protocol Filter Elements
+        const protocolTrigger = document.getElementById('protocol-filter-trigger');
+        const protocolDropdown = document.getElementById('protocol-filter-dropdown');
+        const protocolIndicator = document.getElementById('protocol-filter-indicator');
+        const protocolSearchInput = document.getElementById('protocol-search-input');
+
+        // Action Filter Elements
+        const actionTrigger = document.getElementById('action-filter-trigger');
+        const actionDropdown = document.getElementById('action-filter-dropdown');
+        const actionIndicator = document.getElementById('action-filter-indicator');
+
+        // Status Filter Elements
+        const statusTrigger = document.getElementById('status-filter-trigger');
+        const statusDropdown = document.getElementById('status-filter-dropdown');
+        const statusIndicator = document.getElementById('status-filter-indicator');
+
+        // Problem Filter Elements
+        const problemTrigger = document.getElementById('problem-filter-trigger');
+        const problemDropdown = document.getElementById('problem-filter-dropdown');
+        const problemIndicator = document.getElementById('problem-filter-indicator');
+
+        // Completed Services Filter Elements
+        let compActiveDatePredicate = null;
+        const compDateTrigger = document.getElementById('comp-date-filter-trigger');
+        const compDateDropdown = document.getElementById('comp-date-filter-dropdown');
+        const compDateIndicator = document.getElementById('comp-date-filter-indicator');
+
+        const compProtocolTrigger = document.getElementById('comp-protocol-filter-trigger');
+        const compProtocolDropdown = document.getElementById('comp-protocol-filter-dropdown');
+        const compProtocolIndicator = document.getElementById('comp-protocol-filter-indicator');
+        const compProtocolSearchInput = document.getElementById('comp-protocol-search-input');
+
+        const compPlaquetaTrigger = document.getElementById('comp-plaqueta-filter-trigger');
+        const compPlaquetaDropdown = document.getElementById('comp-plaqueta-filter-dropdown');
+        const compPlaquetaIndicator = document.getElementById('comp-plaqueta-filter-indicator');
+        const compPlaquetaSearchInput = document.getElementById('comp-plaqueta-search-input');
+
+        const compMaterialTrigger = document.getElementById('comp-material-filter-trigger');
+        const compMaterialDropdown = document.getElementById('comp-material-filter-dropdown');
+        const compMaterialIndicator = document.getElementById('comp-material-filter-indicator');
+        const compMaterialSearchInput = document.getElementById('comp-material-search-input');
+
+        const compProblemTrigger = document.getElementById('comp-problem-filter-trigger');
+        const compProblemDropdown = document.getElementById('comp-problem-filter-dropdown');
+        const compProblemIndicator = document.getElementById('comp-problem-filter-indicator');
+        let compActiveProblemFilter = ['all'];
+
+        function initFilterPortals() {
+            [
+                dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
+                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
+            ].forEach(d => {
+                if (d && d.parentElement !== document.body) {
+                    document.body.appendChild(d);
+                }
+            });
+        }
+        initFilterPortals();
+
+        function closeAllFilterDropdowns() {
+            [
+                dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
+                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
+            ].forEach(d => {
+                if (d) {
+                    d.classList.add('hidden');
+                    d.style.display = 'none';
+                }
+            });
+        }
+
+        function openFloatingDropdown(triggerBtn, dropdownEl, alignRight = false) {
+            if (!triggerBtn || !dropdownEl) return;
+
+            // Ensure dropdown is attached to document.body (out of table containing block)
+            if (dropdownEl.parentElement !== document.body) {
+                document.body.appendChild(dropdownEl);
+            }
+
+            const isCurrentlyHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+
+            closeAllFilterDropdowns();
+
+            if (isCurrentlyHidden) {
+                dropdownEl.style.position = 'fixed';
+                dropdownEl.style.zIndex = '99999';
+                dropdownEl.style.display = 'block';
+                dropdownEl.classList.remove('hidden');
+
+                const rect = triggerBtn.getBoundingClientRect();
+                const dropdownHeight = dropdownEl.offsetHeight || 300;
+                const spaceBelow = window.innerHeight - rect.bottom;
+                const spaceAbove = rect.top;
+
+                // Auto vertical flip positioning if not enough space below
+                if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                    dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 4)}px`;
+                } else {
+                    dropdownEl.style.top = `${rect.bottom + 4}px`;
+                }
+
+                if (alignRight) {
+                    dropdownEl.style.left = 'auto';
+                    dropdownEl.style.right = `${Math.max(12, window.innerWidth - rect.right)}px`;
+                } else {
+                    dropdownEl.style.left = `${Math.max(12, rect.left)}px`;
+                    dropdownEl.style.right = 'auto';
+                }
+
+                if (dropdownEl.id === 'protocol-filter-dropdown') {
+                    setTimeout(() => protocolSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'comp-protocol-filter-dropdown') {
+                    setTimeout(() => compProtocolSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'comp-plaqueta-filter-dropdown') {
+                    setTimeout(() => compPlaquetaSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'comp-material-filter-dropdown') {
+                    setTimeout(() => compMaterialSearchInput?.focus(), 50);
+                }
+            }
+        }
+
+        // Close dropdowns on outside click
+        document.addEventListener('click', (e) => {
+            if (dateDropdown && !dateDropdown.contains(e.target) && !dateTrigger?.contains(e.target)) {
+                dateDropdown.classList.add('hidden');
+                dateDropdown.style.display = 'none';
+            }
+            if (protocolDropdown && !protocolDropdown.contains(e.target) && !protocolTrigger?.contains(e.target)) {
+                protocolDropdown.classList.add('hidden');
+                protocolDropdown.style.display = 'none';
+            }
+            if (actionDropdown && !actionDropdown.contains(e.target) && !actionTrigger?.contains(e.target)) {
+                actionDropdown.classList.add('hidden');
+                actionDropdown.style.display = 'none';
+            }
+            if (statusDropdown && !statusDropdown.contains(e.target) && !statusTrigger?.contains(e.target)) {
+                statusDropdown.classList.add('hidden');
+                statusDropdown.style.display = 'none';
+            }
+            if (problemDropdown && !problemDropdown.contains(e.target) && !problemTrigger?.contains(e.target)) {
+                problemDropdown.classList.add('hidden');
+                problemDropdown.style.display = 'none';
+            }
+
+            // Completed Services dropdowns
+            if (compDateDropdown && !compDateDropdown.contains(e.target) && !compDateTrigger?.contains(e.target)) {
+                compDateDropdown.classList.add('hidden');
+                compDateDropdown.style.display = 'none';
+            }
+            if (compProtocolDropdown && !compProtocolDropdown.contains(e.target) && !compProtocolTrigger?.contains(e.target)) {
+                compProtocolDropdown.classList.add('hidden');
+                compProtocolDropdown.style.display = 'none';
+            }
+            if (compPlaquetaDropdown && !compPlaquetaDropdown.contains(e.target) && !compPlaquetaTrigger?.contains(e.target)) {
+                compPlaquetaDropdown.classList.add('hidden');
+                compPlaquetaDropdown.style.display = 'none';
+            }
+            if (compMaterialDropdown && !compMaterialDropdown.contains(e.target) && !compMaterialTrigger?.contains(e.target)) {
+                compMaterialDropdown.classList.add('hidden');
+                compMaterialDropdown.style.display = 'none';
+            }
+            if (compProblemDropdown && !compProblemDropdown.contains(e.target) && !compProblemTrigger?.contains(e.target)) {
+                compProblemDropdown.classList.add('hidden');
+                compProblemDropdown.style.display = 'none';
+            }
+
+            if (!e.target.closest('.group\\/points') && !e.target.closest('.points-expand-trigger')) {
+                document.querySelectorAll('.points-dropdown').forEach(d => d.classList.add('hidden'));
+                document.querySelectorAll('.icon-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
+            }
+        });
+
+        // Toggle dropdowns with floating positioning
+        dateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(dateTrigger, dateDropdown, false);
+        });
+
+        protocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(protocolTrigger, protocolDropdown, false);
+        });
+
+        actionTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(actionTrigger, actionDropdown, true);
+        });
+
+        statusTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(statusTrigger, statusDropdown, false);
+        });
+
+        problemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(problemTrigger, problemDropdown, false);
+        });
+
+        // Completed Services triggers
+        compDateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(compDateTrigger, compDateDropdown, false);
+        });
+
+        // Completed Services triggers
+        compProtocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(compProtocolTrigger, compProtocolDropdown, false);
+        });
+
+        compPlaquetaTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(compPlaquetaTrigger, compPlaquetaDropdown, false);
+        });
+
+        compMaterialTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(compMaterialTrigger, compMaterialDropdown, true);
+        });
+
+        compProblemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(compProblemTrigger, compProblemDropdown, false);
+        });
+
+        // Close open dropdown popups on window scroll or resize, unless user is typing inside a filter input
+        window.addEventListener('scroll', (e) => {
+            const activeEl = document.activeElement;
+            if (activeEl && (
+                activeEl.id === 'protocol-search-input' ||
+                activeEl.id === 'comp-protocol-search-input' ||
+                activeEl.id === 'comp-plaqueta-search-input' ||
+                activeEl.id === 'comp-material-search-input' ||
+                activeEl.closest('#date-filter-dropdown') ||
+                activeEl.closest('#comp-date-filter-dropdown') ||
+                activeEl.closest('#protocol-filter-dropdown') ||
+                activeEl.closest('#comp-protocol-filter-dropdown') ||
+                activeEl.closest('#comp-plaqueta-filter-dropdown') ||
+                activeEl.closest('#comp-material-filter-dropdown')
+            )) {
+                return;
+            }
+            closeAllFilterDropdowns();
+        }, true);
+        window.addEventListener('resize', closeAllFilterDropdowns);
+
+        function parseTableDate(dateStr) {
+            const [day, month] = dateStr.split('/').map(Number);
+            const year = new Date().getFullYear();
+            return new Date(year, month - 1, day);
+        }
+
+        // Modular Text Search Helpers
+        function removeAccents(str) {
+            return (str || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        }
+
+        /**
+         * Checks if a specific column cell text matches a search query.
+         * Insensitive to accents, case, and leading/trailing whitespace.
+         */
+        function matchColumnText(row, colIndex, query) {
+            if (!query || query.trim() === '') return true;
+            const text = removeAccents((row.cells[colIndex]?.textContent || '').trim().toLowerCase());
+            const q = removeAccents(query.trim().toLowerCase());
+            return text.includes(q);
+        }
+
+        /**
+         * Checks if any content within a row matches a global search query.
+         * Insensitive to accents, case, and leading/trailing whitespace.
+         */
+        function matchRowGlobalText(row, query) {
+            if (!query || query.trim() === '') return true;
+            const text = removeAccents((row.textContent || '').toLowerCase());
+            const q = removeAccents(query.trim().toLowerCase());
+            return text.includes(q);
+        }
+
+        // Modular Date Predicate Builder
+        function buildDatePredicate(type, customStart, customEnd) {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+
+            if (type === 'hoje') {
+                return d => d && d.getTime() === now.getTime();
+            } else if (type === 'ontem') {
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                return d => d && d.getTime() === yesterday.getTime();
+            } else if (type === '7dias') {
+                const weekAgo = new Date(now);
+                weekAgo.setDate(now.getDate() - 7);
+                return d => d && d >= weekAgo && d <= now;
+            } else if (type === 'custom' && customStart && customEnd) {
+                const start = new Date(customStart + 'T00:00:00');
+                const end = new Date(customEnd + 'T23:59:59');
+                return d => d && d >= start && d <= end;
+            }
+            return null;
+        }
+
+        function applyCombinedFilters() {
+            const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // 0. Divergence Filter: Must have at least one 'S' audit badge
+                const hasSBadge = row.querySelectorAll('.audit-badge.audit-s').length > 0;
+                if (!hasSBadge) {
+                    showRow = false;
+                }
+
+                // 1. Date Filter
+                if (showRow && activeDatePredicate) {
+                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const rowDate = parseTableDate(dateStr);
+                    if (!rowDate || !activeDatePredicate(rowDate)) {
+                        showRow = false;
+                    }
+                }
+
+                // 2. Protocol Specific Search Filter (Column 0)
+                if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
+                    showRow = false;
+                }
+
+                // 3. Action Completion Filter (Pendentes vs Concluídas)
+                if (showRow && activeActionFilter && activeActionFilter.length > 0 && !activeActionFilter.includes('all')) {
+                    const isCompleted = row.getAttribute('data-completed') === 'true' || row.classList.contains('opacity-70');
+                    const rowStatus = isCompleted ? 'concluida' : 'pendente';
+                    if (!activeActionFilter.includes(rowStatus)) {
+                        showRow = false;
+                    }
+                }
+
+                // 4. Global Text Search Filter
+                if (showRow && !matchRowGlobalText(row, searchQuery)) {
+                    showRow = false;
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visibleCount++;
+            });
+
+            // Toggle No Results Row
+            const noResultsRow = document.getElementById('no-audit-results');
+            if (noResultsRow) {
+                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            }
+
+            // Indicators update
+            if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
+            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '');
+            if (actionIndicator) actionIndicator.classList.toggle('hidden', !activeActionFilter || activeActionFilter.includes('all') || activeActionFilter.length === 0);
+        }
+
+        // Completed Services Filter Function
+        function applyCompletedServicesFilters() {
+            const rows = document.querySelectorAll('#completed-services-table tbody tr:not(#no-completed-results)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // Protocol Filter (Col 0)
+                if (!matchColumnText(row, 0, compProtocolSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Date Filter (Col 1)
+                if (showRow && compActiveDatePredicate) {
+                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const rowDate = parseTableDate(dateStr);
+                    if (!rowDate || !compActiveDatePredicate(rowDate)) {
+                        showRow = false;
+                    }
+                }
+
+                // Plaqueta Filter (Col 2)
+                if (showRow && !matchColumnText(row, 2, compPlaquetaSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Material Filter (Col 6 - Accent Insensitive)
+                if (showRow && !matchColumnText(row, 6, compMaterialSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Problem Filter (Col 4)
+                if (showRow && compActiveProblemFilter && compActiveProblemFilter.length > 0 && !compActiveProblemFilter.includes('all')) {
+                    const probTd = row.cells[4];
+                    const probVal = probTd?.getAttribute('data-problem-value') || '';
+                    const probText = (probTd?.textContent || '').trim().toLowerCase();
+                    
+                    const matches = compActiveProblemFilter.some(filterVal => {
+                        if (probVal && filterVal === probVal) return true;
+                        if (filterVal === 'lampada-queimada' && probText.includes('queimada')) return true;
+                        if (filterVal === 'acesa-dia' && probText.includes('acesa')) return true;
+                        if (filterVal === 'lampada-quebrada' && probText.includes('quebrada')) return true;
+                        if (filterVal === 'outro' && !probText.includes('queimada') && !probText.includes('acesa') && !probText.includes('quebrada')) return true;
+                        return false;
+                    });
+
+                    if (!matches) {
+                        showRow = false;
+                    }
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visibleCount++;
+            });
+
+            const noResultsRow = document.getElementById('no-completed-results');
+            if (noResultsRow) {
+                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            }
+
+            if (compDateIndicator) compDateIndicator.classList.toggle('hidden', !compActiveDatePredicate);
+            if (compProtocolIndicator) compProtocolIndicator.classList.toggle('hidden', compProtocolSearchQuery.trim() === '');
+            if (compPlaquetaIndicator) compPlaquetaIndicator.classList.toggle('hidden', compPlaquetaSearchQuery.trim() === '');
+            if (compMaterialIndicator) compMaterialIndicator.classList.toggle('hidden', compMaterialSearchQuery.trim() === '');
+            if (compProblemIndicator) compProblemIndicator.classList.toggle('hidden', !compActiveProblemFilter || compActiveProblemFilter.includes('all') || compActiveProblemFilter.length === 0);
+        }
+
+        // Search Input Handlers
+        compProtocolSearchInput?.addEventListener('input', (e) => {
+            compProtocolSearchQuery = e.target.value;
+            applyCompletedServicesFilters();
+        });
+
+        compPlaquetaSearchInput?.addEventListener('input', (e) => {
+            compPlaquetaSearchQuery = e.target.value;
+            applyCompletedServicesFilters();
+        });
+
+        compMaterialSearchInput?.addEventListener('input', (e) => {
+            compMaterialSearchQuery = e.target.value;
+            applyCompletedServicesFilters();
+        });
+
+        window.clearCompProtocolFilter = function() {
+            compProtocolSearchQuery = '';
+            if (compProtocolSearchInput) compProtocolSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.clearCompDateFilter = function() {
+            compActiveDatePredicate = null;
+            const start = document.getElementById('comp-range-start');
+            const end = document.getElementById('comp-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.clearCompPlaquetaFilter = function() {
+            compPlaquetaSearchQuery = '';
+            if (compPlaquetaSearchInput) compPlaquetaSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.clearCompMaterialFilter = function() {
+            compMaterialSearchQuery = '';
+            if (compMaterialSearchInput) compMaterialSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.clearCompProblemFilter = function() {
+            compActiveProblemFilter = ['all'];
+            const problemAll = document.getElementById('comp-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="comp-problem-filter"].comp-problem-checkbox').forEach(cb => cb.checked = true);
+            if (compProblemIndicator) compProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.clearAllCompFilters = function() {
+            compProtocolSearchQuery = '';
+            compPlaquetaSearchQuery = '';
+            compMaterialSearchQuery = '';
+            compActiveDatePredicate = null;
+            compActiveProblemFilter = ['all'];
+            if (compProtocolSearchInput) compProtocolSearchInput.value = '';
+            if (compPlaquetaSearchInput) compPlaquetaSearchInput.value = '';
+            if (compMaterialSearchInput) compMaterialSearchInput.value = '';
+            const start = document.getElementById('comp-range-start');
+            const end = document.getElementById('comp-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            const problemAll = document.getElementById('comp-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="comp-problem-filter"].comp-problem-checkbox').forEach(cb => cb.checked = true);
+            if (compProblemIndicator) compProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        // Checkbox completed problem filters
+        const compProblemFilterAll = document.getElementById('comp-problem-filter-all');
+        const compProblemCheckboxes = document.querySelectorAll('input[name="comp-problem-filter"].comp-problem-checkbox');
+
+        const updateCompProblemFilterState = () => {
+            const checkedBoxes = document.querySelectorAll('input[name="comp-problem-filter"].comp-problem-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const totalCheckboxes = compProblemCheckboxes.length;
+
+            if (compProblemFilterAll) {
+                compProblemFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || (checkedValues.length === 0 && compProblemFilterAll && compProblemFilterAll.checked)) {
+                compActiveProblemFilter = ['all'];
+                if (compProblemIndicator) compProblemIndicator.classList.add('hidden');
+            } else if (checkedValues.length === 0) {
+                compActiveProblemFilter = ['all'];
+                if (compProblemIndicator) compProblemIndicator.classList.add('hidden');
+            } else {
+                compActiveProblemFilter = checkedValues;
+                if (compProblemIndicator) compProblemIndicator.classList.remove('hidden');
+            }
+            applyCompletedServicesFilters();
+        };
+
+        if (compProblemFilterAll) {
+            compProblemFilterAll.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                compProblemCheckboxes.forEach(cb => cb.checked = isChecked);
+                updateCompProblemFilterState();
+            });
+        }
+
+        compProblemCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updateCompProblemFilterState();
+            });
+        });
+
+        window.applyCompQuickFilter = function(type) {
+            compActiveDatePredicate = buildDatePredicate(type);
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.applyCompCustomRange = function() {
+            const startVal = document.getElementById('comp-range-start')?.value;
+            const endVal = document.getElementById('comp-range-end')?.value;
+            if (!startVal || !endVal) return;
+            compActiveDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        // Protocol Search Input handler
+        protocolSearchInput?.addEventListener('input', (e) => {
+            protocolSearchQuery = e.target.value;
+            applyCombinedFilters();
+        });
+
+        // Checkbox action filters
+        const actionFilterAll = document.getElementById('action-filter-all');
+        const actionCheckboxes = document.querySelectorAll('input[name="action-filter"].action-checkbox');
+
+        const updateActionFilterState = () => {
+            const checkedBoxes = document.querySelectorAll('input[name="action-filter"].action-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const totalCheckboxes = actionCheckboxes.length;
+
+            if (actionFilterAll) {
+                actionFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || (checkedValues.length === 0 && actionFilterAll && actionFilterAll.checked)) {
+                activeActionFilter = ['all'];
+                if (actionIndicator) actionIndicator.classList.add('hidden');
+            } else if (checkedValues.length === 0) {
+                activeActionFilter = ['all'];
+                if (actionIndicator) actionIndicator.classList.add('hidden');
+            } else {
+                activeActionFilter = checkedValues;
+                if (actionIndicator) actionIndicator.classList.remove('hidden');
+            }
+            applyCombinedFilters();
+        };
+
+        if (actionFilterAll) {
+            actionFilterAll.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                actionCheckboxes.forEach(cb => cb.checked = isChecked);
+                updateActionFilterState();
+            });
+        }
+
+        actionCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updateActionFilterState();
+            });
+        });
+
+        // Radio change handlers
+        document.querySelectorAll('input[name="status-filter"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                activeStatusFilter = e.target.value;
+                applyCombinedFilters();
+            });
+        });
+
+        document.querySelectorAll('input[name="problem-filter"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                activeProblemFilter = e.target.value;
+                applyCombinedFilters();
+            });
+        });
+
+        // Search input handler
+        searchInput?.addEventListener('input', (e) => {
+            searchQuery = e.target.value;
+            applyCombinedFilters();
+        });
+
+        // Dynamic change on row selects
+        document.getElementById('os-table')?.addEventListener('change', (e) => {
+            if (e.target.classList.contains('status-select') || e.target.classList.contains('problem-select')) {
+                applyCombinedFilters();
+            }
+        });
+
+        window.applyCombinedFilters = applyCombinedFilters;
+
+        // Quick date filter global functions for OS Table
+        window.applyQuickFilter = function(type) {
+            activeDatePredicate = buildDatePredicate(type);
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.applyCustomRange = function() {
+            const startVal = document.getElementById('range-start')?.value;
+            const endVal = document.getElementById('range-end')?.value;
+            if (!startVal || !endVal) return;
+            activeDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearAllFilters = function() {
+            activeDatePredicate = null;
+            protocolSearchQuery = '';
+            activeActionFilter = ['all'];
+            const start = document.getElementById('range-start');
+            const end = document.getElementById('range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            if (protocolSearchInput) protocolSearchInput.value = '';
+            const actionAll = document.getElementById('action-filter-all');
+            if (actionAll) actionAll.checked = true;
+            document.querySelectorAll('input[name="action-filter"].action-checkbox').forEach(cb => cb.checked = true);
+            if (actionIndicator) actionIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearProtocolFilter = function() {
+            protocolSearchQuery = '';
+            if (protocolSearchInput) protocolSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearActionFilter = function() {
+            activeActionFilter = ['all'];
+            const actionAll = document.getElementById('action-filter-all');
+            if (actionAll) actionAll.checked = true;
+            document.querySelectorAll('input[name="action-filter"].action-checkbox').forEach(cb => cb.checked = true);
+            if (actionIndicator) actionIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearStatusFilter = function() {
+            activeStatusFilter = 'all';
+            const allRadio = document.querySelector('input[name="status-filter"][value="all"]');
+            if (allRadio) allRadio.checked = true;
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.clearProblemFilter = function() {
+            activeProblemFilter = 'all';
+            const allRadio = document.querySelector('input[name="problem-filter"][value="all"]');
+            if (allRadio) allRadio.checked = true;
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+    })();
+</script>
+
+<script>
+    // Global Lightbox Galeria Script Handlers for Auditoria
+    var galeriaFotosAtualList = [];
+    var galeriaFotosIndexAtual = 0;
+
+    window.abrirDetalhesOSModal = function(id) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+            window.auditoriaController.abrirDetalhesOSModal(id);
+        } else {
+            console.warn('auditoriaController ainda não inicializado para a OS:', id);
+        }
+    };
+
+    window.fecharDetalhesOSModal = function() {
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (!modal || !box) return;
+        box.classList.remove('scale-100', 'opacity-100');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
+        const list = (window.chamadosListCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []));
+        const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+        
+        if (!osObj || !osObj.fotosEvidencias || osObj.fotosEvidencias.length === 0) {
+            alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
+            return;
+        }
+
+        galeriaFotosAtualList = osObj.fotosEvidencias;
+        galeriaFotosIndexAtual = indexInicial || 0;
+
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (!elModal) return;
+
+        const elProt = document.getElementById('galeriaModalProtocolo');
+        if (elProt) elProt.innerText = `Fotos da OS #${osObj.protocolo}`;
+
+        window.renderizarFotoModalAtual();
+
+        elModal.classList.remove('hidden');
+        elModal.classList.add('flex');
+    };
+
+    window.renderizarFotoModalAtual = function() {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        if (galeriaFotosIndexAtual < 0) galeriaFotosIndexAtual = 0;
+        if (galeriaFotosIndexAtual >= galeriaFotosAtualList.length) galeriaFotosIndexAtual = galeriaFotosAtualList.length - 1;
+
+        const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+
+        const imgEl = document.getElementById('galeriaModalImgPrincipal');
+        const tituloEl = document.getElementById('galeriaModalTituloFoto');
+        const counterEl = document.getElementById('galeriaModalCounter');
+        const linkCloudinaryEl = document.getElementById('galeriaModalLinkCloudinary');
+        const stripEl = document.getElementById('galeriaModalThumbnailsStrip');
+
+        if (imgEl) imgEl.src = foto.url;
+        if (tituloEl) tituloEl.innerText = foto.titulo || `Evidência Fotográfica ${galeriaFotosIndexAtual + 1}`;
+        if (counterEl) counterEl.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+        if (linkCloudinaryEl) linkCloudinaryEl.href = foto.url;
+
+        if (stripEl) {
+            stripEl.innerHTML = '';
+            galeriaFotosAtualList.forEach((f, idx) => {
+                const isSelected = idx === galeriaFotosIndexAtual;
+                const thumbDiv = document.createElement('div');
+                thumbDiv.className = `w-14 h-10 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 ${isSelected ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'}`;
+                thumbDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    galeriaFotosIndexAtual = idx;
+                    window.renderizarFotoModalAtual();
+                };
+                thumbDiv.innerHTML = `<img src="${f.url}" class="w-full h-full object-cover" alt="Thumb ${idx+1}" />`;
+                stripEl.appendChild(thumbDiv);
+            });
+        }
+
+        const btnPrev = document.getElementById('btnGaleriaPrev');
+        const btnNext = document.getElementById('btnGaleriaNext');
+        if (btnPrev && btnNext) {
+            if (galeriaFotosAtualList.length <= 1) {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+            } else {
+                btnPrev.style.display = 'flex';
+                btnNext.style.display = 'flex';
+            }
+        }
+    };
+
+    window.navegarGaleriaFotos = function(delta) {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length <= 1) return;
+        galeriaFotosIndexAtual = (galeriaFotosIndexAtual + delta + galeriaFotosAtualList.length) % galeriaFotosAtualList.length;
+        window.renderizarFotoModalAtual();
+    };
+
+    window.fecharGaleriaFotosModal = function() {
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (elModal) {
+            elModal.classList.add('hidden');
+            elModal.classList.remove('flex');
+        }
+    };
+
+    document.addEventListener('keydown', (e) => {
+        const modalGaleria = document.getElementById('modalGaleriaFotosCloudinary');
+        if (modalGaleria && !modalGaleria.classList.contains('hidden')) {
+            if (e.key === 'Escape') window.fecharGaleriaFotosModal();
+            if (e.key === 'ArrowLeft') window.navegarGaleriaFotos(-1);
+            if (e.key === 'ArrowRight') window.navegarGaleriaFotos(1);
+        }
+        const modalDetalhes = document.getElementById('modalDetalhesOSAuditoria');
+        if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && (modalGaleria ? modalGaleria.classList.contains('hidden') : true)) {
+            if (e.key === 'Escape') window.fecharDetalhesOSModal();
+        }
+    });
+</script>
+</body>
+</html>
