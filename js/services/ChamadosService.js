@@ -33,7 +33,7 @@ class ChamadosService {
 
         chamadosList.forEach(item => {
             const status = item.normalizedStatus;
-            if (status === 'aberto' || status === 'pendente') {
+            if (status === 'aberto' || status === 'em_andamento' || status === 'pendente') {
                 emAbertoCount++;
             } else if (status === 'concluida') {
                 concluidaCount++;
@@ -67,7 +67,7 @@ class ChamadosService {
      * Filters chamados list based on active UI filter criteria
      */
     filterChamados(chamadosList, filters = {}) {
-        const { search, protocol, datePredicate, problem, status } = filters;
+        const { search, protocol, protocolPrefix, datePredicate, problem, status } = filters;
         const isManutentor = typeof window !== 'undefined' && Boolean(window.isManutentorView);
 
         return chamadosList.filter(item => {
@@ -87,6 +87,13 @@ class ChamadosService {
                 const matchCoord = fmt(item.coordenadaInicial).toLowerCase().includes(term);
                 const matchMunicipe = fmt(item.municipeNome).toLowerCase().includes(term);
                 if (!matchProtocol && !matchPlaqueta && !matchAddress && !matchCoord && !matchMunicipe) return false;
+            }
+
+            // Protocol prefix filter (Praça 'P' / Viária 'I')
+            if (protocolPrefix) {
+                const pref = protocolPrefix.toUpperCase().trim();
+                const prot = String(item.protocolo || '').trim().toUpperCase();
+                if (!prot.startsWith(pref)) return false;
             }
 
             // Protocol specific column search
@@ -131,6 +138,7 @@ class ChamadosService {
     async changeChamadoStatus(id, newUIStatus, justification = '') {
         const dbStatusMap = {
             'aberto': 'Aberta',
+            'em_andamento': 'Em Andamento',
             'concluida': 'Concluída',
             'cancelada': 'Cancelada',
             'pendente': 'Pendente'

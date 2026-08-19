@@ -403,12 +403,13 @@
                 <!-- FOTO DE ENTRADA DO LOCAL + QTD ELETRICISTAS -->
                 <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                     <div>
-                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
-                            1. Foto de Entrada do Local <span class="text-red-500">*</span>
+                        <label id="labelFotoPraca" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1.5">
+                            1. Foto de Entrada da Sessão <span class="text-red-500 font-bold">* (Obrigatório para iniciar)</span>
                         </label>
                         <div id="boxFotoEntradaPraca">
                             <input type="file" id="fotoEntradaPraca" accept="image/*" capture="environment" class="hidden" onchange="previewFotoEntradaPraca(event)">
                             <button type="button" 
+                                    id="btnAnexarFotoPraca"
                                     onclick="document.getElementById('fotoEntradaPraca').click()"
                                     class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2">
                                 <span class="material-symbols-outlined text-[18px]">photo_camera</span>
@@ -422,9 +423,9 @@
                             Qtd. de Eletricistas na Equipe
                         </label>
                         <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-slate-50">
-                            <button type="button" onclick="alterarQtdEletricista(-1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">−</button>
+                            <button type="button" id="btnQtdMinusPraca" onclick="alterarQtdEletricista(-1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">−</button>
                             <input type="number" id="qtdEletricistaPraca" min="1" value="1" readonly class="w-full border-none bg-transparent text-center font-bold text-sm text-blue-600 focus:ring-0" />
-                            <button type="button" onclick="alterarQtdEletricista(1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">+</button>
+                            <button type="button" id="btnQtdPlusPraca" onclick="alterarQtdEletricista(1)" class="w-10 h-10 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors">+</button>
                         </div>
                     </div>
                 </div>
@@ -450,12 +451,12 @@
                         </span>
                     </div>
 
-                    <div id="mapaCanvasPraca" class="w-full h-44 rounded-xl border border-slate-200 relative overflow-hidden bg-slate-100"></div>
+                    <div id="mapaCanvasPraca" class="w-full h-44 rounded-xl border border-slate-200 relative overflow-hidden bg-slate-100 z-0"></div>
                     <div id="coordsTextPraca" class="text-xs text-center font-medium text-slate-500">Obtendo coordenadas GPS...</div>
                 </div>
 
                 <!-- MATERIAIS PRAÇA -->
-                <div id="blocoMateriaisPraca" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 hidden">
+                <div id="blocoMateriaisPraca" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                     <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
                         <span class="material-symbols-outlined text-emerald-600 text-[20px]">inventory_2</span>
                         <span>Materiais Utilizados na Praça</span>
@@ -539,7 +540,7 @@
     <!-- ========================================================================= -->
 
     <!-- MODAL DE SUCESSO -->
-    <div id="modalSucesso" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="modalSucesso" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100 animate-fade-in">
             <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-3xl">
                 ✓
@@ -555,7 +556,7 @@
     </div>
 
     <!-- MODAL OS JÁ CONCLUÍDA -->
-    <div id="modalOSConcluida" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="modalOSConcluida" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full text-center space-y-4 border border-slate-100">
             <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-3xl">
                 ⚠️
@@ -571,7 +572,7 @@
     </div>
 
     <!-- MODAL CONFIRMAR CONCLUSÃO PRAÇA -->
-    <div id="modalConcluirPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="modalConcluirPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full space-y-4 border border-slate-100">
             <div class="flex items-center gap-3 border-b border-slate-100 pb-3">
                 <span class="material-symbols-outlined text-emerald-600 text-2xl">check_circle</span>
@@ -592,7 +593,7 @@
     </div>
 
     <!-- MODAL ALERTA DE VALIDAÇÃO -->
-    <div id="modalAlertaValidacaoPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div id="modalAlertaValidacaoPraca" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full text-center space-y-4 border border-slate-100">
             <div class="w-14 h-14 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-2xl">
                 ⚠️
@@ -841,7 +842,7 @@
         html += '        <span>Puxar GPS</span>';
         html += '      </button>';
         html += '    </div>';
-        html += '    <div id="mapaCanvasPonto_' + idx + '" class="w-full h-36 rounded-xl border border-slate-200 mt-2 hidden relative overflow-hidden bg-slate-100"></div>';
+        html += '    <div id="mapaCanvasPonto_' + idx + '" class="w-full h-36 rounded-xl border border-slate-200 mt-2 hidden relative overflow-hidden bg-slate-100 z-0"></div>';
         html += '  </div>';
 
         // UPLOAD DE FOTOS E EVIDÊNCIAS
@@ -1611,11 +1612,25 @@
               status: "Aberta"
             };
           }
+          if (dadosPracaAtual.materiais) {
+            try {
+              carrinhoMateriaisPraca = typeof dadosPracaAtual.materiais === 'string'
+                ? JSON.parse(dadosPracaAtual.materiais)
+                : (Array.isArray(dadosPracaAtual.materiais) ? dadosPracaAtual.materiais : []);
+            } catch(e) { carrinhoMateriaisPraca = []; }
+          } else {
+            carrinhoMateriaisPraca = [];
+          }
+          renderizarTabelaMateriaisPraca();
+
           document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
           document.getElementById('infoPracaEndereco').innerText = "📍 " + (dadosPracaAtual.endereco || "Modo Offline");
           document.getElementById('badgeStatusPraca').innerText = dadosPracaAtual.status || "Aberta";
           document.getElementById('boxInfoPraca').classList.remove('hidden');
           document.getElementById('corpoFormPraca').classList.remove('hidden');
+          var blocoMatOffline = document.getElementById('blocoMateriaisPraca');
+          if (blocoMatOffline) blocoMatOffline.classList.remove('hidden');
+          atualizarBotoesSessaoPraca(dadosPracaAtual.status);
           iniciarGpsPracaComMapa();
           msg.innerHTML = '<span class="text-amber-600 font-bold">📡 Modo Offline ativado. Protocolo liberado para preenchimento.</span>';
           return;
@@ -1639,6 +1654,22 @@
 
           dadosPracaAtual = rows[0];
 
+          var elQtd = document.getElementById('qtdEletricistaPraca');
+          if (elQtd) {
+            elQtd.value = dadosPracaAtual.qtd_eletricistas || dadosPracaAtual.qtd_eletricista || 1;
+          }
+
+          if (dadosPracaAtual.materiais) {
+            try {
+              carrinhoMateriaisPraca = typeof dadosPracaAtual.materiais === 'string'
+                ? JSON.parse(dadosPracaAtual.materiais)
+                : (Array.isArray(dadosPracaAtual.materiais) ? dadosPracaAtual.materiais : []);
+            } catch(e) { carrinhoMateriaisPraca = []; }
+          } else {
+            carrinhoMateriaisPraca = [];
+          }
+          renderizarTabelaMateriaisPraca();
+
           document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
           document.getElementById('infoPracaEndereco').innerText = "📍 " + (dadosPracaAtual.endereco || "Endereço registrado");
 
@@ -1648,6 +1679,7 @@
 
           document.getElementById('boxInfoPraca').classList.remove('hidden');
           var corpoForm = document.getElementById('corpoFormPraca');
+          var blocoMat = document.getElementById('blocoMateriaisPraca');
 
           var stLower = stNorm.toLowerCase();
           if (stLower.includes('conclu') || stLower.includes('resolv')) {
@@ -1655,6 +1687,8 @@
             msg.innerHTML = '<div class="p-3 bg-emerald-100 text-emerald-800 rounded-xl border border-emerald-300 font-bold text-center mt-2">✅ Esta Ordem de Serviço da Praça Pública já está CONCLUÍDA. Nenhuma alteração é permitida.</div>';
           } else {
             corpoForm.classList.remove('hidden');
+            if (blocoMat) blocoMat.classList.remove('hidden');
+            atualizarBotoesSessaoPraca(stNorm);
             iniciarGpsPracaComMapa();
             msg.innerHTML = '<span class="text-emerald-700 font-bold">✅ Protocolo localizado e campos liberados!</span>';
             setTimeout(() => { msg.innerHTML = ''; }, 4000);
@@ -1688,9 +1722,29 @@
         document.getElementById('previewEntradaPracaContainer').classList.add('hidden');
       }
 
+      function travarControleQtdEletricista(travar) {
+        var el = document.getElementById('qtdEletricistaPraca');
+        var btnMinus = document.getElementById('btnQtdMinusPraca');
+        var btnPlus = document.getElementById('btnQtdPlusPraca');
+
+        if (btnMinus) {
+          btnMinus.disabled = travar;
+          btnMinus.style.opacity = travar ? '0.4' : '1';
+          btnMinus.style.pointerEvents = travar ? 'none' : 'auto';
+        }
+        if (btnPlus) {
+          btnPlus.disabled = travar;
+          btnPlus.style.opacity = travar ? '0.4' : '1';
+          btnPlus.style.pointerEvents = travar ? 'none' : 'auto';
+        }
+        if (el) {
+          el.disabled = travar;
+        }
+      }
+
       function alterarQtdEletricista(delta) {
         var el = document.getElementById('qtdEletricistaPraca');
-        if (el) {
+        if (el && !el.disabled) {
           var val = parseInt(el.value) || 1;
           val += delta;
           if (val < 1) val = 1;
@@ -1746,6 +1800,75 @@
         document.getElementById('modalAlertaValidacaoPraca').classList.remove('hidden');
       }
 
+      function atualizarBotoesSessaoPraca(status) {
+        var btnSessao = document.getElementById('btnSessaoPraca');
+        var btnConcluir = document.getElementById('btnConcluirPraca');
+        var labelFotoPraca = document.getElementById('labelFotoPraca');
+        var btnAnexarFotoPraca = document.getElementById('btnAnexarFotoPraca');
+
+        if (!btnSessao) return;
+        var stLower = (status || '').toLowerCase().trim();
+        
+        if (stLower.includes('andamento')) {
+          btnSessao.innerHTML = '<span>⏸️ Encerrar Sessão</span>';
+          btnSessao.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+          btnSessao.classList.add('bg-amber-600', 'hover:bg-amber-700');
+
+          if (labelFotoPraca) {
+            labelFotoPraca.innerHTML = '1. Foto de Encerramento da Sessão <span class="text-red-500 font-bold">* (Obrigatório para encerrar)</span>';
+          }
+          if (btnAnexarFotoPraca) {
+            btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Encerramento</span>';
+          }
+
+          if (btnConcluir) {
+            btnConcluir.disabled = true;
+            btnConcluir.classList.add('opacity-50', 'cursor-not-allowed');
+            btnConcluir.title = "Encerre a sessão de trabalho antes de concluir a Ordem de Serviço.";
+          }
+
+          travarControleQtdEletricista(true);
+        } else if (stLower.includes('iniciad')) {
+          btnSessao.innerHTML = '<span>▶️ Continuar Sessão</span>';
+          btnSessao.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+          btnSessao.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+          if (labelFotoPraca) {
+            labelFotoPraca.innerHTML = '1. Foto de Entrada da Sessão <span class="text-red-500 font-bold">* (Obrigatório para iniciar)</span>';
+          }
+          if (btnAnexarFotoPraca) {
+            btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Entrada</span>';
+          }
+
+          if (btnConcluir) {
+            btnConcluir.disabled = false;
+            btnConcluir.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnConcluir.title = "";
+          }
+
+          travarControleQtdEletricista(false);
+        } else {
+          btnSessao.innerHTML = '<span>▶️ Iniciar Sessão</span>';
+          btnSessao.classList.remove('bg-amber-600', 'hover:bg-amber-700');
+          btnSessao.classList.add('bg-blue-600', 'hover:bg-blue-700');
+
+          if (labelFotoPraca) {
+            labelFotoPraca.innerHTML = '1. Foto de Entrada da Sessão <span class="text-red-500 font-bold">* (Obrigatório para iniciar)</span>';
+          }
+          if (btnAnexarFotoPraca) {
+            btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Entrada</span>';
+          }
+
+          if (btnConcluir) {
+            btnConcluir.disabled = false;
+            btnConcluir.classList.remove('opacity-50', 'cursor-not-allowed');
+            btnConcluir.title = "";
+          }
+
+          travarControleQtdEletricista(false);
+        }
+      }
+
       function fecharModalAlertaValidacao() {
         document.getElementById('modalAlertaValidacaoPraca').classList.add('hidden');
       }
@@ -1756,12 +1879,26 @@
           return;
         }
 
+        var stLower = (dadosPracaAtual.status || '').toLowerCase().trim();
+        var isIniciandoSessao = !stLower.includes('andamento');
+
+        // Foto é OBRIGATÓRIA tanto para INICIAR quanto para ENCERRAR a sessão!
         if (!fotoEntradaPracaBase64) {
-          exibirModalAlertaValidacao("Foto de Entrada Obrigatoriedade", "É obrigatório anexar a Foto de Entrada do local antes de registrar a sessão.");
+          var tituloFoto = isIniciandoSessao ? "Foto de Entrada Obrigatória" : "Foto de Encerramento Obrigatória";
+          var msgFoto = isIniciandoSessao 
+            ? "É obrigatório anexar a Foto de Entrada do local para iniciar a sessão de trabalho."
+            : "É obrigatório anexar a Foto de Encerramento do local para encerrar a sessão de trabalho.";
+          exibirModalAlertaValidacao(tituloFoto, msgFoto);
           return;
         }
 
-        enviarAtualizacaoStatusPraca("Em Andamento");
+        if (stLower.includes('andamento')) {
+          // Sessão em andamento -> encerra a sessão de trabalho atual e atualiza status para "Iniciado"
+          enviarAtualizacaoStatusPraca("Iniciado");
+        } else {
+          // Sessão Aberta ou Iniciado -> inicia/continua sessão e atualiza status para "Em Andamento"
+          enviarAtualizacaoStatusPraca("Em Andamento");
+        }
       }
 
       function executarConcluirPraca() {
@@ -1769,8 +1906,9 @@
           exibirModalAlertaValidacao("Protocolo Não Validado", "Busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
           return;
         }
-        if (!fotoEntradaPracaBase64) {
-          exibirModalAlertaValidacao("Foto de Entrada Obrigatória", "É obrigatório anexar a Foto de Entrada do local antes de concluir a OS.");
+        var stLower = (dadosPracaAtual.status || '').toLowerCase().trim();
+        if (stLower.includes('andamento')) {
+          exibirModalAlertaValidacao("Encerrar Sessão Obrigatório", "É necessário encerrar a sessão de trabalho ativa antes de concluir a Ordem de Serviço.");
           return;
         }
         if (!coordsGpsPracaAtual) {
@@ -1801,22 +1939,35 @@
           return;
         }
 
+        var btnConcluirOriginalHTML = btnConcluir.innerHTML;
+
         btnSessao.disabled = true;
         btnConcluir.disabled = true;
+        btnSessao.classList.add('opacity-75', 'cursor-not-allowed');
+        btnConcluir.classList.add('opacity-75', 'cursor-not-allowed');
         msgPraca.innerHTML = "";
+
+        if (novoStatus === "Concluído" || novoStatus === "Concluida" || novoStatus === "Resolvida") {
+          btnConcluir.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> <span>Concluindo...</span>';
+          btnSessao.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> <span>Concluindo...</span>';
+        } else if (novoStatus === "Iniciado") {
+          btnSessao.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> <span>Encerrando...</span>';
+        } else {
+          btnSessao.innerHTML = '<span class="material-symbols-outlined animate-spin text-[18px]">sync</span> <span>Iniciando...</span>';
+        }
 
         try {
           var statusFinal = (novoStatus === "Concluído" || novoStatus === "Concluida" || novoStatus === "Resolvida") ? "Concluída" : novoStatus;
 
-          // Upload foto de entrada para Cloudinary se presente
+          // Upload da foto capturada para Cloudinary
           var fotoEntradaUrl = null;
           if (fotoEntradaPracaBase64) {
             if (fotoEntradaPracaBase64.startsWith('http://') || fotoEntradaPracaBase64.startsWith('https://')) {
               fotoEntradaUrl = fotoEntradaPracaBase64;
             } else if (window.cloudinaryService) {
-              msgPraca.innerHTML = '<span class="text-blue-600 font-bold">☁️ Enviando foto de entrada para o Cloudinary...</span>';
               try {
-                var nomeFotoPraca = window.cloudinaryService.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', 'FOTO ENTRADA');
+                var tipoFotoTag = (novoStatus === 'Em Andamento') ? 'FOTO ENTRADA' : 'FOTO SAIDA';
+                var nomeFotoPraca = window.cloudinaryService.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', tipoFotoTag);
                 fotoEntradaUrl = await window.cloudinaryService.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
               } catch (uploadErr) {
                 console.warn('⚠️ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
@@ -1827,15 +1978,95 @@
             }
           }
 
+          var qtdEletEl = document.getElementById('qtdEletricistaPraca');
+          var qtdElet = qtdEletEl ? (parseInt(qtdEletEl.value) || 1) : 1;
+
+          var agoraIso = new Date().toISOString();
+          var usuarioAtual = localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Técnico';
+
+          // Gestão do Array de Histórico de Sessões em JSONB
+          var historicoSessoes = [];
+          if (dadosPracaAtual.historico_sessoes) {
+            try {
+              historicoSessoes = typeof dadosPracaAtual.historico_sessoes === 'string'
+                ? JSON.parse(dadosPracaAtual.historico_sessoes)
+                : (Array.isArray(dadosPracaAtual.historico_sessoes) ? dadosPracaAtual.historico_sessoes : []);
+            } catch(e) { historicoSessoes = []; }
+          }
+
+          if (fotoEntradaUrl && novoStatus === 'Em Andamento') {
+            dadosPracaAtual.foto_entrada = fotoEntradaUrl;
+          }
+
+          if (novoStatus === 'Em Andamento') {
+            historicoSessoes.push({
+              numero: historicoSessoes.length + 1,
+              status: 'EM ANDAMENTO',
+              inicio: agoraIso,
+              fim: null,
+              duracao_minutos: null,
+              qtd_eletricistas: qtdElet,
+              tecnico: usuarioAtual,
+              foto_entrada: fotoEntradaUrl || dadosPracaAtual.foto_entrada || null,
+              foto_saida: null,
+              coordenada_inicio: coordsGpsPracaAtual || null,
+              coordenada_fim: null,
+              materiais: (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : []
+            });
+          } else if (novoStatus === 'Iniciado' || statusFinal === 'Concluída') {
+            var sessaoAberta = historicoSessoes.find(function(s) { return !s.fim; });
+            if (sessaoAberta) {
+              sessaoAberta.fim = agoraIso;
+              sessaoAberta.status = (statusFinal === 'Concluída') ? 'CONCLUÍDA' : 'ENCERRADA';
+              sessaoAberta.coordenada_fim = coordsGpsPracaAtual || null;
+              if (fotoEntradaUrl) {
+                sessaoAberta.foto_saida = fotoEntradaUrl;
+              }
+              var dtInc = new Date(sessaoAberta.inicio);
+              var dtFm = new Date(agoraIso);
+              var diffMs = dtFm.getTime() - dtInc.getTime();
+              sessaoAberta.duracao_minutos = Math.max(1, Math.round(diffMs / 60000));
+              if (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) {
+                sessaoAberta.materiais = [...carrinhoMateriaisPraca];
+              }
+            }
+          }
+
+          dadosPracaAtual.historico_sessoes = historicoSessoes;
+
+          var tempoTotalMinutos = historicoSessoes.reduce(function(acc, s) {
+            return acc + (s.duracao_minutos || 0);
+          }, 0);
+
+          var todosMateriaisPraca = [];
+          historicoSessoes.forEach(function(s) {
+            if (Array.isArray(s.materiais)) {
+              s.materiais.forEach(function(m) {
+                todosMateriaisPraca.push(m);
+              });
+            }
+          });
+          if (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) {
+            carrinhoMateriaisPraca.forEach(function(m) {
+              todosMateriaisPraca.push(m);
+            });
+          }
+
           var payload = {
             status: statusFinal,
-            materiais: carrinhoMateriaisPraca,
+            materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
+            qtd_eletricistas: qtdElet,
+            historico_sessoes: historicoSessoes,
+            tempo_total_minutos: tempoTotalMinutos,
             status_auditoria: "Pendente"
           };
 
+          if (obsAdicionalModal) {
+            payload.observacao_final = obsAdicionalModal;
+          }
+
           if (fotoEntradaUrl) {
             payload.foto_entrada = fotoEntradaUrl;
-            payload.evidencias = { 'Foto de Entrada': fotoEntradaUrl };
           }
 
           if (statusFinal === "Concluída") {
@@ -1845,17 +2076,11 @@
             }
           }
 
-          if (obsAdicionalModal) {
-            payload.descricao = (dadosPracaAtual.descricao ? dadosPracaAtual.descricao + "\n" : "") + "Obs Conclusão: " + obsAdicionalModal;
-          }
-
           // Se estiver OFFLINE, salva atualização da praça localmente
           if (!navigator.onLine) {
             if (window.offlineSyncService) {
               await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
             }
-            btnSessao.disabled = false;
-            btnConcluir.disabled = false;
             dadosPracaAtual.status = novoStatus;
             document.getElementById('badgeStatusPraca').innerText = novoStatus;
             document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi <strong class='text-amber-600 font-bold'>SALVA LOCALMENTE</strong>!<br><br>Ela será enviada ao servidor automaticamente assim que a conexão retornar.";
@@ -1866,33 +2091,55 @@
             return;
           }
 
-          let { error } = await client
-            .from('ordens_servico_pracas')
-            .update(payload)
-            .eq('protocolo', dadosPracaAtual.protocolo);
+          let payloadAtual = { ...payload };
+          let colunasRemovidas = [];
+          let resUpdate = await client.from('ordens_servico_pracas').update(payloadAtual).eq('protocolo', dadosPracaAtual.protocolo);
 
-          btnSessao.disabled = false;
-          btnConcluir.disabled = false;
+          while (resUpdate.error && resUpdate.error.message && resUpdate.error.message.includes("Could not find the")) {
+            const match = resUpdate.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+            if (match && match[1]) {
+              const colAusente = match[1];
+              colunasRemovidas.push(colAusente);
+              console.warn(`⚠️ [Finalizar Praça] Coluna '${colAusente}' não existe na tabela 'ordens_servico_pracas'. Removendo do payload e tentando novamente...`);
+              delete payloadAtual[colAusente];
+              resUpdate = await client.from('ordens_servico_pracas').update(payloadAtual).eq('protocolo', dadosPracaAtual.protocolo);
+            } else {
+              break;
+            }
+          }
 
-          if (error) {
-            msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro ao atualizar status: ' + error.message + '</span>';
+          if (resUpdate.error) {
+            msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro ao atualizar status: ' + resUpdate.error.message + '</span>';
             return;
           }
 
           dadosPracaAtual.status = novoStatus;
           document.getElementById('badgeStatusPraca').innerText = novoStatus;
 
-          document.getElementById('msgSucessoTexto').innerHTML = "A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi atualizada para <strong>" + novoStatus + "</strong> com sucesso!";
+          var htmlSucesso = "";
+          if (novoStatus === 'Em Andamento') {
+            htmlSucesso = "▶️ Sessão de trabalho iniciada para a Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> com sucesso!";
+          } else if (novoStatus === 'Iniciado') {
+            htmlSucesso = "⏸️ Sessão de trabalho encerrada para a Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> (status atualizado para Iniciado)!";
+            var elQtdReset = document.getElementById('qtdEletricistaPraca');
+            if (elQtdReset) elQtdReset.value = 1;
+          } else {
+            htmlSucesso = "A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi atualizada para <strong>" + novoStatus + "</strong> com sucesso!";
+          }
+
+          if (colunasRemovidas.length > 0) {
+            htmlSucesso += "<br><br><div class='p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-left text-xs'><strong>⚠️ Atenção (Banco de Dados):</strong> As colunas <code>" + colunasRemovidas.join(', ') + "</code> ainda não existem na tabela <code>ordens_servico_pracas</code> do Supabase.<br>Por favor, execute o script SQL <strong>'atualizar_estrutura_pracas_sessoes.sql'</strong> no Editor SQL do Supabase para habilitar o salvamento persistente destas informações.</div>";
+          }
+
+          document.getElementById('msgSucessoTexto').innerHTML = htmlSucesso;
           document.getElementById('modalSucesso').classList.remove('hidden');
 
+          atualizarBotoesSessaoPraca(novoStatus);
           removerFotoEntradaPraca();
           carrinhoMateriaisPraca = [];
           renderizarTabelaMateriaisPraca();
 
         } catch(err) {
-          btnSessao.disabled = false;
-          btnConcluir.disabled = false;
-
           if (window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network'))) {
             try {
               await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
@@ -1906,6 +2153,13 @@
           }
 
           msgPraca.innerHTML = '<span class="text-red-600 font-bold">Falha ao processar requisição: ' + err.message + '</span>';
+        } finally {
+          btnSessao.disabled = false;
+          btnConcluir.disabled = false;
+          btnSessao.classList.remove('opacity-75', 'cursor-not-allowed');
+          btnConcluir.classList.remove('opacity-75', 'cursor-not-allowed');
+          btnConcluir.innerHTML = btnConcluirOriginalHTML;
+          atualizarBotoesSessaoPraca(dadosPracaAtual ? dadosPracaAtual.status : null);
         }
       }
     </script>

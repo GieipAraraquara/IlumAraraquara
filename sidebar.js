@@ -371,13 +371,21 @@ customElements.define('app-sidebar', AppSidebar);
 
 function loadScriptIfNeeded(src) {
     if (!src) return Promise.resolve();
-    const cleanSrc = src.replace(/^\.\//, '');
-    const alreadyLoaded = Array.from(document.querySelectorAll('script')).some(s => {
+    const cleanSrc = src.replace(/^\.\//, '').split('?')[0];
+    const existingScript = Array.from(document.querySelectorAll('script')).find(s => {
         const sSrc = s.getAttribute('src');
-        return sSrc && (sSrc === src || sSrc === cleanSrc || sSrc.includes(cleanSrc));
+        if (!sSrc) return false;
+        const cleanSSrc = sSrc.replace(/^\.\//, '').split('?')[0];
+        return cleanSSrc === cleanSrc || cleanSSrc.endsWith(cleanSrc);
     });
 
-    if (alreadyLoaded) return Promise.resolve();
+    if (existingScript) {
+        if (existingScript.getAttribute('src') === src) {
+            return Promise.resolve();
+        } else {
+            existingScript.remove();
+        }
+    }
 
     return new Promise((resolve) => {
         const script = document.createElement('script');
@@ -498,7 +506,8 @@ window.navigateSPA = async function(targetUrl, pushState = true) {
             mainContent.style.transition = 'opacity 0.15s ease';
         }
 
-        const res = await fetch(targetUrl);
+        const fetchUrl = targetUrl + (targetUrl.includes('?') ? '&' : '?') + '_ts=' + Date.now();
+        const res = await fetch(fetchUrl, { cache: 'no-cache' });
         if (!res.ok) {
             window.location.href = targetUrl;
             return;

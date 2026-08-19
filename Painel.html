@@ -8,12 +8,12 @@
     <!-- Scripts & Clean Architecture Layers -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/guards/authGuard.js?v=9"></script>
-    <script src="js/domain/ChamadoModel.js?v=9"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
-    <script src="js/services/ChamadosService.js?v=12"></script>
-    <script src="js/services/MapService.js?v=9"></script>
-    <script src="js/controllers/PainelController.js?v=13"></script>
+    <script src="js/guards/authGuard.js?v=21"></script>
+    <script src="js/domain/ChamadoModel.js?v=22"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=21"></script>
+    <script src="js/services/ChamadosService.js?v=21"></script>
+    <script src="js/services/MapService.js?v=21"></script>
+    <script src="js/controllers/PainelController.js?v=22"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -307,14 +307,24 @@
                                         <span class="w-2 h-2 rounded-full bg-secondary hidden" id="protocol-filter-indicator"></span>
                                     </button>
                                     
-                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2.5">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Tipo / Protocolo</span>
+                                            <div class="flex gap-2">
+                                                <button type="button" id="protocol-btn-praca" onclick="toggleProtocolPrefix('P')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Praça (começam com P)">
+                                                    <span class="material-symbols-outlined text-[15px]">park</span>
+                                                    <span>Praça (P)</span>
+                                                </button>
+                                                <button type="button" id="protocol-btn-viaria" onclick="toggleProtocolPrefix('I')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Viária (começam com I)">
+                                                    <span class="material-symbols-outlined text-[15px]">alt_route</span>
+                                                    <span>Viária (I)</span>
+                                                </button>
+                                            </div>
                                             <div class="relative">
                                                 <input type="text" id="protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
                                                 <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
                                             </div>
-                                            <button class="text-error font-label-md mt-1 hover:underline text-left cursor-pointer" onclick="clearProtocolFilter()">Limpar Busca</button>
+                                            <button class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="clearProtocolFilter()">Limpar Filtro</button>
                                         </div>
                                     </div>
                                 </div>
@@ -331,10 +341,23 @@
                                     </button>
                                     
                                     <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-4 animate-fade-in-up hidden" id="date-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('hoje')">Hoje</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('ontem')">Ontem</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors cursor-pointer" onclick="applyQuickFilter('7dias')">Últimos 7 dias</button>
+                                        <div class="flex flex-col gap-1.5">
+                                             <button type="button" data-date-type="hoje" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('hoje')">
+                                                 <span>Hoje</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="ontem" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('ontem')">
+                                                 <span>Ontem</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="7dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('7dias')">
+                                                 <span>Últimos 7 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="30dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('30dias')">
+                                                 <span>Últimos 30 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
                                             
                                             <div class="border-t border-outline-variant my-2 pt-2">
                                                 <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
@@ -425,6 +448,10 @@
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
                                                 <input type="checkbox" name="status-filter" value="aberto" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Em aberto</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="status-filter" value="em_andamento" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Em andamento</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
                                                 <input type="checkbox" name="status-filter" value="concluida" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
@@ -674,6 +701,200 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Detalhes OS Auditoria/Painel -->
+<div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) fecharDetalhesOSModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modalDetalhesOSBox" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">assignment</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="detalheModalProtocolo">Protocolo #---</h3>
+                        <span id="detalheModalStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Concluída</span>
+                        <span id="detalheModalAuditBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">Auditoria Pendente</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md mt-0.5" id="detalheModalDataSub">Abertura: --/--/---- | Conclusão: --/--/----</p>
+                </div>
+            </div>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5" id="detalheModalConteudo">
+            <div class="flex items-center justify-center py-12 text-on-surface-variant text-sm">
+                Carregando detalhes do protocolo...
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
+            <span class="text-[11px] text-on-surface-variant/70 font-medium hidden sm:inline">Clique em qualquer foto para visualizar em tela cheia na galeria</span>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Galeria de Fotos Cloudinary (Lightbox) -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[70000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Principal -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Thumbnails geradas via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    var galeriaFotosAtualList = [];
+    var galeriaFotosIndexAtual = 0;
+
+    window.fecharDetalhesOSModal = function() {
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (!modal || !box) return;
+        box.classList.remove('scale-100', 'opacity-100');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
+        const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []));
+        const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+        
+        if (!osObj || !osObj.fotosEvidencias || osObj.fotosEvidencias.length === 0) {
+            alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
+            return;
+        }
+
+        galeriaFotosAtualList = osObj.fotosEvidencias;
+        galeriaFotosIndexAtual = indexInicial || 0;
+
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (!elModal) return;
+
+        const elProt = document.getElementById('galeriaModalProtocolo');
+        if (elProt) elProt.innerText = `Fotos da OS #${osObj.protocolo}`;
+
+        window.renderizarFotoModalAtual();
+
+        elModal.classList.remove('hidden');
+        elModal.classList.add('flex');
+    };
+
+    window.renderizarFotoModalAtual = function() {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        if (galeriaFotosIndexAtual < 0) galeriaFotosIndexAtual = 0;
+        if (galeriaFotosIndexAtual >= galeriaFotosAtualList.length) galeriaFotosIndexAtual = galeriaFotosAtualList.length - 1;
+
+        const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+
+        const imgEl = document.getElementById('galeriaModalImgPrincipal');
+        const tituloEl = document.getElementById('galeriaModalTituloFoto');
+        const counterEl = document.getElementById('galeriaModalCounter');
+        const linkCloudinaryEl = document.getElementById('galeriaModalLinkCloudinary');
+        const stripEl = document.getElementById('galeriaModalThumbnailsStrip');
+
+        if (imgEl) imgEl.src = foto.url;
+        if (tituloEl) tituloEl.innerText = foto.titulo || `Evidência Fotográfica ${galeriaFotosIndexAtual + 1}`;
+        if (counterEl) counterEl.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+        if (linkCloudinaryEl) linkCloudinaryEl.href = foto.url;
+
+        if (stripEl) {
+            stripEl.innerHTML = '';
+            galeriaFotosAtualList.forEach((f, idx) => {
+                const isSelected = idx === galeriaFotosIndexAtual;
+                const thumbDiv = document.createElement('div');
+                thumbDiv.className = `w-14 h-10 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 ${isSelected ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'}`;
+                thumbDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    galeriaFotosIndexAtual = idx;
+                    window.renderizarFotoModalAtual();
+                };
+                thumbDiv.innerHTML = `<img src="${f.url}" class="w-full h-full object-cover" alt="Thumb ${idx+1}" />`;
+                stripEl.appendChild(thumbDiv);
+            });
+        }
+
+        const btnPrev = document.getElementById('btnGaleriaPrev');
+        const btnNext = document.getElementById('btnGaleriaNext');
+        if (btnPrev && btnNext) {
+            if (galeriaFotosAtualList.length <= 1) {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+            } else {
+                btnPrev.style.display = 'flex';
+                btnNext.style.display = 'flex';
+            }
+        }
+    };
+
+    window.navegarGaleriaFotos = function(delta) {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length <= 1) return;
+        galeriaFotosIndexAtual = (galeriaFotosIndexAtual + delta + galeriaFotosAtualList.length) % galeriaFotosAtualList.length;
+        window.renderizarFotoModalAtual();
+    };
+
+    window.fecharGaleriaFotosModal = function() {
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (elModal) {
+            elModal.classList.add('hidden');
+            elModal.classList.remove('flex');
+        }
+    };
+
+    document.addEventListener('keydown', (e) => {
+        const modalGaleria = document.getElementById('modalGaleriaFotosCloudinary');
+        if (modalGaleria && !modalGaleria.classList.contains('hidden')) {
+            if (e.key === 'Escape') window.fecharGaleriaFotosModal();
+            if (e.key === 'ArrowLeft') window.navegarGaleriaFotos(-1);
+            if (e.key === 'ArrowRight') window.navegarGaleriaFotos(1);
+        }
+        const modalDetalhes = document.getElementById('modalDetalhesOSAuditoria');
+        if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && (modalGaleria ? modalGaleria.classList.contains('hidden') : true)) {
+            if (e.key === 'Escape') window.fecharDetalhesOSModal();
+        }
+    });
+</script>
 
 <script>
     // Confirmation Modal System
@@ -1302,16 +1523,25 @@
             const now = new Date();
             now.setHours(0, 0, 0, 0);
 
+            const todayEnd = new Date(now);
+            todayEnd.setHours(23, 59, 59, 999);
+
             if (type === 'hoje') {
-                return d => d && d.getTime() === now.getTime();
+                return d => d && d.getTime() >= now.getTime() && d.getTime() <= todayEnd.getTime();
             } else if (type === 'ontem') {
                 const yesterday = new Date(now);
                 yesterday.setDate(now.getDate() - 1);
-                return d => d && d.getTime() === yesterday.getTime();
+                const yesterdayEnd = new Date(yesterday);
+                yesterdayEnd.setHours(23, 59, 59, 999);
+                return d => d && d >= yesterday && d <= yesterdayEnd;
             } else if (type === '7dias') {
                 const weekAgo = new Date(now);
                 weekAgo.setDate(now.getDate() - 7);
-                return d => d && d >= weekAgo && d <= now;
+                return d => d && d >= weekAgo && d <= todayEnd;
+            } else if (type === '30dias') {
+                const monthAgo = new Date(now);
+                monthAgo.setDate(now.getDate() - 30);
+                return d => d && d >= monthAgo && d <= todayEnd;
             } else if (type === 'custom' && customStart && customEnd) {
                 const start = new Date(customStart + 'T00:00:00');
                 const end = new Date(customEnd + 'T23:59:59');
@@ -1320,9 +1550,12 @@
             return null;
         }
 
+        window.activeProtocolPrefix = '';
+
         function applyCombinedFilters() {
             const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
             let visibleCount = 0;
+            const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
 
             rows.forEach(row => {
                 let showRow = true;
@@ -1336,7 +1569,15 @@
                     }
                 }
 
-                // 2. Protocol Specific Search Filter (Column 0)
+                // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
+                if (showRow && currentPrefix) {
+                    const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
+                    if (!protText.startsWith(currentPrefix.toUpperCase())) {
+                        showRow = false;
+                    }
+                }
+
+                // 2b. Protocol Specific Search Filter (Column 0)
                 if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
                     showRow = false;
                 }
@@ -1376,14 +1617,68 @@
 
             // Indicators update
             if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
-            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '');
+            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !currentPrefix);
             if (statusIndicator) statusIndicator.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 4);
             if (problemIndicator) problemIndicator.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4);
         }
 
+        window.toggleProtocolPrefix = function(prefix) {
+            if (window.painelController) {
+                if (window.painelController.activeFilters.protocolPrefix === prefix) {
+                    window.painelController.activeFilters.protocolPrefix = '';
+                } else {
+                    window.painelController.activeFilters.protocolPrefix = prefix;
+                }
+                window.updateProtocolPrefixUI();
+                window.painelController.renderTable();
+            } else {
+                if (window.activeProtocolPrefix === prefix) {
+                    window.activeProtocolPrefix = '';
+                } else {
+                    window.activeProtocolPrefix = prefix;
+                }
+                window.updateProtocolPrefixUI();
+            }
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.updateProtocolPrefixUI = function() {
+            const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
+            const btnPraca = document.getElementById('protocol-btn-praca');
+            const btnViaria = document.getElementById('protocol-btn-viaria');
+            const indicator = document.getElementById('protocol-filter-indicator');
+            const searchVal = document.getElementById('protocol-search-input')?.value || '';
+
+            if (btnPraca) {
+                if (currentPrefix === 'P') {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (btnViaria) {
+                if (currentPrefix === 'I') {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (indicator) {
+                if (currentPrefix || searchVal.trim()) {
+                    indicator.classList.remove('hidden');
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            }
+        };
+
         // Protocol Search Input handler
         protocolSearchInput?.addEventListener('input', (e) => {
             protocolSearchQuery = e.target.value;
+            window.updateProtocolPrefixUI();
             applyCombinedFilters();
         });
 
@@ -1468,9 +1763,36 @@
 
         window.applyCombinedFilters = applyCombinedFilters;
 
+        window.updateQuickDateUI = function(dropdownId, selectedType) {
+            const dropdown = typeof dropdownId === 'string' ? document.getElementById(dropdownId) : dropdownId;
+            if (!dropdown) return;
+            const buttons = dropdown.querySelectorAll('[data-date-type]');
+            buttons.forEach(btn => {
+                const type = btn.getAttribute('data-date-type');
+                const checkIcon = btn.querySelector('.check-icon');
+                if (type === selectedType) {
+                    btn.className = "quick-date-btn w-full text-left px-3 py-2 bg-secondary/15 text-secondary font-bold rounded transition-all cursor-pointer flex items-center justify-between border-l-4 border-secondary shadow-xs";
+                    if (checkIcon) checkIcon.classList.remove('hidden');
+                } else {
+                    btn.className = "quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between";
+                    if (checkIcon) checkIcon.classList.add('hidden');
+                }
+            });
+
+            const indicatorEl = document.getElementById('filter-active-indicator') || document.getElementById('date-filter-indicator');
+            if (indicatorEl) {
+                indicatorEl.classList.toggle('hidden', !selectedType);
+            }
+        };
+
         // Quick date filter global functions for OS Table
         window.applyQuickFilter = function(type) {
             activeDatePredicate = buildDatePredicate(type);
+            window.updateQuickDateUI('date-filter-dropdown', type);
+            if (window.painelController) {
+                window.painelController.activeFilters.datePredicate = activeDatePredicate;
+                window.painelController.renderTable();
+            }
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
@@ -1480,6 +1802,11 @@
             const endVal = document.getElementById('range-end')?.value;
             if (!startVal || !endVal) return;
             activeDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            window.updateQuickDateUI('date-filter-dropdown', 'custom');
+            if (window.painelController) {
+                window.painelController.activeFilters.datePredicate = activeDatePredicate;
+                window.painelController.renderTable();
+            }
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
@@ -1487,6 +1814,7 @@
         window.clearAllFilters = function() {
             activeDatePredicate = null;
             protocolSearchQuery = '';
+            window.activeProtocolPrefix = '';
             activeStatusFilter = ['all'];
             activeProblemFilter = ['all'];
             searchQuery = '';
@@ -1507,28 +1835,45 @@
             document.querySelectorAll('input[name="problem-filter"].problem-checkbox').forEach(cb => cb.checked = true);
 
             if (window.painelController) {
+                window.painelController.activeFilters.datePredicate = null;
+                window.painelController.activeFilters.protocolPrefix = '';
+                window.painelController.activeFilters.protocol = '';
                 window.painelController.activeFilters.status = ['all'];
                 window.painelController.activeFilters.problem = ['all'];
                 window.painelController.renderTable();
             }
 
+            window.updateProtocolPrefixUI();
+            window.updateQuickDateUI('date-filter-dropdown', null);
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
 
         window.clearProtocolFilter = function() {
             protocolSearchQuery = '';
+            window.activeProtocolPrefix = '';
             if (protocolSearchInput) protocolSearchInput.value = '';
+            if (window.painelController) {
+                window.painelController.activeFilters.protocolPrefix = '';
+                window.painelController.activeFilters.protocol = '';
+                window.painelController.renderTable();
+            }
+            window.updateProtocolPrefixUI();
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
 
         window.clearDateFilter = function() {
             activeDatePredicate = null;
+            if (window.painelController) {
+                window.painelController.activeFilters.datePredicate = null;
+                window.painelController.renderTable();
+            }
             const start = document.getElementById('range-start');
             const end = document.getElementById('range-end');
             if (start) start.value = '';
             if (end) end.value = '';
+            window.updateQuickDateUI('date-filter-dropdown', null);
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };

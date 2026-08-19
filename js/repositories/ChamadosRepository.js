@@ -153,9 +153,6 @@ class ChamadosRepository {
                 // A tabela ordens_servico_pracas não possui a coluna data_conclusao
                 if (tableName === this.pracasTable) {
                     delete currentPayload.data_conclusao;
-                    if (currentPayload.observacao_final && !currentPayload.descricao) {
-                        currentPayload.descricao = currentPayload.observacao_final;
-                    }
                 }
 
                 let res = await client

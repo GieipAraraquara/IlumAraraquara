@@ -8,12 +8,12 @@
     <!-- Scripts & Clean Architecture Layers -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/guards/authGuard.js?v=9"></script>
-    <script src="js/domain/ChamadoModel.js?v=9"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
-    <script src="js/services/ChamadosService.js?v=9"></script>
-    <script src="js/services/MapService.js?v=9"></script>
-    <script src="js/controllers/AuditoriaController.js?v=9"></script>
+    <script src="js/guards/authGuard.js?v=24"></script>
+    <script src="js/domain/ChamadoModel.js?v=24"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=24"></script>
+    <script src="js/services/ChamadosService.js?v=24"></script>
+    <script src="js/services/MapService.js?v=24"></script>
+    <script src="js/controllers/AuditoriaController.js?v=24"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -425,14 +425,24 @@
                                         <span class="w-2 h-2 rounded-full bg-secondary hidden" id="protocol-filter-indicator"></span>
                                     </button>
                                     
-                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2.5">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Tipo / Protocolo</span>
+                                            <div class="flex gap-2">
+                                                <button type="button" id="protocol-btn-praca" onclick="toggleProtocolPrefix('P')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Praça (começam com P)">
+                                                    <span class="material-symbols-outlined text-[15px]">park</span>
+                                                    <span>Praça (P)</span>
+                                                </button>
+                                                <button type="button" id="protocol-btn-viaria" onclick="toggleProtocolPrefix('I')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Viária (começam com I)">
+                                                    <span class="material-symbols-outlined text-[15px]">alt_route</span>
+                                                    <span>Viária (I)</span>
+                                                </button>
+                                            </div>
                                             <div class="relative">
                                                 <input type="text" id="protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
                                                 <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
                                             </div>
-                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearProtocolFilter()">Limpar Busca</button>
+                                            <button class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="clearProtocolFilter()">Limpar Filtro</button>
                                         </div>
                                     </div>
                                 </div>
@@ -449,10 +459,23 @@
                                     </button>
                                     
                                     <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="date-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('hoje')">Hoje</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('ontem')">Ontem</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors" onclick="applyQuickFilter('7dias')">Últimos 7 dias</button>
+                                        <div class="flex flex-col gap-1.5">
+                                             <button type="button" data-date-type="hoje" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('hoje')">
+                                                 <span>Hoje</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="ontem" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('ontem')">
+                                                 <span>Ontem</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="7dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('7dias')">
+                                                 <span>Últimos 7 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="30dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyQuickFilter('30dias')">
+                                                 <span>Últimos 30 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
                                             
                                             <div class="border-t border-outline-variant my-2 pt-2">
                                                 <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
@@ -813,15 +836,232 @@
             </div>
         </div>
 
-        <!-- Tabela de Serviços Finalizados -->
+        <!-- Tabela de Serviços em Praças -->
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+                <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px] text-emerald-600">park</span>
+                    <span>Serviços em praças</span>
+                </h3>
+                <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold" id="praca-badge-count">
+                    0 Registros
+                </span>
+            </div>
+            
+            <div class="w-full min-h-[250px] overflow-visible">
+                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="praca-services-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                            <!-- Column 1: Protocolo com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 140px; min-width: 140px;" data-col="0">
+                                <div class="relative inline-block text-left group/praca-protocol-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="praca-protocol-filter-trigger" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="praca-protocol-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="praca-protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2.5">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo de Praça</span>
+                                            <div class="relative">
+                                                <input type="text" id="praca-protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="clearPracaProtocolFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 2: Data da Conclusão com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 110px; min-width: 100px;" data-col="1">
+                                <div class="relative inline-block text-left group/praca-date-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="praca-date-filter-trigger" title="Filtrar por Data">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="praca-date-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="praca-date-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5">
+                                            <button type="button" data-date-type="hoje" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyPracaQuickFilter('hoje')">
+                                                <span>Hoje</span>
+                                                <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                            </button>
+                                            <button type="button" data-date-type="ontem" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyPracaQuickFilter('ontem')">
+                                                <span>Ontem</span>
+                                                <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                            </button>
+                                            <button type="button" data-date-type="7dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyPracaQuickFilter('7dias')">
+                                                <span>Últimos 7 dias</span>
+                                                <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                            </button>
+                                            <button type="button" data-date-type="30dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyPracaQuickFilter('30dias')">
+                                                <span>Últimos 30 dias</span>
+                                                <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                            </button>
+                                            
+                                            <div class="border-t border-outline-variant my-2 pt-2">
+                                                <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
+                                                <div class="grid grid-cols-2 gap-3 mt-2 px-1">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Início</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="praca-range-start" type="date"/>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-on-surface-variant">Fim</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-outline-variant rounded-md px-2 py-1.5 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="praca-range-end" type="date"/>
+                                                    </div>
+                                                </div>
+                                                <button class="w-full mt-4 bg-secondary text-on-secondary py-2 rounded font-label-md hover:bg-secondary-container transition-colors cursor-pointer" onclick="applyPracaCustomRange()">Aplicar</button>
+                                            </div>
+                                            <button class="text-error font-label-md mt-2 hover:underline text-left cursor-pointer" onclick="clearPracaDateFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3: Praça com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 140px;" data-col="2">
+                                <div class="relative inline-block text-left group/praca-plaqueta-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="praca-plaqueta-filter-trigger" title="Filtrar por Praça">
+                                        <span class="font-label-md uppercase tracking-wider">Praça</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="praca-plaqueta-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="praca-plaqueta-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Praça</span>
+                                            <div class="relative">
+                                                <input type="text" id="praca-plaqueta-search-input" placeholder="Digite o nome da praça..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left cursor-pointer" onclick="clearPracaPlaquetaFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 4: Coordenada de Reparo -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 170px; min-width: 170px;" data-col="3">
+                                Coordenada de Reparo<div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 5: Problema com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 180px; min-width: 180px;" data-col="4">
+                                <div class="relative inline-block text-left group/praca-problem-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="praca-problem-filter-trigger" title="Filtrar por Problema">
+                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="praca-problem-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden text-left" id="praca-problem-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Problema</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="praca-problem-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todos os problemas</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-problem-filter" value="lampada-queimada" checked class="praca-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Queimada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-problem-filter" value="acesa-dia" checked class="praca-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Acesa Dia</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-problem-filter" value="lampada-quebrada" checked class="praca-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Lâmpada Quebrada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-problem-filter" value="outro" checked class="praca-problem-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Outro</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearPracaProblemFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 6: Status com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 170px; min-width: 150px;" data-col="5">
+                                <div class="relative inline-block text-left group/praca-status-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="praca-status-filter-trigger" title="Filtrar por Status">
+                                        <span class="font-label-md uppercase tracking-wider">Status</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="praca-status-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden text-left" id="praca-status-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Status</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="praca-status-filter-all" value="all" class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todos os status</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="concluida" checked class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Concluída</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="em_andamento" checked class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Em Andamento</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="aberto" class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Em Aberto</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="cancelada" checked class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Cancelada</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearPracaStatusFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <!-- Empty State Row for Praca Services -->
+                        <tr id="no-praca-results" class="hidden">
+                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                                    <span class="text-xs">Nenhum serviço em praça encontrado para os filtros selecionados.</span>
+                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllPracaFilters()">Limpar filtros de praça</button>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tabela de Serviços Finalizados (Viário) -->
         <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-8 overflow-visible">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface flex items-center gap-2">
-                    <span class="material-symbols-outlined text-[20px] text-emerald-600">task_alt</span>
-                    <span>Serviços Finalizados</span>
+                    <span class="material-symbols-outlined text-[20px] text-blue-600">alt_route</span>
+                    <span>Serviços Finalizados (Viário)</span>
                 </h3>
                 <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
-                    4 Registros
+                    0 Registros
                 </span>
             </div>
             
@@ -839,13 +1079,13 @@
                                     </button>
                                     
                                     <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="comp-protocol-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo</span>
+                                        <div class="flex flex-col gap-2.5">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Protocolo Viário</span>
                                             <div class="relative">
                                                 <input type="text" id="comp-protocol-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
                                                 <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
                                             </div>
-                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearCompProtocolFilter()">Limpar Busca</button>
+                                            <button class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="clearCompProtocolFilter()">Limpar Filtro</button>
                                         </div>
                                     </div>
                                 </div>
@@ -862,10 +1102,23 @@
                                     </button>
                                     
                                     <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="comp-date-filter-dropdown">
-                                        <div class="flex flex-col gap-2">
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('hoje')">Hoje</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('ontem')">Ontem</button>
-                                            <button class="text-left px-3 py-2 hover:bg-surface-container-low rounded font-body-md transition-colors text-on-surface" onclick="applyCompQuickFilter('7dias')">Últimos 7 dias</button>
+                                        <div class="flex flex-col gap-1.5">
+                                             <button type="button" data-date-type="hoje" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyCompQuickFilter('hoje')">
+                                                 <span>Hoje</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="ontem" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyCompQuickFilter('ontem')">
+                                                 <span>Ontem</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="7dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyCompQuickFilter('7dias')">
+                                                 <span>Últimos 7 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="30dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyCompQuickFilter('30dias')">
+                                                 <span>Últimos 30 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-secondary check-icon hidden">check</span>
+                                             </button>
                                             
                                             <div class="border-t border-outline-variant my-2 pt-2">
                                                 <span class="text-label-sm text-on-surface-variant uppercase px-2 font-semibold">Intervalo Personalizado</span>
@@ -1956,6 +2209,13 @@
             '13': 130 
         }, 'tableColWidths');
 
+        // Inicializa redimensionamento da Tabela de Serviços em Praças
+        initTableResizer('praca-services-table', {
+            '0': 100, '1': 70, '2': 100, '3': 130, '4': 140, '5': 200
+        }, {
+            '0': 220, '1': 150, '2': 350, '3': 300, '4': 300, '5': 600
+        }, 'pracaTableColWidths');
+
         // Inicializa redimensionamento da Tabela de Serviços Finalizados
         initTableResizer('completed-services-table', {
             '0': 100, '1': 70, '2': 100, '3': 130, '4': 140, '5': 50, '6': 200
@@ -1991,6 +2251,7 @@
         const dateIndicator = document.getElementById('filter-active-indicator');
 
         // Protocol Filter Elements
+        let activeProtocolPrefix = '';
         const protocolTrigger = document.getElementById('protocol-filter-trigger');
         const protocolDropdown = document.getElementById('protocol-filter-dropdown');
         const protocolIndicator = document.getElementById('protocol-filter-indicator');
@@ -2011,8 +2272,38 @@
         const problemDropdown = document.getElementById('problem-filter-dropdown');
         const problemIndicator = document.getElementById('problem-filter-indicator');
 
+        // Praca Services Filter Elements
+        let pracaActiveDatePredicate = null;
+        let pracaProtocolSearchQuery = '';
+        let pracaPlaquetaSearchQuery = '';
+        let pracaActiveStatusFilter = ['concluida', 'em_andamento', 'cancelada'];
+        let pracaActiveProblemFilter = ['all'];
+
+        const pracaDateTrigger = document.getElementById('praca-date-filter-trigger');
+        const pracaDateDropdown = document.getElementById('praca-date-filter-dropdown');
+        const pracaDateIndicator = document.getElementById('praca-date-filter-indicator');
+
+        const pracaProtocolTrigger = document.getElementById('praca-protocol-filter-trigger');
+        const pracaProtocolDropdown = document.getElementById('praca-protocol-filter-dropdown');
+        const pracaProtocolIndicator = document.getElementById('praca-protocol-filter-indicator');
+        const pracaProtocolSearchInput = document.getElementById('praca-protocol-search-input');
+
+        const pracaPlaquetaTrigger = document.getElementById('praca-plaqueta-filter-trigger');
+        const pracaPlaquetaDropdown = document.getElementById('praca-plaqueta-filter-dropdown');
+        const pracaPlaquetaIndicator = document.getElementById('praca-plaqueta-filter-indicator');
+        const pracaPlaquetaSearchInput = document.getElementById('praca-plaqueta-search-input');
+
+        const pracaStatusTrigger = document.getElementById('praca-status-filter-trigger');
+        const pracaStatusDropdown = document.getElementById('praca-status-filter-dropdown');
+        const pracaStatusIndicator = document.getElementById('praca-status-filter-indicator');
+
+        const pracaProblemTrigger = document.getElementById('praca-problem-filter-trigger');
+        const pracaProblemDropdown = document.getElementById('praca-problem-filter-dropdown');
+        const pracaProblemIndicator = document.getElementById('praca-problem-filter-indicator');
+
         // Completed Services Filter Elements
-        let compActiveDatePredicate = null;
+        let compActiveDatePredicate = buildDatePredicate('30dias');
+        let compProtocolPrefix = '';
         const compDateTrigger = document.getElementById('comp-date-filter-trigger');
         const compDateDropdown = document.getElementById('comp-date-filter-dropdown');
         const compDateIndicator = document.getElementById('comp-date-filter-indicator');
@@ -2040,6 +2331,7 @@
         function initFilterPortals() {
             [
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
+                pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
             ].forEach(d => {
                 if (d && d.parentElement !== document.body) {
@@ -2052,6 +2344,7 @@
         function closeAllFilterDropdowns() {
             [
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
+                pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
             ].forEach(d => {
                 if (d) {
@@ -2134,6 +2427,28 @@
                 problemDropdown.style.display = 'none';
             }
 
+            // Praca Services dropdowns
+            if (pracaDateDropdown && !pracaDateDropdown.contains(e.target) && !pracaDateTrigger?.contains(e.target)) {
+                pracaDateDropdown.classList.add('hidden');
+                pracaDateDropdown.style.display = 'none';
+            }
+            if (pracaProtocolDropdown && !pracaProtocolDropdown.contains(e.target) && !pracaProtocolTrigger?.contains(e.target)) {
+                pracaProtocolDropdown.classList.add('hidden');
+                pracaProtocolDropdown.style.display = 'none';
+            }
+            if (pracaPlaquetaDropdown && !pracaPlaquetaDropdown.contains(e.target) && !pracaPlaquetaTrigger?.contains(e.target)) {
+                pracaPlaquetaDropdown.classList.add('hidden');
+                pracaPlaquetaDropdown.style.display = 'none';
+            }
+            if (pracaStatusDropdown && !pracaStatusDropdown.contains(e.target) && !pracaStatusTrigger?.contains(e.target)) {
+                pracaStatusDropdown.classList.add('hidden');
+                pracaStatusDropdown.style.display = 'none';
+            }
+            if (pracaProblemDropdown && !pracaProblemDropdown.contains(e.target) && !pracaProblemTrigger?.contains(e.target)) {
+                pracaProblemDropdown.classList.add('hidden');
+                pracaProblemDropdown.style.display = 'none';
+            }
+
             // Completed Services dropdowns
             if (compDateDropdown && !compDateDropdown.contains(e.target) && !compDateTrigger?.contains(e.target)) {
                 compDateDropdown.classList.add('hidden');
@@ -2186,6 +2501,32 @@
         problemTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(problemTrigger, problemDropdown, false);
+        });
+
+        // Praca Services triggers
+        pracaDateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pracaDateTrigger, pracaDateDropdown, false);
+        });
+
+        pracaProtocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pracaProtocolTrigger, pracaProtocolDropdown, false);
+        });
+
+        pracaPlaquetaTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pracaPlaquetaTrigger, pracaPlaquetaDropdown, false);
+        });
+
+        pracaStatusTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pracaStatusTrigger, pracaStatusDropdown, true);
+        });
+
+        pracaProblemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pracaProblemTrigger, pracaProblemDropdown, false);
         });
 
         // Completed Services triggers
@@ -2274,16 +2615,25 @@
             const now = new Date();
             now.setHours(0, 0, 0, 0);
 
+            const todayEnd = new Date(now);
+            todayEnd.setHours(23, 59, 59, 999);
+
             if (type === 'hoje') {
-                return d => d && d.getTime() === now.getTime();
+                return d => d && d.getTime() >= now.getTime() && d.getTime() <= todayEnd.getTime();
             } else if (type === 'ontem') {
                 const yesterday = new Date(now);
                 yesterday.setDate(now.getDate() - 1);
-                return d => d && d.getTime() === yesterday.getTime();
+                const yesterdayEnd = new Date(yesterday);
+                yesterdayEnd.setHours(23, 59, 59, 999);
+                return d => d && d >= yesterday && d <= yesterdayEnd;
             } else if (type === '7dias') {
                 const weekAgo = new Date(now);
                 weekAgo.setDate(now.getDate() - 7);
-                return d => d && d >= weekAgo && d <= now;
+                return d => d && d >= weekAgo && d <= todayEnd;
+            } else if (type === '30dias') {
+                const monthAgo = new Date(now);
+                monthAgo.setDate(now.getDate() - 30);
+                return d => d && d >= monthAgo && d <= todayEnd;
             } else if (type === 'custom' && customStart && customEnd) {
                 const start = new Date(customStart + 'T00:00:00');
                 const end = new Date(customEnd + 'T23:59:59');
@@ -2291,6 +2641,88 @@
             }
             return null;
         }
+
+        window.toggleProtocolPrefix = function(prefix) {
+            if (activeProtocolPrefix === prefix) {
+                activeProtocolPrefix = '';
+            } else {
+                activeProtocolPrefix = prefix;
+            }
+            window.updateProtocolPrefixUI();
+            closeAllFilterDropdowns();
+            applyCombinedFilters();
+        };
+
+        window.updateProtocolPrefixUI = function() {
+            const btnPraca = document.getElementById('protocol-btn-praca');
+            const btnViaria = document.getElementById('protocol-btn-viaria');
+            const searchVal = document.getElementById('protocol-search-input')?.value || '';
+
+            if (btnPraca) {
+                if (activeProtocolPrefix === 'P') {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (btnViaria) {
+                if (activeProtocolPrefix === 'I') {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (protocolIndicator) {
+                if (activeProtocolPrefix || searchVal.trim()) {
+                    protocolIndicator.classList.remove('hidden');
+                } else {
+                    protocolIndicator.classList.add('hidden');
+                }
+            }
+        };
+
+        window.toggleCompProtocolPrefix = function(prefix) {
+            if (compProtocolPrefix === prefix) {
+                compProtocolPrefix = '';
+            } else {
+                compProtocolPrefix = prefix;
+            }
+            window.updateCompProtocolPrefixUI();
+            closeAllFilterDropdowns();
+            applyCompletedServicesFilters();
+        };
+
+        window.updateCompProtocolPrefixUI = function() {
+            const btnPraca = document.getElementById('comp-protocol-btn-praca');
+            const btnViaria = document.getElementById('comp-protocol-btn-viaria');
+            const searchVal = document.getElementById('comp-protocol-search-input')?.value || '';
+
+            if (btnPraca) {
+                if (compProtocolPrefix === 'P') {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnPraca.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (btnViaria) {
+                if (compProtocolPrefix === 'I') {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-bold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-on-secondary border-secondary shadow-xs";
+                } else {
+                    btnViaria.className = "protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40";
+                }
+            }
+
+            if (compProtocolIndicator) {
+                if (compProtocolPrefix || searchVal.trim()) {
+                    compProtocolIndicator.classList.remove('hidden');
+                } else {
+                    compProtocolIndicator.classList.add('hidden');
+                }
+            }
+        };
 
         function applyCombinedFilters() {
             const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
@@ -2314,7 +2746,15 @@
                     }
                 }
 
-                // 2. Protocol Specific Search Filter (Column 0)
+                // 2. Protocol Prefix Filter (Column 0)
+                if (showRow && activeProtocolPrefix) {
+                    const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
+                    if (!protText.startsWith(activeProtocolPrefix.toUpperCase())) {
+                        showRow = false;
+                    }
+                }
+
+                // 2b. Protocol Specific Search Filter (Column 0)
                 if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
                     showRow = false;
                 }
@@ -2345,9 +2785,305 @@
 
             // Indicators update
             if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
-            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '');
+            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !activeProtocolPrefix);
             if (actionIndicator) actionIndicator.classList.toggle('hidden', !activeActionFilter || activeActionFilter.includes('all') || activeActionFilter.length === 0);
         }
+
+        // Praca Services Filter Function
+        function applyPracaServicesFilters() {
+            const rows = document.querySelectorAll('#praca-services-table tbody tr:not(#no-praca-results)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // Protocol Search Filter (Col 0)
+                if (showRow && !matchColumnText(row, 0, pracaProtocolSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Date Filter (Col 1)
+                if (showRow && pracaActiveDatePredicate) {
+                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const rowDate = parseTableDate(dateStr);
+                    if (!rowDate || !pracaActiveDatePredicate(rowDate)) {
+                        showRow = false;
+                    }
+                }
+
+                // Plaqueta Filter (Col 2)
+                if (showRow && !matchColumnText(row, 2, pracaPlaquetaSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Status Filter (Col 5)
+                if (showRow && pracaActiveStatusFilter && pracaActiveStatusFilter.length > 0 && !pracaActiveStatusFilter.includes('all')) {
+                    const statusTd = row.cells[5];
+                    const statusVal = statusTd?.getAttribute('data-status-value') || '';
+                    const statusText = (statusTd?.textContent || '').trim().toLowerCase();
+
+                    const matches = pracaActiveStatusFilter.some(filterVal => {
+                        if (statusVal && filterVal === statusVal) return true;
+                        if (filterVal === 'concluida' && (statusText.includes('concluíd') || statusText.includes('concluid'))) return true;
+                        if (filterVal === 'em_andamento' && (statusText.includes('andamento') || statusText.includes('iniciad'))) return true;
+                        if (filterVal === 'aberto' && statusText.includes('aberto')) return true;
+                        if (filterVal === 'cancelada' && statusText.includes('cancelad')) return true;
+                        return false;
+                    });
+
+                    if (!matches) {
+                        showRow = false;
+                    }
+                }
+
+                // Problem Filter (Col 4)
+                if (showRow && pracaActiveProblemFilter && pracaActiveProblemFilter.length > 0 && !pracaActiveProblemFilter.includes('all')) {
+                    const probTd = row.cells[4];
+                    const probVal = probTd?.getAttribute('data-problem-value') || '';
+                    const probText = (probTd?.textContent || '').trim().toLowerCase();
+                    
+                    const matches = pracaActiveProblemFilter.some(filterVal => {
+                        if (probVal && filterVal === probVal) return true;
+                        if (filterVal === 'lampada-queimada' && probText.includes('queimada')) return true;
+                        if (filterVal === 'acesa-dia' && probText.includes('acesa')) return true;
+                        if (filterVal === 'lampada-quebrada' && probText.includes('quebrada')) return true;
+                        if (filterVal === 'outro' && !probText.includes('queimada') && !probText.includes('acesa') && !probText.includes('quebrada')) return true;
+                        return false;
+                    });
+
+                    if (!matches) {
+                        showRow = false;
+                    }
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visibleCount++;
+            });
+
+            const noResultsRow = document.getElementById('no-praca-results');
+            if (noResultsRow) {
+                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            }
+
+            const badge = document.getElementById('praca-badge-count');
+            if (badge) {
+                badge.textContent = `${visibleCount} Registros`;
+            }
+
+            if (pracaDateIndicator) pracaDateIndicator.classList.toggle('hidden', !pracaActiveDatePredicate);
+            if (pracaProtocolIndicator) pracaProtocolIndicator.classList.toggle('hidden', pracaProtocolSearchQuery.trim() === '');
+            if (pracaPlaquetaIndicator) pracaPlaquetaIndicator.classList.toggle('hidden', pracaPlaquetaSearchQuery.trim() === '');
+            if (pracaStatusIndicator) pracaStatusIndicator.classList.toggle('hidden', !pracaActiveStatusFilter || pracaActiveStatusFilter.includes('all') || pracaActiveStatusFilter.length === 0);
+            if (pracaProblemIndicator) pracaProblemIndicator.classList.toggle('hidden', !pracaActiveProblemFilter || pracaActiveProblemFilter.includes('all') || pracaActiveProblemFilter.length === 0);
+        }
+
+        // Search Input Handlers for Praca Services
+        pracaProtocolSearchInput?.addEventListener('input', (e) => {
+            pracaProtocolSearchQuery = e.target.value;
+            applyPracaServicesFilters();
+        });
+
+        pracaPlaquetaSearchInput?.addEventListener('input', (e) => {
+            pracaPlaquetaSearchQuery = e.target.value;
+            applyPracaServicesFilters();
+        });
+
+        window.clearPracaProtocolFilter = function() {
+            pracaProtocolSearchQuery = '';
+            if (pracaProtocolSearchInput) pracaProtocolSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.clearPracaDateFilter = function() {
+            pracaActiveDatePredicate = null;
+            const start = document.getElementById('praca-range-start');
+            const end = document.getElementById('praca-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.clearPracaPlaquetaFilter = function() {
+            pracaPlaquetaSearchQuery = '';
+            if (pracaPlaquetaSearchInput) pracaPlaquetaSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.clearPracaStatusFilter = function() {
+            pracaActiveStatusFilter = ['all'];
+            const statusAll = document.getElementById('praca-status-filter-all');
+            if (statusAll) statusAll.checked = true;
+            document.querySelectorAll('input[name="praca-status-filter"].praca-status-checkbox').forEach(cb => cb.checked = true);
+            if (pracaStatusIndicator) pracaStatusIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.clearPracaProblemFilter = function() {
+            pracaActiveProblemFilter = ['all'];
+            const problemAll = document.getElementById('praca-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="praca-problem-filter"].praca-problem-checkbox').forEach(cb => cb.checked = true);
+            if (pracaProblemIndicator) pracaProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.clearAllPracaFilters = function() {
+            pracaProtocolSearchQuery = '';
+            pracaPlaquetaSearchQuery = '';
+            pracaActiveStatusFilter = ['all'];
+            pracaActiveDatePredicate = null;
+            pracaActiveProblemFilter = ['all'];
+            if (pracaProtocolSearchInput) pracaProtocolSearchInput.value = '';
+            if (pracaPlaquetaSearchInput) pracaPlaquetaSearchInput.value = '';
+            const statusAll = document.getElementById('praca-status-filter-all');
+            if (statusAll) statusAll.checked = true;
+            document.querySelectorAll('input[name="praca-status-filter"].praca-status-checkbox').forEach(cb => cb.checked = true);
+            if (pracaStatusIndicator) pracaStatusIndicator.classList.add('hidden');
+            const start = document.getElementById('praca-range-start');
+            const end = document.getElementById('praca-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            const problemAll = document.getElementById('praca-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="praca-problem-filter"].praca-problem-checkbox').forEach(cb => cb.checked = true);
+            if (pracaProblemIndicator) pracaProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        // Checkbox praca status filters
+        const pracaStatusFilterAll = document.getElementById('praca-status-filter-all');
+        const pracaStatusCheckboxes = document.querySelectorAll('input[name="praca-status-filter"].praca-status-checkbox');
+
+        const updatePracaStatusFilterState = () => {
+            const checkedBoxes = document.querySelectorAll('input[name="praca-status-filter"].praca-status-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const totalCheckboxes = pracaStatusCheckboxes.length;
+
+            if (pracaStatusFilterAll) {
+                pracaStatusFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || (checkedValues.length === 0 && pracaStatusFilterAll && pracaStatusFilterAll.checked)) {
+                pracaActiveStatusFilter = ['all'];
+                if (pracaStatusIndicator) pracaStatusIndicator.classList.add('hidden');
+            } else if (checkedValues.length === 0) {
+                pracaActiveStatusFilter = ['all'];
+                if (pracaStatusIndicator) pracaStatusIndicator.classList.add('hidden');
+            } else {
+                pracaActiveStatusFilter = checkedValues;
+                if (pracaStatusIndicator) pracaStatusIndicator.classList.remove('hidden');
+            }
+            applyPracaServicesFilters();
+        };
+
+        if (pracaStatusFilterAll) {
+            pracaStatusFilterAll.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                pracaStatusCheckboxes.forEach(cb => cb.checked = isChecked);
+                updatePracaStatusFilterState();
+            });
+        }
+
+        pracaStatusCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updatePracaStatusFilterState();
+            });
+        });
+
+        // Checkbox praca problem filters
+        const pracaProblemFilterAll = document.getElementById('praca-problem-filter-all');
+        const pracaProblemCheckboxes = document.querySelectorAll('input[name="praca-problem-filter"].praca-problem-checkbox');
+
+        const updatePracaProblemFilterState = () => {
+            const checkedBoxes = document.querySelectorAll('input[name="praca-problem-filter"].praca-problem-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const totalCheckboxes = pracaProblemCheckboxes.length;
+
+            if (pracaProblemFilterAll) {
+                pracaProblemFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || (checkedValues.length === 0 && pracaProblemFilterAll && pracaProblemFilterAll.checked)) {
+                pracaActiveProblemFilter = ['all'];
+                if (pracaProblemIndicator) pracaProblemIndicator.classList.add('hidden');
+            } else if (checkedValues.length === 0) {
+                pracaActiveProblemFilter = ['all'];
+                if (pracaProblemIndicator) pracaProblemIndicator.classList.add('hidden');
+            } else {
+                pracaActiveProblemFilter = checkedValues;
+                if (pracaProblemIndicator) pracaProblemIndicator.classList.remove('hidden');
+            }
+            applyPracaServicesFilters();
+        };
+
+        if (pracaProblemFilterAll) {
+            pracaProblemFilterAll.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                pracaProblemCheckboxes.forEach(cb => cb.checked = isChecked);
+                updatePracaProblemFilterState();
+            });
+        }
+
+        pracaProblemCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updatePracaProblemFilterState();
+            });
+        });
+
+        window.updateQuickDateUI = function(dropdownId, selectedType) {
+            const dropdown = typeof dropdownId === 'string' ? document.getElementById(dropdownId) : dropdownId;
+            if (!dropdown) return;
+            const buttons = dropdown.querySelectorAll('[data-date-type]');
+            buttons.forEach(btn => {
+                const type = btn.getAttribute('data-date-type');
+                const checkIcon = btn.querySelector('.check-icon');
+                if (type === selectedType) {
+                    btn.className = "quick-date-btn w-full text-left px-3 py-2 bg-secondary/15 text-secondary font-bold rounded transition-all cursor-pointer flex items-center justify-between border-l-4 border-secondary shadow-xs";
+                    if (checkIcon) checkIcon.classList.remove('hidden');
+                } else {
+                    btn.className = "quick-date-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between";
+                    if (checkIcon) checkIcon.classList.add('hidden');
+                }
+            });
+
+            // Toggle header blue circle indicator dot
+            let indicatorEl = null;
+            if (dropdownId === 'date-filter-dropdown') {
+                indicatorEl = document.getElementById('filter-active-indicator') || document.getElementById('date-filter-indicator');
+            } else if (dropdownId === 'praca-date-filter-dropdown') {
+                indicatorEl = document.getElementById('praca-date-filter-indicator');
+            } else if (dropdownId === 'comp-date-filter-dropdown') {
+                indicatorEl = document.getElementById('comp-date-filter-indicator');
+            }
+            if (indicatorEl) {
+                indicatorEl.classList.toggle('hidden', !selectedType);
+            }
+        };
+
+        window.applyPracaQuickFilter = function(type) {
+            pracaActiveDatePredicate = buildDatePredicate(type);
+            window.updateQuickDateUI('praca-date-filter-dropdown', type);
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.applyPracaCustomRange = function() {
+            const startVal = document.getElementById('praca-range-start')?.value;
+            const endVal = document.getElementById('praca-range-end')?.value;
+            if (!startVal || !endVal) return;
+            pracaActiveDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            window.updateQuickDateUI('praca-date-filter-dropdown', 'custom');
+            closeAllFilterDropdowns();
+            applyPracaServicesFilters();
+        };
+
+        window.applyPracaServicesFilters = applyPracaServicesFilters;
 
         // Completed Services Filter Function
         function applyCompletedServicesFilters() {
@@ -2357,8 +3093,8 @@
             rows.forEach(row => {
                 let showRow = true;
 
-                // Protocol Filter (Col 0)
-                if (!matchColumnText(row, 0, compProtocolSearchQuery)) {
+                // Protocol Search Filter (Col 0)
+                if (showRow && !matchColumnText(row, 0, compProtocolSearchQuery)) {
                     showRow = false;
                 }
 
@@ -2411,7 +3147,7 @@
             }
 
             if (compDateIndicator) compDateIndicator.classList.toggle('hidden', !compActiveDatePredicate);
-            if (compProtocolIndicator) compProtocolIndicator.classList.toggle('hidden', compProtocolSearchQuery.trim() === '');
+            if (compProtocolIndicator) compProtocolIndicator.classList.toggle('hidden', compProtocolSearchQuery.trim() === '' && !compProtocolPrefix);
             if (compPlaquetaIndicator) compPlaquetaIndicator.classList.toggle('hidden', compPlaquetaSearchQuery.trim() === '');
             if (compMaterialIndicator) compMaterialIndicator.classList.toggle('hidden', compMaterialSearchQuery.trim() === '');
             if (compProblemIndicator) compProblemIndicator.classList.toggle('hidden', !compActiveProblemFilter || compActiveProblemFilter.includes('all') || compActiveProblemFilter.length === 0);
@@ -2420,6 +3156,7 @@
         // Search Input Handlers
         compProtocolSearchInput?.addEventListener('input', (e) => {
             compProtocolSearchQuery = e.target.value;
+            window.updateCompProtocolPrefixUI();
             applyCompletedServicesFilters();
         });
 
@@ -2435,7 +3172,9 @@
 
         window.clearCompProtocolFilter = function() {
             compProtocolSearchQuery = '';
+            compProtocolPrefix = '';
             if (compProtocolSearchInput) compProtocolSearchInput.value = '';
+            window.updateCompProtocolPrefixUI();
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
         };
@@ -2446,6 +3185,7 @@
             const end = document.getElementById('comp-range-end');
             if (start) start.value = '';
             if (end) end.value = '';
+            window.updateQuickDateUI('comp-date-filter-dropdown', null);
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
         };
@@ -2476,6 +3216,7 @@
 
         window.clearAllCompFilters = function() {
             compProtocolSearchQuery = '';
+            compProtocolPrefix = '';
             compPlaquetaSearchQuery = '';
             compMaterialSearchQuery = '';
             compActiveDatePredicate = null;
@@ -2491,6 +3232,7 @@
             if (problemAll) problemAll.checked = true;
             document.querySelectorAll('input[name="comp-problem-filter"].comp-problem-checkbox').forEach(cb => cb.checked = true);
             if (compProblemIndicator) compProblemIndicator.classList.add('hidden');
+            window.updateCompProtocolPrefixUI();
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
         };
@@ -2537,6 +3279,7 @@
 
         window.applyCompQuickFilter = function(type) {
             compActiveDatePredicate = buildDatePredicate(type);
+            window.updateQuickDateUI('comp-date-filter-dropdown', type);
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
         };
@@ -2546,6 +3289,7 @@
             const endVal = document.getElementById('comp-range-end')?.value;
             if (!startVal || !endVal) return;
             compActiveDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            window.updateQuickDateUI('comp-date-filter-dropdown', 'custom');
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
         };
@@ -2629,6 +3373,7 @@
         // Quick date filter global functions for OS Table
         window.applyQuickFilter = function(type) {
             activeDatePredicate = buildDatePredicate(type);
+            window.updateQuickDateUI('date-filter-dropdown', type);
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
@@ -2638,6 +3383,7 @@
             const endVal = document.getElementById('range-end')?.value;
             if (!startVal || !endVal) return;
             activeDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            window.updateQuickDateUI('date-filter-dropdown', 'custom');
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
@@ -2645,6 +3391,7 @@
         window.clearAllFilters = function() {
             activeDatePredicate = null;
             protocolSearchQuery = '';
+            activeProtocolPrefix = '';
             activeActionFilter = ['all'];
             const start = document.getElementById('range-start');
             const end = document.getElementById('range-end');
@@ -2655,13 +3402,21 @@
             if (actionAll) actionAll.checked = true;
             document.querySelectorAll('input[name="action-filter"].action-checkbox').forEach(cb => cb.checked = true);
             if (actionIndicator) actionIndicator.classList.add('hidden');
+            window.updateProtocolPrefixUI();
+            window.updateQuickDateUI('date-filter-dropdown', null);
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };
 
+        // Initialize date filter UI selected states on load
+        window.updateQuickDateUI('praca-date-filter-dropdown', null);
+        window.updateQuickDateUI('comp-date-filter-dropdown', '30dias');
+
         window.clearProtocolFilter = function() {
             protocolSearchQuery = '';
+            activeProtocolPrefix = '';
             if (protocolSearchInput) protocolSearchInput.value = '';
+            window.updateProtocolPrefixUI();
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };

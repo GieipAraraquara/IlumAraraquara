@@ -12,10 +12,10 @@
     <!-- Scripts & Clean Architecture Layers -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/guards/authGuard.js?v=9"></script>
-    <script src="js/domain/ChamadoModel.js?v=9"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=9"></script>
-    <script src="js/services/ChamadosService.js?v=9"></script>
+    <script src="js/guards/authGuard.js?v=21"></script>
+    <script src="js/domain/ChamadoModel.js?v=21"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=21"></script>
+    <script src="js/services/ChamadosService.js?v=21"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -187,6 +187,26 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 0, 0, 0.35);
         }
+
+        /* Badge Sequencial de Passos da Rota Viária */
+        .marker-rota-step-badge {
+            width: 28px; height: 28px;
+            background: linear-gradient(135deg, #0051d5 0%, #316bf3 100%);
+            color: #ffffff; border: 2.5px solid #ffffff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800;
+            box-shadow: 0 4px 12px rgba(0, 81, 213, 0.45);
+            cursor: pointer; z-index: 40;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .marker-rota-step-badge:hover {
+            transform: scale(1.25);
+            box-shadow: 0 6px 16px rgba(0, 81, 213, 0.6);
+        }
+        .marker-rota-inicio-badge {
+            background: linear-gradient(135deg, #188038 0%, #2e7d32 100%) !important;
+            box-shadow: 0 4px 12px rgba(24, 128, 56, 0.45) !important;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
@@ -280,15 +300,50 @@
                 <button type="button" id="chipStatusCanceladas" onclick="alterarFiltroStatus('canceladas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-error">❌ Canceladas</button>
                 <button type="button" id="chipStatusTodas" onclick="alterarFiltroStatus('todas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary">🌐 Todas</button>
 
-                <div class="flex items-center gap-1.5 border-l border-outline-variant/60 pl-2 ml-1">
-                    <span class="text-xs font-semibold text-on-surface-variant">Período:</span>
-                    <select id="selectJanelaTempo" onchange="alterarJanelaTempo()" class="text-xs font-medium border border-outline-variant rounded-md px-2 py-1 bg-surface-container-lowest text-on-surface outline-none cursor-pointer focus:ring-1 focus:ring-secondary">
-                        <option value="0" selected>Somente Ativas</option>
-                        <option value="7">Últimos 7 dias</option>
-                        <option value="30">Últimos 30 dias</option>
-                        <option value="90">Últimos 90 dias</option>
-                        <option value="365">Este Ano (365d)</option>
-                    </select>
+                <!-- FILTRO DE PERÍODO / DATA PERSONALIZADA DA OS -->
+                <div class="relative inline-block text-left group/date-filter border-l border-outline-variant/60 pl-2 ml-1">
+                    <button type="button" id="btnFiltroDataMapa" onclick="toggleDropdownFiltroDataMapa(event)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-outline-variant bg-surface-container-lowest text-on-surface hover:border-secondary transition-all cursor-pointer shadow-sm">
+                        <span class="material-symbols-outlined text-[15px] text-secondary">calendar_today</span>
+                        <span id="labelFiltroDataMapa" class="font-medium">Somente Ativas</span>
+                        <span class="material-symbols-outlined text-[15px] transition-transform duration-200" id="iconArrowFiltroDataMapa">expand_more</span>
+                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="indicadorFiltroDataMapa"></span>
+                    </button>
+                    
+                    <div class="absolute left-0 mt-2 w-80 bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/80 rounded-xl shadow-2xl z-50 p-3.5 animate-fade-in-up hidden" id="dropdownFiltroDataMapa">
+                        <div class="flex flex-col gap-1 text-xs text-on-surface">
+                            <span class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider mb-1">Filtrar por Período</span>
+                            
+                            <div class="grid grid-cols-2 gap-1 mb-1">
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('ativas')">Somente Ativas</button>
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('hoje')">Hoje</button>
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('ontem')">Ontem</button>
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('7dias')">Últimos 7 dias</button>
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('30dias')">Últimos 30 dias</button>
+                                <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs" onclick="aplicarFiltroDataRapidoMapa('90dias')">Últimos 90 dias</button>
+                            </div>
+                            
+                            <button type="button" class="text-left px-2.5 py-1.5 hover:bg-surface-container-low rounded-lg font-medium transition-colors cursor-pointer text-xs w-full mb-1" onclick="aplicarFiltroDataRapidoMapa('365dias')">Este Ano (365 dias)</button>
+                            
+                            <div class="border-t border-outline-variant/60 my-1 pt-2">
+                                <span class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1.5">Intervalo Personalizado</span>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="flex flex-col gap-1">
+                                        <label class="text-[10px] font-semibold text-on-surface-variant/80 uppercase">Início</label>
+                                        <input class="w-full text-xs font-medium border border-outline-variant rounded-md px-2 py-1 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="mapa-range-start" type="date"/>
+                                    </div>
+                                    <div class="flex flex-col gap-1">
+                                        <label class="text-[10px] font-semibold text-on-surface-variant/80 uppercase">Fim</label>
+                                        <input class="w-full text-xs font-medium border border-outline-variant rounded-md px-2 py-1 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="mapa-range-end" type="date"/>
+                                    </div>
+                                </div>
+                                <button type="button" class="w-full mt-2.5 bg-secondary text-on-secondary py-1.5 rounded-lg font-semibold hover:bg-secondary-container transition-colors cursor-pointer active:scale-95 shadow-sm text-xs" onclick="aplicarIntervaloPersonalizadoMapa()">Aplicar Data</button>
+                            </div>
+                            
+                            <div class="border-t border-outline-variant/60 mt-1 pt-1 flex justify-between items-center">
+                                <button type="button" class="text-error font-semibold hover:underline cursor-pointer text-left text-xs" onclick="limparFiltroDataMapa()">Limpar Filtro</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -316,6 +371,10 @@
             <div class="flex items-center gap-1.5 ml-auto">
                 <button type="button" id="btnModoPinos" onclick="alternarModoVisao('pinos')" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-secondary bg-secondary/10 text-secondary transition-all">📍 Pinos</button>
                 <button type="button" id="btnModoHeatmap" onclick="alternarModoVisao('heatmap')" class="px-2.5 py-1 text-xs rounded-lg font-medium border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary transition-all">🔥 Heatmap</button>
+                <button type="button" id="btnModoRoteirizacao" onclick="togglePainelRoteirizacao()" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary hover:border-secondary transition-all flex items-center gap-1 active:scale-95">
+                    <span class="material-symbols-outlined text-[15px]">route</span>
+                    <span>Rota Viária</span>
+                </button>
                 <button type="button" onclick="carregarMapaOSsAbertas()" class="px-2.5 py-1 text-xs rounded-lg font-semibold bg-secondary text-on-secondary hover:bg-secondary-container transition-all active:scale-95 flex items-center gap-1">
                     <span class="material-symbols-outlined text-[14px]">refresh</span>
                     <span>Atualizar</span>
@@ -326,6 +385,118 @@
         <!-- PAINEL LATERAL INTERATIVO DA OS -->
         <div id="painelLateralOS" class="glass-overlay absolute top-3 right-3 bottom-16 w-80 z-20 rounded-xl p-4 overflow-y-auto hidden shadow-2xl border border-white/80 font-body-md text-xs space-y-3">
             <!-- Conteúdo dinâmico gerado via JS ao clicar no pino -->
+        </div>
+
+        <!-- PAINEL FLUTUANTE DE ROTEIRIZAÇÃO VIÁRIA INTELIGENTE -->
+        <div id="painelRoteirizacaoOS" class="glass-overlay absolute top-3 right-3 bottom-16 w-84 z-30 rounded-xl p-4 overflow-y-auto hidden shadow-2xl border border-white/80 font-body-md text-xs space-y-3 transition-all duration-300">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-outline-variant/60 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-secondary text-xl">route</span>
+                    <div>
+                        <h3 class="font-bold text-sm text-on-surface leading-tight">Roteirizador Viário</h3>
+                        <p class="text-[11px] text-on-surface-variant font-medium">Protocolos Viários (<code class="bg-surface-container-high px-1 rounded">I</code>) Otimizados</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharPainelRoteirizacao()" class="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container-high transition-colors">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <!-- Configurações da Rota -->
+            <div class="space-y-3 bg-surface-container-lowest/80 p-3 rounded-lg border border-outline-variant/50">
+                <!-- Modo de Escopo -->
+                <div>
+                    <label class="text-[11px] font-bold text-on-surface-variant block mb-1.5 uppercase tracking-wider">Modo de Seleção:</label>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button type="button" id="btnEscopoAuto" onclick="setModoEscopoRota('auto')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm">
+                            <span>⚡ Automático</span>
+                        </button>
+                        <button type="button" id="btnEscopoRegiao" onclick="setModoEscopoRota('regiao')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary">
+                            <span>✏️ Por Região</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Ponto de Partida -->
+                <div>
+                    <label class="text-[11px] font-bold text-on-surface-variant block mb-1.5 uppercase tracking-wider">Ponto de Partida:</label>
+                    <div class="grid grid-cols-2 gap-1.5">
+                        <button type="button" id="btnInicioAncora" onclick="setModoInicioRota('ancora')" class="px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm">
+                            <span>🎯 OS Âncora</span>
+                        </button>
+                        <button type="button" id="btnInicioClique" onclick="setModoInicioRota('clique')" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary">
+                            <span>📍 Clique no Mapa</span>
+                        </button>
+                    </div>
+                    <p id="statusPontoInicioText" class="text-[10px] text-on-surface-variant/80 mt-1.5 italic leading-tight">Ponto 1: OS viária mais antiga / urgente (Automático)</p>
+                </div>
+
+                <!-- Qtd Máxima de OSs -->
+                <div id="containerMaxOSsRota">
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Limite de Atendimentos:</label>
+                        <span id="labelMaxOSsRotaVal" class="text-xs font-bold text-secondary">10 OSs</span>
+                    </div>
+                    <input type="range" id="inputMaxOSsRota" min="3" max="25" value="10" step="1" oninput="document.getElementById('labelMaxOSsRotaVal').innerText = this.value + ' OSs'" class="w-full accent-secondary cursor-pointer" />
+                </div>
+
+                <!-- Botão Desenhar Área (apenas se modo regiao) -->
+                <div id="containerBtnDesenharRegiao" class="hidden">
+                    <button type="button" id="btnDesenharRegiaoMap" onclick="alternarDesenhoRegiao()" class="w-full py-1.5 px-3 rounded-lg text-xs font-bold bg-amber-500/15 border border-amber-500/50 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">gesture</span>
+                        <span id="textBtnDesenharRegiao">Desenhar Área no Mapa</span>
+                    </button>
+                    <p id="infoRegiaoDesenhadatext" class="text-[10px] text-amber-700 dark:text-amber-400 mt-1 hidden font-medium">✓ Região delimitada no mapa</p>
+                </div>
+
+                <!-- Ação Principal de Gerar -->
+                <div class="pt-1 flex gap-2">
+                    <button type="button" onclick="calcularERenderizarRotaViaria()" class="flex-1 py-2 px-3 rounded-xl bg-secondary text-on-secondary font-bold text-xs shadow-md hover:bg-secondary-container transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">directions</span>
+                        <span>Gerar Rota Viária</span>
+                    </button>
+                    <button type="button" onclick="limparRotaViariaAtual()" class="py-2 px-2.5 rounded-xl border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 font-semibold text-xs transition-all cursor-pointer" title="Limpar Rota">
+                        <span class="material-symbols-outlined text-[16px]">cleaning_services</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Container de Resultados da Rota -->
+            <div id="containerResultadoRota" class="hidden space-y-3">
+                <div class="bg-secondary/5 border border-secondary/20 p-2.5 rounded-lg flex items-center justify-between text-xs">
+                    <div>
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-secondary block">Resumo do Percurso</span>
+                        <span id="resumenQtdePontosRota" class="font-bold text-on-surface">0 OSs Viárias</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-secondary block">Distância Est.</span>
+                        <span id="resumenDistanciaRota" class="font-bold text-on-surface">0 km</span>
+                    </div>
+                </div>
+
+                <!-- Botão Google Maps Direto -->
+                <a id="btnGoogleMapsRotaLink" href="#" target="_blank" class="w-full py-2.5 px-3 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white font-bold text-xs shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 text-center text-decoration-none">
+                    <span class="material-symbols-outlined text-[18px]">map</span>
+                    <span>📲 Abrir Rota no Google Maps</span>
+                </a>
+
+                <button type="button" onclick="copiarLinkGoogleMapsRota()" class="w-full py-1.5 px-3 rounded-lg border border-outline-variant text-on-surface-variant hover:text-secondary hover:border-secondary font-semibold text-[11px] transition-all flex items-center justify-center gap-1 cursor-pointer">
+                    <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                    <span id="btnCopiarLinkRotaText">Copiar Link do Google Maps</span>
+                </button>
+
+                <!-- Lista de Sequência da Rota -->
+                <div class="border-t border-outline-variant/60 pt-2">
+                    <h4 class="font-bold text-xs text-on-surface mb-2 flex items-center justify-between">
+                        <span>Sequência do Atendimento:</span>
+                        <span id="badgeAgingMaisAntigoRota" class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold"></span>
+                    </h4>
+                    <div id="listaSequenciaRotaContainer" class="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                        <!-- Itens inseridos dinamicamente -->
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -462,10 +633,16 @@
     var todosMarkersOSsAbertas = [];
     var dadosOSsAbertasCache = [];
     var filtroStatusAtual = 'abertas';
-    var diasHistoricoAtual = 0;
     var modoVisaoMapaAtual = 'pinos';
     var chamadosService = new window.ChamadosService();
     var currentUserRole = 'operador';
+
+    var filtroDataMapaState = {
+        tipo: 'ativas',
+        start: null,
+        end: null,
+        label: 'Somente Ativas'
+    };
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarMapaOSsAbertas();
@@ -474,6 +651,111 @@
     function filtrarOSsMapaDirect(val) {
         filtrarOSsMapa(val);
     }
+
+    function toggleDropdownFiltroDataMapa(event) {
+        if (event) event.stopPropagation();
+        const dropdown = document.getElementById('dropdownFiltroDataMapa');
+        const icon = document.getElementById('iconArrowFiltroDataMapa');
+        if (!dropdown) return;
+        const isHidden = dropdown.classList.contains('hidden');
+        if (isHidden) {
+            dropdown.classList.remove('hidden');
+            if (icon) icon.style.transform = 'rotate(180deg)';
+        } else {
+            dropdown.classList.add('hidden');
+            if (icon) icon.style.transform = 'rotate(0deg)';
+        }
+    }
+
+    function fecharDropdownFiltroDataMapa() {
+        const dropdown = document.getElementById('dropdownFiltroDataMapa');
+        const icon = document.getElementById('iconArrowFiltroDataMapa');
+        if (dropdown) dropdown.classList.add('hidden');
+        if (icon) icon.style.transform = 'rotate(0deg)';
+    }
+
+    function aplicarFiltroDataRapidoMapa(tipo) {
+        const labels = {
+            'ativas': 'Somente Ativas',
+            'hoje': 'Hoje',
+            'ontem': 'Ontem',
+            '7dias': 'Últimos 7 dias',
+            '30dias': 'Últimos 30 dias',
+            '90dias': 'Últimos 90 dias',
+            '365dias': 'Este Ano (365d)'
+        };
+
+        filtroDataMapaState.tipo = tipo;
+        filtroDataMapaState.start = null;
+        filtroDataMapaState.end = null;
+        filtroDataMapaState.label = labels[tipo] || 'Somente Ativas';
+
+        atualizarUIFiltroDataMapa();
+        fecharDropdownFiltroDataMapa();
+        aplicarFiltrosMapa();
+    }
+
+    function aplicarIntervaloPersonalizadoMapa() {
+        const startVal = document.getElementById('mapa-range-start')?.value;
+        const endVal = document.getElementById('mapa-range-end')?.value;
+
+        if (!startVal || !endVal) {
+            alert('Por favor, selecione as datas de início e fim.');
+            return;
+        }
+
+        if (new Date(startVal) > new Date(endVal)) {
+            alert('A data de início não pode ser maior que a data de fim.');
+            return;
+        }
+
+        const fmtStart = new Date(startVal + 'T00:00:00').toLocaleDateString('pt-BR');
+        const fmtEnd = new Date(endVal + 'T00:00:00').toLocaleDateString('pt-BR');
+
+        filtroDataMapaState.tipo = 'custom';
+        filtroDataMapaState.start = startVal;
+        filtroDataMapaState.end = endVal;
+        filtroDataMapaState.label = `${fmtStart} - ${fmtEnd}`;
+
+        atualizarUIFiltroDataMapa();
+        fecharDropdownFiltroDataMapa();
+        aplicarFiltrosMapa();
+    }
+
+    function limparFiltroDataMapa() {
+        filtroDataMapaState = { tipo: 'ativas', start: null, end: null, label: 'Somente Ativas' };
+        const inputStart = document.getElementById('mapa-range-start');
+        const inputEnd = document.getElementById('mapa-range-end');
+        if (inputStart) inputStart.value = '';
+        if (inputEnd) inputEnd.value = '';
+
+        atualizarUIFiltroDataMapa();
+        fecharDropdownFiltroDataMapa();
+        aplicarFiltrosMapa();
+    }
+
+    function atualizarUIFiltroDataMapa() {
+        const labelEl = document.getElementById('labelFiltroDataMapa');
+        const indicador = document.getElementById('indicadorFiltroDataMapa');
+
+        if (labelEl) labelEl.textContent = filtroDataMapaState.label;
+
+        if (indicador) {
+            if (filtroDataMapaState.tipo !== 'ativas') {
+                indicador.classList.remove('hidden');
+            } else {
+                indicador.classList.add('hidden');
+            }
+        }
+    }
+
+    document.addEventListener('click', (e) => {
+        const dropdown = document.getElementById('dropdownFiltroDataMapa');
+        const btn = document.getElementById('btnFiltroDataMapa');
+        if (dropdown && !dropdown.contains(e.target) && !btn?.contains(e.target)) {
+            fecharDropdownFiltroDataMapa();
+        }
+    });
 
     function alterarFiltroStatus(status) {
         filtroStatusAtual = status;
@@ -490,31 +772,38 @@
             }
         });
 
-        const selTempo = document.getElementById('selectJanelaTempo');
-        if (status !== 'abertas' && diasHistoricoAtual === 0) {
-            diasHistoricoAtual = 30;
-            if (selTempo) selTempo.value = "30";
+        if (status !== 'abertas' && filtroDataMapaState.tipo === 'ativas') {
+            aplicarFiltroDataRapidoMapa('30dias');
+        } else {
+            aplicarFiltrosMapa();
         }
+    }
 
+    function aplicarFiltrosMapa() {
         if (dadosOSsAbertasCache && dadosOSsAbertasCache.length > 0) {
             const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+            const globalInput = document.getElementById('global-search-input');
+            const termo = globalInput ? globalInput.value.toLowerCase().trim() : '';
+
+            let listaFinal = filtradas;
+            if (termo) {
+                listaFinal = filtradas.filter(os => {
+                    const emProt = String(os.protocolo || "").toLowerCase().includes(termo);
+                    const emMun = String(os.municipe || "").toLowerCase().includes(termo);
+                    const emPlaq = os.pontos && os.pontos.some(p => String(p.plaqueta || "").toLowerCase().includes(termo));
+                    const emEnd = os.pontos && os.pontos.some(p => String(p.endereco || "").toLowerCase().includes(termo));
+                    const emProb = os.pontos && os.pontos.some(p => String(p.problema || "").toLowerCase().includes(termo));
+                    return emProt || emMun || emPlaq || emEnd || emProb;
+                });
+            }
+
             const stat = document.getElementById('statMapaOSsAbertas');
-            if (stat) stat.innerHTML = `Exibindo ${filtradas.length} OSs (${status.toUpperCase()})`;
-            renderizarMapaOSs(filtradas);
+            if (stat) stat.innerHTML = `Exibindo ${listaFinal.length} OSs (${filtroStatusAtual.toUpperCase()})`;
+            renderizarMapaOSs(listaFinal);
         } else {
             carregarMapaOSsAbertas();
         }
     }
-
-    function alterarJanelaTempo() {
-        const selTempo = document.getElementById('selectJanelaTempo');
-        if (selTempo) {
-            diasHistoricoAtual = parseInt(selTempo.value, 10) || 0;
-        }
-        carregarMapaOSsAbertas();
-    }
-
-
 
     async function carregarMapaOSsAbertas() {
         if (window.AuthGuard) {
@@ -542,9 +831,7 @@
             // Converte as entidades ChamadoModel para a estrutura de renderização do mapa
             dadosOSsAbertasCache = converterChamadosModelParaMapa(chamadosList || []);
 
-            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
-            if (stat) stat.innerHTML = `Exibindo ${filtradas.length} OSs (${filtroStatusAtual.toUpperCase()})`;
-            renderizarMapaOSs(filtradas);
+            aplicarFiltrosMapa();
         } catch (err) {
             console.warn("⚠️ Erro ao carregar OSs para o mapa via Supabase:", err);
             if (stat) stat.innerHTML = '<span class="text-error">Erro ao carregar dados do Supabase.</span>';
@@ -614,9 +901,34 @@
         });
     }
 
+    function obterDataObjetoOS(os) {
+        if (os.dataObjeto && os.dataObjeto instanceof Date && !isNaN(os.dataObjeto.getTime())) {
+            return os.dataObjeto;
+        }
+        if (os.data) {
+            const partes = os.data.toString().trim().split('/');
+            if (partes.length === 3) {
+                const dia = parseInt(partes[0], 10);
+                const mes = parseInt(partes[1], 10) - 1;
+                const ano = parseInt(partes[2], 10);
+                const d = new Date(ano, mes, dia);
+                if (!isNaN(d.getTime())) return d;
+            }
+        }
+        return null;
+    }
+
     function obterListaFiltradaPorStatus(lista, statusFiltro) {
         if (!lista) return [];
+
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+
+        const hojeFim = new Date(hoje);
+        hojeFim.setHours(23, 59, 59, 999);
+
         return lista.filter(os => {
+            // 1. Filtro de Status
             const st = (os.status || "Aberta").toLowerCase();
             const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad");
             const isCanc = st.includes("cancel");
@@ -626,10 +938,48 @@
                 return false;
             }
 
-            if (statusFiltro === 'abertas') return isAberta;
-            if (statusFiltro === 'resolvidas') return isResolv;
-            if (statusFiltro === 'canceladas') return isCanc;
-            return true; // 'todas'
+            if (statusFiltro === 'abertas' && !isAberta) return false;
+            if (statusFiltro === 'resolvidas' && !isResolv) return false;
+            if (statusFiltro === 'canceladas' && !isCanc) return false;
+
+            // 2. Filtro de Data / Período
+            const dataOS = obterDataObjetoOS(os);
+            if (filtroDataMapaState.tipo !== 'ativas') {
+                if (!dataOS) return false;
+
+                const dataZero = new Date(dataOS);
+                dataZero.setHours(0, 0, 0, 0);
+
+                if (filtroDataMapaState.tipo === 'hoje') {
+                    if (dataZero.getTime() !== hoje.getTime()) return false;
+                } else if (filtroDataMapaState.tipo === 'ontem') {
+                    const ontem = new Date(hoje);
+                    ontem.setDate(hoje.getDate() - 1);
+                    if (dataZero.getTime() !== ontem.getTime()) return false;
+                } else if (filtroDataMapaState.tipo === '7dias') {
+                    const limite = new Date(hoje);
+                    limite.setDate(hoje.getDate() - 7);
+                    if (dataOS < limite || dataOS > hojeFim) return false;
+                } else if (filtroDataMapaState.tipo === '30dias') {
+                    const limite = new Date(hoje);
+                    limite.setDate(hoje.getDate() - 30);
+                    if (dataOS < limite || dataOS > hojeFim) return false;
+                } else if (filtroDataMapaState.tipo === '90dias') {
+                    const limite = new Date(hoje);
+                    limite.setDate(hoje.getDate() - 90);
+                    if (dataOS < limite || dataOS > hojeFim) return false;
+                } else if (filtroDataMapaState.tipo === '365dias') {
+                    const limite = new Date(hoje);
+                    limite.setDate(hoje.getDate() - 365);
+                    if (dataOS < limite || dataOS > hojeFim) return false;
+                } else if (filtroDataMapaState.tipo === 'custom' && filtroDataMapaState.start && filtroDataMapaState.end) {
+                    const startDt = new Date(filtroDataMapaState.start + 'T00:00:00');
+                    const endDt = new Date(filtroDataMapaState.end + 'T23:59:59');
+                    if (dataOS < startDt || dataOS > endDt) return false;
+                }
+            }
+
+            return true;
         });
     }
 
@@ -934,26 +1284,7 @@
     }
 
     function filtrarOSsMapa(termoManual) {
-        const globalInput = document.getElementById('global-search-input');
-        let raw = termoManual !== undefined ? termoManual : (globalInput ? globalInput.value : "");
-        const termo = String(raw).toLowerCase().trim();
-        if (!termo) {
-            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
-            renderizarMapaOSs(filtradas);
-            return;
-        }
-
-        const baseLista = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
-        const filtrados = baseLista.filter(os => {
-            const emProt = String(os.protocolo || "").toLowerCase().includes(termo);
-            const emMun = String(os.municipe || "").toLowerCase().includes(termo);
-            const emPlaq = os.pontos && os.pontos.some(p => String(p.plaqueta || "").toLowerCase().includes(termo));
-            const emEnd = os.pontos && os.pontos.some(p => String(p.endereco || "").toLowerCase().includes(termo));
-            const emProb = os.pontos && os.pontos.some(p => String(p.problema || "").toLowerCase().includes(termo));
-            return emProt || emMun || emPlaq || emEnd || emProb;
-        });
-
-        renderizarMapaOSs(filtrados);
+        aplicarFiltrosMapa();
     }
 
     function calcularDistancia(lat1, lon1, lat2, lon2) {
@@ -1466,6 +1797,632 @@
             if (e.key === 'ArrowRight') navegarGaleriaFotos(1);
         }
     });
+
+    // =========================================================================
+    // MÓDULO DE ROTEIRIZAÇÃO VIÁRIA INTELIGENTE (GOOGLE MAPS MULTI-WAYPOINT)
+    // =========================================================================
+    var modoEscopoRota = 'auto'; // 'auto' ou 'regiao'
+    var modoInicioRota = 'ancora'; // 'ancora' ou 'clique'
+    var pontoInicioCliqueCoord = null;
+    var markerPontoInicioClique = null;
+    var desenhoRegiaoState = {
+        ativo: false,
+        pontos: [],
+        markersVertices: []
+    };
+    var rotaViariaAtual = null;
+    var markersRotaViaria = [];
+
+    function togglePainelRoteirizacao() {
+        const painel = document.getElementById('painelRoteirizacaoOS');
+        const painelLat = document.getElementById('painelLateralOS');
+        const btn = document.getElementById('btnModoRoteirizacao');
+
+        if (!painel) return;
+
+        const isHidden = painel.classList.contains('hidden');
+        if (isHidden) {
+            painel.classList.remove('hidden');
+            if (painelLat) painelLat.style.display = 'none';
+            if (btn) {
+                btn.className = "px-2.5 py-1 text-xs rounded-lg font-bold border border-secondary bg-secondary text-white transition-all flex items-center gap-1 active:scale-95 shadow-md";
+            }
+        } else {
+            fecharPainelRoteirizacao();
+        }
+    }
+
+    function fecharPainelRoteirizacao() {
+        const painel = document.getElementById('painelRoteirizacaoOS');
+        const btn = document.getElementById('btnModoRoteirizacao');
+        if (painel) painel.classList.add('hidden');
+        if (btn) {
+            btn.className = "px-2.5 py-1 text-xs rounded-lg font-bold border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary hover:border-secondary transition-all flex items-center gap-1 active:scale-95";
+        }
+        if (desenhoRegiaoState.ativo) {
+            desativarModoDesenhoRegiao();
+        }
+    }
+
+    function setModoEscopoRota(modo) {
+        modoEscopoRota = modo;
+        const btnAuto = document.getElementById('btnEscopoAuto');
+        const btnRegiao = document.getElementById('btnEscopoRegiao');
+        const containerMax = document.getElementById('containerMaxOSsRota');
+        const containerBtnRegiao = document.getElementById('containerBtnDesenharRegiao');
+
+        if (modo === 'auto') {
+            if (btnAuto) btnAuto.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
+            if (btnRegiao) btnRegiao.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+            if (containerMax) containerMax.classList.remove('hidden');
+            if (containerBtnRegiao) containerBtnRegiao.classList.add('hidden');
+            if (desenhoRegiaoState.ativo) desativarModoDesenhoRegiao();
+        } else {
+            if (btnRegiao) btnRegiao.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
+            if (btnAuto) btnAuto.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+            if (containerMax) containerMax.classList.add('hidden');
+            if (containerBtnRegiao) containerBtnRegiao.classList.remove('hidden');
+        }
+    }
+
+    function setModoInicioRota(modo) {
+        modoInicioRota = modo;
+        const btnAncora = document.getElementById('btnInicioAncora');
+        const btnClique = document.getElementById('btnInicioClique');
+        const statusText = document.getElementById('statusPontoInicioText');
+
+        if (modo === 'ancora') {
+            if (btnAncora) btnAncora.className = "px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
+            if (btnClique) btnClique.className = "px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+            if (statusText) statusText.innerText = "Ponto 1: OS viária mais antiga / urgente (Automático)";
+            
+            if (mapOSsInstance) {
+                mapOSsInstance.getCanvas().style.cursor = '';
+                mapOSsInstance.off('click', handleCliqueDefinirInicioRota);
+            }
+            if (markerPontoInicioClique) {
+                markerPontoInicioClique.remove();
+                markerPontoInicioClique = null;
+            }
+            pontoInicioCliqueCoord = null;
+        } else {
+            if (btnClique) btnClique.className = "px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
+            if (btnAncora) btnAncora.className = "px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+            if (statusText) statusText.innerText = pontoInicioCliqueCoord ? "✓ Ponto 1 definido no mapa" : "💡 Clique em qualquer rua no mapa para marcar a saída";
+
+            if (mapOSsInstance) {
+                mapOSsInstance.getCanvas().style.cursor = 'crosshair';
+                mapOSsInstance.off('click', handleCliqueDefinirInicioRota);
+                mapOSsInstance.once('click', handleCliqueDefinirInicioRota);
+            }
+        }
+    }
+
+    function handleCliqueDefinirInicioRota(e) {
+        if (modoInicioRota !== 'clique') return;
+        
+        pontoInicioCliqueCoord = { lat: e.lngLat.lat, lng: e.lngLat.lng };
+        
+        if (mapOSsInstance) {
+            mapOSsInstance.getCanvas().style.cursor = '';
+        }
+
+        if (markerPontoInicioClique) markerPontoInicioClique.remove();
+
+        const elMarker = document.createElement('div');
+        elMarker.className = "w-8 h-8 rounded-full bg-emerald-600 border-2 border-white text-white font-bold flex items-center justify-center text-xs shadow-xl animate-bounce";
+        elMarker.innerHTML = "🚀";
+
+        markerPontoInicioClique = new mapboxgl.Marker({ element: elMarker })
+            .setLngLat([e.lngLat.lng, e.lngLat.lat])
+            .addTo(mapOSsInstance);
+
+        const statusText = document.getElementById('statusPontoInicioText');
+        if (statusText) {
+            statusText.innerText = `✓ Saída em: (${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)})`;
+        }
+    }
+
+    function alternarDesenhoRegiao() {
+        if (desenhoRegiaoState.ativo) {
+            desativarModoDesenhoRegiao();
+        } else {
+            ativarModoDesenhoRegiao();
+        }
+    }
+
+    function ativarModoDesenhoRegiao() {
+        desenhoRegiaoState.ativo = true;
+        desenhoRegiaoState.pontos = [];
+        limparMarkersDesenhoRegiao();
+        
+        const btnText = document.getElementById('textBtnDesenharRegiao');
+        if (btnText) btnText.innerText = "Clique no Mapa (Duplo Clique p/ Fechar)";
+
+        if (mapOSsInstance) {
+            mapOSsInstance.getCanvas().style.cursor = 'crosshair';
+            mapOSsInstance.on('click', handleCliqueDesenhoRegiao);
+            mapOSsInstance.on('dblclick', handleDblClickFinalizarRegiao);
+        }
+    }
+
+    function handleCliqueDesenhoRegiao(e) {
+        if (!desenhoRegiaoState.ativo) return;
+        
+        const pt = [e.lngLat.lng, e.lngLat.lat];
+        desenhoRegiaoState.pontos.push(pt);
+
+        const elV = document.createElement('div');
+        elV.className = "w-3 h-3 bg-amber-500 border border-white rounded-full shadow-md";
+        const m = new mapboxgl.Marker({ element: elV }).setLngLat(pt).addTo(mapOSsInstance);
+        desenhoRegiaoState.markersVertices.push(m);
+
+        atualizarCamadaPoligonoRegiao();
+    }
+
+    function handleDblClickFinalizarRegiao(e) {
+        if (!desenhoRegiaoState.ativo) return;
+        if (e) e.preventDefault();
+        
+        if (desenhoRegiaoState.pontos.length >= 3) {
+            const first = desenhoRegiaoState.pontos[0];
+            const last = desenhoRegiaoState.pontos[desenhoRegiaoState.pontos.length - 1];
+            if (first[0] !== last[0] || first[1] !== last[1]) {
+                desenhoRegiaoState.pontos.push([...first]);
+            }
+            atualizarCamadaPoligonoRegiao();
+
+            const infoText = document.getElementById('infoRegiaoDesenhadatext');
+            if (infoText) {
+                infoText.classList.remove('hidden');
+                infoText.innerText = `✓ Região delimitada (${desenhoRegiaoState.pontos.length - 1} vértices)`;
+            }
+        }
+        desativarModoDesenhoRegiao();
+    }
+
+    function atualizarCamadaPoligonoRegiao() {
+        if (!mapOSsInstance) return;
+        const pts = desenhoRegiaoState.pontos;
+        if (pts.length === 0) return;
+
+        const coords = pts.length > 2 ? [pts] : [[...pts, pts[0]]];
+        const geojson = {
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: coords
+            }
+        };
+
+        if (mapOSsInstance.getSource('regiao-desenhada-source')) {
+            mapOSsInstance.getSource('regiao-desenhada-source').setData(geojson);
+        } else {
+            mapOSsInstance.addSource('regiao-desenhada-source', { type: 'geojson', data: geojson });
+            mapOSsInstance.addLayer({
+                id: 'regiao-desenhada-fill',
+                type: 'fill',
+                source: 'regiao-desenhada-source',
+                paint: {
+                    'fill-color': '#f59e0b',
+                    'fill-opacity': 0.18
+                }
+            });
+            mapOSsInstance.addLayer({
+                id: 'regiao-desenhada-outline',
+                type: 'line',
+                source: 'regiao-desenhada-source',
+                paint: {
+                    'line-color': '#d97706',
+                    'line-width': 2.5,
+                    'line-dasharray': [2, 1]
+                }
+            });
+        }
+    }
+
+    function desativarModoDesenhoRegiao() {
+        desenhoRegiaoState.ativo = false;
+        const btnText = document.getElementById('textBtnDesenharRegiao');
+        if (btnText) btnText.innerText = "Redesenhar Área no Mapa";
+
+        if (mapOSsInstance) {
+            mapOSsInstance.getCanvas().style.cursor = '';
+            mapOSsInstance.off('click', handleCliqueDesenhoRegiao);
+            mapOSsInstance.off('dblclick', handleDblClickFinalizarRegiao);
+        }
+    }
+
+    function limparMarkersDesenhoRegiao() {
+        if (desenhoRegiaoState.markersVertices) {
+            desenhoRegiaoState.markersVertices.forEach(m => m.remove());
+        }
+        desenhoRegiaoState.markersVertices = [];
+        if (mapOSsInstance) {
+            if (mapOSsInstance.getLayer('regiao-desenhada-fill')) mapOSsInstance.removeLayer('regiao-desenhada-fill');
+            if (mapOSsInstance.getLayer('regiao-desenhada-outline')) mapOSsInstance.removeLayer('regiao-desenhada-outline');
+            if (mapOSsInstance.getSource('regiao-desenhada-source')) mapOSsInstance.removeSource('regiao-desenhada-source');
+        }
+        const infoText = document.getElementById('infoRegiaoDesenhadatext');
+        if (infoText) infoText.classList.add('hidden');
+    }
+
+    function isPointInPolygon(point, vs) {
+        var x = point[0], y = point[1];
+        var inside = false;
+        for (var i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+            var xi = vs[i][0], yi = vs[i][1];
+            var xj = vs[j][0], yj = vs[j][1];
+            var intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+            if (intersect) inside = !inside;
+        }
+        return inside;
+    }
+
+    function isViarioProtocol(os) {
+        if (!os) return false;
+        const prot = String(os.protocolo || "").trim().toUpperCase();
+        if (prot.startsWith('P')) return false;
+        if (os.tipoOs) {
+            const t = String(os.tipoOs).toLowerCase();
+            if (t.includes('praça') || t.includes('praca')) return false;
+        }
+        return true;
+    }
+
+    function calcularDistanciaKm(lat1, lon1, lat2, lon2) {
+        const R = 6371;
+        const dLat = (lat2 - lat1) * Math.PI / 180;
+        const dLon = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    async function calcularERenderizarRotaViaria() {
+        if (!dadosOSsAbertasCache || dadosOSsAbertasCache.length === 0) {
+            alert("Nenhuma Ordem de Serviço disponível para roteirização.");
+            return;
+        }
+
+        const osAbertas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, 'abertas');
+        let candidatosViarios = [];
+
+        osAbertas.forEach(os => {
+            if (!isViarioProtocol(os)) return;
+
+            if (os.pontos && Array.isArray(os.pontos)) {
+                os.pontos.forEach(pt => {
+                    const lat = parseFloat(pt.lat);
+                    const lng = parseFloat(pt.lng);
+                    if (!isNaN(lat) && !isNaN(lng)) {
+                        const dias = calcularDiasEmAberto(os.data);
+                        candidatosViarios.push({
+                            os: os,
+                            pt: pt,
+                            lat: lat,
+                            lng: lng,
+                            diasEmAberto: dias,
+                            prioridade: os.prioridade || 'Normal',
+                            scoreCriticidade: (dias * 2) + (os.prioridade === 'Urgente' ? 15 : 0)
+                        });
+                    }
+                });
+            }
+        });
+
+        if (candidatosViarios.length === 0) {
+            alert("Nenhum protocolo viário em aberto foi localizado no filtro atual.");
+            return;
+        }
+
+        if (modoEscopoRota === 'regiao') {
+            if (!desenhoRegiaoState.pontos || desenhoRegiaoState.pontos.length < 3) {
+                alert("Por favor, desenhe a área no mapa (mínimo 3 pontos) antes de gerar a rota por região.");
+                return;
+            }
+            candidatosViarios = candidatosViarios.filter(item => {
+                return isPointInPolygon([item.lng, item.lat], desenhoRegiaoState.pontos);
+            });
+
+            if (candidatosViarios.length === 0) {
+                alert("Nenhum protocolo viário foi encontrado dentro da área delimitada.");
+                return;
+            }
+        }
+
+        const inputMax = document.getElementById('inputMaxOSsRota');
+        const maxOSs = modoEscopoRota === 'auto' ? (parseInt(inputMax?.value, 10) || 10) : candidatosViarios.length;
+
+        const sequenciaRota = [];
+        let pool = [...candidatosViarios];
+        let currentPos = null;
+
+        if (modoInicioRota === 'clique' && pontoInicioCliqueCoord) {
+            currentPos = { lat: pontoInicioCliqueCoord.lat, lng: pontoInicioCliqueCoord.lng };
+        } else {
+            pool.sort((a, b) => b.scoreCriticidade - a.scoreCriticidade);
+            const ancora = pool.shift();
+            sequenciaRota.push(ancora);
+            currentPos = { lat: ancora.lat, lng: ancora.lng };
+        }
+
+        while (pool.length > 0 && sequenciaRota.length < maxOSs) {
+            let idxMaisProximo = -1;
+            let menorDistancia = Infinity;
+
+            for (let i = 0; i < pool.length; i++) {
+                const dist = calcularDistanciaKm(currentPos.lat, currentPos.lng, pool[i].lat, pool[i].lng);
+                if (dist < menorDistancia) {
+                    menorDistancia = dist;
+                    idxMaisProximo = i;
+                }
+            }
+
+            if (idxMaisProximo !== -1) {
+                const proximo = pool.splice(idxMaisProximo, 1)[0];
+                sequenciaRota.push(proximo);
+                currentPos = { lat: proximo.lat, lng: proximo.lng };
+            } else {
+                break;
+            }
+        }
+
+        if (sequenciaRota.length === 0) {
+            alert("Não foi possível gerar uma sequência válida para a rota.");
+            return;
+        }
+
+        let distanciaTotalKm = 0;
+        for (let i = 0; i < sequenciaRota.length - 1; i++) {
+            distanciaTotalKm += calcularDistanciaKm(sequenciaRota[i].lat, sequenciaRota[i].lng, sequenciaRota[i+1].lat, sequenciaRota[i+1].lng);
+        }
+
+        let routeGeometry = null;
+
+        // Busca o traçado real pelas vias e ruas da cidade via Mapbox Directions API
+        try {
+            const coordsString = sequenciaRota.map(p => `${p.lng},${p.lat}`).join(';');
+            const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+            const resp = await fetch(directionsUrl);
+            const data = await resp.json();
+
+            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                const route = data.routes[0];
+                routeGeometry = route.geometry;
+                if (route.distance) {
+                    distanciaTotalKm = route.distance / 1000;
+                }
+            }
+        } catch (err) {
+            console.warn("⚠️ Erro ao consultar Mapbox Directions API, utilizando traçado retilíneo de fallback:", err);
+        }
+
+        const googleMapsUrl = construirUrlGoogleMapsRota(sequenciaRota);
+
+        rotaViariaAtual = {
+            sequencia: sequenciaRota,
+            distanciaTotalKm: distanciaTotalKm,
+            googleMapsUrl: googleMapsUrl,
+            geometry: routeGeometry
+        };
+
+        renderizarRotaNoMapa(rotaViariaAtual);
+        exibirPainelResultadosRota(rotaViariaAtual);
+    }
+
+    function construirUrlGoogleMapsRota(sequencia) {
+        if (!sequencia || sequencia.length === 0) return '#';
+        
+        const p1 = sequencia[0];
+        const origin = `${p1.lat},${p1.lng}`;
+
+        const pN = sequencia[sequencia.length - 1];
+        const destination = `${pN.lat},${pN.lng}`;
+
+        let waypointsStr = '';
+        if (sequencia.length > 2) {
+            const intermediarios = sequencia.slice(1, sequencia.length - 1);
+            waypointsStr = intermediarios.map(p => `${p.lat},${p.lng}`).join('|');
+        }
+
+        let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+        if (waypointsStr) {
+            url += `&waypoints=${encodeURIComponent(waypointsStr)}`;
+        }
+        url += `&travelmode=driving`;
+        return url;
+    }
+
+    function renderizarRotaNoMapa(rota) {
+        if (!mapOSsInstance || !rota || !rota.sequencia) return;
+
+        limparCamadasERotasDoMapa();
+
+        let featureGeometry = null;
+        if (rota.geometry) {
+            featureGeometry = rota.geometry;
+        } else {
+            const coordsGeoJSON = rota.sequencia.map(p => [p.lng, p.lat]);
+            featureGeometry = {
+                type: 'LineString',
+                coordinates: coordsGeoJSON
+            };
+        }
+
+        const featureRota = {
+            type: 'Feature',
+            geometry: featureGeometry
+        };
+
+        mapOSsInstance.addSource('rota-viaria-source', {
+            type: 'geojson',
+            data: featureRota
+        });
+
+        // Sombra / Halo da Linha de Rota
+        mapOSsInstance.addLayer({
+            id: 'rota-viaria-casing',
+            type: 'line',
+            source: 'rota-viaria-source',
+            paint: {
+                'line-color': '#0b1c30',
+                'line-width': 7,
+                'line-opacity': 0.4
+            }
+        });
+
+        // Linha Principal de Navegação (Traçado Real de Ruas)
+        mapOSsInstance.addLayer({
+            id: 'rota-viaria-line',
+            type: 'line',
+            source: 'rota-viaria-source',
+            paint: {
+                'line-color': '#0051d5',
+                'line-width': 5,
+                'line-opacity': 0.95
+            }
+        });
+
+        const bounds = new mapboxgl.LngLatBounds();
+        rota.sequencia.forEach((pt, idx) => {
+            const stepNum = idx + 1;
+            const isFirst = idx === 0;
+
+            const el = document.createElement('div');
+            el.className = `marker-rota-step-badge ${isFirst ? 'marker-rota-inicio-badge' : ''}`;
+            el.innerHTML = isFirst ? '🚀' : stepNum;
+            el.title = `Passo ${stepNum}: OS #${pt.os.protocolo} - ${pt.pt.endereco}`;
+            
+            el.onclick = (e) => {
+                e.stopPropagation();
+                mapOSsInstance.flyTo({ center: [pt.lng, pt.lat], zoom: 16 });
+                if (window.exibirDetalhesOSCardByProt) {
+                    exibirDetalhesOSCardByProt(pt.os.protocolo);
+                }
+            };
+
+            const marker = new mapboxgl.Marker({ element: el })
+                .setLngLat([pt.lng, pt.lat])
+                .addTo(mapOSsInstance);
+
+            markersRotaViaria.push(marker);
+            bounds.extend([pt.lng, pt.lat]);
+        });
+
+        if (!bounds.isEmpty()) {
+            mapOSsInstance.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+        }
+    }
+
+    function exibirPainelResultadosRota(rota) {
+        const container = document.getElementById('containerResultadoRota');
+        const elQtde = document.getElementById('resumenQtdePontosRota');
+        const elDist = document.getElementById('resumenDistanciaRota');
+        const elLinkGmaps = document.getElementById('btnGoogleMapsRotaLink');
+        const listContainer = document.getElementById('listaSequenciaRotaContainer');
+        const badgeAging = document.getElementById('badgeAgingMaisAntigoRota');
+
+        if (!container) return;
+
+        if (elQtde) elQtde.innerText = `${rota.sequencia.length} Ordens Viárias`;
+        if (elDist) elDist.innerText = `~ ${rota.distanciaTotalKm.toFixed(1)} km`;
+        if (elLinkGmaps) elLinkGmaps.href = rota.googleMapsUrl;
+
+        let maiorDias = 0;
+        rota.sequencia.forEach(p => {
+            if (p.diasEmAberto > maiorDias) maiorDias = p.diasEmAberto;
+        });
+        if (badgeAging) {
+            badgeAging.innerText = maiorDias > 0 ? `OS mais antiga: ${maiorDias}d` : 'OSs recentes';
+        }
+
+        if (listContainer) {
+            listContainer.innerHTML = '';
+            rota.sequencia.forEach((p, idx) => {
+                const stepNum = idx + 1;
+                const isFirst = idx === 0;
+                
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "bg-surface-container-lowest border border-outline-variant/60 hover:border-secondary p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all hover:bg-secondary/5";
+                itemDiv.onclick = () => {
+                    if (mapOSsInstance) {
+                        mapOSsInstance.flyTo({ center: [p.lng, p.lat], zoom: 16 });
+                    }
+                    if (window.exibirDetalhesOSCardByProt) {
+                        exibirDetalhesOSCardByProt(p.os.protocolo);
+                    }
+                };
+
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <span class="w-5 h-5 rounded-full ${isFirst ? 'bg-emerald-600' : 'bg-secondary'} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                            ${isFirst ? '1' : stepNum}
+                        </span>
+                        <div class="truncate">
+                            <div class="flex items-center gap-1">
+                                <span class="font-bold text-on-surface text-xs">#${p.os.protocolo}</span>
+                                ${p.prioridade === 'Urgente' ? '<span class="text-error font-bold text-[10px]">⚡</span>' : ''}
+                                <span class="text-[10px] px-1.5 py-0.2 rounded ${p.diasEmAberto > 7 ? 'bg-error/15 text-error font-bold' : (p.diasEmAberto > 3 ? 'bg-amber-500/15 text-amber-700 font-bold' : 'bg-emerald-500/15 text-emerald-700 font-bold')}">${p.diasEmAberto}d</span>
+                            </div>
+                            <p class="text-[10px] text-on-surface-variant truncate">${p.pt.endereco || 'Araraquara, SP'}</p>
+                        </div>
+                    </div>
+                    <span class="material-symbols-outlined text-[14px] text-on-surface-variant/60">my_location</span>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        container.classList.remove('hidden');
+    }
+
+    function copiarLinkGoogleMapsRota() {
+        if (!rotaViariaAtual || !rotaViariaAtual.googleMapsUrl) return;
+
+        navigator.clipboard.writeText(rotaViariaAtual.googleMapsUrl).then(() => {
+            const btnText = document.getElementById('btnCopiarLinkRotaText');
+            if (btnText) {
+                const orig = btnText.innerText;
+                btnText.innerText = "✓ Link Copiado!";
+                setTimeout(() => { btnText.innerText = orig; }, 2500);
+            }
+        }).catch(err => {
+            alert("Link da rota: " + rotaViariaAtual.googleMapsUrl);
+        });
+    }
+
+    function limparRotaViariaAtual() {
+        rotaViariaAtual = null;
+        limparCamadasERotasDoMapa();
+        limparMarkersDesenhoRegiao();
+
+        const container = document.getElementById('containerResultadoRota');
+        if (container) container.classList.add('hidden');
+
+        if (pontoInicioCliqueCoord && markerPontoInicioClique) {
+            markerPontoInicioClique.remove();
+            markerPontoInicioClique = null;
+            pontoInicioCliqueCoord = null;
+        }
+
+        aplicarFiltrosMapa();
+    }
+
+    function limparCamadasERotasDoMapa() {
+        if (markersRotaViaria) {
+            markersRotaViaria.forEach(m => m.remove());
+        }
+        markersRotaViaria = [];
+
+        if (mapOSsInstance) {
+            if (mapOSsInstance.getLayer('rota-viaria-line')) mapOSsInstance.removeLayer('rota-viaria-line');
+            if (mapOSsInstance.getLayer('rota-viaria-casing')) mapOSsInstance.removeLayer('rota-viaria-casing');
+            if (mapOSsInstance.getSource('rota-viaria-source')) mapOSsInstance.removeSource('rota-viaria-source');
+        }
+    }
 </script>
 
 </body>

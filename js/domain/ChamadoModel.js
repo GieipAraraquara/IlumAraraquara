@@ -50,9 +50,10 @@ class ChamadoModel {
             coordRep = data.pontos[0].coordenada || (data.pontos[0].lat && data.pontos[0].lng ? `${data.pontos[0].lat}, ${data.pontos[0].lng}` : '');
         }
         this.coordenadaReparo = coordRep;
-        this.observacaoInicial = data.observacao_inicial || '';
+        this.descricao = data.descricao || data.observacao || data.observacoes || data.obs || '';
+        this.observacaoInicial = data.observacao_inicial || data.observacao || data.observacoes || data.descricao || data.obs || '';
         this.dataConclusao = data.data_conclusao || data.data_fechamento ? new Date(data.data_conclusao || data.data_fechamento) : null;
-        this.observacaoFinal = data.observacao_final || data.descricao || '';
+        this.observacaoFinal = data.observacao_final || data.observacao_conclusao || data.justificativa || '';
         this.anexoPlaquetaDivergente = data.anexo_plaqueta_divergente === true || data.anexo_plaqueta_divergente === 'true';
         this.anexoFaltante = data.anexo_faltante === true || data.anexo_faltante === 'true';
         this.materialUtilizado = data.material_utilizado || data.materiais || '';
@@ -61,7 +62,189 @@ class ChamadoModel {
         this.audit = data.audit || null;
         this.cpfSolicitante = data.cpf_solicitante || data.user_cpf || '';
         this.evidencias = data.evidencias || null;
+        this.tipoOs = data.tipo_os || (data.praca_nome ? 'Praça' : (data.protocolo && String(data.protocolo).toUpperCase().startsWith('P') ? 'Praça' : 'Viária'));
+        this.pracaNome = data.praca_nome || '';
         this.fotoEntrada = data.foto_entrada || null;
+        this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
+        this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
+        this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
+    }
+
+    /**
+     * Retorna se a OS é de Praça Pública (por protocolo 'P...', tipo_os 'Praça', nome de praça, foto de entrada ou sessões ativas)
+     */
+    get isPraca() {
+        // 1. Verificação primária pelo protocolo ('P' = Praça, 'I' = Viário)
+        const prot = (this.protocolo || '').trim().toUpperCase();
+        if (prot.startsWith('P')) return true;
+        if (prot.startsWith('I')) return false;
+
+        // 2. Verificação pelo campo tipo_os (da view vw_todas_ordens_servico)
+        if (this.tipoOs) {
+            const t = String(this.tipoOs).trim().toLowerCase();
+            if (t.includes('praça') || t.includes('praca')) return true;
+            if (t.includes('viária') || t.includes('viaria')) return false;
+        }
+
+        // 3. Verificação por nome de praça
+        if (this.pracaNome && String(this.pracaNome).trim().length > 0) return true;
+
+        // 4. Verificação por foto de entrada da praça
+        if (this.fotoEntrada && String(this.fotoEntrada).trim().length > 0) return true;
+
+        // 5. Verificação por histórico de sessões (array não vazio ou JSON válido)
+        if (this.historicoSessoes) {
+            if (Array.isArray(this.historicoSessoes) && this.historicoSessoes.length > 0) return true;
+            if (typeof this.historicoSessoes === 'string') {
+                const trimmed = this.historicoSessoes.trim();
+                if (trimmed !== '' && trimmed !== '[]' && trimmed !== '{}' && trimmed !== 'null') return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Retorna a lista detalhada de sessões de trabalho emparelhadas (com início, fim, duração e fotos)
+     */
+    get sessoesList() {
+        let rawList = null;
+        if (this.historicoSessoes) {
+            rawList = this.historicoSessoes;
+            if (typeof rawList === 'string') {
+                try { rawList = JSON.parse(rawList); } catch(e) {}
+            }
+            if (typeof rawList === 'object' && rawList !== null && !Array.isArray(rawList)) {
+                try { rawList = Object.values(rawList); } catch(e) {}
+            }
+        }
+
+        if (Array.isArray(rawList) && rawList.length > 0) {
+            return rawList.map((s, idx) => {
+                const st = (s.status || '').toUpperCase();
+                const inc = s.inicio ? new Date(s.inicio) : null;
+                const fm = s.fim ? new Date(s.fim) : null;
+                
+                let dur = s.duracao_minutos;
+                if ((dur === null || dur === undefined || isNaN(dur)) && inc && fm) {
+                    dur = Math.max(1, Math.round((fm.getTime() - inc.getTime()) / 60000));
+                }
+
+                const inicioFormatted = inc && !isNaN(inc.getTime()) 
+                    ? inc.toLocaleString('pt-BR') 
+                    : (s.inicioStr || 'Início registrado');
+                
+                const fimFormatted = fm && !isNaN(fm.getTime()) 
+                    ? fm.toLocaleString('pt-BR') 
+                    : (s.fimStr || (st.includes('ANDAMENTO') ? 'Em andamento...' : 'Concluída'));
+
+                return {
+                    numero: s.numero || (idx + 1),
+                    status: st || (s.fim ? 'ENCERRADA' : 'EM ANDAMENTO'),
+                    inicio: s.inicio || null,
+                    inicioStr: inicioFormatted,
+                    fim: s.fim || null,
+                    fimStr: fimFormatted,
+                    duracao_minutos: dur,
+                    qtd_eletricistas: parseInt(s.qtd_eletricistas, 10) || this.qtdEletricistas || 1,
+                    tecnico: s.tecnico || this.operador || 'Técnico',
+                    foto_entrada: s.foto_entrada || s.foto || (idx === 0 ? this.fotoEntrada : null),
+                    foto_saida: s.foto_saida || null,
+                    coordenada_inicio: s.coordenada_inicio || s.coordenada || null,
+                    coordenada_fim: s.coordenada_fim || null,
+                    materiais: s.materiais || []
+                };
+            });
+        }
+
+        // Fallback: Paireia as entradas e saídas registradas na observação/descrição em texto
+        const obs = (this.observacaoFinal || '') + '\n' + (this.descricao || '');
+        const lines = obs.split('\n');
+        const pairedSessions = [];
+        let currentSess = null;
+        let sessCounter = 1;
+
+        lines.forEach(line => {
+            const match = line.match(/\[(.*?)\]\s*(ENTRADA|SAÍDA|SAIDA|CONCLUSÃO|CONCLUSAO)\s*-\s*(\d+)\s*Eletricista/i);
+            if (match) {
+                const dateStr = match[1].trim();
+                const tag = match[2].toUpperCase();
+                const qtd = parseInt(match[3], 10) || 1;
+
+                if (tag === 'ENTRADA') {
+                    if (currentSess) {
+                        pairedSessions.push(currentSess);
+                    }
+                    currentSess = {
+                        numero: sessCounter++,
+                        status: 'EM ANDAMENTO',
+                        inicioStr: dateStr,
+                        fimStr: 'Em andamento...',
+                        duracao_minutos: null,
+                        qtd_eletricistas: qtd,
+                        tecnico: this.operador || 'Técnico',
+                        foto_entrada: pairedSessions.length === 0 ? this.fotoEntrada : null
+                    };
+                } else if (tag.includes('SAÍDA') || tag.includes('SAIDA') || tag.includes('CONCLU')) {
+                    if (!currentSess) {
+                        currentSess = {
+                            numero: sessCounter++,
+                            status: tag.includes('CONCLU') ? 'CONCLUÍDA' : 'ENCERRADA',
+                            inicioStr: 'Não registrado',
+                            fimStr: dateStr,
+                            duracao_minutos: null,
+                            qtd_eletricistas: qtd,
+                            tecnico: this.operador || 'Técnico',
+                            foto_entrada: null
+                        };
+                    } else {
+                        currentSess.fimStr = dateStr;
+                        currentSess.status = tag.includes('CONCLU') ? 'CONCLUÍDA' : 'ENCERRADA';
+                        
+                        try {
+                            const parseBrDate = (str) => {
+                                const parts = str.split(' ');
+                                const dParts = parts[0].split('/');
+                                const timeStr = parts[1] || '00:00:00';
+                                return new Date(`${dParts[2]}-${dParts[1]}-${dParts[0]}T${timeStr}`);
+                            };
+                            const d1 = parseBrDate(currentSess.inicioStr);
+                            const d2 = parseBrDate(dateStr);
+                            if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+                                currentSess.duracao_minutos = Math.max(1, Math.round((d2.getTime() - d1.getTime()) / 60000));
+                            }
+                        } catch(e) {}
+                    }
+                    pairedSessions.push(currentSess);
+                    currentSess = null;
+                }
+            }
+        });
+
+        if (currentSess) {
+            pairedSessions.push(currentSess);
+        }
+
+        return pairedSessions;
+    }
+
+    /**
+     * Retorna o tempo total trabalhado formatado (ex: 2h 30min ou 45 min)
+     */
+    get tempoTotalFormatado() {
+        let totalMin = this.tempoTotalMinutos;
+        if ((totalMin === null || totalMin === undefined || isNaN(totalMin)) && this.sessoesList.length > 0) {
+            totalMin = this.sessoesList.reduce((acc, s) => acc + (s.duracao_minutos || 0), 0);
+        }
+        if (totalMin === null || totalMin === undefined || isNaN(totalMin) || totalMin <= 0) {
+            return null;
+        }
+        const hor = Math.floor(totalMin / 60);
+        const min = totalMin % 60;
+        if (hor > 0) {
+            return `${hor}h ${min}min (${totalMin} min)`;
+        }
+        return `${min} min`;
     }
 
     /**
@@ -137,6 +320,32 @@ class ChamadoModel {
                             url: fotoUnica,
                             titulo: `Foto Ponto #${idx + 1}`,
                             pontoIndex: idx + 1
+                        });
+                    }
+                }
+            });
+        }
+
+        // 4. Fotos registradas em cada sessão da praça (sessoesList)
+        if (this.sessoesList && this.sessoesList.length > 0) {
+            this.sessoesList.forEach((s, sIdx) => {
+                const fotoEnt = s.foto_entrada || s.foto || s.url_foto;
+                if (fotoEnt && typeof fotoEnt === 'string' && (fotoEnt.startsWith('http') || fotoEnt.startsWith('data:'))) {
+                    if (!list.some(item => item.url === fotoEnt)) {
+                        list.push({
+                            url: fotoEnt,
+                            titulo: `Foto de Entrada (Sessão #${s.numero || (sIdx + 1)})`,
+                            origem: 'Sessão de Praça'
+                        });
+                    }
+                }
+                const fotoSai = s.foto_saida;
+                if (fotoSai && typeof fotoSai === 'string' && (fotoSai.startsWith('http') || fotoSai.startsWith('data:'))) {
+                    if (!list.some(item => item.url === fotoSai)) {
+                        list.push({
+                            url: fotoSai,
+                            titulo: `Foto de Encerramento (Sessão #${s.numero || (sIdx + 1)})`,
+                            origem: 'Sessão de Praça'
                         });
                     }
                 }
@@ -287,12 +496,13 @@ class ChamadoModel {
     }
 
     /**
-     * Maps database status string to UI status code ('aberto', 'concluida', 'cancelada', 'pendente')
+     * Maps database status string to UI status code ('aberto', 'em_andamento', 'concluida', 'cancelada', 'pendente')
      */
     get normalizedStatus() {
         const statusStr = ChamadoModel.formatLocationText(this.rawStatus);
         const statusLower = statusStr.toLowerCase().trim();
         if (statusLower.includes('abert') || statusLower === 'aberta') return 'aberto';
+        if (statusLower.includes('andamento') || statusLower.includes('iniciad') || statusLower.includes('execu')) return 'em_andamento';
         if (statusLower.includes('conclu') || statusLower.includes('resolv')) return 'concluida';
         if (statusLower.includes('canc')) return 'cancelada';
         if (statusLower.includes('pend')) return 'pendente';
@@ -303,8 +513,13 @@ class ChamadoModel {
      * Human readable status label for badges
      */
     get statusBadgeLabel() {
+        const rawLower = ChamadoModel.formatLocationText(this.rawStatus).toLowerCase().trim();
+        if (rawLower.includes('iniciad')) {
+            return 'Iniciado';
+        }
         switch (this.normalizedStatus) {
             case 'aberto': return 'Em aberto';
+            case 'em_andamento': return 'Em andamento';
             case 'concluida': return 'Concluída';
             case 'cancelada': return 'Cancelada';
             case 'pendente': return 'Pendente aprovação';

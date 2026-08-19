@@ -354,7 +354,23 @@ class OfflineSyncService {
         }
       }
 
-      let updateRes = await supabaseClient.from('ordens_servico_pracas').update(payload).eq('protocolo', item.protocolo);
+      let payloadAtual = { ...payload };
+      if (payloadAtual.evidencias) delete payloadAtual.evidencias;
+
+      let updateRes = await supabaseClient.from('ordens_servico_pracas').update(payloadAtual).eq('protocolo', item.protocolo);
+
+      while (updateRes.error && updateRes.error.message && updateRes.error.message.includes("Could not find the")) {
+        const match = updateRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+        if (match && match[1]) {
+          const colAusente = match[1];
+          console.warn(`⚠️ [OfflineSync Praça] Coluna '${colAusente}' não existe na tabela 'ordens_servico_pracas'. Removendo do payload e tentando novamente...`);
+          delete payloadAtual[colAusente];
+          updateRes = await supabaseClient.from('ordens_servico_pracas').update(payloadAtual).eq('protocolo', item.protocolo);
+        } else {
+          break;
+        }
+      }
+
       console.log('📊 [ProcessItem Supabase Praça Response]:', updateRes);
 
       if (updateRes.error) return { success: false, error: updateRes.error.message };

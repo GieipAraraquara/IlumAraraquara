@@ -192,17 +192,36 @@ class AuditoriaController {
                 return getTime(a) - getTime(b);
             });
 
+            // Separação entre Praças (isPraca - inclui Iniciadas/Em Andamento/Concluídas) e Viário (!isPraca - estritamente Concluídas)
+            this.pracaServicesList = this.chamadosList.filter(item => item.isPraca);
+            this.viariaConcludedList = this.concludedList.filter(item => !item.isPraca);
+
+            // Ordenar Praças por data (ascendente)
+            this.pracaServicesList.sort((a, b) => {
+                const getTime = (item) => {
+                    if (item.dataConclusao && !isNaN(new Date(item.dataConclusao).getTime())) return new Date(item.dataConclusao).getTime();
+                    if (item.dataInicio && !isNaN(new Date(item.dataInicio).getTime())) return new Date(item.dataInicio).getTime();
+                    if (item.dataAbertura && !isNaN(new Date(item.dataAbertura).getTime())) return new Date(item.dataAbertura).getTime();
+                    return 0;
+                };
+                return getTime(a) - getTime(b);
+            });
+
             this.auditDivergentList = this.concludedList.filter(item => item.hasDivergence);
 
-            console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs com status Concluída encontradas. (${this.auditDivergentList.length} com divergências 'S')`);
+            console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs concluídas encontradas. (${this.pracaServicesList.length} Praças no total, ${this.viariaConcludedList.length} Viárias Concluídas, ${this.auditDivergentList.length} com divergências 'S')`);
 
             this.updateKPIs(this.concludedList);
             this.renderOSTable(this.auditDivergentList);
-            this.renderCompletedTable(this.concludedList);
+            this.renderPracaTable(this.pracaServicesList);
+            this.renderCompletedTable(this.viariaConcludedList);
 
             // Re-apply filter logic if available
             if (typeof window.applyCombinedFilters === 'function') {
                 window.applyCombinedFilters();
+            }
+            if (typeof window.applyPracaServicesFilters === 'function') {
+                window.applyPracaServicesFilters();
             }
             if (typeof window.applyCompletedServicesFilters === 'function') {
                 window.applyCompletedServicesFilters();
@@ -346,6 +365,38 @@ class AuditoriaController {
     }
 
     /**
+     * Renders Completed Services Table for Praças ('P')
+     */
+    /**
+     * Renders Completed Services Table for Praças ('P')
+     */
+    renderPracaTable(auditList = []) {
+        const tbody = document.querySelector('#praca-services-table tbody');
+        if (!tbody) return;
+
+        const emptyRowHtml = `
+            <tr id="no-praca-results" class="${auditList.length === 0 ? '' : 'hidden'}">
+                <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                    <div class="flex flex-col items-center justify-center gap-1.5">
+                        <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                        <span class="text-xs">Nenhum serviço em praça encontrado.</span>
+                        <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllPracaFilters()">Limpar filtros de praça</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        const rowsHtml = auditList.map(item => this.createCompletedRowHtml(item, true)).join('');
+        tbody.innerHTML = emptyRowHtml + rowsHtml;
+
+        // Update count badge
+        const badge = document.getElementById('praca-badge-count');
+        if (badge) {
+            badge.textContent = `${auditList.length} Registros`;
+        }
+    }
+
+    /**
      * Renders Completed Services Table rows using Finalization/Conclusao data
      */
     renderCompletedTable(auditList = []) {
@@ -364,7 +415,7 @@ class AuditoriaController {
             </tr>
         `;
 
-        const rowsHtml = auditList.map(item => this.createCompletedRowHtml(item)).join('');
+        const rowsHtml = auditList.map(item => this.createCompletedRowHtml(item, false)).join('');
         tbody.innerHTML = emptyRowHtml + rowsHtml;
 
         // Update count badge
@@ -377,9 +428,12 @@ class AuditoriaController {
     /**
      * Generates HTML string for single completed service row using finalization fields
      */
-    createCompletedRowHtml(item) {
-        // Finalization Plaqueta (plaqueta_final)
+    createCompletedRowHtml(item, isPraca = false) {
+        // Finalization Plaqueta / Praça
         const plaquetaFinal = item.plaquetaFinal || item.plaquetaInicial || 'Não informada';
+        const pracaNome = item.pracaNome || item.bairro || item.endereco || plaquetaFinal || 'Praça Pública';
+        const col2Text = isPraca ? pracaNome : plaquetaFinal;
+        const col2Class = isPraca ? 'text-secondary' : 'text-primary';
         
         // Finalization Coordinate (coordenada_reparo or coordenada_inicial)
         const rawCoord = item.coordenadaReparo || item.coordenadaInicial;
@@ -433,6 +487,7 @@ class AuditoriaController {
         
         // Finalization Quantity (qtd_final)
         const qtdFinal = item.qtdFinal || item.qtdInicial || 1;
+        const qtdTdHtml = isPraca ? '' : `<td class="py-3 px-4 text-center font-semibold text-on-surface align-middle">${qtdFinal}</td>`;
 
         // Finalization Problem (problema_encontrado)
         const selectedProblemVal = item.problemEncontradoSelectValue;
@@ -462,11 +517,48 @@ class AuditoriaController {
             distBadgeTable = `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-mono border ${colorCls} mt-1" title="Distância entre a abertura e o reparo"><span class="material-symbols-outlined text-[11px]">straighten</span>${distTxt}</span>`;
         }
 
+        let col2TdHtml = `<td class="py-3 px-4 font-semibold ${col2Class} whitespace-nowrap truncate align-middle" title="${col2Text}">${col2Text}</td>`;
+        if (isPraca) {
+            col2TdHtml = `
+                <td class="py-3 px-4 align-middle">
+                    <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir a localização no mapa Mapbox">
+                        <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                        <span class="font-semibold text-secondary truncate group-hover/loc:underline" title="${col2Text}">${col2Text}</span>
+                    </button>
+                </td>
+            `;
+        }
+
+        // Status Badge for Praça Services
+        let statusBadgeClass = 'bg-slate-100 text-slate-700 border border-slate-300';
+        if (item.normalizedStatus === 'aberto') statusBadgeClass = 'bg-sky-100 text-sky-800 border border-sky-300';
+        if (item.normalizedStatus === 'em_andamento') statusBadgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+        if (item.statusBadgeLabel === 'Iniciado') statusBadgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
+        if (item.normalizedStatus === 'concluida') statusBadgeClass = 'bg-[#dcfce7] text-[#166534]';
+        if (item.normalizedStatus === 'cancelada') statusBadgeClass = 'bg-slate-200 text-slate-700';
+        if (item.normalizedStatus === 'pendente') statusBadgeClass = 'bg-purple-100 text-purple-800 border border-purple-300';
+
+        const statusBadgeHtml = `
+            <span class="status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[140px] transition-colors ${statusBadgeClass}" data-status="${item.normalizedStatus}">
+                ${item.statusBadgeLabel || item.status || 'Concluída'}
+            </span>
+        `;
+
+        const lastColHtml = isPraca ? `
+            <td class="py-3 px-4 whitespace-nowrap truncate align-middle" data-status-value="${item.normalizedStatus}">
+                ${statusBadgeHtml}
+            </td>
+        ` : `
+            <td class="py-3 px-4 align-middle">
+                ${materialsDisplayHtml}
+            </td>
+        `;
+
         return `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="${item.id}" onclick="window.abrirDetalhesOSModal('${item.id}')">
                 <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">${item.protocolo}</td>
                 <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">${dateConclusaoText}</td>
-                <td class="py-3 px-4 font-semibold text-primary whitespace-nowrap truncate align-middle">${plaquetaFinal}</td>
+                ${col2TdHtml}
                 <td class="py-3 px-4 align-middle">
                     <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
                         <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
@@ -482,10 +574,8 @@ class AuditoriaController {
                         ${problemText}
                     </span>
                 </td>
-                <td class="py-3 px-4 text-center font-semibold text-on-surface align-middle">${qtdFinal}</td>
-                <td class="py-3 px-4 align-middle">
-                    ${materialsDisplayHtml}
-                </td>
+                ${qtdTdHtml}
+                ${lastColHtml}
             </tr>
         `;
     }
@@ -768,6 +858,121 @@ class AuditoriaController {
             </div>
         </div>
 
+        <!-- Seção: Gestão de Sessões de Trabalho & Equipe (Praça Pública / Manutenção) -->
+        ${(item.sessoesList && item.sessoesList.length > 0) ? `
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
+            <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                <span class="flex items-center gap-1.5 text-blue-700">
+                    <span class="material-symbols-outlined text-[18px]">groups</span>
+                    <span>Gestão de Sessões & Equipe</span>
+                </span>
+                ${item.tempoTotalFormatado ? `
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">
+                    ⏱️ Tempo Total: ${item.tempoTotalFormatado}
+                </span>
+                ` : ''}
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                ${item.sessoesList.map(s => {
+                    const st = (s.status || '').toUpperCase();
+                    const isEmAndamento = st.includes('ANDAMENTO');
+                    const badgeBg = isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                    const iconStr = isEmAndamento ? 'play_arrow' : 'task_alt';
+                    const dataInc = s.inicioStr || 'Início registrado';
+                    const dataFim = s.fimStr || (isEmAndamento ? 'Em andamento...' : 'Concluída');
+                    const durStr = s.duracao_minutos ? (s.duracao_minutos >= 60 ? `${Math.floor(s.duracao_minutos/60)}h ${s.duracao_minutos%60}min (${s.duracao_minutos} min)` : `${s.duracao_minutos} min`) : '';
+
+                    const fotoEnt = s.foto_entrada || s.foto;
+                    const fotoSai = s.foto_saida;
+                    const fEntIdx = fotoEnt && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoEnt) : -1;
+                    const fSaiIdx = fotoSai && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoSai) : -1;
+
+                    return `
+                    <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 flex flex-col justify-between space-y-2 shadow-2xs">
+                        <div class="flex items-center justify-between gap-1 border-b border-slate-100 pb-1.5">
+                            <span class="font-bold text-[12px] text-slate-800 flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-blue-600">${iconStr}</span>
+                                Sessão #${s.numero || 1}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">${s.status || 'REGISTRADA'}</span>
+                        </div>
+                        
+                        <div class="text-[11px] text-slate-600 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span><b class="text-slate-500 font-medium">Equipe:</b> <span class="font-semibold text-slate-800">${s.qtd_eletricistas || item.qtdEletricistas || 1} Eletricista(s)</span></span>
+                                ${s.tecnico ? `<span class="text-slate-500 text-[10px]"><b>Técnico:</b> ${s.tecnico}</span>` : ''}
+                            </div>
+                            <div class="bg-slate-50/80 p-1.5 rounded-lg border border-slate-200/60 space-y-0.5 text-[10.5px]">
+                                <div><b class="text-slate-500 font-medium">Início:</b> ${dataInc}</div>
+                                <div><b class="text-slate-500 font-medium">Fim:</b> ${dataFim}</div>
+                            </div>
+                            ${durStr ? `<div class="text-blue-700 font-bold text-[11px] pt-0.5">⏱️ Duração: ${durStr}</div>` : ''}
+                            ${(s.coordenada_inicio || s.coordenada_fim) ? `
+                            <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
+                                ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
+                                ${s.coordenada_fim ? `<div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>` : ''}
+                            </div>
+                            ` : ''}
+                            ${(s.materiais && s.materiais.length > 0) ? `
+                            <div class="pt-1.5 border-t border-slate-100/80 text-[10px]">
+                                <b class="text-slate-600 flex items-center gap-1 font-semibold mb-1">
+                                    <span class="material-symbols-outlined text-[13px] text-slate-500">inventory_2</span>
+                                    Materiais da Sessão:
+                                </b>
+                                <div class="flex flex-wrap gap-1">
+                                    ${ChamadoModel.parseMaterialsList(s.materiais).map(mat => `<span class="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[9.5px] font-medium">${mat}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+
+                        ${(fotoEnt || fotoSai) ? `
+                        <div class="pt-1.5 border-t border-slate-100 space-y-1.5">
+                            ${fotoEnt ? `
+                            <div class="flex items-center gap-2 cursor-pointer group p-1 rounded-lg hover:bg-slate-100/80 transition-colors" onclick="${fEntIdx >= 0 ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fEntIdx})` : `window.open('${fotoEnt}', '_blank')`}">
+                                <div class="w-10 h-8 rounded-md overflow-hidden border border-slate-200 bg-slate-900 flex-shrink-0 relative">
+                                    <img src="${fotoEnt}" alt="Foto Entrada Sessão #${s.numero}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10.5px] font-semibold text-blue-700 group-hover:underline flex items-center gap-0.5">
+                                        📷 Foto de Entrada
+                                    </span>
+                                </div>
+                            </div>
+                            ` : ''}
+
+                            ${fotoSai ? `
+                            <div class="flex items-center gap-2 cursor-pointer group p-1 rounded-lg hover:bg-slate-100/80 transition-colors" onclick="${fSaiIdx >= 0 ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fSaiIdx})` : `window.open('${fotoSai}', '_blank')`}">
+                                <div class="w-10 h-8 rounded-md overflow-hidden border border-slate-200 bg-slate-900 flex-shrink-0 relative">
+                                    <img src="${fotoSai}" alt="Foto Encerramento Sessão #${s.numero}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10.5px] font-semibold text-amber-700 group-hover:underline flex items-center gap-0.5">
+                                        📷 Foto de Encerramento
+                                    </span>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        ` : (item.tempoTotalFormatado ? `
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs flex items-center justify-between">
+            <span class="font-bold text-secondary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-blue-600">timer</span>
+                <span>Tempo Total de Trabalho:</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                ${item.tempoTotalFormatado}
+            </span>
+        </div>
+        ` : '')}
+
         <!-- Seção 3: Indicadores da Auditoria -->
         <div class="space-y-1.5">
             <strong class="text-xs font-bold text-secondary flex items-center gap-1">
@@ -783,13 +988,36 @@ class AuditoriaController {
         ${fotosHtml}
 
         <!-- Seção 5: Trilha de Auditoria & Observações -->
-        ${item.observacaoFinal ? `
-        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1">
-            <strong class="text-secondary font-bold block mb-1">📜 Observações / Trilha de Auditoria:</strong>
-            <div class="bg-surface-container-lowest p-2 rounded border border-outline-variant/40 font-mono text-[11px] max-h-24 overflow-y-auto leading-relaxed">
-                ${item.observacaoFinal.replace(/\n/g, '<br/>')}
-            </div>
-        </div>` : ''}
+        ${(() => {
+            const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();
+            const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
+
+            if (!obsIni && !obsFin) {
+                return `
+                <div class="p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs flex items-center gap-2 text-on-surface-variant italic">
+                    <span class="material-symbols-outlined text-[18px] text-outline">notes</span>
+                    <span>Nenhuma observação ou texto de histórico registrado.</span>
+                </div>`;
+            }
+
+            let bodyObs = '';
+            if (obsIni && obsFin && obsIni !== obsFin) {
+                bodyObs = `<div><b class="text-secondary font-semibold">📌 Abertura / Solicitante:</b> ${obsIni.replace(/\n/g, '<br/>')}</div><div class="mt-2 pt-2 border-t border-outline-variant/30"><b class="text-secondary font-semibold">📝 Conclusão / Histórico:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
+            } else {
+                bodyObs = `<div>${(obsFin || obsIni).replace(/\n/g, '<br/>')}</div>`;
+            }
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1.5">
+                <strong class="text-secondary font-bold flex items-center gap-1.5 mb-1">
+                    <span class="material-symbols-outlined text-[16px]">notes</span>
+                    <span>Observações & Trilha de Auditoria</span>
+                </strong>
+                <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 font-mono text-[11px] text-on-surface max-h-32 overflow-y-auto leading-relaxed">
+                    ${bodyObs}
+                </div>
+            </div>`;
+        })()}
         `;
     }
 }

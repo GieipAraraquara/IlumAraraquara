@@ -10,6 +10,7 @@ class PainelController {
         this.activeFilters = {
             search: '',
             protocol: '',
+            protocolPrefix: '',
             datePredicate: null,
             problem: ['all'],
             status: ['all']
@@ -171,10 +172,12 @@ class PainelController {
         const isCancelada = item.normalizedStatus === 'cancelada';
         const isConcluida = item.normalizedStatus === 'concluida';
         const isPendente = item.normalizedStatus === 'pendente';
+        const isEmAndamento = item.normalizedStatus === 'em_andamento';
         const isAberto = item.normalizedStatus === 'aberto';
 
         tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCancelada ? 'opacity-70' : ''}`;
         tr.setAttribute('data-id', item.id);
+        tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${item.id}')`);
 
         // Protocolo
         const tdProtocolo = document.createElement('td');
@@ -285,7 +288,7 @@ class PainelController {
             if (probVal === 'lampada-quebrada') selectBgColor = 'bg-[#ffedd5] text-[#9a3412]';
 
             tdProblema.innerHTML = `
-                <div class="relative inline-block w-[160px]">
+                <div class="relative inline-block w-[160px]" onclick="event.stopPropagation()">
                     <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.id}', this)">
                         <option value="lampada-queimada" ${probVal === 'lampada-queimada' ? 'selected' : ''}>Lâmpada Queimada</option>
                         <option value="acesa-dia" ${probVal === 'acesa-dia' ? 'selected' : ''}>Acesa Dia</option>
@@ -302,6 +305,8 @@ class PainelController {
         tdStatus.className = 'py-3 px-5 whitespace-nowrap truncate align-middle';
 
         let badgeClass = 'bg-error-container text-on-error-container'; // Aberto
+        if (isEmAndamento) badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+        if (item.statusBadgeLabel === 'Iniciado') badgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
         if (isConcluida) badgeClass = 'bg-[#dcfce7] text-[#166534]';
         if (isCancelada) badgeClass = 'bg-slate-200 text-slate-700';
         if (isPendente) badgeClass = 'bg-surface-container-high text-on-surface';
@@ -315,6 +320,7 @@ class PainelController {
         // Actions Column
         const tdAcoes = document.createElement('td');
         tdAcoes.className = 'py-3 px-5 whitespace-nowrap truncate text-center align-middle';
+        tdAcoes.setAttribute('onclick', 'event.stopPropagation()');
 
         const editButtonHtml = isManutentorView ? '' : `
             <button class="btn-edit text-on-surface-variant hover:text-secondary hover:bg-surface-container-high p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida ? 'hidden' : ''}" onclick="window.painelController.abrirEdicaoOS('${item.id}', event)" title="Editar Ordem de Serviço">
@@ -323,7 +329,7 @@ class PainelController {
         `;
 
         const rejectButtonHtml = isManutentorView ? '' : `
-            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'cancelada', event)" title="Cancelar (Cancelada)">
+            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento || isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'cancelada', event)" title="Cancelar (Cancelada)">
                 <span class="material-symbols-outlined text-[20px]">close</span>
             </button>
         `;
@@ -335,7 +341,7 @@ class PainelController {
         `;
 
         const revertButtonHtml = isManutentorView ? '' : `
-            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Reverter para Em aberto">
+            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Reverter para Em aberto">
                 <span class="material-symbols-outlined text-[20px]">undo</span>
             </button>
         `;
@@ -344,7 +350,7 @@ class PainelController {
             <div class="flex items-center justify-center gap-1 action-buttons">
                 ${approveButtonHtml}
                 ${rejectButtonHtml}
-                <button class="btn-complete text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isAberto ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'concluida', event)" title="Concluir / Finalizar OS">
+                <button class="btn-complete text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'concluida', event)" title="Concluir / Finalizar OS">
                     <span class="material-symbols-outlined text-[20px]">task_alt</span>
                 </button>
                 ${revertButtonHtml}
@@ -382,7 +388,7 @@ class PainelController {
                 this.activeFilters.protocol = e.target.value;
                 const indicator = document.getElementById('protocol-filter-indicator');
                 if (indicator) {
-                    if (e.target.value.trim()) indicator.classList.remove('hidden');
+                    if (e.target.value.trim() || this.activeFilters.protocolPrefix) indicator.classList.remove('hidden');
                     else indicator.classList.add('hidden');
                 }
                 this.renderTable();
@@ -468,6 +474,9 @@ class PainelController {
                 updateStatusFilterState();
             });
         });
+
+        // Initialize status filter state based on DOM checkbox state
+        updateStatusFilterState();
     }
 
     /**
@@ -573,7 +582,385 @@ class PainelController {
             console.warn('⚠️ OS não encontrada para edição:', id);
         }
     }
+
+    setupGlobalAuditTooltip() {
+        const getOrCreatePopover = () => {
+            let popover = document.getElementById('audit-global-popover');
+            if (!popover) {
+                popover = document.createElement('div');
+                popover.id = 'audit-global-popover';
+                popover.style.cssText = 'position: fixed; display: none; padding: 10px 14px; background-color: #0f172a; color: #ffffff; font-size: 11px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5); border: 1px solid #334155; max-width: 260px; z-index: 99999999; pointer-events: none; opacity: 0; transition: opacity 0.15s ease; text-align: left;';
+                popover.innerHTML = `
+                    <div style="font-weight: 700; color: #fbbf24; margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;">Aponta SIM quando:</div>
+                    <div id="audit-global-popover-text" style="line-height: 1.4; font-size: 11px; font-weight: 400; color: #e2e8f0;"></div>
+                `;
+                document.body.appendChild(popover);
+            }
+            return popover;
+        };
+
+        getOrCreatePopover();
+
+        if (window._globalAuditTooltipBound) return;
+        window._globalAuditTooltipBound = true;
+
+        let activeTarget = null;
+
+        const showTooltip = (target) => {
+            const explicacao = target.getAttribute('data-audit-explicacao');
+            if (!explicacao) return;
+
+            const popover = getOrCreatePopover();
+            const popoverText = popover.querySelector('#audit-global-popover-text');
+            if (!popoverText) return;
+
+            popoverText.innerText = explicacao;
+            popover.style.display = 'block';
+
+            const rect = target.getBoundingClientRect();
+            const popoverWidth = 260;
+            let left = rect.left + (rect.width / 2) - (popoverWidth / 2);
+            if (left < 10) left = 10;
+            if (left + popoverWidth > window.innerWidth - 10) left = window.innerWidth - popoverWidth - 10;
+
+            let top = rect.top - 12;
+            popover.style.left = `${left}px`;
+            popover.style.top = `${top}px`;
+            popover.style.transform = 'translateY(-100%)';
+
+            requestAnimationFrame(() => {
+                popover.style.opacity = '1';
+            });
+            activeTarget = target;
+        };
+
+        const hideTooltip = () => {
+            const popover = document.getElementById('audit-global-popover');
+            if (popover) {
+                popover.style.opacity = '0';
+                popover.style.display = 'none';
+            }
+            activeTarget = null;
+        };
+
+        document.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('[data-audit-explicacao]');
+            if (target) {
+                showTooltip(target);
+            }
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const target = e.target.closest('[data-audit-explicacao]');
+            if (target && target === activeTarget) {
+                hideTooltip();
+            }
+        });
+    }
+
+    /**
+     * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
+     */
+    abrirDetalhesOSModal(id) {
+        const list = this.chamadosList || window.chamadosListCache || [];
+        let item = list.find(c => String(c.id) === String(id) || String(c.protocolo).toUpperCase() === String(id).toUpperCase());
+        
+        if (!item && window.ChamadoModel) {
+            item = new window.ChamadoModel({
+                id: id,
+                protocolo: id,
+                status: 'Concluída',
+                data_abertura: '2023-08-09T10:00:00Z',
+                data_conclusao: '2023-08-09T14:30:00Z',
+                municipe_nome: 'Munícipe (Linha Estática)',
+                operador: 'Sistema',
+                prioridade: 'Normal',
+                problema_inicial: 'Lâmpada queimada',
+                problema_encontrado: 'Lâmpada queimada',
+                plaqueta_inicial: 'P-10492',
+                plaqueta_final: 'P-10492',
+                coordenada_inicial: '-21.980500, -46.791200',
+                coordenada_reparo: '-21.980850, -46.791520',
+                endereco: 'Av. Principal, 500',
+                materiais: 'Lâmpada LED 50W',
+                status_auditoria: 'Concluída'
+            });
+        }
+        if (!item) return;
+
+        const elProt = document.getElementById('detalheModalProtocolo');
+        if (elProt) elProt.innerText = `Protocolo #${item.protocolo}`;
+        
+        const elSub = document.getElementById('detalheModalDataSub');
+        if (elSub) {
+            const dataAb = item.dataAbertura ? item.dataAbertura.toLocaleDateString('pt-BR') : '--/--/----';
+            const dataConc = item.dataConclusao ? item.dataConclusao.toLocaleDateString('pt-BR') : 'Em aberto';
+            elSub.innerText = `Abertura: ${dataAb} | Conclusão: ${dataConc}`;
+        }
+
+        const elStatusBadge = document.getElementById('detalheModalStatusBadge');
+        if (elStatusBadge) {
+            elStatusBadge.innerText = item.statusBadgeLabel;
+            const stNorm = item.normalizedStatus;
+            if (stNorm === 'concluida') {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#dcfce7] text-[#166534]';
+            } else if (stNorm === 'cancelada') {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700';
+            } else {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container';
+            }
+        }
+
+        const elAuditBadge = document.getElementById('detalheModalAuditBadge');
+        if (elAuditBadge) {
+            elAuditBadge.classList.add('hidden');
+        }
+
+        const container = document.getElementById('detalheModalConteudo');
+        if (container) {
+            container.innerHTML = this.buildDetalhesOSModalHtml(item);
+        }
+
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (modal && box) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('scale-95', 'opacity-0');
+                box.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+    }
+
+    /**
+     * Constrói o HTML dinâmico das informações detalhadas da OS para o modal no Painel
+     */
+    buildDetalhesOSModalHtml(item) {
+        const coordIni = window.ChamadoModel.formatCoordPair(item.coordenadaInicial);
+        const coordFin = window.ChamadoModel.formatCoordPair(item.coordenadaReparo);
+        const linkMaps = (coordFin.lat !== '--') ? `https://www.google.com/maps/search/?api=1&query=${coordFin.lat},${coordFin.lng}` : (coordIni.lat !== '--' ? `https://www.google.com/maps/search/?api=1&query=${coordIni.lat},${coordIni.lng}` : '#');
+
+        const ptsList = item.addressPoints.map(p => `<li class="truncate">• ${p}</li>`).join('');
+
+        let cIniStr = item.coordenadaInicial || item.coordenada_inicial || item.coordenada || '';
+        let cRepStr = item.coordenadaReparo || item.coordenada_reparo || '';
+        
+        if (!cIniStr && item.rawPontos && item.rawPontos.length > 0) {
+            cIniStr = item.rawPontos[0].coordenada || item.rawPontos[0].coordenada_inicial || '';
+        }
+        if (!cRepStr && item.rawPontos && item.rawPontos.length > 0) {
+            cRepStr = item.rawPontos[0].coordenada_reparo || item.rawPontos[0].coordenada || '';
+        }
+
+        let distM = null;
+        if (item.distanciaCalculadaMetros !== undefined && item.distanciaCalculadaMetros !== null) {
+            distM = item.distanciaCalculadaMetros;
+        } else if (cIniStr && cRepStr && window.ChamadoModel) {
+            distM = window.ChamadoModel.calcularDistanciaMetros(cIniStr, cRepStr);
+        }
+
+        if ((distM === null || isNaN(distM)) && item.audit && item.audit.distancia !== undefined && item.audit.distancia !== null) {
+            distM = Number(item.audit.distancia);
+        }
+
+        let distFormatted = 'Não informada (Sem coordenadas)';
+        if (distM !== null && !isNaN(distM)) {
+            if (distM < 1000) {
+                distFormatted = `${Math.round(distM)} metros`;
+            } else {
+                distFormatted = `${(distM / 1000).toFixed(2)} km (${Math.round(distM)} m)`;
+            }
+        } else if (item.isDistanciaAcima100m) {
+            distFormatted = '> 100 metros (Divergente)';
+        }
+
+        const opVal = String(item.operador || "").trim();
+        const opLower = opVal.toLowerCase();
+        const isGovBrOp = !opVal || opLower.includes('gov.br') || opLower === 'cidadão' || opLower === 'cidadao' || opLower.includes('gov');
+
+        return `
+        <!-- Seção 1: Dados do Solicitante & Operação -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-1">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 mb-1.5 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">person</span>
+                    <span>Solicitante & Atendimento</span>
+                </div>
+                <div><b class="text-on-surface-variant font-medium">Munícipe:</b> <span class="font-medium text-on-surface">${item.municipeNome || 'Não informado'}</span></div>
+                <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante}</span></div>
+                ${!isGovBrOp ? `<div><b class="text-on-surface-variant font-medium">Usuário que Abriu / Operador:</b> <span class="font-semibold text-blue-700">${item.operador}</span></div>` : ''}
+                <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
+            </div>
+
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">build</span>
+                    <span>Serviço & Manutenção</span>
+                </div>
+                <div class="space-y-1 text-xs">
+                    <div><b class="text-on-surface-variant font-medium">Problema Inicial:</b> <span class="font-medium text-on-surface">${item.problemaInicial}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Problema Encontrado:</b> <span class="font-medium text-on-surface">${item.problemaEncontrado || item.problemaInicial}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Qtd. Inicial / Final:</b> <span class="font-medium text-on-surface">${item.qtdInicial} / ${item.qtdFinal}</span></div>
+                </div>
+
+                <!-- Seção Estruturada de Materiais Utilizados -->
+                <div class="pt-2 border-t border-outline-variant/30">
+                    ${(() => {
+                        const rawMatModal = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado;
+                        const modalMats = (item.materialsList && Array.isArray(item.materialsList) && item.materialsList.length > 0)
+                            ? item.materialsList
+                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : [String(rawMatModal || 'Lâmpada LED 50W')]);
+                        return `
+                            <div class="flex items-center gap-1.5 mb-1.5">
+                                <span class="material-symbols-outlined text-[15px] text-secondary">inventory_2</span>
+                                <b class="text-on-surface-variant font-semibold text-xs">Materiais Utilizados (${modalMats.length}):</b>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${modalMats.map(mat => `
+                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest text-on-surface border border-outline-variant/60 shadow-2xs">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
+                                        <span>${mat}</span>
+                                    </span>
+                                `).join('')}
+                            </div>
+                        `;
+                    })()}
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção 2: Localização & Plaqueta -->
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
+            <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                <span class="flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[16px]">location_on</span>
+                    <span>Localização & Plaqueta</span>
+                </span>
+                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Google Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                    <strong class="block text-[11px] text-on-surface-variant mb-0.5">Endereço / Ponto(s):</strong>
+                    <ul class="space-y-0.5 text-on-surface max-h-24 overflow-y-auto">${ptsList}</ul>
+                </div>
+                <div class="space-y-1 text-xs">
+                    <div><b class="text-on-surface-variant font-medium">Plaqueta Inicial:</b> <span class="font-medium text-on-surface">${item.plaquetaInicial || 'Não informada'}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Plaqueta Final:</b> <span class="font-medium text-on-surface">${item.plaquetaFinal || item.plaquetaInicial || 'Não informada'}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Coordenada Inicial:</b> <span class="font-medium text-on-surface">${coordIni.formatted}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Coordenada Reparo:</b> <span class="font-medium text-on-surface">${coordFin.formatted}</span></div>
+                    <div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Seção: Gestão de Sessões de Trabalho & Equipe (Praça Pública / Manutenção) -->
+        ${(item.sessoesList && item.sessoesList.length > 0) ? `
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
+            <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                <span class="flex items-center gap-1.5 text-blue-700">
+                    <span class="material-symbols-outlined text-[18px]">groups</span>
+                    <span>Gestão de Sessões & Equipe</span>
+                </span>
+                ${item.tempoTotalFormatado ? `
+                <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-200 shadow-2xs">
+                    ⏱️ Tempo Total: ${item.tempoTotalFormatado}
+                </span>
+                ` : ''}
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                ${item.sessoesList.map(s => {
+                    const st = (s.status || '').toUpperCase();
+                    const isEmAndamento = st.includes('ANDAMENTO');
+                    const badgeBg = isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
+                    const iconStr = isEmAndamento ? 'play_arrow' : 'task_alt';
+                    const dataInc = s.inicioStr || 'Início registrado';
+                    const dataFim = s.fimStr || (isEmAndamento ? 'Em andamento...' : 'Concluída');
+                    const durStr = s.duracao_minutos ? (s.duracao_minutos >= 60 ? `${Math.floor(s.duracao_minutos/60)}h ${s.duracao_minutos%60}min (${s.duracao_minutos} min)` : `${s.duracao_minutos} min`) : '';
+
+                    return `
+                    <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 flex flex-col justify-between space-y-2 shadow-2xs">
+                        <div class="flex items-center justify-between gap-1 border-b border-slate-100 pb-1.5">
+                            <span class="font-bold text-[12px] text-slate-800 flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-blue-600">${iconStr}</span>
+                                Sessão #${s.numero || 1}
+                            </span>
+                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">${s.status || 'REGISTRADA'}</span>
+                        </div>
+                        
+                        <div class="text-[11px] text-slate-600 space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span><b class="text-slate-500 font-medium">Equipe:</b> <span class="font-semibold text-slate-800">${s.qtd_eletricistas || item.qtdEletricistas || 1} Eletricista(s)</span></span>
+                                ${s.tecnico ? `<span class="text-slate-500 text-[10px]"><b>Técnico:</b> ${s.tecnico}</span>` : ''}
+                            </div>
+                            <div class="bg-slate-50/80 p-1.5 rounded-lg border border-slate-200/60 space-y-0.5 text-[10.5px]">
+                                <div><b class="text-slate-500 font-medium">Início:</b> ${dataInc}</div>
+                                <div><b class="text-slate-500 font-medium">Fim:</b> ${dataFim}</div>
+                            </div>
+                            ${durStr ? `<div class="text-blue-700 font-bold text-[11px] pt-0.5">⏱️ Duração: ${durStr}</div>` : ''}
+                        </div>
+                    </div>
+                    `;
+                }).join('')}
+            </div>
+        </div>
+        ` : (item.tempoTotalFormatado ? `
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs flex items-center justify-between">
+            <span class="font-bold text-secondary flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-blue-600">timer</span>
+                <span>Tempo Total de Trabalho:</span>
+            </span>
+            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                ${item.tempoTotalFormatado}
+            </span>
+        </div>
+        ` : '')}
+
+        <!-- Seção 3: Observações & Histórico -->
+        ${(() => {
+            const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();
+            const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
+
+            if (!obsIni && !obsFin) {
+                return `
+                <div class="p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs flex items-center gap-2 text-on-surface-variant italic">
+                    <span class="material-symbols-outlined text-[18px] text-outline">notes</span>
+                    <span>Nenhuma observação ou texto de histórico registrado.</span>
+                </div>`;
+            }
+
+            let bodyObs = '';
+            if (obsIni && obsFin && obsIni !== obsFin) {
+                bodyObs = `<div><b class="text-secondary font-semibold">📌 Abertura / Solicitante:</b> ${obsIni.replace(/\n/g, '<br/>')}</div><div class="mt-2 pt-2 border-t border-outline-variant/30"><b class="text-secondary font-semibold">📝 Conclusão / Histórico:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
+            } else {
+                bodyObs = `<div>${(obsFin || obsIni).replace(/\n/g, '<br/>')}</div>`;
+            }
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1.5">
+                <strong class="text-secondary font-bold flex items-center gap-1.5 mb-1">
+                    <span class="material-symbols-outlined text-[16px]">notes</span>
+                    <span>Observações & Histórico</span>
+                </strong>
+                <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 font-mono text-[11px] text-on-surface max-h-32 overflow-y-auto leading-relaxed">
+                    ${bodyObs}
+                </div>
+            </div>`;
+        })()}
+        `;
+    }
 }
+
+// Global helpers for row click details modal
+window.abrirDetalhesOSModal = function(id) {
+    if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+        window.painelController.abrirDetalhesOSModal(id);
+    } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+        window.auditoriaController.abrirDetalhesOSModal(id);
+    } else {
+        console.warn('Controller não encontrado para a OS:', id);
+    }
+};
 
 // Helper global para expandir/recolher pontos extras na tabela
 window.toggleInlinePoints = function(btn, extraCount, event) {
