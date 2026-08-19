@@ -29,53 +29,62 @@ window.AuthGuard = {
     getUserRole(user, profile) {
         const email = (user?.email || profile?.email || '').toLowerCase().trim();
 
-        // Coleta todas as propriedades candidatas a definir o papel do usuário
-        const candidates = [
+        // 1. Fonte da Verdade Principal: Dados vindos diretamente da tabela 'profiles' no banco de dados
+        const profileRoleCandidates = [
             profile?.role,
-            profile?.cargo_solicitado,
             profile?.cargo,
             profile?.categoria,
             profile?.tipo,
             profile?.perfil,
-            profile?.funcao,
-            user?.user_metadata?.role,
-            user?.user_metadata?.cargo_solicitado,
-            user?.user_metadata?.cargo,
-            user?.user_metadata?.categoria,
-            user?.user_metadata?.tipo,
-            user?.app_metadata?.role,
-            user?.app_metadata?.claims?.role
+            profile?.funcao
         ].filter(Boolean).map(s => String(s).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
 
         let finalRole = '';
 
-        // 1. Verificação prioritária para Ouvidoria
-        if (candidates.some(c => c.includes('ouvidor') || c.includes('ouvidoria'))) {
-            finalRole = 'ouvidoria';
-        }
-        // 2. Verificação para Agente de Manutenção
-        else if (candidates.some(c => c.includes('manutencao') || c.includes('manutentor'))) {
-            finalRole = 'manutentor';
-        }
-        // 3. Verificação para Cidadão / Gov.br
-        else if (candidates.some(c => c.includes('cidadao') || c.includes('citizen') || c.includes('govbr'))) {
-            finalRole = 'cidadao';
-        }
-        // 4. Verificação para Operador de Campo
-        else if (candidates.some(c => c.includes('campo') || c.includes('tecnico') || c.includes('executor') || c.includes('operador') || c.includes('operacional'))) {
-            finalRole = 'operador';
-        }
-        // 5. Verificação para Administrador
-        else if (candidates.some(c => c.includes('admin') || c.includes('gestor') || c.includes('gerente') || c.includes('supervisor'))) {
-            finalRole = 'admin';
+        if (profileRoleCandidates.length > 0) {
+            if (profileRoleCandidates.some(c => c.includes('admin') || c.includes('gestor') || c.includes('gerente') || c.includes('supervisor'))) {
+                finalRole = 'admin';
+            } else if (profileRoleCandidates.some(c => c.includes('ouvidor') || c.includes('ouvidoria'))) {
+                finalRole = 'ouvidoria';
+            } else if (profileRoleCandidates.some(c => c.includes('manutencao') || c.includes('manutentor'))) {
+                finalRole = 'manutentor';
+            } else if (profileRoleCandidates.some(c => c.includes('cidadao') || c.includes('citizen') || c.includes('govbr'))) {
+                finalRole = 'cidadao';
+            } else if (profileRoleCandidates.some(c => c.includes('campo') || c.includes('tecnico') || c.includes('executor') || c.includes('operador') || c.includes('operacional'))) {
+                finalRole = 'operador';
+            }
         }
 
-        // Se nenhuma propriedade explícita foi conclusiva, faz o fallback pelo e-mail
-        if (!finalRole && email) {
-            if (email.includes('ouvidoria') || email.includes('ouvidor')) {
-                finalRole = 'ouvidoria';
-            } else if (email.includes('admin') || email.includes('gestor') || email.includes('gerente') || email.includes('supervisor')) {
+        // 2. Fallback: Se a tabela 'profiles' não retornou um papel decisivo, verifica os metadados do usuário no Supabase Auth
+        if (!finalRole) {
+            const metadataCandidates = [
+                user?.user_metadata?.role,
+                user?.user_metadata?.cargo,
+                user?.user_metadata?.categoria,
+                user?.user_metadata?.tipo,
+                user?.app_metadata?.role,
+                user?.app_metadata?.claims?.role
+            ].filter(Boolean).map(s => String(s).toLowerCase().trim().normalize("NFD").replace(/[\u0300-\u036f]/g, ""));
+
+            if (metadataCandidates.some(c => c.includes('admin') || c.includes('gestor') || c.includes('gerente') || c.includes('supervisor'))) {
                 finalRole = 'admin';
+            } else if (metadataCandidates.some(c => c.includes('ouvidor') || c.includes('ouvidoria'))) {
+                finalRole = 'ouvidoria';
+            } else if (metadataCandidates.some(c => c.includes('manutencao') || c.includes('manutentor'))) {
+                finalRole = 'manutentor';
+            } else if (metadataCandidates.some(c => c.includes('cidadao') || c.includes('citizen') || c.includes('govbr'))) {
+                finalRole = 'cidadao';
+            } else if (metadataCandidates.some(c => c.includes('campo') || c.includes('tecnico') || c.includes('executor') || c.includes('operador') || c.includes('operacional'))) {
+                finalRole = 'operador';
+            }
+        }
+
+        // 3. Fallback final pelo e-mail se nada for conclusivo
+        if (!finalRole && email) {
+            if (email.includes('admin') || email.includes('gestor') || email.includes('gerente') || email.includes('supervisor')) {
+                finalRole = 'admin';
+            } else if (email.includes('ouvidoria') || email.includes('ouvidor')) {
+                finalRole = 'ouvidoria';
             } else if (email.includes('manutentor') || email.includes('manutencao')) {
                 finalRole = 'manutentor';
             } else if (email.includes('campo') || email.includes('tecnico') || email.includes('executor') || email.includes('operador') || email.includes('operacional')) {
@@ -91,7 +100,6 @@ window.AuthGuard = {
         console.log('🔍 [AuthGuard DEBUG] getUserRole resolvido:', {
             email: email,
             finalRole: finalRole,
-            candidates: candidates,
             profileObj: profile,
             userMetadata: user?.user_metadata
         });

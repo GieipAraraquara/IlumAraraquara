@@ -366,18 +366,14 @@
             if (btnIcon) btnIcon.classList.add('animate-spin');
 
             try {
-                // Registrar usuário no Supabase Auth com role 'ouvidoria' e status 'pendente'
+                // Registrar usuário no Supabase Auth com apenas informações básicas de perfil nos metadados
                 const { data, error } = await window.supabaseClient.auth.signUp({
                     email: email,
                     password: password,
                     options: {
                         data: {
                             nome: nome,
-                            full_name: nome,
-                            role: 'ouvidoria',
-                            cargo_solicitado: 'ouvidoria',
-                            status: 'pendente',
-                            ativo: false
+                            full_name: nome
                         }
                     }
                 });
@@ -393,7 +389,7 @@
                 } else if (data) {
                     console.log('✅ [Cadastro DEBUG] Usuário cadastrado no Supabase Auth:', data.user);
 
-                    // Tentar upsert na tabela profiles com role 'ouvidoria', status 'pendente' e ativo = false
+                    // Tentar upsert na tabela profiles com role 'ouvidoria', status 'pendente' e ativo = false (Fonte da Verdade)
                     if (data.user) {
                         try {
                             const { error: profileErr } = await window.supabaseClient
@@ -403,7 +399,6 @@
                                     email: email,
                                     nome: nome,
                                     role: 'ouvidoria',
-                                    cargo_solicitado: 'ouvidoria',
                                     status: 'pendente',
                                     ativo: false
                                 });
