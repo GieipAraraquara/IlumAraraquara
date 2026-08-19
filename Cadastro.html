@@ -136,7 +136,7 @@
                 <span class="material-symbols-outlined text-[32px]">person_add</span>
             </div>
             <h1 class="text-2xl font-bold tracking-tight text-on-surface">Solicitar Cadastro</h1>
-            <p class="text-xs font-medium text-on-surface-variant mt-1">Servidores da Prefeitura (@araraquara.sp.gov.br)</p>
+            <p class="text-xs font-medium text-on-surface-variant mt-1">Servidores e Colaboradores (@araraquara.sp.gov.br / @ilumiterra.com)</p>
         </div>
 
         <!-- Alert Message Container -->
@@ -180,17 +180,17 @@
             <div>
                 <div class="flex items-center justify-between mb-1.5">
                     <label for="reg-email" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant">E-mail Institucional</label>
-                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full">Exclusivo Prefeitura</span>
+                    <span class="text-[10px] font-bold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full">Domínios Autorizados</span>
                 </div>
                 <div class="relative">
                     <input type="email" 
                            id="reg-email" 
                            required 
-                           placeholder="nome@araraquara.sp.gov.br"
+                           placeholder="nome@araraquara.sp.gov.br ou nome@ilumiterra.com"
                            class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-medium text-on-surface placeholder:text-on-surface-variant/50 focus:outline-none focus:ring-2 focus:ring-secondary focus:border-secondary transition-all" />
                     <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">mail</span>
                 </div>
-                <p class="text-[11px] text-on-surface-variant/70 mt-1">Obrigatório terminar com <strong class="text-on-surface">@araraquara.sp.gov.br</strong></p>
+                <p class="text-[11px] text-on-surface-variant/70 mt-1">Obrigatório terminar com <strong class="text-on-surface">@araraquara.sp.gov.br</strong> ou <strong class="text-on-surface">@ilumiterra.com</strong></p>
             </div>
 
             <!-- Campo Senha -->
@@ -257,11 +257,12 @@
 
     <!-- Script de Validação e Cadastro no Supabase -->
     <script>
-        // Validação estrita do domínio institucional @araraquara.sp.gov.br
+        // Validação estrita dos domínios institucionais (@araraquara.sp.gov.br e @ilumiterra.com)
         function validarEmailAraraquara(email) {
             if (!email) return false;
             const cleanEmail = email.trim().toLowerCase();
-            return cleanEmail.endsWith('@araraquara.sp.gov.br') && 
+            const dominioValido = cleanEmail.endsWith('@araraquara.sp.gov.br') || cleanEmail.endsWith('@ilumiterra.com');
+            return dominioValido && 
                    cleanEmail.indexOf('@') === cleanEmail.lastIndexOf('@') && 
                    cleanEmail.split('@')[0].length > 0;
         }
@@ -337,9 +338,9 @@
                 return;
             }
 
-            // 2. Validação estrita do E-mail (@araraquara.sp.gov.br)
+            // 2. Validação estrita do E-mail (@araraquara.sp.gov.br ou @ilumiterra.com)
             if (!validarEmailAraraquara(email)) {
-                exibirAlerta('O cadastro é permitido EXCLUSIVAMENTE para e-mails oficiais terminados em @araraquara.sp.gov.br');
+                exibirAlerta('O cadastro é permitido EXCLUSIVAMENTE para e-mails oficiais terminados em @araraquara.sp.gov.br ou @ilumiterra.com');
                 return;
             }
 
