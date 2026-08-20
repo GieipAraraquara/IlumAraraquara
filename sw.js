@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v99';
+const CACHE_NAME = 'sistema-os-pwa-v100';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -21,7 +21,8 @@ const ASSETS_TO_CACHE = [
   './js/controllers/AuditoriaController.js?v=44',
   './js/services/CloudinaryService.js',
   './js/services/OfflineSyncService.js',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap'
 ];
 
 self.addEventListener('install', (event) => {
