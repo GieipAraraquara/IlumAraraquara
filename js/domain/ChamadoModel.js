@@ -748,24 +748,61 @@ class ChamadoModel {
 
     static parseLatLng(str) {
         if (!str) return null;
+        if (typeof str === 'object' && str !== null) {
+            if (str.lat !== undefined && str.lng !== undefined) {
+                const lat = parseFloat(str.lat);
+                const lng = parseFloat(str.lng);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    if (Math.abs(lat) > 35 && Math.abs(lng) < 35) {
+                        return { lat: lng, lng: lat };
+                    }
+                    return { lat, lng };
+                }
+            }
+            if (str.coordinates && Array.isArray(str.coordinates) && str.coordinates.length >= 2) {
+                const p1 = parseFloat(str.coordinates[0]);
+                const p2 = parseFloat(str.coordinates[1]);
+                if (!isNaN(p1) && !isNaN(p2)) {
+                    if (Math.abs(p1) > 35 && Math.abs(p2) < 35) {
+                        return { lat: p2, lng: p1 };
+                    }
+                    return { lat: p1, lng: p2 };
+                }
+            }
+        }
+
         const clean = ChamadoModel.formatLocationText(str);
+        if (!clean || clean === '[---]' || clean === '---' || clean === 'null') return null;
+
         if (/POINT\s*\(([^)]+)\)/i.test(clean)) {
             const matches = clean.match(/POINT\s*\(([^)]+)\)/i);
             if (matches && matches[1]) {
                 const parts = matches[1].trim().split(/\s+/);
                 if (parts.length >= 2) {
-                    const lng = parseFloat(parts[0]);
-                    const lat = parseFloat(parts[1]);
-                    if (!isNaN(lat) && !isNaN(lng)) return { lat, lng };
+                    const p1 = parseFloat(parts[0]);
+                    const p2 = parseFloat(parts[1]);
+                    if (!isNaN(p1) && !isNaN(p2)) {
+                        if (Math.abs(p1) > 35 && Math.abs(p2) < 35) {
+                            return { lat: p2, lng: p1 };
+                        }
+                        return { lat: p1, lng: p2 };
+                    }
                 }
             }
         }
+
         const parts = clean.split(',').map(s => parseFloat(s.trim()));
-        if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-            return { lat: parts[0], lng: parts[1] };
+        if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+            const p1 = parts[0];
+            const p2 = parts[1];
+            if (Math.abs(p1) > 35 && Math.abs(p2) < 35) {
+                return { lat: p2, lng: p1 };
+            }
+            return { lat: p1, lng: p2 };
         }
         return null;
     }
+
 
     /**
      * Formata qualquer representação de coordenada em par lat/lng limpo e legível

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v43';
+const CACHE_NAME = 'sistema-os-pwa-v45';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -9,10 +9,10 @@ const ASSETS_TO_CACHE = [
   './manifest.json',
   './js/config/supabaseClient.js',
   './js/config/cloudinaryConfig.js',
-  './js/guards/authGuard.js?v=20',
-  './js/domain/ChamadoModel.js?v=20',
-  './js/repositories/ChamadosRepository.js?v=20',
-  './js/services/ChamadosService.js?v=20',
+  './js/guards/authGuard.js?v=25',
+  './js/domain/ChamadoModel.js?v=25',
+  './js/repositories/ChamadosRepository.js?v=25',
+  './js/services/ChamadosService.js?v=25',
   './js/services/CloudinaryService.js',
   './js/services/OfflineSyncService.js'
 ];

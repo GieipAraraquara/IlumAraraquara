@@ -12,10 +12,10 @@
     <!-- Scripts & Clean Architecture Layers -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/guards/authGuard.js?v=21"></script>
-    <script src="js/domain/ChamadoModel.js?v=21"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=21"></script>
-    <script src="js/services/ChamadosService.js?v=21"></script>
+    <script src="js/guards/authGuard.js?v=25"></script>
+    <script src="js/domain/ChamadoModel.js?v=25"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=25"></script>
+    <script src="js/services/ChamadosService.js?v=25"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -805,6 +805,79 @@
         }
     }
 
+    var GEO_CACHE_KEY = 'sys_os_geocache_v1';
+
+    function getCachedGeocode(enderecoText) {
+        if (!enderecoText) return null;
+        const key = enderecoText.toLowerCase().trim();
+        try {
+            const raw = localStorage.getItem(GEO_CACHE_KEY);
+            if (raw) {
+                const cache = JSON.parse(raw);
+                if (cache[key]) return cache[key];
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    function setCachedGeocode(enderecoText, coords) {
+        if (!enderecoText || !coords) return;
+        const key = enderecoText.toLowerCase().trim();
+        try {
+            const raw = localStorage.getItem(GEO_CACHE_KEY);
+            const cache = raw ? JSON.parse(raw) : {};
+            cache[key] = coords;
+            localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(cache));
+        } catch (e) {}
+    }
+
+    async function geocodificarEnderecosFaltantes(dadosOSs) {
+        if (!dadosOSs || !Array.isArray(dadosOSs) || dadosOSs.length === 0) return;
+
+        let houveAtualizacao = false;
+        const maxGeocodeRequests = 20;
+        let count = 0;
+
+        for (const os of dadosOSs) {
+            if (!os.pontos || !Array.isArray(os.pontos)) continue;
+            for (const pt of os.pontos) {
+                if (pt.needsGeocoding && pt.endereco && pt.endereco !== 'Araraquara, SP' && pt.endereco !== 'Ponto não informado') {
+                    if (count >= maxGeocodeRequests) break;
+                    
+                    let endLimpo = pt.endereco.split('|')[0].trim().replace(/^Plaqueta:\s*/i, '');
+                    if (!endLimpo || endLimpo.length < 4 || endLimpo.startsWith('[---]')) continue;
+
+                    try {
+                        const query = encodeURIComponent(`${endLimpo}, Araraquara, SP, Brasil`);
+                        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${MAPBOX_TOKEN}&limit=1`);
+                        const geoData = await res.json();
+                        
+                        if (geoData && geoData.features && geoData.features.length > 0) {
+                            const center = geoData.features[0].center; // [lng, lat]
+                            if (center && center.length >= 2) {
+                                const geolng = center[0];
+                                const geolat = center[1];
+                                pt.lng = geolng;
+                                pt.lat = geolat;
+                                pt.needsGeocoding = false;
+                                setCachedGeocode(pt.endereco, { lat: geolat, lng: geolng });
+                                houveAtualizacao = true;
+                                count++;
+                            }
+                        }
+                    } catch(e) {
+                        console.warn("⚠️ Geocoding Mapbox falhou para:", endLimpo, e);
+                    }
+                }
+            }
+            if (count >= maxGeocodeRequests) break;
+        }
+
+        if (houveAtualizacao) {
+            aplicarFiltrosMapa();
+        }
+    }
+
     async function carregarMapaOSsAbertas() {
         if (window.AuthGuard) {
             const authData = await window.AuthGuard.requireAuth();
@@ -832,6 +905,9 @@
             dadosOSsAbertasCache = converterChamadosModelParaMapa(chamadosList || []);
 
             aplicarFiltrosMapa();
+
+            // Geocodificação em segundo plano para ordens com endereço mas sem coordenada GPS prévia
+            geocodificarEnderecosFaltantes(dadosOSsAbertasCache);
         } catch (err) {
             console.warn("⚠️ Erro ao carregar OSs para o mapa via Supabase:", err);
             if (stat) stat.innerHTML = '<span class="text-error">Erro ao carregar dados do Supabase.</span>';
@@ -840,40 +916,109 @@
 
     function converterChamadosModelParaMapa(chamadosList) {
         return chamadosList.map(c => {
-            let lat = null;
-            let lng = null;
-
-            // Extrai coordenadas formatadas da entidade ChamadoModel
-            const coordStr = window.ChamadoModel ? window.ChamadoModel.formatLocationText(c.coordenadaInicial || c.coordenadaReparo) : (c.coordenadaInicial || c.coordenadaReparo || '');
-            if (coordStr) {
-                const parts = coordStr.split(',');
-                if (parts.length >= 2) {
-                    const pLat = parseFloat(parts[0]);
-                    const pLng = parseFloat(parts[1]);
-                    if (!isNaN(pLat) && !isNaN(pLng)) {
-                        lat = pLat;
-                        lng = pLng;
-                    }
-                }
-            }
-
-            // Fallback de amostragem geográfica determinística em Araraquara quando a OS não possuir GPS explícito
-            if (lat === null || lng === null) {
-                const hashStr = String(c.id || c.protocolo || 'OS');
-                let hash = 0;
-                for (let i = 0; i < hashStr.length; i++) {
-                    hash = (hash << 5) - hash + hashStr.charCodeAt(i);
-                    hash |= 0;
-                }
-                const offsetLat = ((Math.abs(hash) % 100) - 50) * 0.0006;
-                const offsetLng = ((Math.abs(hash * 13) % 100) - 50) * 0.0006;
-                lat = -21.7946 + offsetLat;
-                lng = -48.1766 + offsetLng;
-            }
-
             const formattedDate = (c.dataAbertura && !isNaN(c.dataAbertura.getTime())) 
                 ? c.dataAbertura.toLocaleDateString('pt-BR') 
                 : new Date().toLocaleDateString('pt-BR');
+
+            let pontosProcessados = [];
+
+            // 1. Processa múltiplos pontos se c.rawPontos for um array JSON ou lista válida
+            let rawPts = c.rawPontos;
+            if (typeof rawPts === 'string') {
+                try { rawPts = JSON.parse(rawPts); } catch(e) { rawPts = null; }
+            }
+
+            if (Array.isArray(rawPts) && rawPts.length > 0) {
+                rawPts.forEach((pObj, pIdx) => {
+                    if (!pObj) return;
+                    const endText = pObj.endereco || pObj.local || (c.addressPoints && c.addressPoints[pIdx]) || c.endereco || '';
+                    const plaqText = pObj.plaqueta || pObj.plaqueta_inicial || c.plaquetaInicial || '[---]';
+                    const probText = pObj.problema || pObj.problema_inicial || c.problemaInicial || 'Outro';
+                    const coordRaw = pObj.coordenada || pObj.coordenada_inicial || pObj.coordenada_reparo || (pObj.lat && pObj.lng ? `${pObj.lat}, ${pObj.lng}` : null) || (pIdx === 0 ? (c.coordenadaInicial || c.coordenadaReparo) : null);
+
+                    let parsedPt = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordRaw) : null;
+                    let lat = parsedPt ? parsedPt.lat : null;
+                    let lng = parsedPt ? parsedPt.lng : null;
+                    let isGeocoded = false;
+
+                    if ((lat === null || lng === null) && endText) {
+                        const cached = getCachedGeocode(endText);
+                        if (cached && !isNaN(cached.lat) && !isNaN(cached.lng)) {
+                            lat = cached.lat;
+                            lng = cached.lng;
+                            isGeocoded = true;
+                        }
+                    }
+
+                    let needsGeocode = false;
+                    if (lat === null || lng === null) {
+                        const hashStr = String(c.id || c.protocolo || 'OS') + '_' + pIdx;
+                        let hash = 0;
+                        for (let i = 0; i < hashStr.length; i++) {
+                            hash = (hash << 5) - hash + hashStr.charCodeAt(i);
+                            hash |= 0;
+                        }
+                        const offsetLat = ((Math.abs(hash) % 100) - 50) * 0.0006;
+                        const offsetLng = ((Math.abs(hash * 13) % 100) - 50) * 0.0006;
+                        lat = -21.7946 + offsetLat;
+                        lng = -48.1766 + offsetLng;
+                        if (endText) needsGeocode = true;
+                    }
+
+                    pontosProcessados.push({
+                        lat: lat,
+                        lng: lng,
+                        endereco: endText || 'Araraquara, SP',
+                        plaqueta: plaqText,
+                        problema: probText,
+                        needsGeocoding: needsGeocode
+                    });
+                });
+            }
+
+            // 2. Se nenhum ponto foi extraído de rawPontos, usa os dados da OS principal
+            if (pontosProcessados.length === 0) {
+                const coordRaw = c.coordenadaInicial || c.coordenadaReparo;
+                let parsedPt = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordRaw) : null;
+                let lat = parsedPt ? parsedPt.lat : null;
+                let lng = parsedPt ? parsedPt.lng : null;
+                let isGeocoded = false;
+
+                const endText = (c.addressPoints && Array.isArray(c.addressPoints)) ? c.addressPoints.join(' | ') : (c.endereco || '');
+
+                if ((lat === null || lng === null) && endText) {
+                    const cached = getCachedGeocode(endText);
+                    if (cached && !isNaN(cached.lat) && !isNaN(cached.lng)) {
+                        lat = cached.lat;
+                        lng = cached.lng;
+                        isGeocoded = true;
+                    }
+                }
+
+                let needsGeocode = false;
+                if (lat === null || lng === null) {
+                    const hashStr = String(c.id || c.protocolo || 'OS');
+                    let hash = 0;
+                    for (let i = 0; i < hashStr.length; i++) {
+                        hash = (hash << 5) - hash + hashStr.charCodeAt(i);
+                        hash |= 0;
+                    }
+                    const offsetLat = ((Math.abs(hash) % 100) - 50) * 0.0006;
+                    const offsetLng = ((Math.abs(hash * 13) % 100) - 50) * 0.0006;
+                    lat = -21.7946 + offsetLat;
+                    lng = -48.1766 + offsetLng;
+                    if (endText) needsGeocode = true;
+                }
+
+                pontosProcessados.push({
+                    lat: lat,
+                    lng: lng,
+                    endereco: endText || 'Araraquara, SP',
+                    plaqueta: c.plaquetaInicial || '[---]',
+                    problema: c.problemaInicial || 'Outro',
+                    needsGeocoding: needsGeocode
+                });
+            }
             
             return {
                 id: c.id,
@@ -890,13 +1035,7 @@
                 descricao: c.problemaInicial || '',
                 logs: c.observacaoFinal || '',
                 fotos: c.fotosEvidencias || [],
-                pontos: [{
-                    lat: lat,
-                    lng: lng,
-                    endereco: (c.addressPoints && Array.isArray(c.addressPoints)) ? c.addressPoints.join(' | ') : (c.endereco || 'Araraquara, SP'),
-                    plaqueta: c.plaquetaInicial || '[---]',
-                    problema: c.problemaInicial || 'Outro'
-                }]
+                pontos: pontosProcessados
             };
         });
     }
