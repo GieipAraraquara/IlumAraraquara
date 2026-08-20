@@ -5,8 +5,11 @@
     <title>OS Iluminação e Praças - Araraquara</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
     <!-- Supabase JS Client para gravação direta no navegador -->
@@ -38,6 +41,22 @@
     </script>
 
     <style>
+      .material-symbols-outlined {
+        font-family: 'Material Symbols Outlined' !important;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: 'liga';
+      }
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
@@ -2723,30 +2742,33 @@
              return;
          }
 
-         var pt = pontosData[idx];
+         var pt = pontosData[idx] || {};
          var prob = document.getElementById('tipoProblema_' + idx);
-         if (!prob.value) prob.classList.add('input-invalido'); 
+         if (prob && !prob.value) prob.classList.add('input-invalido'); 
 
          if (pt.usarMesmoEndereco) {
              validarProximoAsync(idx + 1);
              return;
          }
 
-         var modo = document.querySelector('input[name="tipoLocal_'+idx+'"]:checked').value;
+         var radioModo = document.querySelector('input[name="tipoLocal_'+idx+'"]:checked');
+         var modo = radioModo ? radioModo.value : (pt.modo || 'plaqueta');
          
          if (modo === 'plaqueta' && !pt.enderecoValidado) {
              var pInput = document.getElementById('inputPlaqueta_' + idx);
-             if (/^[A-Z]\d{4}$/.test(pInput.value.trim().toUpperCase())) {
-                 btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
+             if (pInput && /^[A-Z]\d{4}$/.test(pInput.value.trim().toUpperCase())) {
+                 if (btn) btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
                  validarPlaqueta(true, idx);
              } else {
-                 pInput.classList.add('input-invalido'); document.getElementById('msgErroPonto_' + idx).innerText = "Preencha a plaqueta";
+                 if (pInput) pInput.classList.add('input-invalido'); 
+                 var elMsgErr = document.getElementById('msgErroPonto_' + idx);
+                 if (elMsgErr) elMsgErr.innerText = "Preencha a plaqueta";
                  validarProximoAsync(idx + 1);
              }
          } else if (modo === 'coordenadas' && !pt.enderecoValidado) {
              var latIn = document.getElementById('lat_' + idx); var lngIn = document.getElementById('lng_' + idx);
-             if (latIn.value.trim() && lngIn.value.trim()) {
-                 btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
+             if (latIn && lngIn && latIn.value.trim() && lngIn.value.trim()) {
+                 if (btn) btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
                  validarCoordsManuais(true, idx);
              } else {
                  latIn.classList.add('input-invalido'); lngIn.classList.add('input-invalido');
@@ -2778,12 +2800,14 @@
         var temErrosMassa = false;
         
         for (var i = 0; i < qtdAtual; i++) {
-           var pt = pontosData[i];
-           if (!document.getElementById('tipoProblema_' + i).value) temErrosMassa = true;
+           var pt = pontosData[i] || {};
+           var elProb = document.getElementById('tipoProblema_' + i);
+           if (!elProb || !elProb.value) temErrosMassa = true;
            
            if (!pt.usarMesmoEndereco && !pt.enderecoValidado) {
                temErrosMassa = true;
-               document.getElementById('msgErroPonto_' + i).innerText = "Localização pendente ou com erro.";
+               var elErr = document.getElementById('msgErroPonto_' + i);
+               if (elErr) elErr.innerText = "Localização pendente ou com erro.";
            }
         }
 
@@ -2933,26 +2957,36 @@
 
            var modoSel = "";
            if (ptState.usarMesmoEndereco) {
-               var pt0 = pontosData[0];
-               modoSel = document.querySelector('input[name="tipoLocal_0"]:checked').value;
+               var pt0 = pontosData[0] || {};
+               var elRadio0 = document.querySelector('input[name="tipoLocal_0"]:checked');
+               modoSel = elRadio0 ? elRadio0.value : (pt0.modo || 'plaqueta');
                var lat0_6 = pt0.latAtual ? Number(pt0.latAtual).toFixed(6) : "";
                var lng0_6 = pt0.lngAtual ? Number(pt0.lngAtual).toFixed(6) : "";
                coordStr = (lat0_6 && lng0_6) ? (lat0_6 + ", " + lng0_6) : "";
-               plaq = (modoSel === 'plaqueta') ? document.getElementById('inputPlaqueta_0').value.toUpperCase().trim() : "";
-               end = (modoSel === 'endereco') ? document.getElementById('endereco_0').value.trim() : "";
-               isDup = pt0.isPlaquetaDuplicadaOrigem;
+               var elPlaq0 = document.getElementById('inputPlaqueta_0');
+               plaq = (modoSel === 'plaqueta' && elPlaq0) ? elPlaq0.value.toUpperCase().trim() : (pt0.plaqueta || "");
+               var elEnd0 = document.getElementById('endereco_0');
+               end = (modoSel === 'endereco' && elEnd0) ? elEnd0.value.trim() : (pt0.endereco || "");
+               isDup = pt0.isPlaquetaDuplicadaOrigem || false;
            } else {
-               modoSel = document.querySelector('input[name="tipoLocal_'+i+'"]:checked').value;
+               var elRadioI = document.querySelector('input[name="tipoLocal_'+i+'"]:checked');
+               modoSel = elRadioI ? elRadioI.value : (ptState.modo || 'plaqueta');
                var lat_6 = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : "";
                var lng_6 = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : "";
                coordStr = (lat_6 && lng_6) ? (lat_6 + ", " + lng_6) : "";
-               plaq = (modoSel === 'plaqueta') ? document.getElementById('inputPlaqueta_' + i).value.toUpperCase().trim() : "";
-               end = (modoSel === 'endereco') ? document.getElementById('endereco_' + i).value.trim() : "";
-               isDup = ptState.isPlaquetaDuplicadaOrigem;
+               var elPlaqI = document.getElementById('inputPlaqueta_' + i);
+               plaq = (modoSel === 'plaqueta' && elPlaqI) ? elPlaqI.value.toUpperCase().trim() : (ptState.plaqueta || "");
+               var elEndI = document.getElementById('endereco_' + i);
+               end = (modoSel === 'endereco' && elEndI) ? elEndI.value.trim() : (ptState.endereco || "");
+               isDup = ptState.isPlaquetaDuplicadaOrigem || false;
            }
            
-           var prob = document.getElementById('tipoProblema_' + i).value;
-           if (prob === "Outros") prob = document.getElementById('problemaOutros_' + i).value.trim();
+           var elProb = document.getElementById('tipoProblema_' + i);
+           var prob = elProb ? elProb.value : "";
+           if (prob === "Outros") {
+             var elOutros = document.getElementById('problemaOutros_' + i);
+             if (elOutros) prob = elOutros.value.trim();
+           }
 
            arrPontosPayload.push({
              modo: modoSel,

@@ -8,12 +8,12 @@
     <!-- Scripts & Clean Architecture Layers -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/guards/authGuard.js?v=25"></script>
-    <script src="js/domain/ChamadoModel.js?v=25"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=25"></script>
-    <script src="js/services/ChamadosService.js?v=25"></script>
-    <script src="js/services/MapService.js?v=25"></script>
-    <script src="js/controllers/AuditoriaController.js?v=25"></script>
+    <script src="js/guards/authGuard.js?v=30"></script>
+    <script src="js/domain/ChamadoModel.js?v=43"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=30"></script>
+    <script src="js/services/ChamadosService.js?v=30"></script>
+    <script src="js/services/MapService.js?v=73"></script>
+    <script src="js/controllers/AuditoriaController.js?v=44"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -24,7 +24,9 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
     
     <!-- Fonts & Icons -->
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
     
     <script id="tailwind-config">
@@ -130,6 +132,29 @@
     </script>
     
     <style>
+        select, select.problem-select {
+            background-image: none !important;
+            -webkit-appearance: none !important;
+            appearance: none !important;
+        }
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined' !important;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga' 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga' 1;
+            text-rendering: optimizeLegibility;
+        }
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -1027,6 +1052,10 @@
                                                 <input type="checkbox" name="praca-status-filter" value="cancelada" checked class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Cancelada</span>
                                             </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="rejeitada" checked class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Rejeitada / Recusada</span>
+                                            </label>
                                             <div class="border-t border-outline-variant my-1 pt-1">
                                                 <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearPracaStatusFilter()">Limpar Filtro</button>
                                             </div>
@@ -1411,11 +1440,212 @@
                 </table>
             </div>
         </div>
+
+        <!-- Tabela de Demandas Emergenciais (Atendimento Direto) -->
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-amber-200/80 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
+            <div class="px-5 py-4 border-b border-amber-200/60 bg-amber-50/60 flex justify-between items-center">
+                <h3 class="font-data-tabular text-data-tabular font-bold text-amber-950 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[20px] text-amber-600">electric_bolt</span>
+                    <span>Demandas Emergenciais (Atendimento Direto)</span>
+                </h3>
+                <span class="text-label-sm text-amber-900 bg-amber-100/90 px-2.5 py-1 rounded-full font-semibold" id="emergencia-badge-count">
+                    0 Registros
+                </span>
+            </div>
+            
+            <div class="w-full min-h-[250px] overflow-visible">
+                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="emergencia-services-table">
+                    <thead>
+                        <tr class="bg-amber-50/50 border-b border-amber-200/80 overflow-visible z-20 relative">
+                            <!-- Column 1: Protocolo / Técnico com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 140px; min-width: 140px;" data-col="0">
+                                <div class="relative inline-block text-left group/emg-protocol-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-amber-100/70 transition-colors text-amber-900 hover:text-amber-950" id="emg-protocol-filter-trigger" title="Filtrar por Protocolo / Técnico">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="emg-protocol-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-amber-200 rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="emg-protocol-filter-dropdown">
+                                        <div class="flex flex-col gap-2.5">
+                                            <span class="text-label-sm text-amber-900 uppercase font-semibold">Buscar Protocolo / Técnico</span>
+                                            <div class="relative">
+                                                <input type="text" id="emg-protocol-search-input" placeholder="Digite o protocolo ou nome..." class="w-full text-xs border border-amber-200 rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-500 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-amber-600/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="clearEmgProtocolFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 2: Data da Conclusão com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 110px; min-width: 100px;" data-col="1">
+                                <div class="relative inline-block text-left group/emg-date-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-amber-100/70 transition-colors text-amber-900 hover:text-amber-950" id="emg-date-filter-trigger" title="Filtrar por Data">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="emg-date-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-84 min-w-[320px] bg-surface-container-lowest border border-amber-200 rounded-lg shadow-lg z-[100] p-4 animate-fade-in-up hidden" id="emg-date-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5">
+                                             <button type="button" data-date-type="hoje" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-amber-50 text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyEmgQuickFilter('hoje')">
+                                                 <span>Hoje</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-amber-600 check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="ontem" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-amber-50 text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyEmgQuickFilter('ontem')">
+                                                 <span>Ontem</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-amber-600 check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="7dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-amber-50 text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyEmgQuickFilter('7dias')">
+                                                 <span>Últimos 7 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-amber-600 check-icon hidden">check</span>
+                                             </button>
+                                             <button type="button" data-date-type="30dias" class="quick-date-btn w-full text-left px-3 py-2 hover:bg-amber-50 text-on-surface font-body-md rounded transition-all cursor-pointer flex items-center justify-between" onclick="applyEmgQuickFilter('30dias')">
+                                                 <span>Últimos 30 dias</span>
+                                                 <span class="material-symbols-outlined text-[16px] text-amber-600 check-icon hidden">check</span>
+                                             </button>
+                                            
+                                            <div class="border-t border-amber-200 my-2 pt-2">
+                                                <span class="text-label-sm text-amber-900 uppercase px-2 font-semibold">Intervalo Personalizado</span>
+                                                <div class="grid grid-cols-2 gap-3 mt-2 px-1">
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-amber-900">Início</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-amber-200 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="emg-range-start" type="date"/>
+                                                    </div>
+                                                    <div class="flex flex-col gap-1">
+                                                        <label class="text-[10px] uppercase font-semibold text-amber-900">Fim</label>
+                                                        <input class="w-full min-w-0 text-xs font-medium border border-amber-200 rounded-md px-2 py-1.5 focus:ring-1 focus:ring-amber-500 outline-none bg-surface-container-lowest text-on-surface cursor-pointer" id="emg-range-end" type="date"/>
+                                                    </div>
+                                                </div>
+                                                <button class="w-full mt-4 bg-amber-600 text-white py-2 rounded font-label-md hover:bg-amber-700 transition-colors cursor-pointer" onclick="applyEmgCustomRange()">Aplicar</button>
+                                            </div>
+                                            <button class="text-error font-label-md mt-2 hover:underline text-left cursor-pointer" onclick="clearEmgDateFilter()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3: Plaqueta com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 130px; min-width: 130px;" data-col="2">
+                                <div class="relative inline-block text-left group/emg-plaqueta-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-amber-100/70 transition-colors text-amber-900 hover:text-amber-950" id="emg-plaqueta-filter-trigger" title="Filtrar por Plaqueta">
+                                        <span class="font-label-md uppercase tracking-wider">Plaqueta</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="emg-plaqueta-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-amber-200 rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="emg-plaqueta-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-amber-900 uppercase font-semibold">Buscar Plaqueta</span>
+                                            <div class="relative">
+                                                <input type="text" id="emg-plaqueta-search-input" placeholder="Digite a plaqueta..." class="w-full text-xs border border-amber-200 rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-500 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-amber-600/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearEmgPlaquetaFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 4: Coordenada de Reparo -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 170px; min-width: 170px;" data-col="3">
+                                Coordenada de Reparo<div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 5: Problema com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 180px; min-width: 180px;" data-col="4">
+                                <div class="relative inline-block text-left group/emg-problem-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-amber-100/70 transition-colors text-amber-900 hover:text-amber-950" id="emg-problem-filter-trigger" title="Filtrar por Problema">
+                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="emg-problem-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-amber-200 rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden text-left" id="emg-problem-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-amber-900 font-semibold uppercase px-2 mb-1">Filtrar por Problema</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-amber-50 rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="emg-problem-filter-all" value="all" checked class="rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                                                <span>Todos os problemas</span>
+                                            </label>
+                                            <div class="border-t border-amber-200/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-amber-50 rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="emg-problem-filter" value="lampada-queimada" checked class="emg-problem-checkbox rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                                                <span>Lâmpada Queimada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-amber-50 rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="emg-problem-filter" value="acesa-dia" checked class="emg-problem-checkbox rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                                                <span>Acesa Dia</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-amber-50 rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="emg-problem-filter" value="lampada-quebrada" checked class="emg-problem-checkbox rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                                                <span>Lâmpada Quebrada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-amber-50 rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="emg-problem-filter" value="outro" checked class="emg-problem-checkbox rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                                                <span>Outro</span>
+                                            </label>
+                                            <div class="border-t border-amber-200 my-1 pt-1">
+                                                <button class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="clearEmgProblemFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 6: QTD. -->
+                            <th class="py-3 px-4 font-label-md text-label-md text-amber-900 uppercase tracking-wider text-center relative align-bottom pb-3" style="width: 70px; min-width: 70px;" data-col="5">
+                                QTD.<div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 7: Material Utilizado com Filtro -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-amber-900 uppercase tracking-wider relative align-bottom pb-3" style="width: 300px; min-width: 260px;" data-col="6">
+                                <div class="relative inline-block text-left group/emg-material-filter">
+                                    <button class="flex items-center gap-1 px-1.5 py-1 rounded hover:bg-amber-100/70 transition-colors text-amber-900 hover:text-amber-950" id="emg-material-filter-trigger" title="Filtrar por Material">
+                                        <span class="font-label-md uppercase tracking-wider">Material Utilizado</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="emg-material-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-amber-200 rounded-lg shadow-lg z-[100] p-3 animate-fade-in-up hidden" id="emg-material-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-amber-900 uppercase font-semibold">Buscar Material</span>
+                                            <div class="relative">
+                                                <input type="text" id="emg-material-search-input" placeholder="Digite o material..." class="w-full text-xs border border-amber-200 rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-500 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-amber-600/60">search</span>
+                                            </div>
+                                            <button class="text-error font-label-md mt-1 hover:underline text-left" onclick="clearEmgMaterialFilter()">Limpar Busca</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <tr id="no-emergencia-results">
+                            <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-amber-500/60">electric_bolt</span>
+                                    <span class="text-xs">Nenhuma demanda emergencial / atendimento direto encontrado.</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </main>
 
 <!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->
-<div id="confirm-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+<div id="confirm-modal" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
     <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
         <div class="flex items-start gap-4">
             <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700">
@@ -1482,45 +1712,53 @@
 </div>
 
 <!-- Modal de Visualização do Ponto no Mapbox -->
-<div id="modal-mapa-ponto" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/50 backdrop-blur-md transition-opacity duration-300">
-    <div id="modal-mapa-ponto-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-4xl w-full h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-on-surface transform transition-all duration-300 scale-95 opacity-0">
-        <!-- Header do Modal -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/50 flex-shrink-0">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
-                    <span class="material-symbols-outlined text-[24px]">location_on</span>
+<div id="modal-mapa-ponto" class="fixed inset-0 z-50 hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-ponto-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] sm:h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header do Modal (Sólido, não transparente) -->
+        <div class="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex-shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[24px]">location_on</span>
                 </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="modal-mapa-protocolo">Protocolo #---</h3>
-                        <span id="modal-mapa-status-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container">Em aberto</span>
-                    </div>
-                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md" id="modal-mapa-endereco-sub">Carregando endereço...</p>
+                <div class="min-w-0">
+                    <h3 class="hidden sm:inline-block text-sm sm:text-base font-bold text-slate-900 truncate" id="modal-mapa-protocolo">Protocolo #---</h3>
                 </div>
             </div>
-            <button onclick="window.closeMapaPontoModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar Modal (Esc)">
-                <span class="material-symbols-outlined text-[22px]">close</span>
-            </button>
+
+            <!-- Ações do Cabeçalho: Botões Waze / Google Maps e Fechar -->
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <a id="modal-mapa-btn-gmaps" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('gmaps', event)" target="_blank" title="Navegar via Google Maps" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-blue-600">map</span>
+                    <span class="text-[11px] sm:text-xs">Maps</span>
+                </a>
+                <a id="modal-mapa-btn-waze" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('waze', event)" target="_blank" title="Navegar via Waze" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-cyan-600">navigation</span>
+                    <span class="text-[11px] sm:text-xs">Waze</span>
+                </a>
+                <button onclick="window.closeMapaPontoModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-0.5" title="Fechar Modal (Esc)">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[22px]">close</span>
+                </button>
+            </div>
         </div>
         
         <!-- Canvas do Mapa & Card Informativo Flutuante -->
         <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
             <div id="mapa-ponto-canvas" class="w-full h-full"></div>
 
-            <!-- Card Informativo Glassmorphism -->
-            <div class="absolute bottom-4 left-4 right-4 sm:left-4 sm:right-auto sm:max-w-sm bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/60 p-4 rounded-xl shadow-xl text-xs space-y-2 z-10">
-                <div class="flex items-center justify-between border-b border-outline-variant/40 pb-2">
-                    <span class="font-semibold text-on-surface flex items-center gap-1">
-                        <span class="material-symbols-outlined text-[16px] text-secondary">pin_drop</span>
+            <!-- Card Informativo Glassmorphism (Localização, Plaqueta, Problema) -->
+            <div class="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm bg-white/95 backdrop-blur-md border border-slate-200 p-3.5 sm:p-4 rounded-xl shadow-xl text-xs space-y-2 z-10 text-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="font-bold text-slate-900 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px] text-blue-600">pin_drop</span>
                         <span>Detalhes da Localização</span>
                     </span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-secondary/10 text-secondary" id="modal-mapa-card-tipo">Endereço</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200" id="modal-mapa-card-tipo">Endereço</span>
                 </div>
-                <div class="space-y-1.5 text-on-surface">
-                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-on-surface-variant">---</span></p>
-                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-on-surface-variant font-medium">---</span></p>
-                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-on-surface-variant font-medium">---</span></p>
-                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-secondary font-semibold">---</span></p>
+                <div class="space-y-1.5">
+                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-slate-700 font-medium">---</span></p>
+                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-blue-600 font-bold">---</span></p>
                 </div>
             </div>
         </div>
@@ -2223,6 +2461,13 @@
             '0': 220, '1': 150, '2': 220, '3': 300, '4': 300, '5': 120, '6': 600
         }, 'completedTableColWidths');
 
+        // Inicializa redimensionamento da Tabela de Demandas Emergenciais
+        initTableResizer('emergencia-services-table', {
+            '0': 100, '1': 70, '2': 100, '3': 130, '4': 140, '5': 50, '6': 200
+        }, {
+            '0': 220, '1': 150, '2': 220, '3': 300, '4': 300, '5': 120, '6': 600
+        }, 'emgTableColWidths');
+
         // Inicializa botões de ação de auditoria com base nos indicadores S/N
         updateAuditActionButtons();
     });
@@ -2328,11 +2573,41 @@
         const compProblemIndicator = document.getElementById('comp-problem-filter-indicator');
         let compActiveProblemFilter = ['all'];
 
+        // Emergency Services Filter References
+        const emgDateTrigger = document.getElementById('emg-date-filter-trigger');
+        const emgDateDropdown = document.getElementById('emg-date-filter-dropdown');
+        const emgDateIndicator = document.getElementById('emg-date-filter-indicator');
+        let emgActiveDatePredicate = buildDatePredicate('30dias');
+
+        const emgProtocolTrigger = document.getElementById('emg-protocol-filter-trigger');
+        const emgProtocolDropdown = document.getElementById('emg-protocol-filter-dropdown');
+        const emgProtocolIndicator = document.getElementById('emg-protocol-filter-indicator');
+        const emgProtocolSearchInput = document.getElementById('emg-protocol-search-input');
+        let emgProtocolSearchQuery = '';
+
+        const emgPlaquetaTrigger = document.getElementById('emg-plaqueta-filter-trigger');
+        const emgPlaquetaDropdown = document.getElementById('emg-plaqueta-filter-dropdown');
+        const emgPlaquetaIndicator = document.getElementById('emg-plaqueta-filter-indicator');
+        const emgPlaquetaSearchInput = document.getElementById('emg-plaqueta-search-input');
+        let emgPlaquetaSearchQuery = '';
+
+        const emgMaterialTrigger = document.getElementById('emg-material-filter-trigger');
+        const emgMaterialDropdown = document.getElementById('emg-material-filter-dropdown');
+        const emgMaterialIndicator = document.getElementById('emg-material-filter-indicator');
+        const emgMaterialSearchInput = document.getElementById('emg-material-search-input');
+        let emgMaterialSearchQuery = '';
+
+        const emgProblemTrigger = document.getElementById('emg-problem-filter-trigger');
+        const emgProblemDropdown = document.getElementById('emg-problem-filter-dropdown');
+        const emgProblemIndicator = document.getElementById('emg-problem-filter-indicator');
+        let emgActiveProblemFilter = ['all'];
+
         function initFilterPortals() {
             [
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
-                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
+                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
+                emgDateDropdown, emgProtocolDropdown, emgPlaquetaDropdown, emgMaterialDropdown, emgProblemDropdown
             ].forEach(d => {
                 if (d && d.parentElement !== document.body) {
                     document.body.appendChild(d);
@@ -2345,7 +2620,8 @@
             [
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
-                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown
+                compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
+                emgDateDropdown, emgProtocolDropdown, emgPlaquetaDropdown, emgMaterialDropdown, emgProblemDropdown
             ].forEach(d => {
                 if (d) {
                     d.classList.add('hidden');
@@ -2400,6 +2676,12 @@
                     setTimeout(() => compPlaquetaSearchInput?.focus(), 50);
                 } else if (dropdownEl.id === 'comp-material-filter-dropdown') {
                     setTimeout(() => compMaterialSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'emg-protocol-filter-dropdown') {
+                    setTimeout(() => emgProtocolSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'emg-plaqueta-filter-dropdown') {
+                    setTimeout(() => emgPlaquetaSearchInput?.focus(), 50);
+                } else if (dropdownEl.id === 'emg-material-filter-dropdown') {
+                    setTimeout(() => emgMaterialSearchInput?.focus(), 50);
                 }
             }
         }
@@ -2471,6 +2753,28 @@
                 compProblemDropdown.style.display = 'none';
             }
 
+            // Emergency Services dropdowns
+            if (emgDateDropdown && !emgDateDropdown.contains(e.target) && !emgDateTrigger?.contains(e.target)) {
+                emgDateDropdown.classList.add('hidden');
+                emgDateDropdown.style.display = 'none';
+            }
+            if (emgProtocolDropdown && !emgProtocolDropdown.contains(e.target) && !emgProtocolTrigger?.contains(e.target)) {
+                emgProtocolDropdown.classList.add('hidden');
+                emgProtocolDropdown.style.display = 'none';
+            }
+            if (emgPlaquetaDropdown && !emgPlaquetaDropdown.contains(e.target) && !emgPlaquetaTrigger?.contains(e.target)) {
+                emgPlaquetaDropdown.classList.add('hidden');
+                emgPlaquetaDropdown.style.display = 'none';
+            }
+            if (emgMaterialDropdown && !emgMaterialDropdown.contains(e.target) && !emgMaterialTrigger?.contains(e.target)) {
+                emgMaterialDropdown.classList.add('hidden');
+                emgMaterialDropdown.style.display = 'none';
+            }
+            if (emgProblemDropdown && !emgProblemDropdown.contains(e.target) && !emgProblemTrigger?.contains(e.target)) {
+                emgProblemDropdown.classList.add('hidden');
+                emgProblemDropdown.style.display = 'none';
+            }
+
             if (!e.target.closest('.group\\/points') && !e.target.closest('.points-expand-trigger')) {
                 document.querySelectorAll('.points-dropdown').forEach(d => d.classList.add('hidden'));
                 document.querySelectorAll('.icon-arrow').forEach(a => a.style.transform = 'rotate(0deg)');
@@ -2535,7 +2839,6 @@
             openFloatingDropdown(compDateTrigger, compDateDropdown, false);
         });
 
-        // Completed Services triggers
         compProtocolTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(compProtocolTrigger, compProtocolDropdown, false);
@@ -2556,6 +2859,32 @@
             openFloatingDropdown(compProblemTrigger, compProblemDropdown, false);
         });
 
+        // Emergency Services triggers
+        emgDateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(emgDateTrigger, emgDateDropdown, false);
+        });
+
+        emgProtocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(emgProtocolTrigger, emgProtocolDropdown, false);
+        });
+
+        emgPlaquetaTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(emgPlaquetaTrigger, emgPlaquetaDropdown, false);
+        });
+
+        emgMaterialTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(emgMaterialTrigger, emgMaterialDropdown, true);
+        });
+
+        emgProblemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(emgProblemTrigger, emgProblemDropdown, false);
+        });
+
         // Close open dropdown popups on window scroll or resize, unless user is typing inside a filter input
         window.addEventListener('scroll', (e) => {
             const activeEl = document.activeElement;
@@ -2564,12 +2893,19 @@
                 activeEl.id === 'comp-protocol-search-input' ||
                 activeEl.id === 'comp-plaqueta-search-input' ||
                 activeEl.id === 'comp-material-search-input' ||
+                activeEl.id === 'emg-protocol-search-input' ||
+                activeEl.id === 'emg-plaqueta-search-input' ||
+                activeEl.id === 'emg-material-search-input' ||
                 activeEl.closest('#date-filter-dropdown') ||
                 activeEl.closest('#comp-date-filter-dropdown') ||
+                activeEl.closest('#emg-date-filter-dropdown') ||
                 activeEl.closest('#protocol-filter-dropdown') ||
                 activeEl.closest('#comp-protocol-filter-dropdown') ||
+                activeEl.closest('#emg-protocol-filter-dropdown') ||
                 activeEl.closest('#comp-plaqueta-filter-dropdown') ||
-                activeEl.closest('#comp-material-filter-dropdown')
+                activeEl.closest('#emg-plaqueta-filter-dropdown') ||
+                activeEl.closest('#comp-material-filter-dropdown') ||
+                activeEl.closest('#emg-material-filter-dropdown')
             )) {
                 return;
             }
@@ -2828,6 +3164,7 @@
                         if (filterVal === 'em_andamento' && (statusText.includes('andamento') || statusText.includes('iniciad'))) return true;
                         if (filterVal === 'aberto' && statusText.includes('aberto')) return true;
                         if (filterVal === 'cancelada' && statusText.includes('cancelad')) return true;
+                        if (filterVal === 'rejeitada' && (statusText.includes('rejeit') || statusText.includes('recus'))) return true;
                         return false;
                     });
 
@@ -3060,6 +3397,8 @@
                 indicatorEl = document.getElementById('praca-date-filter-indicator');
             } else if (dropdownId === 'comp-date-filter-dropdown') {
                 indicatorEl = document.getElementById('comp-date-filter-indicator');
+            } else if (dropdownId === 'emg-date-filter-dropdown') {
+                indicatorEl = document.getElementById('emg-date-filter-indicator');
             }
             if (indicatorEl) {
                 indicatorEl.classList.toggle('hidden', !selectedType);
@@ -3294,6 +3633,217 @@
             applyCompletedServicesFilters();
         };
 
+        // Emergency Services Filter Function
+        function applyEmergenciaServicesFilters() {
+            const rows = document.querySelectorAll('#emergencia-services-table tbody tr:not(#no-emergencia-results)');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                let showRow = true;
+
+                // Protocol Search Filter (Col 0)
+                if (showRow && !matchColumnText(row, 0, emgProtocolSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Date Filter (Col 1)
+                if (showRow && emgActiveDatePredicate) {
+                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const rowDate = parseTableDate(dateStr);
+                    if (!rowDate || !emgActiveDatePredicate(rowDate)) {
+                        showRow = false;
+                    }
+                }
+
+                // Plaqueta Filter (Col 2)
+                if (showRow && !matchColumnText(row, 2, emgPlaquetaSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Material Filter (Col 6 - Accent Insensitive)
+                if (showRow && !matchColumnText(row, 6, emgMaterialSearchQuery)) {
+                    showRow = false;
+                }
+
+                // Problem Filter (Col 4)
+                if (showRow && emgActiveProblemFilter && emgActiveProblemFilter.length > 0 && !emgActiveProblemFilter.includes('all')) {
+                    const probTd = row.cells[4];
+                    const probVal = probTd?.getAttribute('data-problem-value') || '';
+                    const probText = (probTd?.textContent || '').trim().toLowerCase();
+                    
+                    const matches = emgActiveProblemFilter.some(filterVal => {
+                        if (probVal && filterVal === probVal) return true;
+                        if (filterVal === 'lampada-queimada' && probText.includes('queimada')) return true;
+                        if (filterVal === 'acesa-dia' && probText.includes('acesa')) return true;
+                        if (filterVal === 'lampada-quebrada' && probText.includes('quebrada')) return true;
+                        if (filterVal === 'outro' && !probText.includes('queimada') && !probText.includes('acesa') && !probText.includes('quebrada')) return true;
+                        return false;
+                    });
+
+                    if (!matches) {
+                        showRow = false;
+                    }
+                }
+
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visibleCount++;
+            });
+
+            const noResultsRow = document.getElementById('no-emergencia-results');
+            if (noResultsRow) {
+                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            }
+
+            const badge = document.getElementById('emergencia-badge-count');
+            if (badge) {
+                badge.textContent = `${visibleCount} Registros`;
+            }
+
+            if (emgDateIndicator) emgDateIndicator.classList.toggle('hidden', !emgActiveDatePredicate);
+            if (emgProtocolIndicator) emgProtocolIndicator.classList.toggle('hidden', emgProtocolSearchQuery.trim() === '');
+            if (emgPlaquetaIndicator) emgPlaquetaIndicator.classList.toggle('hidden', emgPlaquetaSearchQuery.trim() === '');
+            if (emgMaterialIndicator) emgMaterialIndicator.classList.toggle('hidden', emgMaterialSearchQuery.trim() === '');
+            if (emgProblemIndicator) emgProblemIndicator.classList.toggle('hidden', !emgActiveProblemFilter || emgActiveProblemFilter.includes('all') || emgActiveProblemFilter.length === 0);
+        }
+
+        window.applyEmergenciaServicesFilters = applyEmergenciaServicesFilters;
+
+        // Search Input Handlers for Emergency Services
+        emgProtocolSearchInput?.addEventListener('input', (e) => {
+            emgProtocolSearchQuery = e.target.value;
+            applyEmergenciaServicesFilters();
+        });
+
+        emgPlaquetaSearchInput?.addEventListener('input', (e) => {
+            emgPlaquetaSearchQuery = e.target.value;
+            applyEmergenciaServicesFilters();
+        });
+
+        emgMaterialSearchInput?.addEventListener('input', (e) => {
+            emgMaterialSearchQuery = e.target.value;
+            applyEmergenciaServicesFilters();
+        });
+
+        window.clearEmgProtocolFilter = function() {
+            emgProtocolSearchQuery = '';
+            if (emgProtocolSearchInput) emgProtocolSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.clearEmgDateFilter = function() {
+            emgActiveDatePredicate = null;
+            const start = document.getElementById('emg-range-start');
+            const end = document.getElementById('emg-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            window.updateQuickDateUI('emg-date-filter-dropdown', null);
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.clearEmgPlaquetaFilter = function() {
+            emgPlaquetaSearchQuery = '';
+            if (emgPlaquetaSearchInput) emgPlaquetaSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.clearEmgMaterialFilter = function() {
+            emgMaterialSearchQuery = '';
+            if (emgMaterialSearchInput) emgMaterialSearchInput.value = '';
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.clearEmgProblemFilter = function() {
+            emgActiveProblemFilter = ['all'];
+            const problemAll = document.getElementById('emg-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="emg-problem-filter"].emg-problem-checkbox').forEach(cb => cb.checked = true);
+            if (emgProblemIndicator) emgProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.clearAllEmgFilters = function() {
+            emgProtocolSearchQuery = '';
+            emgPlaquetaSearchQuery = '';
+            emgMaterialSearchQuery = '';
+            emgActiveDatePredicate = null;
+            emgActiveProblemFilter = ['all'];
+            if (emgProtocolSearchInput) emgProtocolSearchInput.value = '';
+            if (emgPlaquetaSearchInput) emgPlaquetaSearchInput.value = '';
+            if (emgMaterialSearchInput) emgMaterialSearchInput.value = '';
+            const start = document.getElementById('emg-range-start');
+            const end = document.getElementById('emg-range-end');
+            if (start) start.value = '';
+            if (end) end.value = '';
+            const problemAll = document.getElementById('emg-problem-filter-all');
+            if (problemAll) problemAll.checked = true;
+            document.querySelectorAll('input[name="emg-problem-filter"].emg-problem-checkbox').forEach(cb => cb.checked = true);
+            if (emgProblemIndicator) emgProblemIndicator.classList.add('hidden');
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        // Checkbox emergency problem filters
+        const emgProblemFilterAll = document.getElementById('emg-problem-filter-all');
+        const emgProblemCheckboxes = document.querySelectorAll('input[name="emg-problem-filter"].emg-problem-checkbox');
+
+        const updateEmgProblemFilterState = () => {
+            const checkedBoxes = document.querySelectorAll('input[name="emg-problem-filter"].emg-problem-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const totalCheckboxes = emgProblemCheckboxes.length;
+
+            if (emgProblemFilterAll) {
+                emgProblemFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || (checkedValues.length === 0 && emgProblemFilterAll && emgProblemFilterAll.checked)) {
+                emgActiveProblemFilter = ['all'];
+                if (emgProblemIndicator) emgProblemIndicator.classList.add('hidden');
+            } else if (checkedValues.length === 0) {
+                emgActiveProblemFilter = ['all'];
+                if (emgProblemIndicator) emgProblemIndicator.classList.add('hidden');
+            } else {
+                emgActiveProblemFilter = checkedValues;
+                if (emgProblemIndicator) emgProblemIndicator.classList.remove('hidden');
+            }
+            applyEmergenciaServicesFilters();
+        };
+
+        if (emgProblemFilterAll) {
+            emgProblemFilterAll.addEventListener('change', (e) => {
+                const isChecked = e.target.checked;
+                emgProblemCheckboxes.forEach(cb => cb.checked = isChecked);
+                updateEmgProblemFilterState();
+            });
+        }
+
+        emgProblemCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                updateEmgProblemFilterState();
+            });
+        });
+
+        window.applyEmgQuickFilter = function(type) {
+            emgActiveDatePredicate = buildDatePredicate(type);
+            window.updateQuickDateUI('emg-date-filter-dropdown', type);
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
+        window.applyEmgCustomRange = function() {
+            const startVal = document.getElementById('emg-range-start')?.value;
+            const endVal = document.getElementById('emg-range-end')?.value;
+            if (!startVal || !endVal) return;
+            emgActiveDatePredicate = buildDatePredicate('custom', startVal, endVal);
+            window.updateQuickDateUI('emg-date-filter-dropdown', 'custom');
+            closeAllFilterDropdowns();
+            applyEmergenciaServicesFilters();
+        };
+
         // Protocol Search Input handler
         protocolSearchInput?.addEventListener('input', (e) => {
             protocolSearchQuery = e.target.value;
@@ -3411,6 +3961,7 @@
         // Initialize date filter UI selected states on load
         window.updateQuickDateUI('praca-date-filter-dropdown', null);
         window.updateQuickDateUI('comp-date-filter-dropdown', '30dias');
+        window.updateQuickDateUI('emg-date-filter-dropdown', '30dias');
 
         window.clearProtocolFilter = function() {
             protocolSearchQuery = '';
@@ -3455,10 +4006,12 @@
     var galeriaFotosIndexAtual = 0;
 
     window.abrirDetalhesOSModal = function(id) {
-        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+            window.painelController.abrirDetalhesOSModal(id);
+        } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
             window.auditoriaController.abrirDetalhesOSModal(id);
         } else {
-            console.warn('auditoriaController ainda não inicializado para a OS:', id);
+            console.warn('Controller não encontrado para abrir detalhes da OS:', id);
         }
     };
 

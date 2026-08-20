@@ -1,20 +1,27 @@
-const CACHE_NAME = 'sistema-os-pwa-v45';
+const CACHE_NAME = 'sistema-os-pwa-v99';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
   './Login-Servidor.html',
-  './Finalizar.html',
   './Abrir.html',
+  './Painel.html',
   './Painel-Manutentor.html',
+  './Finalizar.html',
+  './Auditoria.html',
+  './Mapa.html',
   './manifest.json',
+  './fonts/material-symbols.css',
+  './fonts/material-symbols-outlined.woff2',
   './js/config/supabaseClient.js',
   './js/config/cloudinaryConfig.js',
-  './js/guards/authGuard.js?v=25',
-  './js/domain/ChamadoModel.js?v=25',
-  './js/repositories/ChamadosRepository.js?v=25',
-  './js/services/ChamadosService.js?v=25',
+  './js/guards/authGuard.js?v=30',
+  './js/domain/ChamadoModel.js?v=43',
+  './js/repositories/ChamadosRepository.js?v=30',
+  './js/services/ChamadosService.js?v=30',
+  './js/controllers/AuditoriaController.js?v=44',
   './js/services/CloudinaryService.js',
-  './js/services/OfflineSyncService.js'
+  './js/services/OfflineSyncService.js',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap'
 ];
 
 self.addEventListener('install', (event) => {
@@ -48,10 +55,15 @@ self.addEventListener('fetch', (event) => {
 
   if (request.method !== 'GET') return;
 
+  // Ignora requisições externas do Mapbox e Supabase para permitir manuseio nativo de CORS e tiles pelo navegador
+  if (request.url.includes('mapbox.com') || request.url.includes('supabase.co')) {
+    return;
+  }
+
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+        if (networkResponse && (networkResponse.status === 200 || networkResponse.type === 'opaque' || networkResponse.type === 'cors')) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);
@@ -66,6 +78,7 @@ self.addEventListener('fetch', (event) => {
           if (request.headers.get('accept') && request.headers.get('accept').includes('text/html')) {
             return caches.match('./Login.html');
           }
+          return new Response('', { status: 408, statusText: 'Request Timeout' });
         });
       })
   );

@@ -170,19 +170,34 @@ class PainelController {
     createRowElement(item) {
         const tr = document.createElement('tr');
         const isCancelada = item.normalizedStatus === 'cancelada';
+        const isRejeitada = item.normalizedStatus === 'rejeitada';
         const isConcluida = item.normalizedStatus === 'concluida';
         const isPendente = item.normalizedStatus === 'pendente';
         const isEmAndamento = item.normalizedStatus === 'em_andamento';
         const isAberto = item.normalizedStatus === 'aberto';
 
-        tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCancelada ? 'opacity-70' : ''}`;
-        tr.setAttribute('data-id', item.id);
-        tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${item.id}')`);
+        tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${(isCancelada || isRejeitada) ? 'opacity-70' : ''}`;
+        const targetId = item.id || item.protocolo || '';
+        tr.setAttribute('data-id', targetId);
+        tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${targetId}')`);
 
         // Protocolo
         const tdProtocolo = document.createElement('td');
         tdProtocolo.className = 'py-3 px-5 font-medium whitespace-nowrap truncate align-middle';
-        tdProtocolo.textContent = item.protocolo;
+        if (item.isDireto) {
+            const tecNome = item.operadorFinalizacao || item.operador || 'Técnico';
+            tdProtocolo.innerHTML = `
+                <div class="flex flex-col gap-0.5">
+                    <span class="font-mono font-bold text-amber-900" title="${item.protocolo}">${item.protocolo}</span>
+                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold w-fit border border-amber-200">
+                        <span class="material-symbols-outlined text-[11px] text-amber-600">electric_bolt</span>
+                        <span>Emergencial (${tecNome})</span>
+                    </span>
+                </div>
+            `;
+        } else {
+            tdProtocolo.textContent = item.protocolo;
+        }
 
         // Data Abertura
         const tdData = document.createElement('td');
@@ -289,7 +304,7 @@ class PainelController {
 
             tdProblema.innerHTML = `
                 <div class="relative inline-block w-[160px]" onclick="event.stopPropagation()">
-                    <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.id}', this)">
+                    <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none [background-image:none] bg-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.id}', this)">
                         <option value="lampada-queimada" ${probVal === 'lampada-queimada' ? 'selected' : ''}>Lâmpada Queimada</option>
                         <option value="acesa-dia" ${probVal === 'acesa-dia' ? 'selected' : ''}>Acesa Dia</option>
                         <option value="lampada-quebrada" ${probVal === 'lampada-quebrada' ? 'selected' : ''}>Lâmpada Quebrada</option>
@@ -309,6 +324,7 @@ class PainelController {
         if (item.statusBadgeLabel === 'Iniciado') badgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
         if (isConcluida) badgeClass = 'bg-[#dcfce7] text-[#166534]';
         if (isCancelada) badgeClass = 'bg-slate-200 text-slate-700';
+        if (isRejeitada) badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
         if (isPendente) badgeClass = 'bg-surface-container-high text-on-surface';
 
         tdStatus.innerHTML = `
@@ -328,7 +344,11 @@ class PainelController {
             </button>
         `;
 
-        const rejectButtonHtml = isManutentorView ? '' : `
+        const rejectButtonHtml = isManutentorView ? `
+            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'rejeitada', event)" title="Rejeitar Ordem de Serviço (Rejeitada)">
+                <span class="material-symbols-outlined text-[20px]">thumb_down</span>
+            </button>
+        ` : `
             <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento || isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'cancelada', event)" title="Cancelar (Cancelada)">
                 <span class="material-symbols-outlined text-[20px]">close</span>
             </button>
@@ -341,7 +361,7 @@ class PainelController {
         `;
 
         const revertButtonHtml = isManutentorView ? '' : `
-            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Reverter para Em aberto">
+            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada || isRejeitada || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Reverter para Em aberto">
                 <span class="material-symbols-outlined text-[20px]">undo</span>
             </button>
         `;
@@ -526,6 +546,13 @@ class PainelController {
             iconBgClass = 'bg-rose-100 text-rose-700';
             confirmBtnClass = 'bg-rose-600 hover:bg-rose-700 text-white';
             confirmText = 'Cancelar OS';
+        } else if (targetUIStatus === 'rejeitada') {
+            title = 'Rejeitar Ordem de Serviço';
+            message = `Deseja realmente rejeitar a Ordem de Serviço do protocolo <strong class="text-on-surface font-semibold">${protocol}</strong>?<br>Esta ação alterará o status da OS para <strong class="text-rose-700 font-semibold">Rejeitada</strong>.`;
+            icon = 'thumb_down';
+            iconBgClass = 'bg-rose-100 text-rose-700';
+            confirmBtnClass = 'bg-rose-600 hover:bg-rose-700 text-white';
+            confirmText = 'Rejeitar OS';
         }
 
         window.showConfirmModal({
@@ -662,8 +689,9 @@ class PainelController {
      * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
      */
     abrirDetalhesOSModal(id) {
+        if (!id) return;
         const list = this.chamadosList || window.chamadosListCache || [];
-        let item = list.find(c => String(c.id) === String(id) || String(c.protocolo).toUpperCase() === String(id).toUpperCase());
+        let item = list.find(c => String(c.id).toUpperCase() === String(id).toUpperCase() || String(c.protocolo).toUpperCase() === String(id).toUpperCase());
         
         if (!item && window.ChamadoModel) {
             item = new window.ChamadoModel({
@@ -682,7 +710,7 @@ class PainelController {
                 coordenada_inicial: '-21.980500, -46.791200',
                 coordenada_reparo: '-21.980850, -46.791520',
                 endereco: 'Av. Principal, 500',
-                materiais: 'Lâmpada LED 50W',
+                materiais: '',
                 status_auditoria: 'Concluída'
             });
         }
@@ -706,6 +734,8 @@ class PainelController {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#dcfce7] text-[#166534]';
             } else if (stNorm === 'cancelada') {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700';
+            } else if (stNorm === 'rejeitada') {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-300';
             } else {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container';
             }
@@ -740,7 +770,7 @@ class PainelController {
         const coordFin = window.ChamadoModel.formatCoordPair(item.coordenadaReparo);
         const linkMaps = (coordFin.lat !== '--') ? `https://www.google.com/maps/search/?api=1&query=${coordFin.lat},${coordFin.lng}` : (coordIni.lat !== '--' ? `https://www.google.com/maps/search/?api=1&query=${coordIni.lat},${coordIni.lng}` : '#');
 
-        const ptsList = item.addressPoints.map(p => `<li class="truncate">• ${p}</li>`).join('');
+        const ptsList = (item.addressPoints || [item.endereco || 'Endereço não informado']).map(p => `<li class="truncate">• ${p}</li>`).join('');
 
         let cIniStr = item.coordenadaInicial || item.coordenada_inicial || item.coordenada || '';
         let cRepStr = item.coordenadaReparo || item.coordenada_reparo || '';
@@ -774,9 +804,23 @@ class PainelController {
             distFormatted = '> 100 metros (Divergente)';
         }
 
-        const opVal = String(item.operador || "").trim();
-        const opLower = opVal.toLowerCase();
-        const isGovBrOp = !opVal || opLower.includes('gov.br') || opLower === 'cidadão' || opLower === 'cidadao' || opLower.includes('gov');
+        const getCleanOp = (v) => {
+            if (!v) return '';
+            const s = String(v).trim();
+            if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'não informado' || s.toLowerCase() === 'nao informado') return '';
+            return s;
+        };
+
+        const opAbertura = getCleanOp(item.displayOperadorAbertura) ||
+                           getCleanOp(item.operadorAbertura) ||
+                           getCleanOp(item.operador) ||
+                           getCleanOp(item.userEmail) ||
+                           getCleanOp(item.user_email) ||
+                           getCleanOp(item.rawRow?.user_email) ||
+                           getCleanOp(item.rawRow?.operador) ||
+                           getCleanOp(item.municipeNome) ||
+                           'Não informado';
+        const opFinalizacao = getCleanOp(item.displayOperadorFinalizacao) || getCleanOp(item.operadorFinalizacao) || 'Pendente finalização';
 
         return `
         <!-- Seção 1: Dados do Solicitante & Operação -->
@@ -787,35 +831,34 @@ class PainelController {
                     <span>Solicitante & Atendimento</span>
                 </div>
                 <div><b class="text-on-surface-variant font-medium">Munícipe:</b> <span class="font-medium text-on-surface">${item.municipeNome || 'Não informado'}</span></div>
-                <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante}</span></div>
-                ${!isGovBrOp ? `<div><b class="text-on-surface-variant font-medium">Usuário que Abriu / Operador:</b> <span class="font-semibold text-blue-700">${item.operador}</span></div>` : ''}
+                <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante || 'Não informado'}</span></div>
+                <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
+                <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
             </div>
 
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2">
                 <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[16px]">build</span>
-                    <span>Serviço & Manutenção</span>
-                </div>
-                <div class="space-y-1 text-xs">
-                    <div><b class="text-on-surface-variant font-medium">Problema Inicial:</b> <span class="font-medium text-on-surface">${item.problemaInicial}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Problema Encontrado:</b> <span class="font-medium text-on-surface">${item.problemaEncontrado || item.problemaInicial}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Qtd. Inicial / Final:</b> <span class="font-medium text-on-surface">${item.qtdInicial} / ${item.qtdFinal}</span></div>
+                    <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                    <span>Materiais Utilizados</span>
                 </div>
 
                 <!-- Seção Estruturada de Materiais Utilizados -->
-                <div class="pt-2 border-t border-outline-variant/30">
+                <div>
                     ${(() => {
                         const rawMatModal = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado;
                         const modalMats = (item.materialsList && Array.isArray(item.materialsList) && item.materialsList.length > 0)
                             ? item.materialsList
-                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : [String(rawMatModal || 'Lâmpada LED 50W')]);
+                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : (rawMatModal ? [String(rawMatModal)] : []));
+                        if (modalMats.length === 0) {
+                            return `
+                                <div class="flex items-center gap-1.5 py-1">
+                                    <span class="text-on-surface-variant italic text-xs">Nenhum material registrado</span>
+                                </div>
+                            `;
+                        }
                         return `
-                            <div class="flex items-center gap-1.5 mb-1.5">
-                                <span class="material-symbols-outlined text-[15px] text-secondary">inventory_2</span>
-                                <b class="text-on-surface-variant font-semibold text-xs">Materiais Utilizados (${modalMats.length}):</b>
-                            </div>
-                            <div class="flex flex-wrap gap-1.5">
+                            <div class="flex flex-wrap gap-1.5 pt-0.5">
                                 ${modalMats.map(mat => `
                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest text-on-surface border border-outline-variant/60 shadow-2xs">
                                         <span class="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
@@ -829,27 +872,65 @@ class PainelController {
             </div>
         </div>
 
-        <!-- Seção 2: Localização & Plaqueta -->
+        <!-- Seção 2: Pontos de Manutenção, Plaqueta & Coordenadas -->
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
-                <span class="flex items-center gap-1">
+                <span class="flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
-                    <span>Localização & Plaqueta</span>
+                    <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
-                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Google Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
+                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                    <strong class="block text-[11px] text-on-surface-variant mb-0.5">Endereço / Ponto(s):</strong>
-                    <ul class="space-y-0.5 text-on-surface max-h-24 overflow-y-auto">${ptsList}</ul>
-                </div>
-                <div class="space-y-1 text-xs">
-                    <div><b class="text-on-surface-variant font-medium">Plaqueta Inicial:</b> <span class="font-medium text-on-surface">${item.plaquetaInicial || 'Não informada'}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Plaqueta Final:</b> <span class="font-medium text-on-surface">${item.plaquetaFinal || item.plaquetaInicial || 'Não informada'}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Coordenada Inicial:</b> <span class="font-medium text-on-surface">${coordIni.formatted}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Coordenada Reparo:</b> <span class="font-medium text-on-surface">${coordFin.formatted}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>
-                </div>
+
+            <!-- Resumo Rápido -->
+            <div class="p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/50 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11.5px]">
+                <div><b class="text-on-surface-variant font-medium">Plaqueta(s) Registrada(s):</b> <span class="font-semibold text-primary">${(item.plaquetasFinalList || []).join(', ') || 'Não informada'}</span></div>
+                ${!item.isDireto ? `<div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>` : '<div><b class="text-on-surface-variant font-medium">Tipo:</b> <span class="font-semibold text-amber-700">Demanda Emergencial (Atendimento Direto)</span></div>'}
+            </div>
+
+            <!-- Lista Estruturada dos Pontos -->
+            <div class="space-y-2">
+                ${(item.pontosDetalhados || []).map(p => `
+                    <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
+                        <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1">
+                            <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
+                                <span class="material-symbols-outlined text-[15px]">pin_drop</span>
+                                <span>Ponto #${p.numero}</span>
+                            </div>
+                            ${p.hasFinalData ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Concluído</span>` : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Abertura / Pendente</span>`}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <!-- Coluna Abertura (Inicial) -->
+                            <div class="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                <div class="font-bold text-slate-700 text-[11px] border-b border-slate-200/60 pb-0.5">📌 Abertura (Inicial)</div>
+                                <div><b class="text-slate-600 font-medium">Plaqueta:</b> <span class="font-semibold text-primary">${p.plaquetaInicial || 'Não informada'}</span></div>
+                                <div><b class="text-slate-600 font-medium">Coordenada:</b> <span class="font-mono text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
+                                <div><b class="text-slate-600 font-medium">Problema:</b> <span class="text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
+                                ${p.enderecoInicial ? `<div class="text-[11px] text-slate-600 pt-0.5"><b class="text-slate-600 font-medium">Endereço:</b> ${p.enderecoInicial}</div>` : ''}
+                            </div>
+
+                            <!-- Coluna Conclusão (Final / Reparo) -->
+                            ${p.hasFinalData ? `
+                                <div class="p-2 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1">
+                                    <div class="font-bold text-emerald-800 text-[11px] border-b border-emerald-200/60 pb-0.5">✅ Conclusão (Reparo)</div>
+                                    <div><b class="text-slate-600 font-medium">Plaqueta Final:</b> <span class="font-semibold text-primary">${p.plaquetaFinal || 'Não informada'}</span></div>
+                                    <div><b class="text-slate-600 font-medium">Coordenada Reparo:</b> <span class="font-mono text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
+                                    <div><b class="text-slate-600 font-medium">Problema Encontrado:</b> <span class="text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
+                                    ${p.materiais && p.materiais.length > 0 ? `<div><b class="text-slate-600 font-medium">Materiais:</b> <span class="text-slate-800 font-medium">${p.materiais.join(', ')}</span></div>` : ''}
+                                </div>
+                            ` : `
+                                <div class="p-2 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1 flex flex-col justify-center items-center text-center min-h-[90px]">
+                                    <div class="font-bold text-amber-800 text-[11px] flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
+                                        <span>Conclusão (Reparo)</span>
+                                    </div>
+                                    <span class="text-[11px] text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         </div>
 
@@ -947,6 +1028,145 @@ class PainelController {
                 </div>
             </div>`;
         })()}
+
+        <!-- Seção 4: Ações & Navegação do Protocolo -->
+        ${(() => {
+            let isAdminUser = false;
+            let isManutentorUser = false;
+            try {
+                if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                    const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                    if (r === 'admin') isAdminUser = true;
+                    if (r === 'manutentor') isManutentorUser = true;
+                }
+                if (!isAdminUser && window.usuarioLogadoSupabase) {
+                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                    if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
+                }
+                if (!isManutentorUser && window.usuarioLogadoSupabase) {
+                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                    if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isManutentorUser = true;
+                }
+                if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                    isAdminUser = true;
+                }
+                if (!isManutentorUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('manutentor')) {
+                    isManutentorUser = true;
+                }
+                if (!isManutentorUser && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
+                    isManutentorUser = true;
+                }
+            } catch(e) {}
+
+            let linkGoogleMaps = '#';
+            let linkWaze = '#';
+
+            const coordIni = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaInicial) : { lat: '--', lng: '--' };
+            const coordFin = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaReparo) : { lat: '--', lng: '--' };
+
+            let targetLat = null;
+            let targetLng = null;
+
+            if (coordFin && coordFin.lat !== '--' && coordFin.lng !== '--') {
+                targetLat = coordFin.lat;
+                targetLng = coordFin.lng;
+            } else if (coordIni && coordIni.lat !== '--' && coordIni.lng !== '--') {
+                targetLat = coordIni.lat;
+                targetLng = coordIni.lng;
+            }
+
+            if (targetLat && targetLng) {
+                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
+                linkWaze = `https://waze.com/ul?ll=${targetLat},${targetLng}&navigate=yes`;
+            } else if (item.endereco && item.endereco.trim()) {
+                const queryEnc = encodeURIComponent(item.endereco.trim() + ', Araraquara - SP');
+                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+                linkWaze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
+            }
+
+            const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
+            const isJaCancelada = (item.normalizedStatus === 'cancelada');
+            const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
+            const isConcluida = (item.normalizedStatus === 'concluida');
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2 pt-3">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">touch_app</span>
+                        <span>Ações & Navegação</span>
+                    </span>
+                    ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>` : ''}
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <!-- Botões de Navegação (Disponíveis para Todos os Usuários) -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">explore</span> Navegar:
+                        </span>
+                        ${linkGoogleMaps !== '#' ? `
+                        <a href="${linkGoogleMaps}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                            <span class="material-symbols-outlined text-[15px] text-blue-600">map</span>
+                            <span>Maps</span>
+                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
+                        </a>` : `
+                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">map</span>
+                            <span>Maps</span>
+                        </button>`}
+
+                        ${linkWaze !== '#' ? `
+                        <a href="${linkWaze}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                            <span class="material-symbols-outlined text-[15px] text-cyan-600">navigation</span>
+                            <span>Waze</span>
+                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
+                        </a>` : `
+                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">navigation</span>
+                            <span>Waze</span>
+                        </button>`}
+                    </div>
+
+                    <!-- Botões de Ações (Manutentor & Admin) -->
+                    <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
+                        ${isManutentorUser ? `
+                            ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
+                            <button type="button" onclick="window.rejeitarOSManutentor('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">thumb_down</span>
+                                <span>Rejeitar OS</span>
+                            </button>` : (isJaRejeitada ? `
+                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 opacity-70 cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[15px]">thumb_down</span>
+                                <span>OS Rejeitada</span>
+                            </button>` : '')}
+                        ` : ''}
+
+                        ${isAdminUser ? `
+                            ${!isJaUrgente ? `
+                            <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">priority_high</span>
+                                <span>Priorizar para Urgente</span>
+                            </button>` : `
+                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[15px]">check_circle</span>
+                                <span>Já é Urgente</span>
+                            </button>`}
+
+                            ${!isJaCancelada ? `
+                            <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">block</span>
+                                <span>Cancelar OS</span>
+                            </button>` : `
+                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[15px]">block</span>
+                                <span>OS Cancelada</span>
+                            </button>`}
+                        ` : ''}
+                    </div>
+                </div>
+            </div>`;
+        })()}
         `;
     }
 }
@@ -959,6 +1179,128 @@ window.abrirDetalhesOSModal = function(id) {
         window.auditoriaController.abrirDetalhesOSModal(id);
     } else {
         console.warn('Controller não encontrado para a OS:', id);
+    }
+};
+
+window.priorizarOSUrgente = function(osId) {
+    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const protocol = item ? item.protocolo : osId;
+
+    const doPrioritize = async () => {
+        try {
+            const repo = new window.ChamadosRepository();
+            await repo.updatePriority(osId || protocol, 'Urgente');
+            if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                await window.painelController.loadData();
+            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                await window.auditoriaController.loadData();
+            } else {
+                window.location.reload();
+            }
+        } catch(err) {
+            alert('Erro ao atualizar prioridade: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: 'Priorizar para Urgente',
+            message: `Deseja alterar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-amber-600 font-bold">URGENTE</strong>?`,
+            icon: 'warning',
+            iconBgClass: 'bg-amber-100 text-amber-700',
+            confirmBtnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+            confirmText: 'Definir como Urgente',
+            onConfirm: doPrioritize
+        });
+    } else {
+        if (confirm(`Deseja alterar a prioridade da OS #${protocol} para URGENTE?`)) {
+            doPrioritize();
+        }
+    }
+};
+
+window.rejeitarOSManutentor = function(osId) {
+    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const protocol = item ? item.protocolo : osId;
+
+    const doReject = async (justification) => {
+        try {
+            const repo = new window.ChamadosRepository();
+            await repo.updateStatus(osId || protocol, 'Rejeitada', justification);
+            if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                await window.painelController.loadData();
+            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                await window.auditoriaController.loadData();
+            } else {
+                window.location.reload();
+            }
+        } catch(err) {
+            alert('Erro ao rejeitar a Ordem de Serviço: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: 'Rejeitar Ordem de Serviço',
+            message: `Deseja realmente rejeitar a Ordem de Serviço do protocolo <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Esta ação alterará o status da OS para <strong class="text-rose-700 font-bold">Rejeitada</strong>.`,
+            icon: 'thumb_down',
+            iconBgClass: 'bg-rose-100 text-rose-700',
+            confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+            confirmText: 'Rejeitar OS',
+            onConfirm: doReject
+        });
+    } else {
+        const just = prompt(`Deseja rejeitar a OS #${protocol}? Digite o motivo:`);
+        if (just !== null) {
+            doReject(just);
+        }
+    }
+};
+
+window.cancelarOSAdmin = function(osId) {
+    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const protocol = item ? item.protocolo : osId;
+
+    const doCancel = async (justification) => {
+        try {
+            const repo = new window.ChamadosRepository();
+            await repo.updateStatus(osId || protocol, 'Cancelada', justification);
+            if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                await window.painelController.loadData();
+            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                await window.auditoriaController.loadData();
+            } else {
+                window.location.reload();
+            }
+        } catch(err) {
+            alert('Erro ao cancelar a Ordem de Serviço: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: 'Cancelar Ordem de Serviço',
+            message: `Deseja realmente cancelar a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Esta ação alterará o status da OS para <strong class="text-rose-700 font-bold">Cancelada</strong>.`,
+            icon: 'block',
+            iconBgClass: 'bg-rose-100 text-rose-700',
+            confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+            confirmText: 'Cancelar OS',
+            onConfirm: doCancel
+        });
+    } else {
+        const just = prompt(`Deseja cancelar a OS #${protocol}? Digite o motivo (opcional):`);
+        if (just !== null) {
+            doCancel(just);
+        }
     }
 };
 

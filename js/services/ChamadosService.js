@@ -141,6 +141,7 @@ class ChamadosService {
             'em_andamento': 'Em Andamento',
             'concluida': 'Concluída',
             'cancelada': 'Cancelada',
+            'rejeitada': 'Rejeitada',
             'pendente': 'Pendente'
         };
 

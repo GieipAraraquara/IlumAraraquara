@@ -63,7 +63,7 @@ class ChamadosRepository {
                 data.forEach((row, i) => {
                     console.log(`OS #${i+1} [${row.protocolo || row.id}] | Tipo: ${row.tipo_os || 'N/A'}:`, {
                         endereco_raw: row.endereco,
-                        pontos_raw_str: JSON.stringify(row.pontos),
+                        pontos_raw_str: JSON.stringify(row.pontos_inicial || row.pontos),
                         plaqueta_raw: row.plaqueta_inicial,
                         coordenada_raw: row.coordenada,
                         praca_nome_raw: row.praca_nome
@@ -227,6 +227,61 @@ class ChamadosRepository {
             return updatedData;
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateStatus:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Updates prioridade for an OS across ordens_servico and ordens_servico_pracas
+     */
+    async updatePriority(idOrProtocol, newPriority = 'Urgente') {
+        try {
+            const client = this.getClient();
+            const updatePayload = { prioridade: newPriority };
+
+            const tablesToTry = [this.primaryTable, this.pracasTable];
+            let updatedData = null;
+            let lastError = null;
+
+            for (const tableName of tablesToTry) {
+                let res = await client
+                    .from(tableName)
+                    .update(updatePayload)
+                    .eq('id', idOrProtocol)
+                    .select();
+
+                if (res.data && res.data.length > 0) {
+                    updatedData = res.data;
+                    break;
+                } else if (res.error) {
+                    lastError = res.error;
+                }
+
+                if (idOrProtocol) {
+                    res = await client
+                        .from(tableName)
+                        .update(updatePayload)
+                        .eq('protocolo', idOrProtocol)
+                        .select();
+
+                    if (res.data && res.data.length > 0) {
+                        updatedData = res.data;
+                        break;
+                    } else if (res.error) {
+                        lastError = res.error;
+                    }
+                }
+            }
+
+            if (!updatedData || updatedData.length === 0) {
+                if (lastError) throw lastError;
+                throw new Error(`Nenhum registro encontrado no banco de dados para a OS (${idOrProtocol}).`);
+            }
+
+            console.log(`✅ [ChamadosRepository] Prioridade da OS ${idOrProtocol} atualizada para "${newPriority}".`);
+            return updatedData;
+        } catch (err) {
+            console.error('❌ [ChamadosRepository] Exceção em updatePriority:', err);
             throw err;
         }
     }

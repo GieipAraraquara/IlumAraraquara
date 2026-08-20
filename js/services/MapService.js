@@ -6,6 +6,27 @@
 
 const MAPBOX_TOKEN_SHARED = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
 
+// Função Global de Navegação Externa (Waze / Google Maps)
+window.abrirNavegacaoExterna = function(tipo, event) {
+    if (event && typeof event.preventDefault === 'function') {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    const navLinks = window.currentMapaNavLinks || {};
+    const url = navLinks[tipo];
+    if (url && url !== '#') {
+        window.open(url, '_blank');
+    } else {
+        const btnId = tipo === 'gmaps' ? 'modal-mapa-btn-gmaps' : 'modal-mapa-btn-waze';
+        const btn = document.getElementById(btnId);
+        if (btn && btn.href && btn.href !== '#' && !btn.href.endsWith('#')) {
+            window.open(btn.href, '_blank');
+        } else {
+            alert('Navegação indisponível para esta localização.');
+        }
+    }
+};
+
 // Suppress Mapbox telemetry requests to events.mapbox.com to eliminate CORS errors in browser
 (function suppressMapboxTelemetry() {
     if (window._mapboxTelemetrySuppressed) return;
@@ -72,13 +93,23 @@ const MAPBOX_TOKEN_SHARED = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4Mnpw
 // Global persistent references
 window.sharedMapInstance = window.sharedMapInstance || null;
 window.sharedMapMarker = window.sharedMapMarker || null;
+window.currentMapaNavLinks = window.currentMapaNavLinks || { gmaps: '#', waze: '#' };
 
 window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
-    if (event) event.stopPropagation();
+    if (typeof pointIndex !== 'number') {
+        event = pointIndex;
+        pointIndex = 0;
+    }
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
 
-    // 1. Search for item in PainelController or AuditoriaController chamadosList
+    // 1. Search for item in PainelController or AuditoriaController chamadosList, or check if osId is an object
     let item = null;
-    if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
+    if (typeof osId === 'object' && osId !== null) {
+        item = osId;
+    }
+    if (!item && window.painelController && Array.isArray(window.painelController.chamadosList)) {
         item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
     }
     if (!item && window.auditoriaController) {
@@ -127,11 +158,16 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     
     const statusBadge = document.getElementById('modal-mapa-status-badge');
     if (statusBadge) {
-        statusBadge.textContent = item.statusBadgeLabel || item.status || 'Concluída';
-        let badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container';
-        if (item.normalizedStatus === 'concluida') badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#dcfce7] text-[#166534]';
-        if (item.normalizedStatus === 'cancelada') badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700';
-        if (item.normalizedStatus === 'pendente') badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-surface-container-high text-on-surface';
+        const stText = item.statusBadgeLabel || item.status || 'Em aberto';
+        statusBadge.textContent = stText;
+        let badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200';
+        if (item.normalizedStatus === 'concluida' || stText.toLowerCase().includes('conclu')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200';
+        } else if (item.normalizedStatus === 'cancelada' || stText.toLowerCase().includes('cancel')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700 border border-slate-300';
+        } else if (stText.toLowerCase().includes('andamento') || stText.toLowerCase().includes('iniciad')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200';
+        }
         statusBadge.className = badgeClass;
     }
 
@@ -174,6 +210,57 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     const cardProb = document.getElementById('modal-mapa-card-problema');
     if (cardProb) cardProb.textContent = item.problemaInicial || item.problemaEncontrado || 'Não informado';
 
+    // Helper local para extrair coordenadas { lat, lng } do item com suporte ao ChamadoModel
+    const resolveItemCoords = (targetItem) => {
+        if (!targetItem) return null;
+        const cRep = targetItem.coordenadaReparo || targetItem.coordenada_reparo;
+        const cIni = targetItem.coordenadaInicial || targetItem.coordenada_inicial || targetItem.coordenada;
+        
+        let pt = null;
+        if (window.ChamadoModel && typeof window.ChamadoModel.parseLatLng === 'function') {
+            pt = window.ChamadoModel.parseLatLng(cRep) || window.ChamadoModel.parseLatLng(cIni);
+        } else {
+            const str = String(cRep || cIni || '').replace(/^"|"$/g, '').trim();
+            if (str && str.includes(',')) {
+                const parts = str.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    pt = Math.abs(parts[0]) > 35
+                        ? { lat: parts[1], lng: parts[0] }
+                        : { lat: parts[0], lng: parts[1] };
+                }
+            }
+        }
+        return pt;
+    };
+
+    const cleanAddressSearchText = (rawText) => {
+        if (!rawText) return '';
+        return String(rawText)
+            .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/gu, '')
+            .replace(/^Plaqueta:\s*/i, '')
+            .trim();
+    };
+
+    // Geracao imediata de links preliminares de navegacao
+    let initGmaps = '#';
+    let initWaze = '#';
+    const initPt = resolveItemCoords(item);
+    const cleanSearchText = cleanAddressSearchText(currentPointText);
+
+    if (initPt) {
+        initGmaps = `https://www.google.com/maps/search/?api=1&query=${initPt.lat},${initPt.lng}`;
+        initWaze = `https://waze.com/ul?ll=${initPt.lat},${initPt.lng}&navigate=yes`;
+    } else if (cleanSearchText && cleanSearchText !== 'Endereço não informado' && cleanSearchText !== 'Localização não informada' && cleanSearchText !== 'Ponto não informado') {
+        const qEnc = encodeURIComponent(cleanSearchText + ', Araraquara - SP');
+        initGmaps = `https://www.google.com/maps/search/?api=1&query=${qEnc}`;
+        initWaze = `https://waze.com/ul?q=${qEnc}&navigate=yes`;
+    }
+    window.currentMapaNavLinks = { gmaps: initGmaps, waze: initWaze };
+    const btnGmapsInit = document.getElementById('modal-mapa-btn-gmaps');
+    if (btnGmapsInit) btnGmapsInit.href = initGmaps;
+    const btnWazeInit = document.getElementById('modal-mapa-btn-waze');
+    if (btnWazeInit) btnWazeInit.href = initWaze;
+
     // 3. Display Modal with Animation
     modal.classList.remove('hidden');
     setTimeout(() => {
@@ -185,31 +272,19 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     let lat = null;
     let lng = null;
 
-    const rawCoordStr = window.ChamadoModel ? window.ChamadoModel.formatLocationText(item.coordenadaReparo || item.coordenadaInicial) : (item.coordenadaReparo || item.coordenadaInicial || '');
-    const hasRawCoord = rawCoordStr && (window.ChamadoModel ? window.ChamadoModel.isValidLocationText(rawCoordStr) : Boolean(rawCoordStr));
+    const parsedPt = resolveItemCoords(item);
+    const hasRawCoord = Boolean(parsedPt);
     const hasExplicitCoordinates = hasRawCoord && !hasAddress && !hasPlaqueta;
 
-    if (hasRawCoord) {
-        const parts = rawCoordStr.split(',');
-        if (parts.length >= 2) {
-            let p1 = parseFloat(parts[0].trim());
-            let p2 = parseFloat(parts[1].trim());
-            if (!isNaN(p1) && !isNaN(p2)) {
-                if (Math.abs(p1) > 35 && Math.abs(p2) < 35) {
-                    lng = p1;
-                    lat = p2;
-                } else {
-                    lat = p1;
-                    lng = p2;
-                }
-            }
-        }
+    if (parsedPt) {
+        lat = parsedPt.lat;
+        lng = parsedPt.lng;
     }
 
     // Geocoding fallback via Mapbox API if no raw coordinates
-    if ((lat === null || lng === null) && currentPointText && currentPointText !== 'Endereço não informado' && currentPointText !== 'Ponto não informado') {
+    if ((lat === null || lng === null) && cleanSearchText && cleanSearchText !== 'Endereço não informado' && cleanSearchText !== 'Ponto não informado') {
         try {
-            const query = encodeURIComponent(`${currentPointText}, Araraquara, SP, Brasil`);
+            const query = encodeURIComponent(`${cleanSearchText}, Araraquara, SP, Brasil`);
             const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${MAPBOX_TOKEN_SHARED}&limit=1`);
             const geoData = await res.json();
             if (geoData && geoData.features && geoData.features.length > 0) {
@@ -253,6 +328,43 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
         else if (hasAddress) cardTipoBadge.textContent = 'Endereço';
         else if (hasPlaqueta) cardTipoBadge.textContent = 'Plaqueta';
         else cardTipoBadge.textContent = 'Localização';
+    }
+
+    console.log("🗺️ [MapService] abrirMapaPonto chamado com item:", item, "pointIndex:", pointIndex);
+
+    // Update Waze & Google Maps Navigation Links (Immediate & Resolved)
+    let linkGmaps = '#';
+    let linkWaze = '#';
+    if (lat !== null && lng !== null) {
+        linkGmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+        linkWaze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+    } else if (cleanSearchText && cleanSearchText !== 'Endereço não informado' && cleanSearchText !== 'Localização não informada' && cleanSearchText !== 'Ponto não informado') {
+        const queryEnc = encodeURIComponent(cleanSearchText + ', Araraquara - SP');
+        linkGmaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+        linkWaze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
+    }
+
+    window.currentMapaNavLinks = {
+        gmaps: linkGmaps,
+        waze: linkWaze
+    };
+
+    console.log("🗺️ [MapService] Links gerados:", window.currentMapaNavLinks);
+
+    const btnGmaps = document.getElementById('modal-mapa-btn-gmaps');
+    if (btnGmaps) {
+        btnGmaps.href = linkGmaps;
+        console.log("🗺️ [MapService] btnGmaps.href atribuído para:", btnGmaps.href);
+    } else {
+        console.warn("⚠️ [MapService] Elemento #modal-mapa-btn-gmaps não foi encontrado no DOM.");
+    }
+
+    const btnWaze = document.getElementById('modal-mapa-btn-waze');
+    if (btnWaze) {
+        btnWaze.href = linkWaze;
+        console.log("🗺️ [MapService] btnWaze.href atribuído para:", btnWaze.href);
+    } else {
+        console.warn("⚠️ [MapService] Elemento #modal-mapa-btn-waze não foi encontrado no DOM.");
     }
 
     // 5. Initialize or Reuse Singleton Mapbox Instance
@@ -324,7 +436,6 @@ window.closeMapaPontoModal = function() {
     }, 200);
 };
 
-// Global keydown escape event listener
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         window.closeMapaPontoModal();

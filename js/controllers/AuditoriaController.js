@@ -192,9 +192,10 @@ class AuditoriaController {
                 return getTime(a) - getTime(b);
             });
 
-            // Separação entre Praças (isPraca - inclui Iniciadas/Em Andamento/Concluídas) e Viário (!isPraca - estritamente Concluídas)
-            this.pracaServicesList = this.chamadosList.filter(item => item.isPraca);
-            this.viariaConcludedList = this.concludedList.filter(item => !item.isPraca);
+            // Separação entre Praças, Demandas Emergenciais (Atendimento Direto) e Viário Concluídas
+            this.emergenciaServicesList = this.chamadosList.filter(item => item.isDireto);
+            this.pracaServicesList = this.chamadosList.filter(item => item.isPraca && !item.isDireto);
+            this.viariaConcludedList = this.concludedList.filter(item => !item.isPraca && !item.isDireto);
 
             // Ordenar Praças por data (ascendente)
             this.pracaServicesList.sort((a, b) => {
@@ -209,12 +210,13 @@ class AuditoriaController {
 
             this.auditDivergentList = this.concludedList.filter(item => item.hasDivergence);
 
-            console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs concluídas encontradas. (${this.pracaServicesList.length} Praças no total, ${this.viariaConcludedList.length} Viárias Concluídas, ${this.auditDivergentList.length} com divergências 'S')`);
+            console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs concluídas encontradas. (${this.pracaServicesList.length} Praças, ${this.emergenciaServicesList.length} Emergenciais, ${this.viariaConcludedList.length} Viárias Concluídas, ${this.auditDivergentList.length} com divergências 'S')`);
 
             this.updateKPIs(this.concludedList);
             this.renderOSTable(this.auditDivergentList);
             this.renderPracaTable(this.pracaServicesList);
             this.renderCompletedTable(this.viariaConcludedList);
+            this.renderEmergenciaTable(this.emergenciaServicesList);
 
             // Re-apply filter logic if available
             if (typeof window.applyCombinedFilters === 'function') {
@@ -426,6 +428,41 @@ class AuditoriaController {
     }
 
     /**
+     * Renders Demandas Emergenciais Table (Atendimento Direto)
+     */
+    renderEmergenciaTable(auditList = []) {
+        const tbody = document.querySelector('#emergencia-services-table tbody');
+        if (!tbody) return;
+
+        const emptyRowHtml = `
+            <tr id="no-emergencia-results" class="${auditList.length === 0 ? '' : 'hidden'}">
+                <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                    <div class="flex flex-col items-center justify-center gap-1.5">
+                        <span class="material-symbols-outlined text-[24px] text-amber-500/60">electric_bolt</span>
+                        <span class="text-xs">Nenhuma demanda emergencial / atendimento direto encontrado.</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+
+        const rowsHtml = auditList.map(item => this.createEmergenciaRowHtml(item)).join('');
+        tbody.innerHTML = emptyRowHtml + rowsHtml;
+
+        // Update count badge
+        const badge = document.getElementById('emergencia-badge-count');
+        if (badge) {
+            badge.textContent = `${auditList.length} Registros`;
+        }
+    }
+
+    /**
+     * Generates HTML string for single Demandas Emergenciais row
+     */
+    createEmergenciaRowHtml(item) {
+        return this.createCompletedRowHtml(item, false);
+    }
+
+    /**
      * Generates HTML string for single completed service row using finalization fields
      */
     createCompletedRowHtml(item, isPraca = false) {
@@ -445,7 +482,7 @@ class AuditoriaController {
         const rawMat = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado;
         const materialsList = (item.materialsList && Array.isArray(item.materialsList) && item.materialsList.length > 0)
             ? item.materialsList
-            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMat) : [String(rawMat || 'Lâmpada LED 50W')]);
+            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMat) : (rawMat ? [String(rawMat)] : []));
         let materialsDisplayHtml = '';
 
         if (materialsList.length > 1) {
@@ -475,13 +512,17 @@ class AuditoriaController {
                     </div>
                 </div>
             `;
-        } else {
-            const singleMat = materialsList[0] || 'Lâmpada LED 50W';
+        } else if (materialsList.length === 1) {
+            const singleMat = materialsList[0];
             materialsDisplayHtml = `
                 <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-100/90 text-slate-800 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] max-w-full" title="${singleMat}">
                     <span class="material-symbols-outlined text-[15px] text-slate-500 flex-shrink-0">inventory_2</span>
                     <span class="truncate">${singleMat}</span>
                 </span>
+            `;
+        } else {
+            materialsDisplayHtml = `
+                <span class="text-on-surface-variant/70 italic text-xs font-medium">Nenhum material</span>
             `;
         }
         
@@ -491,34 +532,114 @@ class AuditoriaController {
 
         // Finalization Problem (problema_encontrado)
         const selectedProblemVal = item.problemEncontradoSelectValue;
-        const problemLabels = {
-            'lampada-queimada': 'Lâmpada Queimada',
-            'acesa-dia': 'Acesa Dia',
-            'lampada-quebrada': 'Lâmpada Quebrada',
-            'outro': 'Outro'
-        };
-        let problemBgColor = 'bg-[#f3f4f6] text-[#374151]';
-        if (selectedProblemVal === 'lampada-queimada') problemBgColor = 'bg-[#fef3c7] text-[#92400e]';
-        if (selectedProblemVal === 'acesa-dia') problemBgColor = 'bg-[#dbeafe] text-[#1e40af]';
-        if (selectedProblemVal === 'lampada-quebrada') problemBgColor = 'bg-[#ffedd5] text-[#9a3412]';
+        const rawProblemText = item.problemaEncontrado || item.problemaInicial || 'Outro';
+        const problemText = (window.ChamadoModel && window.ChamadoModel.formatLocationText) 
+            ? window.ChamadoModel.formatLocationText(rawProblemText) 
+            : String(rawProblemText).trim();
+        const probLower = problemText.toLowerCase();
 
-        const problemText = problemLabels[selectedProblemVal] || item.problemaEncontrado || item.problemaInicial || 'Outro';
+        let problemBgColor = 'bg-[#f3f4f6] text-[#374151]';
+        if (probLower.includes('queimada') || probLower.includes('apagada') || probLower.includes('intermitente') || probLower.includes('sem luz')) {
+            problemBgColor = 'bg-[#fef3c7] text-[#92400e]';
+        } else if (probLower.includes('acesa')) {
+            problemBgColor = 'bg-[#dbeafe] text-[#1e40af]';
+        } else if (probLower.includes('quebrada') || probLower.includes('braço') || probLower.includes('braco') || probLower.includes('danificada')) {
+            problemBgColor = 'bg-[#ffedd5] text-[#9a3412]';
+        }
 
         // Finalization Date (data_conclusao)
-        const dateConclusaoText = item.formattedDateConclusaoShort;
+        const dateConclusaoText = item.formattedDateConclusaoShort || item.formattedDateShort;
 
         const distM = (item.distanciaCalculadaMetros !== undefined && item.distanciaCalculadaMetros !== null) 
             ? item.distanciaCalculadaMetros 
             : (window.ChamadoModel ? window.ChamadoModel.calcularDistanciaMetros(item.coordenadaInicial, item.coordenadaReparo) : null);
         let distBadgeTable = '';
-        if (distM !== null && !isNaN(distM)) {
+        if (distM !== null && !isNaN(distM) && !item.isDireto) {
             const distTxt = distM < 1000 ? `${Math.round(distM)}m` : `${(distM/1000).toFixed(1)}km`;
             const colorCls = distM > 100 ? 'bg-rose-100 text-rose-800 border-rose-200 font-bold' : 'bg-emerald-50 text-emerald-700 border-emerald-200';
             distBadgeTable = `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[10px] font-mono border ${colorCls} mt-1" title="Distância entre a abertura e o reparo"><span class="material-symbols-outlined text-[11px]">straighten</span>${distTxt}</span>`;
         }
 
-        let col2TdHtml = `<td class="py-3 px-4 font-semibold ${col2Class} whitespace-nowrap truncate align-middle" title="${col2Text}">${col2Text}</td>`;
-        if (isPraca) {
+        // Multi-point Repair Coordinates Display
+        const coordsList = item.coordenadasReparoList || [];
+        let coordsDisplayHtml = '';
+
+        if (coordsList.length > 1) {
+            const firstCoord = coordsList[0];
+            const extraCoordCount = coordsList.length - 1;
+
+            const extraCoordsHtml = coordsList.slice(1).map((c, idx) => `
+                <button onclick="window.abrirMapaPonto('${item.id}', ${c.index !== undefined ? c.index : idx + 1}, event)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-100/90 text-slate-800 hover:text-secondary border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-secondary/40 transition-all cursor-pointer min-w-0 w-full text-left" title="Abrir Ponto #${(c.index !== undefined ? c.index : idx + 1) + 1} no mapa Mapbox">
+                    <span class="material-symbols-outlined text-[15px] text-secondary flex-shrink-0">location_on</span>
+                    <span class="truncate font-semibold">${c.lat}, ${c.lng}</span>
+                </button>
+            `).join('');
+
+            coordsDisplayHtml = `
+                <div class="flex flex-col gap-1 w-full text-left">
+                    <div class="flex items-center gap-1.5 min-w-0 w-full">
+                        <button onclick="window.abrirMapaPonto('${item.id}', ${firstCoord.index || 0}, event)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-100/90 text-slate-800 hover:text-secondary border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-secondary/40 transition-all cursor-pointer min-w-0 flex-1 text-left" title="Clique para abrir no mapa Mapbox">
+                            <span class="material-symbols-outlined text-[15px] text-secondary flex-shrink-0">location_on</span>
+                            <span class="truncate font-semibold">${firstCoord.lat}, ${firstCoord.lng}</span>
+                            ${distBadgeTable}
+                        </button>
+                        <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all flex-shrink-0 cursor-pointer active:scale-95 border border-secondary/20" onclick="toggleInlinePoints(this, ${extraCoordCount}, event)" title="Expandir/Recolher coordenadas">
+                            <span class="btn-text">+${extraCoordCount}</span>
+                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                        </button>
+                    </div>
+                    <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 transition-all w-full">
+                        ${extraCoordsHtml}
+                    </div>
+                </div>
+            `;
+        } else {
+            coordsDisplayHtml = `
+                <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono bg-slate-100/90 text-slate-800 hover:text-secondary border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:border-secondary/40 transition-all cursor-pointer min-w-0 max-w-full text-left" title="Clique para abrir no mapa Mapbox">
+                    <span class="material-symbols-outlined text-[15px] text-secondary flex-shrink-0">location_on</span>
+                    <span class="truncate font-semibold">${lat}, ${lng}</span>
+                    ${distBadgeTable}
+                </button>
+            `;
+        }
+
+        // Multi-point Plaqueta Display
+        const plaquetasList = (item.plaquetasFinalList && item.plaquetasFinalList.length > 0) 
+            ? item.plaquetasFinalList 
+            : [col2Text];
+
+        let col2TdHtml = '';
+        if (!isPraca && plaquetasList.length > 1) {
+            const firstPlq = plaquetasList[0];
+            const extraPlqCount = plaquetasList.length - 1;
+
+            const extraPlqsHtml = plaquetasList.slice(1).map(plq => `
+                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-primary bg-slate-100/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] w-full min-w-0" title="${plq}">
+                    <span class="material-symbols-outlined text-[15px] text-primary/70 flex-shrink-0">tag</span>
+                    <span class="truncate">${plq}</span>
+                </div>
+            `).join('');
+
+            col2TdHtml = `
+                <td class="py-3 px-4 align-middle">
+                    <div class="flex flex-col gap-1 w-full text-left">
+                        <div class="flex items-center gap-1.5 min-w-0 w-full">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-primary bg-slate-100/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] min-w-0 flex-1" title="${firstPlq}">
+                                <span class="material-symbols-outlined text-[15px] text-primary/70 flex-shrink-0">tag</span>
+                                <span class="truncate">${firstPlq}</span>
+                            </span>
+                            <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-primary/10 text-primary hover:bg-primary/20 transition-all flex-shrink-0 cursor-pointer active:scale-95 border border-primary/20" onclick="toggleInlinePoints(this, ${extraPlqCount}, event)" title="Expandir/Recolher plaquetas">
+                                <span class="btn-text">+${extraPlqCount}</span>
+                                <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                            </button>
+                        </div>
+                        <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 transition-all w-full">
+                            ${extraPlqsHtml}
+                        </div>
+                    </div>
+                </td>
+            `;
+        } else if (isPraca) {
             col2TdHtml = `
                 <td class="py-3 px-4 align-middle">
                     <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir a localização no mapa Mapbox">
@@ -527,7 +648,19 @@ class AuditoriaController {
                     </button>
                 </td>
             `;
+        } else {
+            col2TdHtml = `
+                <td class="py-3 px-4 align-middle">
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-primary bg-slate-100/90 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.04)] max-w-full" title="${col2Text}">
+                        <span class="material-symbols-outlined text-[15px] text-primary/70 flex-shrink-0">tag</span>
+                        <span class="truncate">${col2Text}</span>
+                    </span>
+                </td>
+            `;
         }
+
+        // Protocol Cell
+        const protocolTdHtml = `<td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">${item.protocolo}</td>`;
 
         // Status Badge for Praça Services
         let statusBadgeClass = 'bg-slate-100 text-slate-700 border border-slate-300';
@@ -536,6 +669,7 @@ class AuditoriaController {
         if (item.statusBadgeLabel === 'Iniciado') statusBadgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
         if (item.normalizedStatus === 'concluida') statusBadgeClass = 'bg-[#dcfce7] text-[#166534]';
         if (item.normalizedStatus === 'cancelada') statusBadgeClass = 'bg-slate-200 text-slate-700';
+        if (item.normalizedStatus === 'rejeitada') statusBadgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
         if (item.normalizedStatus === 'pendente') statusBadgeClass = 'bg-purple-100 text-purple-800 border border-purple-300';
 
         const statusBadgeHtml = `
@@ -556,18 +690,11 @@ class AuditoriaController {
 
         return `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="${item.id}" onclick="window.abrirDetalhesOSModal('${item.id}')">
-                <td class="py-3 px-4 font-medium text-on-surface whitespace-nowrap truncate align-middle">${item.protocolo}</td>
+                ${protocolTdHtml}
                 <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">${dateConclusaoText}</td>
                 ${col2TdHtml}
                 <td class="py-3 px-4 align-middle">
-                    <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                        <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                        <div class="flex flex-col text-xs font-mono text-on-surface-variant group-hover/loc:text-secondary leading-tight min-w-0">
-                            <span class="font-medium group-hover/loc:underline" title="${lat}">${lat}</span>
-                            <span class="text-on-surface-variant/70 group-hover/loc:text-secondary/80 group-hover/loc:underline" title="${lng}">${lng}</span>
-                            ${distBadgeTable}
-                        </div>
-                    </button>
+                    ${coordsDisplayHtml}
                 </td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle" data-problem-value="${selectedProblemVal}">
                     <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] ${problemBgColor}">
@@ -630,7 +757,7 @@ class AuditoriaController {
                 coordenada_inicial: '-21.980500, -46.791200',
                 coordenada_reparo: isDivergenteTest ? '-21.982200, -46.793100' : '-21.980850, -46.791520',
                 endereco: 'Av. Principal, 500',
-                materiais: 'Lâmpada LED 50W',
+                materiais: '',
                 status_auditoria: 'Concluída'
             });
         }
@@ -779,9 +906,23 @@ class AuditoriaController {
             distFormatted = '> 100 metros (Divergente)';
         }
 
-        const opVal = String(item.operador || "").trim();
-        const opLower = opVal.toLowerCase();
-        const isGovBrOp = !opVal || opLower.includes('gov.br') || opLower === 'cidadão' || opLower === 'cidadao' || opLower.includes('gov');
+        const getCleanOp = (v) => {
+            if (!v) return '';
+            const s = String(v).trim();
+            if (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'não informado' || s.toLowerCase() === 'nao informado') return '';
+            return s;
+        };
+
+        const opAbertura = getCleanOp(item.displayOperadorAbertura) ||
+                           getCleanOp(item.operadorAbertura) ||
+                           getCleanOp(item.operador) ||
+                           getCleanOp(item.userEmail) ||
+                           getCleanOp(item.user_email) ||
+                           getCleanOp(item.rawRow?.user_email) ||
+                           getCleanOp(item.rawRow?.operador) ||
+                           getCleanOp(item.municipeNome) ||
+                           'Não informado';
+        const opFinalizacao = getCleanOp(item.displayOperadorFinalizacao) || getCleanOp(item.operadorFinalizacao) || 'Pendente finalização';
 
         return `
         <!-- Seção 1: Dados do Solicitante & Operação -->
@@ -793,34 +934,33 @@ class AuditoriaController {
                 </div>
                 <div><b class="text-on-surface-variant font-medium">Munícipe:</b> <span class="font-medium text-on-surface">${item.municipeNome || 'Não informado'}</span></div>
                 <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante}</span></div>
-                ${!isGovBrOp ? `<div><b class="text-on-surface-variant font-medium">Operador / Atendente:</b> <span class="font-medium text-on-surface">${item.operador}</span></div>` : ''}
+                <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
+                <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
             </div>
 
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2">
                 <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[16px]">build</span>
-                    <span>Serviço & Manutenção</span>
-                </div>
-                <div class="space-y-1 text-xs">
-                    <div><b class="text-on-surface-variant font-medium">Problema Inicial:</b> <span class="font-medium text-on-surface">${item.problemaInicial}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Problema Encontrado:</b> <span class="font-medium text-on-surface">${item.problemaEncontrado || item.problemaInicial}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Qtd. Inicial / Final:</b> <span class="font-medium text-on-surface">${item.qtdInicial} / ${item.qtdFinal}</span></div>
+                    <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                    <span>Materiais Utilizados</span>
                 </div>
 
                 <!-- Seção Estruturada de Materiais Utilizados -->
-                <div class="pt-2 border-t border-outline-variant/30">
+                <div>
                     ${(() => {
                         const rawMatModal = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado;
                         const modalMats = (item.materialsList && Array.isArray(item.materialsList) && item.materialsList.length > 0)
                             ? item.materialsList
-                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : [String(rawMatModal || 'Lâmpada LED 50W')]);
+                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : (rawMatModal ? [String(rawMatModal)] : []));
+                        if (modalMats.length === 0) {
+                            return `
+                                <div class="flex items-center gap-1.5 py-1">
+                                    <span class="text-on-surface-variant italic text-xs">Nenhum material registrado</span>
+                                </div>
+                            `;
+                        }
                         return `
-                            <div class="flex items-center gap-1.5 mb-1.5">
-                                <span class="material-symbols-outlined text-[15px] text-secondary">inventory_2</span>
-                                <b class="text-on-surface-variant font-semibold text-xs">Materiais Utilizados (${modalMats.length}):</b>
-                            </div>
-                            <div class="flex flex-wrap gap-1.5">
+                            <div class="flex flex-wrap gap-1.5 pt-0.5">
                                 ${modalMats.map(mat => `
                                     <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest text-on-surface border border-outline-variant/60 shadow-2xs">
                                         <span class="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
@@ -834,27 +974,65 @@ class AuditoriaController {
             </div>
         </div>
 
-        <!-- Seção 2: Localização & Plaqueta -->
+        <!-- Seção 2: Pontos de Manutenção, Plaqueta & Coordenadas -->
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
-                <span class="flex items-center gap-1">
+                <span class="flex items-center gap-1.5">
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
-                    <span>Localização & Plaqueta</span>
+                    <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
-                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Google Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
+                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                    <strong class="block text-[11px] text-on-surface-variant mb-0.5">Endereço / Ponto(s):</strong>
-                    <ul class="space-y-0.5 text-on-surface max-h-24 overflow-y-auto">${ptsList}</ul>
-                </div>
-                <div class="space-y-1 text-xs">
-                    <div><b class="text-on-surface-variant font-medium">Plaqueta Inicial:</b> <span class="font-medium text-on-surface">${item.plaquetaInicial || 'Não informada'}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Plaqueta Final:</b> <span class="font-medium text-on-surface">${item.plaquetaFinal || item.plaquetaInicial || 'Não informada'}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Coordenada Inicial:</b> <span class="font-medium text-on-surface">${coordIni.formatted}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Coordenada Reparo:</b> <span class="font-medium text-on-surface">${coordFin.formatted}</span></div>
-                    <div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>
-                </div>
+
+            <!-- Resumo Rápido -->
+            <div class="p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/50 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11.5px]">
+                <div><b class="text-on-surface-variant font-medium">Plaqueta(s) Registrada(s):</b> <span class="font-semibold text-primary">${(item.plaquetasFinalList || []).join(', ') || 'Não informada'}</span></div>
+                ${!item.isDireto ? `<div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>` : '<div><b class="text-on-surface-variant font-medium">Tipo:</b> <span class="font-semibold text-amber-700">Demanda Emergencial (Atendimento Direto)</span></div>'}
+            </div>
+
+            <!-- Lista Estruturada dos Pontos -->
+            <div class="space-y-2">
+                ${(item.pontosDetalhados || []).map(p => `
+                    <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
+                        <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1">
+                            <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
+                                <span class="material-symbols-outlined text-[15px]">pin_drop</span>
+                                <span>Ponto #${p.numero}</span>
+                            </div>
+                            ${p.hasFinalData ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Concluído</span>` : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Abertura / Pendente</span>`}
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <!-- Coluna Abertura (Inicial) -->
+                            <div class="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                <div class="font-bold text-slate-700 text-[11px] border-b border-slate-200/60 pb-0.5">📌 Abertura (Inicial)</div>
+                                <div><b class="text-slate-600 font-medium">Plaqueta:</b> <span class="font-semibold text-primary">${p.plaquetaInicial || 'Não informada'}</span></div>
+                                <div><b class="text-slate-600 font-medium">Coordenada:</b> <span class="font-mono text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
+                                <div><b class="text-slate-600 font-medium">Problema:</b> <span class="text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
+                                ${p.enderecoInicial ? `<div class="text-[11px] text-slate-600 pt-0.5"><b class="text-slate-600 font-medium">Endereço:</b> ${p.enderecoInicial}</div>` : ''}
+                            </div>
+
+                            <!-- Coluna Conclusão (Final / Reparo) -->
+                            ${p.hasFinalData ? `
+                                <div class="p-2 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1">
+                                    <div class="font-bold text-emerald-800 text-[11px] border-b border-emerald-200/60 pb-0.5">✅ Conclusão (Reparo)</div>
+                                    <div><b class="text-slate-600 font-medium">Plaqueta Final:</b> <span class="font-semibold text-primary">${p.plaquetaFinal || 'Não informada'}</span></div>
+                                    <div><b class="text-slate-600 font-medium">Coordenada Reparo:</b> <span class="font-mono text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
+                                    <div><b class="text-slate-600 font-medium">Problema Encontrado:</b> <span class="text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
+                                    ${p.materiais && p.materiais.length > 0 ? `<div><b class="text-slate-600 font-medium">Materiais:</b> <span class="text-slate-800 font-medium">${p.materiais.join(', ')}</span></div>` : ''}
+                                </div>
+                            ` : `
+                                <div class="p-2 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1 flex flex-col justify-center items-center text-center min-h-[90px]">
+                                    <div class="font-bold text-amber-800 text-[11px] flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
+                                        <span>Conclusão (Reparo)</span>
+                                    </div>
+                                    <span class="text-[11px] text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
+                                </div>
+                            `}
+                        </div>
+                    </div>
+                `).join('')}
             </div>
         </div>
 
@@ -979,9 +1157,16 @@ class AuditoriaController {
                 <span class="material-symbols-outlined text-[16px]">fact_check</span>
                 <span>Divergências da Auditoria</span>
             </strong>
-            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-                ${auditBadgesHtml}
-            </div>
+            ${item.isDireto ? `
+                <div class="p-3 bg-amber-50 border border-amber-200/80 rounded-xl text-xs text-amber-900 flex items-center gap-2 font-medium">
+                    <span class="material-symbols-outlined text-[18px] text-amber-600">info</span>
+                    <span>Atendimento Direto — Isento de conferência de critérios de auditoria.</span>
+                </div>
+            ` : `
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+                    ${auditBadgesHtml}
+                </div>
+            `}
         </div>
 
         <!-- Seção 4: Galeria de Fotos -->
@@ -1018,14 +1203,130 @@ class AuditoriaController {
                 </div>
             </div>`;
         })()}
+
+        <!-- Seção 6: Ações & Navegação do Protocolo -->
+        ${(() => {
+            let isAdminUser = false;
+            try {
+                if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                    const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                    if (r === 'admin') isAdminUser = true;
+                }
+                if (!isAdminUser && window.usuarioLogadoSupabase) {
+                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                    if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
+                }
+                if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                    isAdminUser = true;
+                }
+            } catch(e) {}
+
+            let linkGoogleMaps = '#';
+            let linkWaze = '#';
+
+            const coordIni = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaInicial) : { lat: '--', lng: '--' };
+            const coordFin = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaReparo) : { lat: '--', lng: '--' };
+
+            let targetLat = null;
+            let targetLng = null;
+
+            if (coordFin && coordFin.lat !== '--' && coordFin.lng !== '--') {
+                targetLat = coordFin.lat;
+                targetLng = coordFin.lng;
+            } else if (coordIni && coordIni.lat !== '--' && coordIni.lng !== '--') {
+                targetLat = coordIni.lat;
+                targetLng = coordIni.lng;
+            }
+
+            if (targetLat && targetLng) {
+                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
+                linkWaze = `https://waze.com/ul?ll=${targetLat},${targetLng}&navigate=yes`;
+            } else if (item.endereco && item.endereco.trim()) {
+                const queryEnc = encodeURIComponent(item.endereco.trim() + ', Araraquara - SP');
+                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+                linkWaze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
+            }
+
+            const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
+            const isJaCancelada = (item.normalizedStatus === 'cancelada');
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2 pt-3">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">touch_app</span>
+                        <span>Ações & Navegação</span>
+                    </span>
+                    ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>` : ''}
+                </div>
+                
+                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+                    <!-- Botões de Navegação (Disponíveis para Todos os Usuários) -->
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">explore</span> Navegar:
+                        </span>
+                        ${linkGoogleMaps !== '#' ? `
+                        <a href="${linkGoogleMaps}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                            <span class="material-symbols-outlined text-[15px] text-blue-600">map</span>
+                            <span>Maps</span>
+                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
+                        </a>` : `
+                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">map</span>
+                            <span>Maps</span>
+                        </button>`}
+
+                        ${linkWaze !== '#' ? `
+                        <a href="${linkWaze}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                            <span class="material-symbols-outlined text-[15px] text-cyan-600">navigation</span>
+                            <span>Waze</span>
+                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
+                        </a>` : `
+                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">navigation</span>
+                            <span>Waze</span>
+                        </button>`}
+                    </div>
+
+                    <!-- Botões Exclusivos do Administrador -->
+                    ${isAdminUser ? `
+                    <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
+                        ${!isJaUrgente ? `
+                        <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">priority_high</span>
+                            <span>Priorizar para Urgente</span>
+                        </button>` : `
+                        <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">check_circle</span>
+                            <span>Já é Urgente</span>
+                        </button>`}
+
+                        ${!isJaCancelada ? `
+                        <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">block</span>
+                            <span>Cancelar OS</span>
+                        </button>` : `
+                        <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">block</span>
+                            <span>OS Cancelada</span>
+                        </button>`}
+                    </div>` : ''}
+                </div>
+            </div>`;
+        })()}
         `;
     }
 }
 
 // Global helpers for row click details modal
 window.abrirDetalhesOSModal = function(id) {
-    if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+    if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+        window.painelController.abrirDetalhesOSModal(id);
+    } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
         window.auditoriaController.abrirDetalhesOSModal(id);
+    } else {
+        console.warn('Controller não encontrado para abrir detalhes da OS:', id);
     }
 };
 

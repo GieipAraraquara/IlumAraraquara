@@ -4,9 +4,94 @@
     <base target="_top">
     <title>OS Iluminação e Praças - Araraquara</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+
+    <!-- PWA Manifest & Meta Tags -->
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#2563eb" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <script>
+      // Registro do Service Worker PWA e Gerenciador de Instalação
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').then(function(reg) {
+            console.log('⚡ [PWA] Service Worker registrado a partir do Abrir:', reg.scope);
+          }).catch(function(err) {
+            console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
+          });
+        });
+      }
+
+      let deferredPwaPrompt = null;
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPwaPrompt = e;
+
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        if (window.self === window.top && !isStandalone) {
+          const banner = document.getElementById('pwaInstallBanner');
+          const btnHeader = document.getElementById('btnInstalarPwaHeader');
+          if (banner && sessionStorage.getItem('pwa_banner_dismissed') !== 'true') {
+            banner.classList.remove('hidden');
+            banner.classList.add('flex');
+          }
+          if (btnHeader) {
+            btnHeader.classList.remove('hidden');
+            btnHeader.classList.add('inline-flex');
+          }
+        }
+      });
+
+      async function dispararInstalacaoPWA() {
+        if (!deferredPwaPrompt) {
+          alert('Para instalar o aplicativo, abra o menu do seu navegador (três pontos ou compartilhar) e selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
+          return;
+        }
+
+        deferredPwaPrompt.prompt();
+        const { outcome } = await deferredPwaPrompt.userChoice;
+        console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+        deferredPwaPrompt = null;
+        fecharBannerPWA();
+      }
+
+      function fecharBannerPWA() {
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner) {
+          banner.classList.add('hidden');
+          banner.classList.remove('flex');
+        }
+        sessionStorage.setItem('pwa_banner_dismissed', 'true');
+      }
+
+      window.addEventListener('appinstalled', () => {
+        console.log('⚡ [PWA] Aplicativo instalado com sucesso!');
+        deferredPwaPrompt = null;
+        fecharBannerPWA();
+        const btnHeader = document.getElementById('btnInstalarPwaHeader');
+        if (btnHeader) btnHeader.classList.add('hidden');
+      });
+
+      // Aplicação instantânea do layout salvo do Modo Rápido (Evita FOUC / Carregamento rápido do formulário padrão)
+      (function() {
+        try {
+          var isSmall = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          var editProt = (new URLSearchParams(window.location.search)).get('edit') || (new URLSearchParams(window.location.search)).get('protocolo') || sessionStorage.getItem('os_para_edicao');
+          var salvo = localStorage.getItem('os_modo_rapido_ativo');
+          if (isSmall && !editProt && salvo === 'true') {
+            document.write('<style id="styleModoRapidoEarly">#painelModoPadrao { display: none; } #painelModoRapido { display: block; } #footerAbrir { display: none; }</style>');
+          }
+        } catch(e) {}
+      })();
+    </script>
+
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
     
@@ -102,6 +187,34 @@
     </script>
 
     <style>
+      .material-symbols-outlined {
+        font-family: 'Material Symbols Outlined' !important;
+        font-weight: normal;
+        font-style: normal;
+        font-size: 24px;
+        line-height: 1;
+        letter-spacing: normal;
+        text-transform: none;
+        display: inline-block;
+        white-space: nowrap;
+        word-wrap: normal;
+        direction: ltr;
+        -webkit-font-feature-settings: 'liga';
+        -webkit-font-smoothing: antialiased;
+        font-feature-settings: 'liga';
+      }
+
+      /* Oculta os botões/setinhas nativas do navegador para inputs de número que utilizam botões de stepper */
+      input[type=number]::-webkit-inner-spin-button, 
+      input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+      }
+      input[type=number] {
+        -moz-appearance: textfield;
+        appearance: textfield;
+      }
+
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f8fafc;
@@ -640,6 +753,12 @@
       html.in-iframe #headerAbrir {
         display: none !important;
       }
+      html.in-iframe #pwaInstallBanner,
+      body.in-iframe #pwaInstallBanner,
+      html.in-iframe #btnInstalarPwaHeader,
+      body.in-iframe #btnInstalarPwaHeader {
+        display: none !important;
+      }
     </style>
 
     <script>
@@ -711,6 +830,14 @@
             </div>
           </div>
           <div class="flex items-center gap-3">
+            <!-- Botão de Instalação PWA no Cabeçalho -->
+            <button type="button" 
+                    id="btnInstalarPwaHeader"
+                    onclick="dispararInstalacaoPWA()"
+                    class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors items-center gap-1 cursor-pointer" title="Instalar Aplicativo">
+              <span class="material-symbols-outlined text-[18px] text-blue-600">download</span>
+              <span class="hidden sm:inline">Instalar App</span>
+            </button>
             <button type="button" id="btnHeaderLogout" onclick="if(window.AuthGuard)window.AuthGuard.logout();else window.location.href='Login.html';" class="text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors" title="Sair do Sistema">
               <span class="material-symbols-outlined text-[18px]">logout</span>
               <span class="hidden sm:inline">Sair</span>
@@ -723,8 +850,140 @@
 
         <!-- CORPO DO POPUP (CONTEÚDO FORMULÁRIO ROLÁVEL NA PÁGINA) -->
         <div id="corpoFormularioModal" class="flex-1 min-h-0 p-5 sm:p-7 space-y-4">
-          <!-- SELETOR DE TIPO DE OS (ILUMINAÇÃO VIÁRIA VS PRAÇA PÚBLICA) -->
-          <div class="tab-tipo-os">
+
+          <!-- BANNER PROMPT DE INSTALAÇÃO DO PWA -->
+          <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-3.5 shadow-md border border-blue-500/30 flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 animate-fade-in mb-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white flex-shrink-0 border border-white/20">
+                <span class="material-symbols-outlined text-xl">install_mobile</span>
+              </div>
+              <div>
+                <h3 class="font-bold text-xs sm:text-sm leading-tight text-white">Instalar App Sistema OS</h3>
+                <p class="text-[11px] text-blue-100/90 mt-0.5">Instale no seu celular para abrir chamados de forma rápida.</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <button type="button" 
+                      onclick="fecharBannerPWA()" 
+                      class="px-2.5 py-1 text-xs text-blue-200 hover:text-white hover:bg-white/10 rounded-lg transition-colors cursor-pointer">
+                Agora não
+              </button>
+              <button type="button" 
+                      onclick="dispararInstalacaoPWA()" 
+                      class="px-3.5 py-1.5 bg-white hover:bg-blue-50 text-blue-700 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95">
+                <span class="material-symbols-outlined text-[15px]">get_app</span>
+                <span>Instalar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- TOGGLE DO MODO RÁPIDO (EXCLUSIVO NO MOBILE) -->
+          <div id="containerModoRapidoToggle" class="hidden bg-slate-100/90 border border-slate-200 rounded-xl px-3 py-2 mb-2 transition-all">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-amber-500 font-bold text-sm">⚡</span>
+                <span class="text-xs font-bold text-slate-700">Modo Rápido</span>
+                <span class="text-[10px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">Mobile</span>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer select-none">
+                <input type="checkbox" id="toggleModoRapido" class="sr-only peer" onchange="alternarModoRapidoUser(this.checked)">
+                <div class="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
+          </div>
+
+          <!-- PAINEL MODO RÁPIDO (EXIBIDO QUANDO ATIVADO NO MOBILE) -->
+          <div id="painelModoRapido" style="display: none;" class="space-y-3.5">
+            <!-- SELEÇÃO DE LOCALIZAÇÃO (TABS COMPACTAS) -->
+            <div class="form-group">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Localização do Chamado:</label>
+              <div class="tab-local">
+                <input type="radio" name="tipoLocalRapido" id="tabGpsRapido" value="gps" checked onchange="alternarLocalRapido()">
+                <label for="tabGpsRapido">📍 GPS</label>
+
+                <input type="radio" name="tipoLocalRapido" id="tabPlaqRapido" value="plaqueta" onchange="alternarLocalRapido()">
+                <label for="tabPlaqRapido">🏷️ Plaqueta</label>
+
+                <input type="radio" name="tipoLocalRapido" id="tabEndRapido" value="endereco" onchange="alternarLocalRapido()">
+                <label for="tabEndRapido">🏠 Endereço</label>
+              </div>
+
+              <!-- TAB 1: GPS REAL-TIME -->
+              <div id="contGpsRapido" class="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div class="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2">
+                  <span>GPS do Celular:</span>
+                  <span id="gpsBadgeRapido" onclick="alternarCongelarGpsRapidoManualmente()" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 cursor-pointer select-none" title="Clique para fixar/liberar a posição do GPS">📡 Buscando...</span>
+                </div>
+                <div id="mapaGpsCanvasRapido" class="w-full h-[160px] rounded-lg border border-slate-300"></div>
+                <div id="gpsCoordsTextRapido" class="text-[11px] text-slate-500 mt-1.5 text-center font-medium">Obtendo coordenadas do GPS...</div>
+              </div>
+
+              <!-- TAB 2: PLAQUETA -->
+              <div id="contPlaqRapido" style="display: none;" class="pt-1">
+                <div class="flex gap-2">
+                  <input type="text" id="inputPlaquetaRapida" maxlength="6" placeholder="Ex: U8162" style="text-transform: uppercase;" oninput="resetarValidacaoPlaquetaRapida()" class="flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm font-bold focus:ring-2 focus:ring-blue-600 outline-none">
+                  <button type="button" id="btnValidarPlaqRapida" class="btn-secundario px-4" onclick="validarPlaquetaRapida()">Validar</button>
+                </div>
+                <div id="msgErroPlaquetaRapida" class="erro text-red-600 text-xs mt-1 font-semibold"></div>
+              </div>
+
+              <!-- TAB 3: ENDEREÇO -->
+              <div id="contEndRapido" style="display: none;" class="relative pt-1">
+                <input type="text" id="inputEnderecoRapido" placeholder="Rua, NÚMERO e bairro em Araraquara..." oninput="buscarEnderecoRapido()" autocomplete="off" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none">
+                <div id="msgErroEnderecoRapido" class="erro text-red-600 text-xs mt-1 font-semibold"></div>
+                <div id="mapboxSuggestionsRapido" class="mapbox-suggestions-dropdown" style="display: none;"></div>
+                <div id="miniResultadoEnderecoRapido" class="hidden mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-700">
+                  📍 <span id="textoEndValidadoRapido"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- SELEÇÃO RÁPIDA DE PROBLEMAS -->
+            <div class="form-group">
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">Problema Detectado:</label>
+              <div class="grid grid-cols-1 gap-2" id="gridProblemasRapidos">
+                <button type="button" class="btn-problema-rapido active flex items-center justify-between p-3 rounded-xl border-2 border-blue-600 bg-blue-50/80 text-blue-800 font-semibold text-sm transition-all cursor-pointer" onclick="selecionarProblemaRapido('Lâmpada queimada', this)">
+                  <span class="flex items-center gap-2.5">
+                    <span class="text-lg">💡</span>
+                    <span>Lâmpada queimada</span>
+                  </span>
+                  <span class="material-symbols-outlined text-[20px] text-blue-600 check-icon">check_circle</span>
+                </button>
+                <button type="button" class="btn-problema-rapido flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-all cursor-pointer" onclick="selecionarProblemaRapido('Intermitente', this)">
+                  <span class="flex items-center gap-2.5">
+                    <span class="text-lg">⚡</span>
+                    <span>Intermitente</span>
+                  </span>
+                  <span class="material-symbols-outlined text-[20px] text-blue-600 check-icon hidden">check_circle</span>
+                </button>
+                <button type="button" class="btn-problema-rapido flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 font-semibold text-sm transition-all cursor-pointer" onclick="selecionarProblemaRapido('Acesa ao dia', this)">
+                  <span class="flex items-center gap-2.5">
+                    <span class="text-lg">☀️</span>
+                    <span>Acesa ao dia</span>
+                  </span>
+                  <span class="material-symbols-outlined text-[20px] text-blue-600 check-icon hidden">check_circle</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- OBSERVAÇÃO OPCIONAL MODO RÁPIDO -->
+            <div class="form-group">
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Observações (opcional):</label>
+              <input type="text" id="descricaoRapida" placeholder="Informação adicional..." class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none">
+            </div>
+
+            <!-- BOTÃO PRINCIPAL MODO RÁPIDO -->
+            <button type="button" id="btnSalvarOSRapida" onclick="validarEEnviarOSRapida()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold text-base py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 mt-3 cursor-pointer">
+              <span>Salvar</span>
+              <span class="text-lg">⚡</span>
+            </button>
+            <div id="mensagemRapida" class="mt-2 text-center text-xs font-semibold"></div>
+          </div>
+
+          <!-- PAINEL MODO PADRÃO -->
+          <div id="painelModoPadrao" class="space-y-4">
+            <!-- SELETOR DE TIPO DE OS (ILUMINAÇÃO VIÁRIA VS PRAÇA PÚBLICA) -->
+            <div class="tab-tipo-os">
             <input type="radio" name="tipoOS" id="tabIluminacao" value="iluminacao" checked onchange="alternarTipoOS()">
             <label for="tabIluminacao">💡 Viária</label>
             
@@ -773,16 +1032,20 @@
           <!-- ABA 1: ILUMINAÇÃO VIÁRIA -->
           <div id="abaIluminacao">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-              <div class="form-group" id="grupoPrioridadeViaria">
+              <div class="form-group" id="grupoPrioridadeViaria" style="display: none;">
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Prioridade:</label>
                 <select id="prioridade" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none">
                   <option value="Normal">Normal</option>
                   <option value="Urgente">Urgente</option>
                 </select>
               </div>
-              <div class="form-group" id="grupoQtdPontosViaria">
+              <div class="form-group sm:col-span-2" id="grupoQtdPontosViaria">
                 <label class="obrigatorio block text-xs font-semibold text-slate-700 mb-1">Qtd. Pontos:</label>
-                <input type="number" id="quantidade" value="1" min="1" onchange="ajustarPontos()" oninput="this.value = this.value.replace(/[^0-9]/g, ''); ajustarPontos();" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none">
+                <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-xs">
+                  <button type="button" onclick="alterarQtdInput('quantidade', -1, 1, ajustarPontos)" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors border-r border-slate-300 cursor-pointer select-none">−</button>
+                  <input type="number" id="quantidade" value="1" min="1" onchange="ajustarPontos()" oninput="this.value = this.value.replace(/[^0-9]/g, ''); ajustarPontos();" class="w-full border-none bg-transparent text-center font-bold text-sm text-blue-600 focus:ring-0 outline-none">
+                  <button type="button" onclick="alterarQtdInput('quantidade', 1, 1, ajustarPontos)" class="w-10 h-10 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-lg flex items-center justify-center transition-colors border-l border-slate-300 cursor-pointer select-none">+</button>
+                </div>
               </div>
             </div>
 
@@ -794,7 +1057,7 @@
             <div class="card-praca">
               <div class="card-praca-header">🌳 Dados da Praça Pública</div>
               
-              <div class="form-group mb-3" id="grupoPrioridadePraca">
+              <div class="form-group mb-3" id="grupoPrioridadePraca" style="display: none;">
                 <label class="obrigatorio block text-xs font-semibold text-slate-700 mb-1">Prioridade:</label>
                 <select id="prioridadePraca" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none">
                   <option value="Normal">Normal</option>
@@ -833,10 +1096,16 @@
                     <label for="tabMapa_praca">Mapa</label>
                   </div>
 
-                  <div id="contCoord_praca" class="flex gap-2">
-                    <input type="text" id="lat_praca" class="flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 outline-none" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); resetarValidacaoPracaOutra();">
-                    <input type="text" id="lng_praca" class="flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 outline-none" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); resetarValidacaoPracaOutra();">
-                    <button type="button" id="btnValidar_praca" class="btn-secundario" onclick="validarCoordsManuaisPracaOutra()">Validar</button>
+                  <div id="contCoord_praca" class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" id="lat_praca" class="w-full sm:flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 outline-none" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); resetarValidacaoPracaOutra();">
+                    <input type="text" id="lng_praca" class="w-full sm:flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-emerald-600 outline-none" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); resetarValidacaoPracaOutra();">
+                    <div class="flex gap-2 w-full sm:w-auto">
+                      <button type="button" onclick="puxarGpsParaFormulario('praca')" class="sm:hidden flex-1 px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 font-bold text-xs rounded-lg border border-emerald-200 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">my_location</span>
+                        <span>Puxar GPS</span>
+                      </button>
+                      <button type="button" id="btnValidar_praca" class="btn-secundario flex-1 sm:flex-initial !px-4" onclick="validarCoordsManuaisPracaOutra()">Validar</button>
+                    </div>
                   </div>
 
                   <div id="contEnd_praca" style="display: none; position: relative;">
@@ -883,6 +1152,7 @@
             <textarea id="descricao" rows="2" placeholder="Detalhes adicionais..." class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none resize-none"></textarea>
           </div>
           <div id="mensagem"></div>
+          </div> <!-- FIM DO PAINEL MODO PADRÃO -->
         </div>
 
         <!-- FOOTER FIXO DO POPUP -->
@@ -891,7 +1161,7 @@
             Cancelar
           </button>
           <button type="button" id="btnSalvar" class="btn-primario !w-auto px-6 cursor-pointer" onclick="validarEEnviar()">
-            Salvar Ordem de Serviço
+            Salvar
           </button>
         </div>
       </div>
@@ -1357,6 +1627,39 @@
        * Valida a sessão de autenticação do Supabase (Email/Senha ou Gov.br)
        * Preenche automaticamente o operador, munícipe (solicitante) e renderiza badge no header.
        */
+      function ajustarExibicaoPrioridade(bloquearGovBr) {
+        var isEmbeddedInPainel = false;
+        try {
+          isEmbeddedInPainel = (window.parent && window.parent !== window && (
+            (window.parent.location && window.parent.location.href.indexOf('Painel') !== -1) ||
+            !!window.parent.document.querySelector('app-sidebar') ||
+            !!window.parent.document.getElementById('iframe-abertura-os')
+          ));
+        } catch(e) {
+          isEmbeddedInPainel = (window.parent && window.parent !== window);
+        }
+
+        var grupoPrioViaria = document.getElementById('grupoPrioridadeViaria');
+        var grupoPrioPraca = document.getElementById('grupoPrioridadePraca');
+        var grupoQtdPontos = document.getElementById('grupoQtdPontosViaria');
+        var prioSel = document.getElementById('prioridade');
+        var prioPracaSel = document.getElementById('prioridadePraca');
+
+        var exibir = isEmbeddedInPainel && !bloquearGovBr;
+
+        if (exibir) {
+          if (grupoPrioViaria) grupoPrioViaria.style.display = 'block';
+          if (grupoPrioPraca) grupoPrioPraca.style.display = 'block';
+          if (grupoQtdPontos) grupoQtdPontos.classList.remove('sm:col-span-2');
+        } else {
+          if (grupoPrioViaria) grupoPrioViaria.style.display = 'none';
+          if (grupoPrioPraca) grupoPrioPraca.style.display = 'none';
+          if (prioSel) prioSel.value = 'Normal';
+          if (prioPracaSel) prioPracaSel.value = 'Normal';
+          if (grupoQtdPontos) grupoQtdPontos.classList.add('sm:col-span-2');
+        }
+      }
+
       async function carregarOperadorESessaoSupabase() {
         var opInput = document.getElementById('operador');
         var municipeInput = document.getElementById('municipe');
@@ -1396,24 +1699,8 @@
             }
           }
 
-          // Ocultar prioridade para acessos via Gov.br
-          var grupoPrioViaria = document.getElementById('grupoPrioridadeViaria');
-          var grupoPrioPraca = document.getElementById('grupoPrioridadePraca');
-          var grupoQtdPontos = document.getElementById('grupoQtdPontosViaria');
-          var prioSel = document.getElementById('prioridade');
-          var prioPracaSel = document.getElementById('prioridadePraca');
-
-          if (bloquear) {
-            if (grupoPrioViaria) grupoPrioViaria.style.display = 'none';
-            if (grupoPrioPraca) grupoPrioPraca.style.display = 'none';
-            if (prioSel) prioSel.value = 'Normal';
-            if (prioPracaSel) prioPracaSel.value = 'Normal';
-            if (grupoQtdPontos) grupoQtdPontos.classList.add('sm:col-span-2');
-          } else {
-            if (grupoPrioViaria) grupoPrioViaria.style.display = 'block';
-            if (grupoPrioPraca) grupoPrioPraca.style.display = 'block';
-            if (grupoQtdPontos) grupoQtdPontos.classList.remove('sm:col-span-2');
-          }
+          // Controle de exibição do campo Prioridade (apenas se aberto via Painel.html)
+          ajustarExibicaoPrioridade(bloquear);
 
           if (badgeGovBr) {
             if (bloquear) { badgeGovBr.classList.remove('hidden'); badgeGovBr.classList.add('flex'); }
@@ -1633,7 +1920,11 @@
         if (h1Title) h1Title.textContent = 'Abertura de Ordem de Serviço';
 
         var btnSalvar = document.getElementById('btnSalvar');
-        if (btnSalvar) btnSalvar.innerText = '💾 Salvar Ordem de Serviço';
+        if (btnSalvar) btnSalvar.innerText = 'Salvar';
+
+        if (typeof verificarEAplicarModoRapido === 'function') {
+          verificarEAplicarModoRapido();
+        }
       };
 
       function buscarEPreencherOSEdicao(protocolo) {
@@ -1945,10 +2236,686 @@
           });
       }
 
+      // =========================================================================
+      // MODO RÁPIDO (SUPORTE MOBILE & GPS REAL-TIME)
+      // =========================================================================
+      var modoRapidoAtivo = false;
+      var mapGpsRapido = null;
+      var markerGpsRapido = null;
+      var currentGpsPosRapido = null;
+      var watchIdGpsRapido = null;
+      var timerVerificacaoGpsRapido = null;
+      var gpsCongeladoRapido = false;
+      var ultimaPrecisaoGpsRapido = null;
+      var ultimoTimestampGpsRapido = 0;
+      function obterProblemaPadraoPorHorario() {
+        var hora = new Date().getHours();
+        return (hora < 18) ? 'Acesa ao dia' : 'Lâmpada queimada';
+      }
+
+      function aplicarProblemaPadraoPorHorario() {
+        var probPadrao = obterProblemaPadraoPorHorario();
+        problemaRapidoSelecionado = probPadrao;
+        var botoes = document.querySelectorAll('#gridProblemasRapidos .btn-problema-rapido');
+        botoes.forEach(function(b) {
+          var dataProb = b.getAttribute('data-problema');
+          if (dataProb === probPadrao) {
+            selecionarProblemaRapido(probPadrao, b);
+          }
+        });
+      }
+
+      var problemaRapidoSelecionado = obterProblemaPadraoPorHorario();
+      var addressTimeoutRapido = null;
+
+      var estadoPontoRapido = {
+        lat: null,
+        lng: null,
+        plaqueta: '',
+        endereco: '',
+        validado: false
+      };
+
+      function isDispositivoMobile() {
+        var isSmallScreen = window.innerWidth <= 768;
+        var isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        return isSmallScreen || isMobileUA;
+      }
+
+      function verificarEAplicarModoRapido() {
+        var containerToggle = document.getElementById('containerModoRapidoToggle');
+        var checkbox = document.getElementById('toggleModoRapido');
+
+        if (!containerToggle || !checkbox) return;
+
+        if (isModoEdicao) {
+          containerToggle.classList.add('hidden');
+          containerToggle.style.display = 'none';
+          ativarModoRapidoUI(false);
+          return;
+        }
+
+        var mobile = isDispositivoMobile();
+
+        if (mobile) {
+          containerToggle.classList.remove('hidden');
+          containerToggle.style.display = 'block';
+
+          var salvo = localStorage.getItem('os_modo_rapido_ativo');
+          var deveAtivar = (salvo === 'true');
+          checkbox.checked = deveAtivar;
+          ativarModoRapidoUI(deveAtivar);
+        } else {
+          containerToggle.classList.add('hidden');
+          containerToggle.style.display = 'none';
+          checkbox.checked = false;
+          ativarModoRapidoUI(false);
+        }
+      }
+
+      function alternarModoRapidoUser(checked) {
+        localStorage.setItem('os_modo_rapido_ativo', checked ? 'true' : 'false');
+        ativarModoRapidoUI(checked);
+      }
+
+      function ativarModoRapidoUI(ativar) {
+        modoRapidoAtivo = ativar;
+        var earlyStyle = document.getElementById('styleModoRapidoEarly');
+        if (earlyStyle) earlyStyle.remove();
+
+        var pRapido = document.getElementById('painelModoRapido');
+        var pPadrao = document.getElementById('painelModoPadrao');
+        var footer = document.getElementById('footerAbrir');
+
+        if (!pRapido || !pPadrao) return;
+
+        if (ativar) {
+          pRapido.style.display = 'block';
+          pPadrao.style.display = 'none';
+          if (footer) footer.style.display = 'none';
+
+          aplicarProblemaPadraoPorHorario();
+          alternarLocalRapido();
+        } else {
+          pRapido.style.display = 'none';
+          pPadrao.style.display = 'block';
+          if (footer) footer.style.display = 'flex';
+
+          pararGpsRealTimeRapido();
+        }
+      }
+
+      function alternarLocalRapido() {
+        var radModo = document.querySelector('input[name="tipoLocalRapido"]:checked');
+        if (!radModo) return;
+        var modo = radModo.value;
+
+        var contGps = document.getElementById('contGpsRapido');
+        var contPlaq = document.getElementById('contPlaqRapido');
+        var contEnd = document.getElementById('contEndRapido');
+
+        if (contGps) contGps.style.display = (modo === 'gps') ? 'block' : 'none';
+        if (contPlaq) contPlaq.style.display = (modo === 'plaqueta') ? 'block' : 'none';
+        if (contEnd) contEnd.style.display = (modo === 'endereco') ? 'block' : 'none';
+
+        if (modo === 'gps') {
+          iniciarGpsRealTimeRapido();
+          if (currentGpsPosRapido) {
+            estadoPontoRapido.lat = currentGpsPosRapido.lat;
+            estadoPontoRapido.lng = currentGpsPosRapido.lng;
+            estadoPontoRapido.validado = true;
+          }
+          if (mapGpsRapido) setTimeout(function() { mapGpsRapido.resize(); }, 150);
+        } else {
+          pararGpsRealTimeRapido();
+          estadoPontoRapido.validado = (modo === 'plaqueta') ? Boolean(estadoPontoRapido.plaqueta) : Boolean(estadoPontoRapido.endereco);
+        }
+      }
+
+      function iniciarGpsRealTimeRapido() {
+        var badge = document.getElementById('gpsBadgeRapido');
+        var coordsText = document.getElementById('gpsCoordsTextRapido');
+
+        if (!navigator.geolocation) {
+          if (badge) { badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800'; badge.innerText = '❌ Indisponível'; }
+          if (coordsText) coordsText.innerText = 'Este dispositivo não suporta localização por GPS.';
+          atualizarEstadoBotaoSalvarGPSRapido();
+          return;
+        }
+
+        if (!mapGpsRapido) {
+          var canvasEl = document.getElementById('mapaGpsCanvasRapido');
+          if (canvasEl) {
+            mapGpsRapido = new mapboxgl.Map({
+              container: 'mapaGpsCanvasRapido',
+              style: 'mapbox://styles/mapbox/streets-v12',
+              center: [-48.1766, -21.7946],
+              zoom: 16
+            });
+            mapGpsRapido.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+          }
+        }
+
+        if (watchIdGpsRapido) {
+          navigator.geolocation.clearWatch(watchIdGpsRapido);
+          watchIdGpsRapido = null;
+        }
+
+        watchIdGpsRapido = navigator.geolocation.watchPosition(
+          function(pos) {
+            var lat = pos.coords.latitude;
+            var lng = pos.coords.longitude;
+            var acc = Math.round(pos.coords.accuracy);
+
+            ultimaPrecisaoGpsRapido = acc;
+
+            if (gpsCongeladoRapido) return;
+
+            ultimoTimestampGpsRapido = Date.now();
+            currentGpsPosRapido = { lat: lat, lng: lng };
+            estadoPontoRapido.lat = Number(lat).toFixed(6);
+            estadoPontoRapido.lng = Number(lng).toFixed(6);
+            estadoPontoRapido.validado = true;
+
+            if (badge) {
+              badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800';
+              badge.innerText = '🎯 ±' + acc + 'm';
+            }
+            if (coordsText) {
+              coordsText.innerText = 'Lat: ' + Number(lat).toFixed(6) + ' | Lng: ' + Number(lng).toFixed(6);
+            }
+
+            if (mapGpsRapido) {
+              mapGpsRapido.setCenter([lng, lat]);
+              if (!markerGpsRapido) {
+                markerGpsRapido = new mapboxgl.Marker({ color: '#0051d5' })
+                  .setLngLat([lng, lat])
+                  .addTo(mapGpsRapido);
+              } else {
+                markerGpsRapido.setLngLat([lng, lat]);
+              }
+            }
+
+            atualizarEstadoBotaoSalvarGPSRapido();
+
+            fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + lng + ',' + lat + '.json?access_token=' + MAPBOX_TOKEN + '&language=pt&country=br')
+              .then(function(r) { return r.json(); })
+              .then(function(resData) {
+                if (resData && resData.features && resData.features.length > 0) {
+                  estadoPontoRapido.endereco = resData.features[0].place_name;
+                }
+              })
+              .catch(function() {});
+          },
+          function(err) {
+            if (gpsCongeladoRapido) return;
+            console.warn("Aviso GPS Modo Rápido:", err.message);
+            if (badge) {
+              badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-red-100 text-red-800';
+              badge.innerText = '⚠️ Sem sinal';
+            }
+            if (coordsText) coordsText.innerText = 'Ative a localização/GPS do celular.';
+            atualizarEstadoBotaoSalvarGPSRapido();
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+
+        if (!timerVerificacaoGpsRapido) {
+          timerVerificacaoGpsRapido = setInterval(function() {
+            atualizarEstadoBotaoSalvarGPSRapido();
+          }, 1000);
+        }
+      }
+
+      function pararGpsRealTimeRapido() {
+        if (watchIdGpsRapido) {
+          navigator.geolocation.clearWatch(watchIdGpsRapido);
+          watchIdGpsRapido = null;
+        }
+        if (timerVerificacaoGpsRapido) {
+          clearInterval(timerVerificacaoGpsRapido);
+          timerVerificacaoGpsRapido = null;
+        }
+      }
+
+      function congelarGpsRapido() {
+        gpsCongeladoRapido = true;
+        ultimoTimestampGpsRapido = Date.now();
+        var badge = document.getElementById('gpsBadgeRapido');
+        if (badge) {
+          badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-sky-100 text-sky-800 border border-sky-300';
+          var textAcc = ultimaPrecisaoGpsRapido ? (' ±' + ultimaPrecisaoGpsRapido + 'm') : '';
+          badge.innerText = '❄️ Fixado' + textAcc;
+        }
+      }
+
+      function descongelarGpsRapido() {
+        gpsCongeladoRapido = false;
+        ultimoTimestampGpsRapido = Date.now();
+        var badge = document.getElementById('gpsBadgeRapido');
+        if (badge && currentGpsPosRapido) {
+          badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800';
+          var textAcc = ultimaPrecisaoGpsRapido ? (' ±' + ultimaPrecisaoGpsRapido + 'm') : '';
+          badge.innerText = '🎯' + textAcc;
+        }
+        iniciarGpsRealTimeRapido();
+      }
+
+      function alternarCongelarGpsRapidoManualmente() {
+        if (gpsCongeladoRapido) {
+          descongelarGpsRapido();
+        } else if (currentGpsPosRapido) {
+          congelarGpsRapido();
+        }
+      }
+
+      function atualizarEstadoBotaoSalvarGPSRapido() {
+        var modoEl = document.querySelector('input[name="tipoLocalRapido"]:checked');
+        if (!modoEl || modoEl.value !== 'gps' || !modoRapidoAtivo) return;
+
+        var btnSalvar = document.getElementById('btnSalvarOSRapida');
+        var badge = document.getElementById('gpsBadgeRapido');
+        if (!btnSalvar) return;
+
+        if (gpsCongeladoRapido) return;
+
+        var idadeGpsMs = Date.now() - ultimoTimestampGpsRapido;
+
+        if (ultimoTimestampGpsRapido > 0 && idadeGpsMs <= 4000) {
+          btnSalvar.disabled = false;
+          btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+        } else {
+          btnSalvar.disabled = true;
+          btnSalvar.innerHTML = '<span>📡 Atualizando GPS...</span>';
+          if (badge && !gpsCongeladoRapido) {
+            badge.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800';
+            badge.innerText = '📡 Atualizando...';
+          }
+        }
+      }
+
+      function puxarGpsParaFormulario(tipo, idx) {
+        if (!navigator.geolocation) {
+          alert("⚠️ Geolocalização não é suportada ou está desativada no seu navegador.");
+          return;
+        }
+
+        var isPraca = (tipo === 'praca');
+        var inputLat = isPraca ? document.getElementById('lat_praca') : document.getElementById('lat_' + idx);
+        var inputLng = isPraca ? document.getElementById('lng_praca') : document.getElementById('lng_' + idx);
+
+        if (!inputLat || !inputLng) return;
+
+        inputLat.value = "Obtendo...";
+        inputLng.value = "Obtendo...";
+
+        navigator.geolocation.getCurrentPosition(
+          function(pos) {
+            var lat = pos.coords.latitude.toFixed(6);
+            var lng = pos.coords.longitude.toFixed(6);
+            inputLat.value = lat;
+            inputLng.value = lng;
+
+            if (isPraca) {
+              if (typeof validarCoordsManuaisPracaOutra === 'function') validarCoordsManuaisPracaOutra();
+            } else {
+              if (typeof validarCoordsManuais === 'function') validarCoordsManuais(false, idx);
+            }
+          },
+          function(err) {
+            alert("⚠️ Não foi possível obter sua localização GPS: " + (err.message || 'Permissão negada ou sinal indisponível.'));
+            inputLat.value = "";
+            inputLng.value = "";
+          },
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+      }
+
+      function alterarQtdInput(inputId, delta, minVal, callback) {
+        var el = document.getElementById(inputId);
+        if (!el) return;
+        var val = parseInt(el.value) || (minVal || 1);
+        val += delta;
+        if (minVal !== undefined && val < minVal) val = minVal;
+        el.value = val;
+        if (typeof callback === 'function') callback();
+        else if (typeof callback === 'string' && typeof window[callback] === 'function') window[callback]();
+      }
+
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && modoRapidoAtivo && !gpsCongeladoRapido) {
+          iniciarGpsRealTimeRapido();
+        }
+      });
+      window.addEventListener('focus', function() {
+        if (modoRapidoAtivo && !gpsCongeladoRapido) {
+          iniciarGpsRealTimeRapido();
+        }
+      });
+      window.addEventListener('resize', function() {
+        verificarEAplicarModoRapido();
+      });
+
+      function resetarValidacaoPlaquetaRapida() {
+        var input = document.getElementById('inputPlaquetaRapida');
+        var btn = document.getElementById('btnValidarPlaqRapida');
+        var msg = document.getElementById('msgErroPlaquetaRapida');
+        if (input) input.classList.remove('input-validado', 'input-invalido');
+        if (btn) { btn.className = 'btn-secundario px-4'; btn.innerText = 'Validar'; }
+        if (msg) msg.innerText = '';
+        estadoPontoRapido.validado = false;
+        estadoPontoRapido.plaqueta = '';
+      }
+
+      async function validarPlaquetaRapida() {
+        var input = document.getElementById('inputPlaquetaRapida');
+        var btn = document.getElementById('btnValidarPlaqRapida');
+        var msg = document.getElementById('msgErroPlaquetaRapida');
+        var plaq = input.value.trim().toUpperCase();
+
+        if (!plaq) { if (msg) msg.innerText = 'Informe a plaqueta.'; return; }
+
+        if (btn) { btn.disabled = true; btn.innerText = 'Buscando...'; }
+
+        try {
+          var client = obterSupabaseClient();
+          if (client) {
+            var resP = await client.from('cadastro_postes').select('*').eq('plaqueta', plaq).maybeSingle();
+            if (resP && resP.data) {
+              var row = resP.data;
+              var lat = parseFloat(row.latitude || row.lat || 0);
+              var lng = parseFloat(row.longitude || row.lng || 0);
+              if (lat && lng) {
+                estadoPontoRapido.lat = lat;
+                estadoPontoRapido.lng = lng;
+                estadoPontoRapido.plaqueta = plaq;
+                estadoPontoRapido.endereco = row.endereco || row.logradouro || '';
+                estadoPontoRapido.validado = true;
+
+                if (input) input.classList.add('input-validado');
+                if (btn) { btn.disabled = false; btn.className = 'btn-secundario px-4 input-validado'; btn.innerText = '✓ OK'; }
+                if (msg) msg.innerText = '';
+                return;
+              }
+            }
+          }
+        } catch(e) { console.warn("Aviso ao buscar plaqueta no Supabase:", e); }
+
+        var token = localStorage.getItem('os_token');
+        callServer('validarPlaquetaUnica', [plaq, token])
+          .then(function(res) {
+            if (btn) btn.disabled = false;
+            if (res && res.sucesso && res.coordenadas && res.coordenadas.length > 0) {
+              var first = res.coordenadas[0];
+              estadoPontoRapido.lat = first.lat;
+              estadoPontoRapido.lng = first.lng;
+              estadoPontoRapido.plaqueta = plaq;
+              estadoPontoRapido.endereco = first.endereco || '';
+              estadoPontoRapido.validado = true;
+
+              if (input) input.classList.add('input-validado');
+              if (btn) { btn.className = 'btn-secundario px-4 input-validado'; btn.innerText = '✓ OK'; }
+              if (msg) msg.innerText = '';
+            } else {
+              if (input) input.classList.add('input-invalido');
+              if (btn) { btn.className = 'btn-secundario px-4 input-invalido'; btn.innerText = 'X Erro'; }
+              if (msg) msg.innerText = 'Plaqueta não encontrada.';
+              estadoPontoRapido.validado = false;
+            }
+          })
+          .catch(function() {
+            if (btn) { btn.disabled = false; btn.innerText = 'Validar'; }
+            if (msg) msg.innerText = 'Erro ao consultar plaqueta.';
+          });
+      }
+
+      function buscarEnderecoRapido() {
+        var input = document.getElementById('inputEnderecoRapido');
+        var query = input.value.trim();
+        var sugBox = document.getElementById('mapboxSuggestionsRapido');
+        var msgErr = document.getElementById('msgErroEnderecoRapido');
+        if (msgErr) msgErr.innerText = '';
+
+        if (addressTimeoutRapido) clearTimeout(addressTimeoutRapido);
+        if (query.length < 3) { if (sugBox) sugBox.style.display = 'none'; return; }
+
+        addressTimeoutRapido = setTimeout(function() {
+          var queryBbox = query;
+          if (query.toLowerCase().indexOf("araraquara") === -1) queryBbox = query + ", Araraquara";
+
+          var url = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' + 
+                    encodeURIComponent(queryBbox) + '.json?access_token=' + MAPBOX_TOKEN + 
+                    '&country=br&language=pt&autocomplete=true&proximity=-48.1766,-21.7946';
+
+          fetch(url)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (!data || !data.features || data.features.length === 0) { if (sugBox) sugBox.style.display = 'none'; return; }
+
+              sugBox.innerHTML = '';
+              data.features.forEach(function(feat) {
+                var item = document.createElement('div');
+                item.className = 'mapbox-suggestion-item';
+                item.innerText = feat.place_name;
+
+                item.addEventListener('mousedown', function(e) {
+                  e.preventDefault();
+                  selecionarEnderecoRapido(feat);
+                });
+                sugBox.appendChild(item);
+              });
+              sugBox.style.display = 'block';
+            })
+            .catch(function() {});
+        }, 300);
+      }
+
+      function selecionarEnderecoRapido(feature) {
+        var input = document.getElementById('inputEnderecoRapido');
+        var sugBox = document.getElementById('mapboxSuggestionsRapido');
+        var msgErr = document.getElementById('msgErroEnderecoRapido');
+
+        if (sugBox) sugBox.style.display = 'none';
+        if (input) input.value = feature.place_name;
+
+        if (feature.place_name.toLowerCase().indexOf("araraquara") !== -1) {
+          estadoPontoRapido.lat = feature.center[1];
+          estadoPontoRapido.lng = feature.center[0];
+          estadoPontoRapido.endereco = feature.place_name;
+          estadoPontoRapido.validado = true;
+
+          if (input) input.classList.add('input-validado');
+          var txtEnd = document.getElementById('textoEndValidadoRapido');
+          var miniRes = document.getElementById('miniResultadoEnderecoRapido');
+          if (txtEnd) txtEnd.innerText = feature.place_name;
+          if (miniRes) miniRes.style.display = 'block';
+          if (msgErr) msgErr.innerText = '';
+        } else {
+          if (input) input.classList.add('input-invalido');
+          if (msgErr) msgErr.innerText = 'Selecione um endereço em Araraquara.';
+          estadoPontoRapido.validado = false;
+        }
+      }
+
+      function selecionarProblemaRapido(problemaText, btnElement) {
+        problemaRapidoSelecionado = problemaText;
+        var botoes = document.querySelectorAll('.btn-problema-rapido');
+        botoes.forEach(function(b) {
+          b.classList.remove('active', 'border-2', 'border-blue-600', 'bg-blue-50/80', 'text-blue-800');
+          b.classList.add('border', 'border-slate-200', 'bg-white', 'text-slate-700');
+          var check = b.querySelector('.check-icon');
+          if (check) check.classList.add('hidden');
+        });
+
+        btnElement.classList.remove('border', 'border-slate-200', 'bg-white', 'text-slate-700');
+        btnElement.classList.add('active', 'border-2', 'border-blue-600', 'bg-blue-50/80', 'text-blue-800');
+        var checkActive = btnElement.querySelector('.check-icon');
+        if (checkActive) checkActive.classList.remove('hidden');
+      }
+
+      async function validarEEnviarOSRapida(forcarSalvar) {
+        var radModo = document.querySelector('input[name="tipoLocalRapido"]:checked');
+        var modo = radModo ? radModo.value : 'gps';
+        var msg = document.getElementById('mensagemRapida');
+        var btnSalvar = document.getElementById('btnSalvarOSRapida');
+
+        if (modo === 'gps') {
+          var idadeGpsMs = Date.now() - ultimoTimestampGpsRapido;
+          if (!currentGpsPosRapido || ultimoTimestampGpsRapido === 0 || idadeGpsMs > 4000) {
+            if (msg) msg.innerHTML = '<span class="text-red-600 font-semibold">Aguarde o sinal atualizado do GPS...</span>';
+            atualizarEstadoBotaoSalvarGPSRapido();
+            return;
+          }
+          congelarGpsRapido();
+          estadoPontoRapido.lat = currentGpsPosRapido.lat;
+          estadoPontoRapido.lng = currentGpsPosRapido.lng;
+          estadoPontoRapido.validado = true;
+        } else if (modo === 'plaqueta') {
+          if (!estadoPontoRapido.validado) {
+            if (msg) msg.innerHTML = '<span class="text-red-600 font-semibold">Valide a Plaqueta antes de salvar.</span>';
+            return;
+          }
+        } else if (modo === 'endereco') {
+          if (!estadoPontoRapido.validado) {
+            if (msg) msg.innerHTML = '<span class="text-red-600 font-semibold">Selecione um endereço na lista.</span>';
+            return;
+          }
+        }
+
+        if (!window.usuarioLogadoSupabase) {
+          var userAuth = await carregarOperadorESessaoSupabase();
+          if (!userAuth) {
+            exibirAlertaAutenticacao(true, "Você precisa estar autenticado no sistema para cadastrar uma Ordem de Serviço.");
+            descongelarGpsRapido();
+            return;
+          }
+        }
+
+        btnSalvar.disabled = true;
+        btnSalvar.innerHTML = '<span>Processando e gravando OS... ⚡</span>';
+        if (msg) msg.innerHTML = '';
+
+        var userAuth = window.usuarioLogadoSupabase || {};
+        var protExtraido = gerarNovoProtocolo('iluminacao');
+        var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
+
+        var plaq = (modo === 'plaqueta') ? (estadoPontoRapido.plaqueta || '') : '';
+        var end = (modo === 'endereco') ? (estadoPontoRapido.endereco || '') : (estadoPontoRapido.endereco || '');
+
+        var lat6 = (estadoPontoRapido.lat !== null && estadoPontoRapido.lat !== undefined) ? Number(estadoPontoRapido.lat).toFixed(6) : '';
+        var lng6 = (estadoPontoRapido.lng !== null && estadoPontoRapido.lng !== undefined) ? Number(estadoPontoRapido.lng).toFixed(6) : '';
+        var coordStr = (lat6 && lng6) ? (lat6 + ", " + lng6) : '';
+        var descRapida = document.getElementById('descricaoRapida')?.value.trim() || '';
+
+        var arrPontos = [
+          {
+            modo: modo,
+            tipoLocal: modo,
+            lat: lat6 ? parseFloat(lat6) : null,
+            lng: lng6 ? parseFloat(lng6) : null,
+            coordenada: coordStr,
+            plaqueta: plaq,
+            endereco: end,
+            problema: problemaRapidoSelecionado,
+            enderecoValidado: true
+          }
+        ];
+
+        var payloadOSViaria = {
+          protocolo: protExtraido,
+          status: statusOS,
+          prioridade: 'Normal',
+          municipe_nome: userAuth.nome || 'Servidor',
+          operador: userAuth.nome || 'Servidor',
+          telefone_fixo: null,
+          telefone_celular: null,
+          quantidade: 1,
+          descricao: descRapida || null,
+          pontos: arrPontos,
+          endereco: end || null,
+          coordenada: formatarCoordenadaPostGIS(coordStr),
+          plaqueta_inicial: plaq || null,
+          user_id: userAuth.id || null,
+          origem_login: userAuth.isGovBr ? 'gov.br' : 'servidor',
+          user_email: userAuth.email || null,
+          cpf_solicitante: userAuth.cpf || null,
+          data_abertura: new Date().toISOString()
+        };
+
+        var isGovBrUser = userAuth.isGovBr || 
+                          sessionStorage.getItem('govbr_user_authenticated') === 'true' || 
+                          localStorage.getItem('govbr_user_authenticated') === 'true' || 
+                          userAuth.role === 'cidadao';
+
+        if (!navigator.onLine) {
+          if (isGovBrUser) {
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+            alert("⚠️ Conexão com a internet necessária.\n\nA abertura de OS para cidadãos (gov.br) requer conexão ativa.");
+            descongelarGpsRapido();
+            return;
+          }
+
+          if (window.offlineSyncService) {
+            window.offlineSyncService.savePendingSubmission('abertura_viaria', protExtraido, payloadOSViaria)
+              .then(function() {
+                btnSalvar.disabled = false;
+                btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+                document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Modo Offline Ativado!</strong><br>A OS Modo Rápido foi gravada no dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>";
+                document.getElementById('modalSucesso').style.display = 'flex';
+                descongelarGpsRapido();
+              });
+            return;
+          }
+        }
+
+        enviarSupabaseDiretoFrontend('ordens_servico', payloadOSViaria)
+          .then(function() {
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+
+            document.getElementById('msgSucessoTexto').innerHTML = "OS Modo Rápido Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
+            document.getElementById('modalSucesso').style.display = 'flex';
+            descongelarGpsRapido();
+
+            if (window.parent && window.parent !== window) {
+              window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
+            }
+
+            var token = localStorage.getItem('os_token');
+            if (token && typeof callServer === 'function') {
+              try { callServer('salvarOSComVerificacao', [payloadOSViaria, token, forcarSalvar === true]); } catch(e) {}
+            }
+          })
+          .catch(function(err) {
+            console.error("❌ Erro ao salvar OS Modo Rápido:", err);
+            btnSalvar.disabled = false;
+            btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+
+            if (!isGovBrUser && window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))) {
+              window.offlineSyncService.savePendingSubmission('abertura_viaria', protExtraido, payloadOSViaria);
+              document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>";
+              document.getElementById('modalSucesso').style.display = 'flex';
+              descongelarGpsRapido();
+              return;
+            }
+
+            descongelarGpsRapido();
+            if (msg) msg.innerHTML = '<span class="text-red-600 font-semibold">Falha ao salvar OS: ' + (err.message || err.toString()) + '</span>';
+          });
+      }
+
       window.onload = function() {
+        if (typeof ajustarExibicaoPrioridade === 'function') ajustarExibicaoPrioridade(false);
+        var tabIlum = document.getElementById('tabIluminacao');
+        if (tabIlum) {
+          tabIlum.checked = true;
+          alternarTipoOS();
+        }
         adicionarProblemaPraca(); // Inicializa 1º problema de praça
         ajustarPontos(); // Inicia desenhando o 1º Ponto de Iluminação Viária
         carregarListaPracasServidor(); // Carrega lista de praças dinamicamente da planilha
+        verificarEAplicarModoRapido(); // Verifica e aplica o Modo Rápido se em dispositivo mobile
       };
 
       // =========================================================================
@@ -2526,22 +3493,29 @@
         var idx = contadorProblemasPraca++;
 
         var div = document.createElement('div');
-        div.className = 'row-problema-praca flex gap-2 items-center mb-2';
+        div.className = 'row-problema-praca bg-slate-50/70 border border-slate-200 rounded-xl p-3 mb-2.5 flex flex-col sm:flex-row gap-2.5 sm:items-center';
         div.id = 'probPracaRow_' + idx;
 
-        var h = '<div class="flex-1">';
-        h += '  <select class="select-prob-praca w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none" id="tipoProbPraca_' + idx + '">';
+        var h = '<div class="w-full sm:flex-1 min-w-0">';
+        h += '  <select class="select-prob-praca w-full bg-white border border-slate-300 rounded-lg p-2.5 text-xs sm:text-sm focus:ring-2 focus:ring-emerald-600 outline-none text-slate-800 font-semibold" id="tipoProbPraca_' + idx + '">';
         h += '    <option value="Lâmpadas queimadas">Lâmpadas queimadas</option>';
         h += '    <option value="Lâmpadas quebrada">Lâmpadas quebrada</option>';
         h += '    <option value="Cabos roubados">Cabos roubados</option>';
         h += '    <option value="Outros">Outros (Descrever em OBS)</option>';
         h += '  </select>';
         h += '</div>';
-        h += '<div class="w-24">';
-        h += '  <input type="number" class="qtd-prob-praca w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none" id="qtdProbPraca_' + idx + '" value="1" min="1" placeholder="Qtd">';
-        h += '</div>';
-        h += '<div>';
-        h += '  <button type="button" class="btn-remover-prob p-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors" onclick="removerProblemaPraca(' + idx + ')" title="Remover Problema">🗑️</button>';
+        h += '<div class="flex items-center gap-2 justify-between sm:justify-end w-full sm:w-auto">';
+        h += '  <div class="flex items-center gap-2">';
+        h += '    <span class="text-xs text-slate-600 font-bold">Qtd:</span>';
+        h += '    <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-xs">';
+        h += '      <button type="button" onclick="alterarQtdInput(\'qtdProbPraca_' + idx + '\', -1, 1)" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-base flex items-center justify-center transition-colors border-r border-slate-300 cursor-pointer select-none">−</button>';
+        h += '      <input type="number" class="qtd-prob-praca w-12 border-none bg-transparent text-center font-bold text-xs sm:text-sm text-emerald-700 focus:ring-0 outline-none p-1" id="qtdProbPraca_' + idx + '" value="1" min="1" placeholder="Qtd">';
+        h += '      <button type="button" onclick="alterarQtdInput(\'qtdProbPraca_' + idx + '\', 1, 1)" class="w-8 h-8 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold text-base flex items-center justify-center transition-colors border-l border-slate-300 cursor-pointer select-none">+</button>';
+        h += '    </div>';
+        h += '  </div>';
+        h += '  <div>';
+        h += '    <button type="button" class="btn-remover-prob p-2.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center justify-center cursor-pointer" onclick="removerProblemaPraca(' + idx + ')" title="Remover Problema">🗑️</button>';
+        h += '  </div>';
         h += '</div>';
 
         div.innerHTML = h;
@@ -2655,14 +3629,17 @@
         h += '      </div>';
         h += '    </div>';
 
-        h += '    <div id="contCoord_' + idx + '" class="flex gap-2" style="display: none;">';
-        h += '      <input type="text" id="lat_' + idx + '" class="flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); resetarValidacaoPonto(' + idx + ')">';
-        h += '      <input type="text" id="lng_' + idx + '" class="flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); resetarValidacaoPonto(' + idx + ')">';
-        h += '      <button type="button" id="btnValidar_' + idx + '" class="btn-secundario !px-4" onclick="validarCoordsManuais(false, ' + idx + ')">Validar</button>';
+        h += '    <div id="contCoord_' + idx + '" class="flex flex-col sm:flex-row gap-2" style="display: none;">';
+        h += '      <input type="text" id="lat_' + idx + '" class="w-full sm:flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); resetarValidacaoPonto(' + idx + ')">';
+        h += '      <input type="text" id="lng_' + idx + '" class="w-full sm:flex-1 bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); resetarValidacaoPonto(' + idx + ')">';
+        h += '      <div class="flex gap-2 w-full sm:w-auto">';
+        h += '        <button type="button" onclick="puxarGpsParaFormulario(\'viaria\', ' + idx + ')" class="sm:hidden flex-1 px-3.5 py-2 bg-blue-50 hover:bg-blue-100 active:scale-95 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"><span class="material-symbols-outlined text-[16px]">my_location</span><span>Puxar GPS</span></button>';
+        h += '        <button type="button" id="btnValidar_' + idx + '" class="btn-secundario flex-1 sm:flex-initial !px-4" onclick="validarCoordsManuais(false, ' + idx + ')">Validar</button>';
+        h += '      </div>';
         h += '    </div>';
 
         h += '    <div id="contEnd_' + idx + '" style="display: none; position: relative;">';
-        h += '      <input type="text" id="endereco_' + idx + '" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Rua, NÚMERO e bairro (Ex: Av. Brasil, 500)..." oninput="buscarEnderecoMapbox(' + idx + ')" autocomplete="off">';
+        h += '      <input type="text" id="endereco_' + idx + '" class="w-full bg-white border border-slate-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-blue-600 outline-none limpar-erro" placeholder="Rua, NÚMERO e bairro..." oninput="buscarEnderecoMapbox(' + idx + ')" autocomplete="off">';
         h += '      <div id="msgErroEndereco_' + idx + '" class="erro text-red-600 text-xs mt-1 font-semibold"></div>';
         h += '      <div id="mapboxSuggestions_' + idx + '" class="mapbox-suggestions-dropdown" style="display: none;"></div>';
         h += '    </div>';
@@ -3812,7 +4789,7 @@
 
       function resetarBotaoSalvar() {
         var btn = document.getElementById('btnSalvar');
-        btn.disabled = false; btn.innerText = "Salvar Ordem de Serviço";
+        if (btn) { btn.disabled = false; btn.innerText = "Salvar"; }
       }
 
       // =========================================================================
@@ -4087,24 +5064,27 @@
              return;
          }
 
-         var pt = pontosData[idx];
+         var pt = pontosData[idx] || {};
          var prob = document.getElementById('tipoProblema_' + idx);
-         if (!prob.value) prob.classList.add('input-invalido'); 
+         if (prob && !prob.value) prob.classList.add('input-invalido'); 
 
          if (pt.usarMesmoEndereco) {
              validarProximoAsync(idx + 1);
              return;
          }
 
-         var modo = document.querySelector('input[name="tipoLocal_'+idx+'"]:checked').value;
+         var radioModo = document.querySelector('input[name="tipoLocal_'+idx+'"]:checked');
+         var modo = radioModo ? radioModo.value : (pt.modo || 'plaqueta');
          
          if (modo === 'plaqueta' && !pt.enderecoValidado) {
              var pInput = document.getElementById('inputPlaqueta_' + idx);
-             if (/^[A-Z]\d{4}$/.test(pInput.value.trim().toUpperCase())) {
-                 btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
+             if (pInput && /^[A-Z]\d{4}$/.test(pInput.value.trim().toUpperCase())) {
+                 if (btn) btn.innerText = "Autovalidando Ponto " + (idx+1) + "...";
                  validarPlaqueta(true, idx);
              } else {
-                 pInput.classList.add('input-invalido'); document.getElementById('msgErroPonto_' + idx).innerText = "Preencha a plaqueta";
+                 if (pInput) pInput.classList.add('input-invalido'); 
+                 var elMsgErr = document.getElementById('msgErroPonto_' + idx);
+                 if (elMsgErr) elMsgErr.innerText = "Preencha a plaqueta";
                  validarProximoAsync(idx + 1);
              }
          } else if (modo === 'coordenadas' && !pt.enderecoValidado) {
@@ -4142,12 +5122,14 @@
         var temErrosMassa = false;
         
         for (var i = 0; i < qtdAtual; i++) {
-           var pt = pontosData[i];
-           if (!document.getElementById('tipoProblema_' + i).value) temErrosMassa = true;
+           var pt = pontosData[i] || {};
+           var elProb = document.getElementById('tipoProblema_' + i);
+           if (!elProb || !elProb.value) temErrosMassa = true;
            
            if (!pt.usarMesmoEndereco && !pt.enderecoValidado) {
                temErrosMassa = true;
-               document.getElementById('msgErroPonto_' + i).innerText = "Localização pendente ou com erro.";
+               var elErr = document.getElementById('msgErroPonto_' + i);
+               if (elErr) elErr.innerText = "Localização pendente ou com erro.";
            }
         }
 
@@ -4326,25 +5308,35 @@
            var modoSel = "";
            if (ptState.usarMesmoEndereco) {
                var pt0 = pontosData[0];
-               modoSel = document.querySelector('input[name="tipoLocal_0"]:checked').value;
+               var elRadio0 = document.querySelector('input[name="tipoLocal_0"]:checked');
+               modoSel = elRadio0 ? elRadio0.value : (pt0.modo || 'plaqueta');
                var lat0_6 = pt0.latAtual ? Number(pt0.latAtual).toFixed(6) : "";
                var lng0_6 = pt0.lngAtual ? Number(pt0.lngAtual).toFixed(6) : "";
                coordStr = (lat0_6 && lng0_6) ? (lat0_6 + ", " + lng0_6) : "";
-               plaq = (modoSel === 'plaqueta') ? document.getElementById('inputPlaqueta_0').value.toUpperCase().trim() : "";
-               end = endTextoValidado || ((modoSel === 'endereco') ? document.getElementById('endereco_0').value.trim() : "");
+               var elPlaq0 = document.getElementById('inputPlaqueta_0');
+               plaq = (modoSel === 'plaqueta' && elPlaq0) ? elPlaq0.value.toUpperCase().trim() : (pt0.plaqueta || "");
+               var elEnd0 = document.getElementById('endereco_0');
+               end = endTextoValidado || ((modoSel === 'endereco' && elEnd0) ? elEnd0.value.trim() : (pt0.endereco || ""));
                isDup = pt0.isPlaquetaDuplicadaOrigem;
            } else {
-               modoSel = document.querySelector('input[name="tipoLocal_'+i+'"]:checked').value;
+               var elRadioI = document.querySelector('input[name="tipoLocal_'+i+'"]:checked');
+               modoSel = elRadioI ? elRadioI.value : (ptState.modo || 'plaqueta');
                var lat_6 = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : "";
                var lng_6 = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : "";
                coordStr = (lat_6 && lng_6) ? (lat_6 + ", " + lng_6) : "";
-               plaq = (modoSel === 'plaqueta') ? document.getElementById('inputPlaqueta_' + i).value.toUpperCase().trim() : "";
-               end = endTextoValidado || ((modoSel === 'endereco') ? document.getElementById('endereco_' + i).value.trim() : "");
+               var elPlaqI = document.getElementById('inputPlaqueta_' + i);
+               plaq = (modoSel === 'plaqueta' && elPlaqI) ? elPlaqI.value.toUpperCase().trim() : (ptState.plaqueta || "");
+               var elEndI = document.getElementById('endereco_' + i);
+               end = endTextoValidado || ((modoSel === 'endereco' && elEndI) ? elEndI.value.trim() : (ptState.endereco || ""));
                isDup = ptState.isPlaquetaDuplicadaOrigem;
            }
            
-           var prob = document.getElementById('tipoProblema_' + i).value;
-           if (prob === "Outros") prob = document.getElementById('problemaOutros_' + i).value.trim();
+           var elProb = document.getElementById('tipoProblema_' + i);
+           var prob = elProb ? elProb.value : "";
+           if (prob === "Outros") {
+             var elOutros = document.getElementById('problemaOutros_' + i);
+             if (elOutros) prob = elOutros.value.trim();
+           }
 
            arrPontosPayload.push({
              modo: modoSel,
@@ -4382,7 +5374,7 @@
             telefone_celular: dadosFinais.telefoneCelular,
             quantidade: parseInt(dadosFinais.quantidade) || 1,
             descricao: dadosFinais.descricao,
-            pontos: dadosFinais.pontos
+            pontos_inicial: dadosFinais.pontos
           };
           
           atualizarSupabaseDiretoFrontend('ordens_servico', osRecordEmEdicao.id, payloadUpdate)
@@ -4420,7 +5412,7 @@
           telefone_celular: dadosFinais.telefoneCelular || null,
           quantidade: parseInt(dadosFinais.quantidade) || 1,
           descricao: dadosFinais.descricao || null,
-          pontos: dadosFinais.pontos,
+          pontos_inicial: dadosFinais.pontos,
           endereco: (dadosFinais.pontos && dadosFinais.pontos[0]) ? dadosFinais.pontos[0].endereco : null,
           coordenada: formatarCoordenadaPostGIS(dadosFinais.pontos && dadosFinais.pontos[0] ? dadosFinais.pontos[0].coordenada : null),
           plaqueta_inicial: (dadosFinais.pontos && dadosFinais.pontos[0]) ? dadosFinais.pontos[0].plaqueta : null,
@@ -4533,6 +5525,23 @@
         pontosData = {};
         document.getElementById('pontosContainer').innerHTML = '';
         ajustarPontos(); 
+
+        // Reset Modo Rápido
+        if (typeof resetarValidacaoPlaquetaRapida === 'function') resetarValidacaoPlaquetaRapida();
+        var inEndR = document.getElementById('inputEnderecoRapido');
+        if (inEndR) { inEndR.value = ''; inEndR.classList.remove('input-validado', 'input-invalido'); }
+        var txtEndR = document.getElementById('textoEndValidadoRapido');
+        if (txtEndR) txtEndR.innerText = '';
+        var miniResR = document.getElementById('miniResultadoEnderecoRapido');
+        if (miniResR) miniResR.style.display = 'none';
+        var descR = document.getElementById('descricaoRapida');
+        if (descR) descR.value = '';
+        var msgR = document.getElementById('mensagemRapida');
+        if (msgR) msgR.innerHTML = '';
+        if (typeof aplicarProblemaPadraoPorHorario === 'function') aplicarProblemaPadraoPorHorario();
+        if (typeof modoRapidoAtivo !== 'undefined' && modoRapidoAtivo && typeof descongelarGpsRapido === 'function') {
+          descongelarGpsRapido();
+        }
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
 

@@ -5,60 +5,85 @@
 
 class ChamadoModel {
     constructor(data = {}) {
-        this.id = data.id || '';
-        this.protocolo = data.protocolo || 'N/A';
+        this.id = data.id || data.protocolo || '';
+        this.protocolo = data.protocolo || data.id || 'N/A';
         this.dataAbertura = data.data_abertura ? new Date(data.data_abertura) : new Date();
         this.rawStatus = data.status || 'Aberta';
         this.prioridade = data.prioridade || 'Normal';
-        this.operador = data.operador || '';
-        this.municipeNome = data.municipe_nome || '';
-        this.rawPontos = data.pontos || null;
+        this.rawRow = data;
+        const cleanVal = (val) => {
+            if (val === null || val === undefined) return '';
+            const str = String(val).trim();
+            if (str === '' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined' || str.toLowerCase() === 'não informado' || str.toLowerCase() === 'nao informado') {
+                return '';
+            }
+            return str;
+        };
+
+        this.userEmail = cleanVal(data.user_email);
+        this.operadorAbertura = cleanVal(data.operador_abertura) || cleanVal(data.operador) || cleanVal(data.cadastrado_por) || cleanVal(data.usuario_cadastro) || cleanVal(data.user_email) || cleanVal(data.solicitante_operador) || cleanVal(data.criado_por) || cleanVal(data.usuario_abertura) || '';
+        this.operador = cleanVal(data.operador) || this.operadorAbertura || cleanVal(data.user_email) || '';
+        this.operadorFinalizacao = cleanVal(data.operador_finalizacao) || cleanVal(data.finalizado_por) || cleanVal(data.usuario_finalizacao) || cleanVal(data.operador_fechamento) || cleanVal(data.tecnico) || cleanVal(data.fechado_por) || cleanVal(data.usuario_conclusao) || '';
+        this.municipeNome = cleanVal(data.municipe_nome) || '';
+        this.rawPontosInicial = data.pontos_inicial || null;
+        this.rawPontosFinal = data.pontos_final || null;
+        this.rawPontos = data.pontos_final || data.pontos_inicial || data.pontos || null;
+
+        const parseArrayJson = (val) => {
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                try { return JSON.parse(val); } catch(e) {}
+            }
+            return null;
+        };
+
+        const ptsInicial = parseArrayJson(data.pontos_inicial) || parseArrayJson(data.pontos);
+        const ptsFinal = parseArrayJson(data.pontos_final) || (String(data.status || '').toLowerCase().includes('conclu') ? parseArrayJson(data.pontos) : null);
+
         let endExtraido = data.endereco || '';
         let plaqExtraida = data.plaqueta_inicial || data.plaqueta || '';
         let coordExtraida = data.coordenada_inicial || data.coordenada || '';
 
-        if (!endExtraido && data.pontos) {
-            let pts = [];
-            if (Array.isArray(data.pontos)) pts = data.pontos;
-            else if (typeof data.pontos === 'string') {
-                try { pts = JSON.parse(data.pontos); } catch(e) {}
-            }
-            if (pts && pts.length > 0) {
-                const p0 = pts[0] || {};
-                const listaEnderecos = pts.map(p => p.endereco || p.local || '').filter(Boolean);
-                if (listaEnderecos.length > 0) endExtraido = listaEnderecos.join('\n');
-                else if (p0.endereco) endExtraido = p0.endereco;
-                
-                if (!plaqExtraida) plaqExtraida = p0.plaqueta || p0.plaqueta_inicial || '';
-                if (!coordExtraida) coordExtraida = p0.coordenada || p0.coordenada_inicial || '';
-            }
+        if (ptsInicial && ptsInicial.length > 0) {
+            const p0Ini = ptsInicial[0] || {};
+            const listaEnderecos = ptsInicial.map(p => p.endereco || p.local || '').filter(Boolean);
+            if (!endExtraido && listaEnderecos.length > 0) endExtraido = listaEnderecos.join('\n');
+            else if (!endExtraido && p0Ini.endereco) endExtraido = p0Ini.endereco;
+            
+            if (!plaqExtraida) plaqExtraida = p0Ini.plaqueta || p0Ini.plaqueta_inicial || '';
+            if (!coordExtraida) coordExtraida = p0Ini.coordenada || p0Ini.coordenada_inicial || (p0Ini.lat && p0Ini.lng ? `${p0Ini.lat}, ${p0Ini.lng}` : '');
         }
-        if (!endExtraido && data.praca_nome) {
-            endExtraido = data.praca_nome + (data.endereco ? (' - ' + data.endereco) : '');
+
+        let plaqFinExtraida = data.plaqueta_final || '';
+        let coordRepExtraida = data.coordenada_reparo || '';
+        let probFinExtraido = data.problema_encontrado || '';
+
+        if (ptsFinal && ptsFinal.length > 0) {
+            const p0Fin = ptsFinal[0] || {};
+            if (!plaqFinExtraida) plaqFinExtraida = p0Fin.plaqueta || '';
+            if (!coordRepExtraida) coordRepExtraida = p0Fin.coordenada || (p0Fin.lat && p0Fin.lng ? `${p0Fin.lat}, ${p0Fin.lng}` : '');
+            if (!probFinExtraido) probFinExtraido = p0Fin.problema || '';
         }
 
         this.plaquetaInicial = plaqExtraida;
-        this.plaquetaFinal = data.plaqueta_final || (data.pontos && Array.isArray(data.pontos) && data.pontos[0]?.plaqueta) || '';
-        this.problemaInicial = data.problema_inicial || 'Lâmpada queimada';
-        this.problemaEncontrado = data.problema_encontrado || (data.pontos && Array.isArray(data.pontos) && data.pontos[0]?.problema) || '';
-        this.qtdInicial = parseInt(data.qtd_inicial, 10) || (data.quantidade ? parseInt(data.quantidade, 10) : 1);
-        this.qtdFinal = parseInt(data.qtd_final, 10) || (data.quantidade ? parseInt(data.quantidade, 10) : 1);
+        this.plaquetaFinal = plaqFinExtraida || '';
+        this.problemaInicial = data.problema_inicial || (ptsInicial && ptsInicial[0]?.problema) || '';
+        this.problemaEncontrado = probFinExtraido || data.problema_encontrado || (ptsFinal && ptsFinal[0]?.problema) || '';
+        this.qtdInicial = parseInt(data.qtd_inicial, 10) || (ptsInicial ? ptsInicial.length : (data.quantidade ? parseInt(data.quantidade, 10) : 1));
+        this.qtdFinal = parseInt(data.qtd_final, 10) || (ptsFinal ? ptsFinal.length : this.qtdInicial);
         this.endereco = endExtraido;
         this.coordenadaInicial = coordExtraida;
-        let coordRep = data.coordenada_reparo || '';
-        if (!coordRep && data.pontos && Array.isArray(data.pontos) && data.pontos[0]) {
-            coordRep = data.pontos[0].coordenada || (data.pontos[0].lat && data.pontos[0].lng ? `${data.pontos[0].lat}, ${data.pontos[0].lng}` : '');
-        }
-        this.coordenadaReparo = coordRep;
+        this.coordenadaReparo = coordRepExtraida;
         this.descricao = data.descricao || data.observacao || data.observacoes || data.obs || '';
         this.observacaoInicial = data.observacao_inicial || data.observacao || data.observacoes || data.descricao || data.obs || '';
-        this.dataConclusao = data.data_conclusao || data.data_fechamento ? new Date(data.data_conclusao || data.data_fechamento) : null;
+        this.dataConclusao = (data.data_conclusao || data.data_fechamento) ? new Date(data.data_conclusao || data.data_fechamento) : null;
         this.observacaoFinal = data.observacao_final || data.observacao_conclusao || data.justificativa || '';
         this.anexoPlaquetaDivergente = data.anexo_plaqueta_divergente === true || data.anexo_plaqueta_divergente === 'true';
         this.anexoFaltante = data.anexo_faltante === true || data.anexo_faltante === 'true';
         this.materialUtilizado = data.material_utilizado || data.materiais || '';
         this.statusAuditoria = data.status_auditoria || (data.auditoria_concluida === true ? 'Concluída' : 'Pendente');
         this.dataConclusaoAuditoria = data.data_conclusao_auditoria ? new Date(data.data_conclusao_auditoria) : null;
+        this.audit = data.audit || null;
         this.audit = data.audit || null;
         this.cpfSolicitante = data.cpf_solicitante || data.user_cpf || '';
         this.evidencias = data.evidencias || null;
@@ -68,6 +93,35 @@ class ChamadoModel {
         this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
+    }
+
+    /**
+     * Retorna se a OS é uma Demanda Emergencial / Atendimento Direto por técnico nominativo
+     */
+    get isDireto() {
+        const NOMES_DIRETOS = ["IGOR", "FERNANDO", "CARLOS", "ANA", "ERNESTO", "VALTER"];
+        const prot = String(this.protocolo || '').trim().toUpperCase();
+        const mun = String(this.municipeNome || '').trim().toUpperCase();
+
+        // 1. Verificação por flag explícita do banco de dados (is_direto)
+        if (this.rawRow && (this.rawRow.is_direto === true || this.rawRow.is_direto === 'true' || this.rawRow.isDireto === true)) return true;
+
+        // 2. Verificação por texto de munícipe ("ATENDIMENTO DIRETO" ou "EMERGENCIAL")
+        if (mun.includes('ATENDIMENTO DIRETO') || mun.includes('EMERGENCIAL')) return true;
+
+        // 3. Protocolo de atendimento emergencial nominativo (ex: IP8A1B200826-IGOR, IP2VGOA-IGOR..., IP2-FERNANDO...)
+        if (prot.includes('-')) {
+            const parts = prot.split('-');
+            const suf = parts[parts.length - 1].trim();
+            if (NOMES_DIRETOS.includes(suf) || suf === 'DIRETO' || suf === 'EMERGENCIAL') return true;
+        }
+
+        if (prot.startsWith('IP2VGOA-') || prot.startsWith('IP2-')) return true;
+
+        // 4. Protocolo idêntico ao nome do técnico de emergência (digitado no input do Finalizar.html)
+        if (NOMES_DIRETOS.includes(prot)) return true;
+
+        return false;
     }
 
     /**
@@ -368,6 +422,202 @@ class ChamadoModel {
     }
 
     /**
+     * Retorna o nome/email do operador que cadastrou/abriu a OS
+     */
+    get displayOperadorAbertura() {
+        const cleanVal = (val) => {
+            if (val === null || val === undefined) return '';
+            const str = String(val).trim();
+            if (str === '' || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined' || str.toLowerCase() === 'não informado' || str.toLowerCase() === 'nao informado') {
+                return '';
+            }
+            return str;
+        };
+
+        const val = cleanVal(this.operadorAbertura) ||
+                    cleanVal(this.operador) ||
+                    cleanVal(this.userEmail) ||
+                    cleanVal(this.rawRow?.user_email) ||
+                    cleanVal(this.rawRow?.operador) ||
+                    cleanVal(this.rawRow?.operador_abertura) ||
+                    cleanVal(this.rawRow?.cadastrado_por) ||
+                    cleanVal(this.rawRow?.usuario_cadastro) ||
+                    cleanVal(this.municipeNome);
+
+        return val || 'Não informado';
+    }
+
+    /**
+     * Retorna o nome/email do operador/técnico que finalizou a OS
+     */
+    get displayOperadorFinalizacao() {
+        const val = String(this.operadorFinalizacao || '').trim();
+        if (val && val !== 'null' && val !== 'undefined') return val;
+
+        if (this.audit && this.audit.usuario_finalizacao) {
+            const auditUser = String(this.audit.usuario_finalizacao).trim();
+            if (auditUser) return auditUser;
+        }
+
+        if (this.sessoesList && this.sessoesList.length > 0) {
+            const lastSession = this.sessoesList[this.sessoesList.length - 1];
+            if (lastSession && lastSession.tecnico && lastSession.tecnico !== 'Técnico' && lastSession.tecnico !== 'Não informado') {
+                return String(lastSession.tecnico).trim();
+            }
+        }
+
+        const stNorm = this.normalizedStatus;
+        if (stNorm === 'concluida') {
+            return 'Técnico Responsável';
+        }
+        return 'Pendente finalização';
+    }
+
+    /**
+     * Retorna a lista completa e pareada dos pontos de Abertura (Inicial) e Conclusão (Final)
+     */
+    get pontosDetalhados() {
+        const parseArrayJson = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                try {
+                    const parsed = JSON.parse(val);
+                    if (Array.isArray(parsed)) return parsed;
+                    if (parsed && typeof parsed === 'object') return [parsed];
+                } catch(e) {}
+            }
+            return [];
+        };
+
+        const ptsIni = parseArrayJson(this.rawPontosInicial);
+        const ptsFin = parseArrayJson(this.rawPontosFinal);
+        const ptsLegacy = parseArrayJson(this.rawPontos);
+
+        const iniList = ptsIni.length > 0 ? ptsIni : (ptsLegacy.length > 0 && !this.rawPontosFinal ? ptsLegacy : []);
+        const finList = ptsFin.length > 0 ? ptsFin : (ptsLegacy.length > 0 && String(this.rawStatus || '').toLowerCase().includes('conclu') ? ptsLegacy : []);
+
+        const maxLen = Math.max(iniList.length, finList.length, 1);
+        const result = [];
+
+        for (let i = 0; i < maxLen; i++) {
+            const pIni = iniList[i] || null;
+            const pFin = finList[i] || null;
+
+            let endIni = pIni ? (pIni.endereco || pIni.local || '') : (i === 0 ? this.endereco : '');
+            let plqIni = pIni ? (pIni.plaqueta || pIni.plaqueta_inicial || '') : (i === 0 ? this.plaquetaInicial : '');
+            let coordIni = pIni ? (pIni.coordenada || pIni.coordenada_inicial || (pIni.lat && pIni.lng ? `${pIni.lat}, ${pIni.lng}` : '')) : (i === 0 ? this.coordenadaInicial : '');
+            let probIni = pIni ? (pIni.problema || pIni.problema_inicial || '') : (i === 0 ? this.problemaInicial : '');
+
+            let endFin = pFin ? (pFin.endereco || pFin.local || '') : (i === 0 ? (this.coordenadaReparo || this.plaquetaFinal || this.dataConclusao ? (this.endereco || '') : '') : '');
+            let plqFin = pFin ? (pFin.plaqueta || pFin.plaqueta_final || '') : (i === 0 ? (this.plaquetaFinal || '') : '');
+            let coordFin = pFin ? (pFin.coordenada_reparo || (pFin.lat && pFin.lng ? `${pFin.lat}, ${pFin.lng}` : '')) : (i === 0 ? (this.coordenadaReparo || '') : '');
+            let probFin = pFin ? (pFin.problema_encontrado || pFin.problema || '') : (i === 0 ? (this.problemaEncontrado || '') : '');
+            let matFin = pFin ? ChamadoModel.parseMaterialsList(pFin.materiais || pFin.material_utilizado) : (i === 0 ? ChamadoModel.parseMaterialsList(this.materialUtilizado) : []);
+
+            const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
+            const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado') || (matFin && matFin.length > 0)) || isConcluida;
+
+            result.push({
+                numero: i + 1,
+                enderecoInicial: ChamadoModel.formatLocationText(endIni),
+                plaquetaInicial: ChamadoModel.formatLocationText(plqIni),
+                coordenadaInicial: ChamadoModel.formatLocationText(coordIni),
+                problemaInicial: ChamadoModel.formatLocationText(probIni),
+                enderecoFinal: ChamadoModel.formatLocationText(endFin),
+                plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
+                coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
+                problemaEncontrado: ChamadoModel.formatLocationText(probFin),
+                materiais: matFin,
+                hasFinalData: hasFinalData
+            });
+        }
+
+        return result;
+    }
+
+    /**
+     * Retorna a lista de plaquetas registradas em todos os pontos da OS
+     */
+    get plaquetasFinalList() {
+        const list = [];
+        const pts = this.pontosDetalhados;
+        pts.forEach(p => {
+            const plq = p.plaquetaFinal;
+            if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') {
+                if (!list.includes(plq)) list.push(plq);
+            }
+        });
+
+        if (list.length === 0 && (this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao))) {
+            const fallback = ChamadoModel.formatLocationText(this.plaquetaFinal);
+            if (fallback && fallback !== 'Não informada' && fallback !== '---' && fallback !== 'null') {
+                list.push(fallback);
+            }
+        }
+
+        return list;
+    }
+
+    /**
+     * Retorna a lista de coordenadas de abertura (inicial) para todos os pontos da OS
+     */
+    get coordenadasInicialList() {
+        const list = [];
+        const pts = this.pontosDetalhados;
+        pts.forEach((p, idx) => {
+            const coord = p.coordenadaInicial;
+            if (coord) {
+                const parsed = ChamadoModel.parseLatLng(coord);
+                if (parsed) {
+                    list.push({
+                        index: idx,
+                        lat: parsed.lat.toFixed(5),
+                        lng: parsed.lng.toFixed(5),
+                        raw: coord
+                    });
+                }
+            }
+        });
+        return list;
+    }
+
+    /**
+     * Retorna a lista de coordenadas de reparo/finalização para todos os pontos da OS
+     */
+    get coordenadasReparoList() {
+        const list = [];
+        const pts = this.pontosDetalhados;
+        pts.forEach((p, idx) => {
+            if (p.hasFinalData && p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') {
+                const parsed = ChamadoModel.parseLatLng(p.coordenadaFinal);
+                if (parsed) {
+                    list.push({
+                        index: idx,
+                        lat: parsed.lat.toFixed(5),
+                        lng: parsed.lng.toFixed(5),
+                        raw: p.coordenadaFinal
+                    });
+                }
+            }
+        });
+
+        if (list.length === 0 && this.coordenadaReparo) {
+            const parsed = ChamadoModel.parseLatLng(this.coordenadaReparo);
+            if (parsed) {
+                list.push({
+                    index: 0,
+                    lat: parsed.lat.toFixed(5),
+                    lng: parsed.lng.toFixed(5),
+                    raw: this.coordenadaReparo
+                });
+            }
+        }
+
+        return list;
+    }
+
+    /**
      * Retorna se a auditoria desta OS já foi dada como Concluída
      */
     get isAuditoriaConcluida() {
@@ -379,6 +629,7 @@ class ChamadoModel {
      * Audit Divergence Indicators mapped from vw_auditoria_chamados or dynamic fallback logic
      */
     get isProblemaDivergente() {
+        if (this.isDireto) return false;
         if (this.problemaInicial && this.problemaEncontrado) {
             const pIni = ChamadoModel.formatLocationText(this.problemaInicial).trim().toLowerCase();
             const pFin = ChamadoModel.formatLocationText(this.problemaEncontrado).trim().toLowerCase();
@@ -391,6 +642,7 @@ class ChamadoModel {
     }
 
     get isPlaquetaDivergente() {
+        if (this.isDireto) return false;
         if (this.plaquetaInicial && this.plaquetaFinal) {
             const pIni = ChamadoModel.formatLocationText(this.plaquetaInicial).trim().toUpperCase();
             const pFin = ChamadoModel.formatLocationText(this.plaquetaFinal).trim().toUpperCase();
@@ -403,6 +655,7 @@ class ChamadoModel {
     }
 
     get isQuantidadeDivergente() {
+        if (this.isDireto) return false;
         if (this.qtdInicial && this.qtdFinal && this.qtdInicial !== this.qtdFinal) {
             return true;
         }
@@ -413,6 +666,7 @@ class ChamadoModel {
     }
 
     get distanciaCalculadaMetros() {
+        if (this.isDireto) return null;
         if (this.coordenadaInicial && this.coordenadaReparo) {
             return ChamadoModel.calcularDistanciaMetros(this.coordenadaInicial, this.coordenadaReparo);
         }
@@ -423,6 +677,7 @@ class ChamadoModel {
     }
 
     get formattedDistancia() {
+        if (this.isDireto) return 'N/A (Atendimento Direto)';
         const d = this.distanciaCalculadaMetros;
         if (d === null || isNaN(d)) return 'N/A';
         if (d < 1000) {
@@ -432,6 +687,7 @@ class ChamadoModel {
     }
 
     get isDistanciaAcima100m() {
+        if (this.isDireto) return false;
         if (this.coordenadaInicial && this.coordenadaReparo) {
             const dist = ChamadoModel.calcularDistanciaMetros(this.coordenadaInicial, this.coordenadaReparo);
             if (dist !== null && dist > 100) return true;
@@ -443,6 +699,7 @@ class ChamadoModel {
     }
 
     get isOutraPlaquetaProxima() {
+        if (this.isDireto) return false;
         if (this.audit && this.audit.outra_plaqueta_proxima !== undefined && this.audit.outra_plaqueta_proxima !== null) {
             return Boolean(this.audit.outra_plaqueta_proxima);
         }
@@ -450,6 +707,7 @@ class ChamadoModel {
     }
 
     get isPlaquetaProblematica() {
+        if (this.isDireto) return false;
         if (this.audit && this.audit.outro_reparo_no_mes !== undefined && this.audit.outro_reparo_no_mes !== null) {
             return Boolean(this.audit.outro_reparo_no_mes);
         }
@@ -457,6 +715,7 @@ class ChamadoModel {
     }
 
     get isPrecisaAnexarFoto() {
+        if (this.isDireto) return false;
         if (this.isPlaquetaDivergente || this.anexoPlaquetaDivergente) return true;
         if (this.audit && this.audit.precisa_anexar_foto !== undefined && this.audit.precisa_anexar_foto !== null) {
             return Boolean(this.audit.precisa_anexar_foto);
@@ -465,10 +724,12 @@ class ChamadoModel {
     }
 
     get isAnexoFaltante() {
+        if (this.isDireto) return false;
         return Boolean(this.anexoFaltante);
     }
 
     get isMaterialDivergente() {
+        if (this.isDireto) return false;
         if (this.audit && this.audit.material_divergente !== undefined && this.audit.material_divergente !== null) {
             return Boolean(this.audit.material_divergente);
         }
@@ -476,6 +737,7 @@ class ChamadoModel {
     }
 
     get isProblemaExterno() {
+        if (this.isDireto) return false;
         if (this.audit && this.audit.problema_externo !== undefined && this.audit.problema_externo !== null) {
             return Boolean(this.audit.problema_externo);
         }
@@ -483,6 +745,7 @@ class ChamadoModel {
     }
 
     get hasDivergence() {
+        if (this.isDireto) return false;
         return this.isProblemaDivergente ||
                this.isPlaquetaDivergente ||
                this.isQuantidadeDivergente ||
@@ -505,6 +768,7 @@ class ChamadoModel {
         if (statusLower.includes('andamento') || statusLower.includes('iniciad') || statusLower.includes('execu')) return 'em_andamento';
         if (statusLower.includes('conclu') || statusLower.includes('resolv')) return 'concluida';
         if (statusLower.includes('canc')) return 'cancelada';
+        if (statusLower.includes('rejeit') || statusLower.includes('recus')) return 'rejeitada';
         if (statusLower.includes('pend')) return 'pendente';
         return 'aberto';
     }
@@ -522,6 +786,7 @@ class ChamadoModel {
             case 'em_andamento': return 'Em andamento';
             case 'concluida': return 'Concluída';
             case 'cancelada': return 'Cancelada';
+            case 'rejeitada': return rawLower.includes('recus') ? 'Recusada' : 'Rejeitada';
             case 'pendente': return 'Pendente aprovação';
             default: return 'Em aberto';
         }
@@ -552,9 +817,9 @@ class ChamadoModel {
      */
     get problemSelectValue() {
         const prob = ChamadoModel.formatLocationText(this.problemaInicial).toLowerCase();
-        if (prob.includes('queimada')) return 'lampada-queimada';
+        if (prob.includes('queimada') || prob.includes('apagada') || prob.includes('desligada') || prob.includes('sem luz') || prob.includes('não acende') || prob.includes('nao acende')) return 'lampada-queimada';
         if (prob.includes('acesa')) return 'acesa-dia';
-        if (prob.includes('quebrada')) return 'lampada-quebrada';
+        if (prob.includes('quebrada') || prob.includes('danificada') || prob.includes('caída') || prob.includes('caida')) return 'lampada-quebrada';
         return 'outro';
     }
 
@@ -564,9 +829,9 @@ class ChamadoModel {
     get problemEncontradoSelectValue() {
         if (this.problemaEncontrado) {
             const prob = ChamadoModel.formatLocationText(this.problemaEncontrado).toLowerCase();
-            if (prob.includes('queimada')) return 'lampada-queimada';
+            if (prob.includes('queimada') || prob.includes('apagada') || prob.includes('desligada') || prob.includes('sem luz') || prob.includes('não acende') || prob.includes('nao acende')) return 'lampada-queimada';
             if (prob.includes('acesa')) return 'acesa-dia';
-            if (prob.includes('quebrada')) return 'lampada-quebrada';
+            if (prob.includes('quebrada') || prob.includes('danificada') || prob.includes('caída') || prob.includes('caida')) return 'lampada-quebrada';
             return 'outro';
         }
         return this.problemSelectValue;
@@ -576,7 +841,7 @@ class ChamadoModel {
      * Helper estático para converter qualquer formato de material (JSON, Array, Object ou String) em um Array de strings formatadas
      */
     static parseMaterialsList(rawMaterial) {
-        if (!rawMaterial) return ['Lâmpada LED 50W'];
+        if (!rawMaterial) return [];
         
         let raw = rawMaterial;
         if (typeof raw === 'string') {
@@ -622,7 +887,6 @@ class ChamadoModel {
             list = raw.split(/[\n,;\r]+/).map(s => s.trim()).filter(Boolean);
         }
 
-        if (list.length === 0) return ['Lâmpada LED 50W'];
         return list;
     }
 
@@ -637,7 +901,7 @@ class ChamadoModel {
      * Returns human readable material string from JSONB/Text field
      */
     get formattedMaterialUtilizado() {
-        return this.materialsList.join(', ');
+        return this.materialsList.length > 0 ? this.materialsList.join(', ') : '';
     }
 
     /**
@@ -671,47 +935,26 @@ class ChamadoModel {
      */
     get addressPoints() {
         try {
-            // 1ª Opção: Se existirem múltiplos pontos no array JSON 'rawPontos'
-            let ptsArray = [];
-            if (Array.isArray(this.rawPontos)) ptsArray = this.rawPontos;
-            else if (typeof this.rawPontos === 'string') {
-                try { ptsArray = JSON.parse(this.rawPontos); } catch(e) {}
-            }
-
-            if (ptsArray && ptsArray.length > 0) {
-                const formattedPoints = ptsArray.map(p => {
-                    if (!p) return null;
-                    if (typeof p === 'string') return ChamadoModel.isValidLocationText(p) ? ChamadoModel.formatLocationText(p) : null;
-                    if (ChamadoModel.isValidLocationText(p.endereco)) return ChamadoModel.formatLocationText(p.endereco);
-                    if (ChamadoModel.isValidLocationText(p.local)) return ChamadoModel.formatLocationText(p.local);
-                    if (ChamadoModel.isValidLocationText(p.plaqueta)) return `Plaqueta: ${p.plaqueta}`;
-                    if (ChamadoModel.isValidLocationText(p.coordenada)) return ChamadoModel.formatLocationText(p.coordenada);
-                    if (p.lat && p.lng) return `${p.lat}, ${p.lng}`;
-                    return null;
+            const list = this.pontosDetalhados;
+            if (list && list.length > 0) {
+                const formatted = list.map(p => {
+                    const parts = [];
+                    const end = p.enderecoFinal || p.enderecoInicial;
+                    const plq = p.plaquetaFinal || p.plaquetaInicial;
+                    const coord = p.coordenadaFinal || p.coordenadaInicial;
+                    if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
+                    if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') parts.push(`Plaqueta: ${plq}`);
+                    if (coord && coord !== 'Sem coordenadas') parts.push(`Coord: ${coord}`);
+                    return parts.length > 0 ? parts.join(' | ') : null;
                 }).filter(Boolean);
 
-                if (formattedPoints.length > 0) {
-                    return formattedPoints;
-                }
+                if (formatted.length > 0) return formatted;
             }
 
-            // 2ª Opção: Endereço único / string
             if (ChamadoModel.isValidLocationText(this.endereco)) {
                 const cleanAddress = ChamadoModel.formatLocationText(this.endereco);
                 const lines = cleanAddress.split(/\r?\n/).map(l => l.trim()).filter(l => ChamadoModel.isValidLocationText(l));
                 if (lines.length > 0) return lines;
-            }
-
-            // 3ª Opção: Plaqueta
-            if (ChamadoModel.isValidLocationText(this.plaquetaInicial)) {
-                const cleanPlaqueta = ChamadoModel.formatLocationText(this.plaquetaInicial);
-                return [`Plaqueta: ${cleanPlaqueta}`];
-            }
-
-            // 4ª Opção: Coordenada
-            if (ChamadoModel.isValidLocationText(this.coordenadaInicial || this.coordenadaReparo)) {
-                const cleanCoord = ChamadoModel.formatLocationText(this.coordenadaReparo || this.coordenadaInicial);
-                return [cleanCoord];
             }
 
             return ['Ponto não informado'];

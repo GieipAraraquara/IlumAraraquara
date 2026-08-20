@@ -5,7 +5,7 @@
 class OfflineSyncService {
   constructor() {
     this.dbName = 'SistemaOS_PWA_DB';
-    this.dbVersion = 1;
+    this.dbVersion = 2;
     this.db = null;
     this.isSyncing = false;
     this.onQueueChangeCallbacks = [];
@@ -43,6 +43,10 @@ class OfflineSyncService {
         if (!db.objectStoreNames.contains('os_cache')) {
           db.createObjectStore('os_cache', { keyPath: 'protocolo' });
         }
+
+        if (!db.objectStoreNames.contains('form_drafts')) {
+          db.createObjectStore('form_drafts', { keyPath: 'id' });
+        }
       };
 
       request.onsuccess = (event) => {
@@ -58,6 +62,81 @@ class OfflineSyncService {
         resolve(null);
       };
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // GERENCIAMENTO DE RASCUNHOS DE FORMULÁRIO (FORM DRAFTS)
+  // -------------------------------------------------------------------------
+  async saveDraft(id, data) {
+    if (!id || !data) return;
+    await this.initDB();
+    const item = { id: id, data: data, updatedAt: new Date().toISOString() };
+
+    if (this.db) {
+      try {
+        await new Promise((resolve, reject) => {
+          const tx = this.db.transaction('form_drafts', 'readwrite');
+          const store = tx.objectStore('form_drafts');
+          const req = store.put(item);
+          req.onsuccess = () => resolve();
+          req.onerror = (e) => reject(e.target.error);
+        });
+        return;
+      } catch(e) {
+        console.warn('⚠️ Erro ao salvar rascunho no IndexedDB, tentando LocalStorage:', e);
+      }
+    }
+
+    try {
+      localStorage.setItem('form_draft_' + id, JSON.stringify(item));
+    } catch(e) {
+      console.warn('⚠️ Falha ao salvar rascunho no LocalStorage:', e);
+    }
+  }
+
+  async getDraft(id) {
+    if (!id) return null;
+    await this.initDB();
+
+    if (this.db) {
+      try {
+        const result = await new Promise((resolve) => {
+          const tx = this.db.transaction('form_drafts', 'readonly');
+          const store = tx.objectStore('form_drafts');
+          const req = store.get(id);
+          req.onsuccess = () => resolve(req.result ? req.result.data : null);
+          req.onerror = () => resolve(null);
+        });
+        if (result) return result;
+      } catch(e) {}
+    }
+
+    try {
+      const stored = localStorage.getItem('form_draft_' + id);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed ? parsed.data : null;
+      }
+    } catch(e) {}
+
+    return null;
+  }
+
+  async clearDraft(id) {
+    if (!id) return;
+    await this.initDB();
+
+    if (this.db) {
+      try {
+        const tx = this.db.transaction('form_drafts', 'readwrite');
+        const store = tx.objectStore('form_drafts');
+        store.delete(id);
+      } catch(e) {}
+    }
+
+    try {
+      localStorage.removeItem('form_draft_' + id);
+    } catch(e) {}
   }
 
   // -------------------------------------------------------------------------
@@ -324,12 +403,26 @@ class OfflineSyncService {
       }
 
       console.log(`🚀 [ProcessItem Supabase] Enviando update para ordens_servico...`, payload);
-      let updateRes = await supabaseClient.from('ordens_servico').update(payload).eq('protocolo', item.protocolo);
+      let payloadAtualViaria = { ...payload };
+      let updateRes = await supabaseClient.from('ordens_servico').update(payloadAtualViaria).eq('protocolo', item.protocolo);
+
+      while (updateRes.error && updateRes.error.message && updateRes.error.message.includes("Could not find the")) {
+        const match = updateRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+        if (match && match[1]) {
+          const colAusente = match[1];
+          console.warn(`⚠️ [OfflineSync Viária] Coluna '${colAusente}' não existe na tabela 'ordens_servico'. Removendo do payload e tentando novamente...`);
+          delete payloadAtualViaria[colAusente];
+          updateRes = await supabaseClient.from('ordens_servico').update(payloadAtualViaria).eq('protocolo', item.protocolo);
+        } else {
+          break;
+        }
+      }
+
       console.log('📊 [ProcessItem Supabase Response]:', updateRes);
 
       if (updateRes.error) {
         console.warn('⚠️ Falha no update em ordens_servico, tentando tabela fallback chamados...', updateRes.error);
-        let fallbackRes = await supabaseClient.from('chamados').update(payload).eq('protocolo', item.protocolo);
+        let fallbackRes = await supabaseClient.from('chamados').update(payloadAtualViaria).eq('protocolo', item.protocolo);
         console.log('📊 [ProcessItem Chamados Fallback Response]:', fallbackRes);
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
       }
@@ -379,11 +472,25 @@ class OfflineSyncService {
 
     } else if (item.tipo === 'abertura_viaria') {
       console.log(`➕ [ProcessItem Abertura Viária] Cadastrando novo chamado ${item.protocolo} no Supabase...`);
-      let insertRes = await supabaseClient.from('ordens_servico').insert([payload]);
+      let payloadAtualAbertura = { ...payload };
+      let insertRes = await supabaseClient.from('ordens_servico').insert([payloadAtualAbertura]);
+
+      while (insertRes.error && insertRes.error.message && insertRes.error.message.includes("Could not find the")) {
+        const match = insertRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+        if (match && match[1]) {
+          const colAusente = match[1];
+          console.warn(`⚠️ [OfflineSync Abertura Viária] Coluna '${colAusente}' não existe na tabela 'ordens_servico'. Removendo do payload e tentando novamente...`);
+          delete payloadAtualAbertura[colAusente];
+          insertRes = await supabaseClient.from('ordens_servico').insert([payloadAtualAbertura]);
+        } else {
+          break;
+        }
+      }
+
       console.log('📊 [ProcessItem Abertura Viária Response]:', insertRes);
       if (insertRes.error) {
         console.warn('⚠️ Falha ao inserir em ordens_servico, tentando tabela chamados...', insertRes.error);
-        let fallbackRes = await supabaseClient.from('chamados').insert([payload]);
+        let fallbackRes = await supabaseClient.from('chamados').insert([payloadAtualAbertura]);
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
       }
       return { success: true };
