@@ -1306,7 +1306,20 @@
 
             gruposPontos.forEach(grp => {
                 let marker = null;
-                if (grp.length > 1) {
+
+                // Extrai OSs únicas no grupo (evita falso positivo quando 1 mesma OS tem 2+ pontos no mesmo local)
+                const osMap = new Map();
+                grp.forEach(gItem => {
+                    const key = String(gItem.os.id || gItem.os.protocolo);
+                    if (!osMap.has(key)) {
+                        osMap.set(key, { os: gItem.os, pontos: [] });
+                    }
+                    osMap.get(key).pontos.push(gItem.pt);
+                });
+
+                const totalOSsUnicas = osMap.size;
+
+                if (totalOSsUnicas > 1) {
                     const temAbertaNoGrupo = grp.some(gItem => {
                         const st = (gItem.os.status || "Aberta").toLowerCase();
                         return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
@@ -1329,8 +1342,8 @@
                     const elDup = document.createElement('div');
                     elDup.className = 'marker-duplicado-badge';
                     elDup.style.backgroundColor = corMarkerDup;
-                    elDup.title = `⚠️ ${grp.length} OSs neste local (Possível Duplicidade)`;
-                    elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${grp.length}</span>`;
+                    elDup.title = `⚠️ ${totalOSsUnicas} OSs distintas neste local (${grp.length} pontos de problema)`;
+                    elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${totalOSsUnicas}</span>`;
 
                     marker = new mapboxgl.Marker({ element: elDup })
                         .setLngLat([grp[0].lng, grp[0].lat])
@@ -1465,19 +1478,32 @@
             painel.addEventListener('click', (e) => e.stopPropagation());
         }
 
+        // Agrupa os itens por OS única para evitar cartões repetidos do mesmo protocolo
+        const osMap = new Map();
+        grp.forEach(item => {
+            const key = String(item.os.id || item.os.protocolo);
+            if (!osMap.has(key)) {
+                osMap.set(key, { os: item.os, pontos: [item.pt], diasEmAberto: item.diasEmAberto });
+            } else {
+                osMap.get(key).pontos.push(item.pt);
+            }
+        });
+
+        const totalOSsUnicas = osMap.size;
+
         let html = `
         <div class="flex justify-between items-center border-b border-error/30 pb-2 mb-2">
-            <strong class="text-sm text-error flex items-center gap-1">⚠️ ${grp.length} OSs no Mesmo Local</strong>
+            <strong class="text-sm text-error flex items-center gap-1">⚠️ ${totalOSsUnicas} OSs Distintas no Mesmo Local</strong>
             <button type="button" onclick="document.getElementById('painelLateralOS').style.display='none'" class="text-on-surface-variant hover:text-on-surface text-lg cursor-pointer">&times;</button>
         </div>
         <div class="text-[11px] text-on-surface-variant bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg mb-3">
-            📍 <b>Alerta de Duplicidade:</b> Chamados múltiplos detectados nesta mesma localização ou plaqueta.
+            📍 <b>Alerta de Duplicidade:</b> Chamados múltiplos detectados nesta mesma localização ou plaqueta (${grp.length} pontos no total).
         </div>`;
 
-        grp.forEach(item => {
-            const os = item.os;
-            const pt = item.pt;
-            const diasEmAberto = item.diasEmAberto;
+        osMap.forEach(osGroup => {
+            const os = osGroup.os;
+            const pontosOS = osGroup.pontos;
+            const diasEmAberto = osGroup.diasEmAberto;
             const stLower = (os.status || "Aberta").toLowerCase();
 
             let badgeHTML = "";
@@ -1493,7 +1519,8 @@
                 badgeHTML = `<span class="px-2 py-0.5 rounded-full font-bold text-[10px] text-white ${corAging}">⏱️ ${labelAging}</span>`;
             }
 
-            const linkGmaps = (pt && pt.lat && pt.lng) ? `https://www.google.com/maps/search/?api=1&query=${pt.lat},${pt.lng}` : "#";
+            const ptPrincipal = pontosOS[0];
+            const linkGmaps = (ptPrincipal && ptPrincipal.lat && ptPrincipal.lng) ? `https://www.google.com/maps/search/?api=1&query=${ptPrincipal.lat},${ptPrincipal.lng}` : "#";
 
             let btnAcaoCard = "";
             if (currentUserRole === 'admin') {
@@ -1509,6 +1536,8 @@
                 btnFotoGroup = `<button type="button" onclick="abrirGaleriaFotosModal('${os.protocolo}', 0)" class="bg-amber-500/10 text-amber-700 border border-amber-500/30 px-2 py-1 rounded font-bold text-[10px] hover:bg-amber-500/20 transition-colors cursor-pointer flex items-center gap-1">📸 ${os.fotos.length} foto(s)</button>`;
             }
 
+            let pontosText = pontosOS.map(p => `• Plaqueta: ${p.plaqueta || '-'} | Problema: ${p.problema || '-'}`).join('<br>');
+
             html += `
             <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-2.5 mb-2.5 shadow-sm">
                 <div class="flex justify-between items-center mb-1">
@@ -1517,9 +1546,9 @@
                 </div>
                 <div class="text-[11px] leading-relaxed text-on-surface space-y-0.5">
                     <div><b>Data:</b> ${os.data} | <b>Prioridade:</b> ${os.prioridade}</div>
-                    <div><b>Plaqueta:</b> ${pt ? pt.plaqueta : "-"}</div>
-                    <div><b>Problema:</b> ${pt ? pt.problema : "-"}</div>
-                    <div><b>Endereço:</b> ${pt ? pt.endereco : "-"}</div>
+                    <div><b>Pontos de Problema (${pontosOS.length}):</b></div>
+                    <div class="pl-2 border-l-2 border-outline-variant/60 my-1 text-[10px] text-on-surface-variant font-mono">${pontosText}</div>
+                    <div><b>Endereço:</b> ${ptPrincipal ? ptPrincipal.endereco : "-"}</div>
                     <div><b>Munícipe:</b> ${os.municipe || "-"}</div>
                 </div>
                 <div class="mt-2 flex flex-wrap gap-1.5">
