@@ -16,6 +16,7 @@
     <script src="js/domain/ChamadoModel.js?v=25"></script>
     <script src="js/repositories/ChamadosRepository.js?v=25"></script>
     <script src="js/services/ChamadosService.js?v=25"></script>
+    <script src="js/controllers/PainelController.js?v=25"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -131,6 +132,39 @@
     </script>
     
     <style>
+        /* Mapbox Popup Overrides & Anti-Blur Pixel Snapping */
+        .mapboxgl-popup {
+            z-index: 9999 !important;
+            -webkit-font-smoothing: subpixel-antialiased !important;
+            -moz-osx-font-smoothing: auto !important;
+            text-rendering: geometricPrecision !important;
+            will-change: auto !important;
+        }
+        .mapboxgl-popup-content {
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            padding: 0 !important;
+            transform: none !important;
+        }
+        .card-ponto-duplicado {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        .mapboxgl-popup-close-button {
+            font-size: 20px !important;
+            color: #ffffff !important;
+            padding: 4px 8px !important;
+            border-radius: 50% !important;
+            top: 8px !important;
+            right: 8px !important;
+            z-index: 10000 !important;
+        }
+        .mapboxgl-popup-close-button:hover {
+            background: rgba(255, 255, 255, 0.2) !important;
+        }
+
         .material-symbols-outlined {
             font-family: 'Material Symbols Outlined' !important;
             font-weight: normal;
@@ -535,70 +569,88 @@
 </div>
 
 <!-- MODAL DE CANCELAMENTO DE OS -->
-<div id="modalConfirmacaoCancelamento" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60000] hidden items-center justify-center p-4">
-    <div class="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant">
-        <div class="text-center text-4xl mb-2">❌</div>
-        <h3 class="text-lg font-bold text-error text-center mb-1">Cancelar Ordem de Serviço</h3>
-        <p class="text-xs text-on-surface-variant text-center mb-4">Tem certeza que deseja cancelar a OS <b id="protModalCancelamento" class="text-on-surface"></b>?</p>
-        <div class="text-left mb-5">
-            <label class="text-xs font-bold text-on-surface-variant block mb-1">Motivo / Justificativa do Cancelamento:</label>
-
-            <textarea id="obsModalCancelamento" rows="3" placeholder="Digite a justificativa (ex: OS duplicada com o protocolo...)" class="w-full text-xs p-2.5 border border-outline-variant rounded-lg bg-surface-container-lowest outline-none focus:ring-1 focus:ring-error text-on-surface resize-none"></textarea>
+<div id="modalConfirmacaoCancelamento" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-rose-100 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50">
+                <span class="material-symbols-outlined text-[24px]">close</span>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-on-surface mb-1">Cancelar Ordem de Serviço</h3>
+                <p class="text-xs text-on-surface-variant leading-relaxed">Tem certeza que deseja cancelar a OS <b id="protModalCancelamento" class="text-on-surface font-bold"></b>?</p>
+            </div>
+        </div>
+        
+        <!-- Campo de Justificativa / Observação -->
+        <div class="mb-5">
+            <label for="obsModalCancelamento" class="block text-xs font-semibold text-on-surface-variant mb-1.5">
+                Motivo / Justificativa do Cancelamento <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+            
+            <textarea id="obsModalCancelamento" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none text-xs text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors" placeholder="Informe o motivo ou observação sobre o cancelamento..."></textarea>
 
             <!-- Botões de Mensagens Padrão (Quick Presets) -->
             <div class="mt-2.5">
                 <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
-                    <span class="material-symbols-outlined text-[13px] text-error">chat_bubble_outline</span>
+                    <span class="material-symbols-outlined text-[14px] text-rose-500">chat_bubble_outline</span>
                     <span>Mensagens Padrão:</span>
                 </div>
                 <div class="flex flex-wrap gap-1.5">
                     <button type="button" 
                             onclick="setModalJustification('Identificada duplicidade de protocolo.', 'obsModalCancelamento')" 
                             title="Identificada duplicidade de protocolo."
-                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-rose-500/15 hover:text-rose-600 hover:border-rose-500/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
                         <span>Identificada duplicidade</span>
                     </button>
                     <button type="button" 
                             onclick="setModalJustification('Resolvido em outro protocolo.', 'obsModalCancelamento')" 
                             title="Resolvido em outro protocolo."
-                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-rose-500/15 hover:text-rose-600 hover:border-rose-500/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
                         <span>Resolvido em outro protocolo</span>
                     </button>
                     <button type="button" 
                             onclick="setModalJustification('Atendimento cancelado pela equipe.', 'obsModalCancelamento')" 
                             title="Atendimento cancelado pela equipe."
-                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-rose-500/15 hover:text-rose-600 hover:border-rose-500/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
                         <span>Cancelado pela equipe</span>
                     </button>
                     <button type="button" 
                             onclick="setModalJustification('Endereço não localizado.', 'obsModalCancelamento')" 
                             title="Endereço não localizado."
-                            class="px-2 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-error/15 hover:text-error hover:border-error/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-rose-500/15 hover:text-rose-600 hover:border-rose-500/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
                         <span>Endereço não localizado</span>
                     </button>
                 </div>
             </div>
         </div>
-        <div class="flex gap-3">
-            <button type="button" onclick="fecharModalCancelamento()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Voltar</button>
-            <button type="button" onclick="executarCancelamentoOSConfirmado()" class="flex-1 py-2 px-4 rounded-xl bg-error text-white font-semibold shadow-md hover:bg-error/90 transition-all">Confirmar</button>
+        <div class="flex items-center justify-end gap-3">
+            <button type="button" onclick="fecharModalCancelamento()" class="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/60">Voltar</button>
+            <button type="button" onclick="executarCancelamentoOSConfirmado()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-md transition-all cursor-pointer">Confirmar Cancelamento</button>
         </div>
     </div>
 </div>
 
 <!-- MODAL DE REABERTURA / REVERSÃO DE OS -->
-<div id="modalConfirmacaoReversao" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60000] hidden items-center justify-center p-4">
-    <div class="bg-surface-container-lowest rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-outline-variant">
-        <div class="text-center text-4xl mb-2">🔄</div>
-        <h3 class="text-lg font-bold text-secondary text-center mb-1">Reabrir Ordem de Serviço</h3>
-        <p class="text-xs text-on-surface-variant text-center mb-4">Tem certeza que deseja reabrir a OS <b id="protModalReversao" class="text-on-surface"></b>?</p>
-        <div class="text-left mb-5">
-            <label class="text-xs font-bold text-on-surface-variant block mb-1">Motivo / Justificativa da Reabertura:</label>
-            <textarea id="obsModalReversao" rows="3" placeholder="Digite a justificativa (ex: serviço pendente / reaberto a pedido do supervisor)..." class="w-full text-xs p-2.5 border border-outline-variant rounded-lg bg-surface-container-lowest outline-none focus:ring-1 focus:ring-secondary text-on-surface resize-none"></textarea>
+<div id="modalConfirmacaoReversao" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface">
+        <div class="flex items-start gap-4 mb-4">
+            <div class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50">
+                <span class="material-symbols-outlined text-[24px]">undo</span>
+            </div>
+            <div class="flex-1">
+                <h3 class="text-lg font-bold text-on-surface mb-1">Reabrir Ordem de Serviço</h3>
+                <p class="text-xs text-on-surface-variant leading-relaxed">Tem certeza que deseja reabrir a OS <b id="protModalReversao" class="text-on-surface font-bold"></b>?</p>
+            </div>
         </div>
-        <div class="flex gap-3">
-            <button type="button" onclick="fecharModalReversao()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Voltar</button>
-            <button type="button" onclick="executarReversaoOSConfirmado()" class="flex-1 py-2 px-4 rounded-xl bg-secondary text-white font-semibold shadow-md hover:bg-secondary-container transition-all">Confirmar</button>
+        <div class="mb-5">
+            <label for="obsModalReversao" class="block text-xs font-semibold text-on-surface-variant mb-1.5">
+                Motivo / Justificativa da Reabertura <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+            <textarea id="obsModalReversao" rows="2" placeholder="Digite a justificativa (ex: serviço pendente / reaberto a pedido do supervisor)..." class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none text-xs text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors"></textarea>
+        </div>
+        <div class="flex items-center justify-end gap-3">
+            <button type="button" onclick="fecharModalReversao()" class="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer border border-outline-variant/60">Voltar</button>
+            <button type="button" onclick="executarReversaoOSConfirmado()" class="px-4 py-2 rounded-xl text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all cursor-pointer">Confirmar Reabertura</button>
         </div>
     </div>
 </div>
@@ -853,47 +905,59 @@
     async function geocodificarEnderecosFaltantes(dadosOSs) {
         if (!dadosOSs || !Array.isArray(dadosOSs) || dadosOSs.length === 0) return;
 
-        let houveAtualizacao = false;
-        const maxGeocodeRequests = 20;
-        let count = 0;
-
+        // Coleta todos os pontos que necessitam de geocodificação
+        const pontosParaGeocodificar = [];
         for (const os of dadosOSs) {
             if (!os.pontos || !Array.isArray(os.pontos)) continue;
             for (const pt of os.pontos) {
                 if (pt.needsGeocoding && pt.endereco && pt.endereco !== 'Araraquara, SP' && pt.endereco !== 'Ponto não informado') {
-                    if (count >= maxGeocodeRequests) break;
-                    
                     let endLimpo = pt.endereco.split('|')[0].trim().replace(/^Plaqueta:\s*/i, '');
-                    if (!endLimpo || endLimpo.length < 4 || endLimpo.startsWith('[---]')) continue;
-
-                    try {
-                        const query = encodeURIComponent(`${endLimpo}, Araraquara, SP, Brasil`);
-                        const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${MAPBOX_TOKEN}&limit=1`);
-                        const geoData = await res.json();
-                        
-                        if (geoData && geoData.features && geoData.features.length > 0) {
-                            const center = geoData.features[0].center; // [lng, lat]
-                            if (center && center.length >= 2) {
-                                const geolng = center[0];
-                                const geolat = center[1];
-                                pt.lng = geolng;
-                                pt.lat = geolat;
-                                pt.needsGeocoding = false;
-                                setCachedGeocode(pt.endereco, { lat: geolat, lng: geolng });
-                                houveAtualizacao = true;
-                                count++;
-                            }
-                        }
-                    } catch(e) {
-                        console.warn("⚠️ Geocoding Mapbox falhou para:", endLimpo, e);
+                    if (endLimpo && endLimpo.length >= 4 && !endLimpo.startsWith('[---]')) {
+                        pontosParaGeocodificar.push({ os, pt, endLimpo });
                     }
                 }
             }
-            if (count >= maxGeocodeRequests) break;
         }
 
-        if (houveAtualizacao) {
-            aplicarFiltrosMapa();
+        if (pontosParaGeocodificar.length === 0) return;
+
+        const BATCH_SIZE = 10;
+        
+        for (let i = 0; i < pontosParaGeocodificar.length; i += BATCH_SIZE) {
+            const batch = pontosParaGeocodificar.slice(i, i + BATCH_SIZE);
+            let batchAtualizou = false;
+
+            await Promise.all(batch.map(async (item) => {
+                try {
+                    const query = encodeURIComponent(`${item.endLimpo}, Araraquara, SP, Brasil`);
+                    const res = await fetch(`https://api.mapbox.com/geocoding/v5/mapbox.places/${query}.json?access_token=${MAPBOX_TOKEN}&limit=1`);
+                    const geoData = await res.json();
+                    
+                    if (geoData && geoData.features && geoData.features.length > 0) {
+                        const center = geoData.features[0].center; // [lng, lat]
+                        if (center && center.length >= 2) {
+                            const geolng = center[0];
+                            const geolat = center[1];
+                            item.pt.lng = geolng;
+                            item.pt.lat = geolat;
+                            item.pt.needsGeocoding = false;
+                            setCachedGeocode(item.pt.endereco, { lat: geolat, lng: geolng });
+                            batchAtualizou = true;
+                        }
+                    }
+                } catch(e) {
+                    console.warn("⚠️ Geocoding Mapbox falhou para:", item.endLimpo, e);
+                }
+            }));
+
+            if (batchAtualizou) {
+                aplicarFiltrosMapa();
+            }
+
+            // Pequena pausa entre lotes para evitar estouro de limite de requisições da API
+            if (i + BATCH_SIZE < pontosParaGeocodificar.length) {
+                await new Promise(resolve => setTimeout(resolve, 150));
+            }
         }
     }
 
@@ -919,6 +983,7 @@
         try {
             // Carrega a lista de chamados via ChamadosService (idêntico ao Painel.html)
             const chamadosList = await chamadosService.getChamadosList();
+            window.chamadosListCache = chamadosList;
             
             // Converte as entidades ChamadoModel para a estrutura de renderização do mapa
             dadosOSsAbertasCache = converterChamadosModelParaMapa(chamadosList || []);
@@ -1054,7 +1119,8 @@
                 descricao: c.problemaInicial || '',
                 logs: c.observacaoFinal || '',
                 fotos: c.fotosEvidencias || [],
-                pontos: pontosProcessados
+                pontos: pontosProcessados,
+                _originalModel: c
             };
         });
     }
@@ -1351,7 +1417,7 @@
 
                     marker.getElement().addEventListener('click', (e) => {
                         e.stopPropagation();
-                        exibirDetalhesGrupoDuplicadoCard(grp);
+                        exibirPopupQuadradosFlutuantesDuplicados(grp, [grp[0].lng, grp[0].lat]);
                     });
                 } else {
                     const item = grp[0];
@@ -1407,7 +1473,7 @@
 
                     marker.getElement().addEventListener('click', (e) => {
                         e.stopPropagation();
-                        exibirDetalhesOSCard(os, pt, diasEmAberto);
+                        abrirModalDetalhesPrincipal(os.protocolo);
                     });
                 }
 
@@ -1467,6 +1533,191 @@
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
+    }
+
+    let popupDuplicadosAtual = null;
+
+    function exibirPopupQuadradosFlutuantesDuplicados(grp, lngLat) {
+        if (popupDuplicadosAtual) {
+            popupDuplicadosAtual.remove();
+            popupDuplicadosAtual = null;
+        }
+
+        // Agrupa os itens por OS única
+        const osMap = new Map();
+        grp.forEach(gItem => {
+            const key = String(gItem.os.id || gItem.os.protocolo);
+            if (!osMap.has(key)) {
+                osMap.set(key, { os: gItem.os, pontos: [gItem.pt], diasEmAberto: gItem.diasEmAberto });
+            } else {
+                osMap.get(key).pontos.push(gItem.pt);
+            }
+        });
+
+        const totalUnicas = osMap.size;
+
+        let cardWidthClass = "w-64";
+        if (totalUnicas === 1) cardWidthClass = "w-72 sm:w-80";
+        else if (totalUnicas === 2) cardWidthClass = "w-64 sm:w-72";
+        else if (totalUnicas === 3) cardWidthClass = "w-52 sm:w-56";
+        else if (totalUnicas >= 4) cardWidthClass = "w-44 sm:w-48";
+
+        let htmlCards = '';
+        osMap.forEach(grpOS => {
+            const os = grpOS.os;
+            const pontos = grpOS.pontos;
+            const dataStr = os.data || os.formattedDateShort || (os.dataAbertura ? (os.dataAbertura.toLocaleDateString ? os.dataAbertura.toLocaleDateString('pt-BR') : os.dataAbertura) : '--/--/----');
+            
+            // Extrai Operador ou Munícipe
+            const opVal = String(os.operador || os.displayOperadorAbertura || os.operadorAbertura || '').trim();
+            const opLower = opVal.toLowerCase();
+            const isOpValido = opVal && !opLower.includes('gov.br') && !opLower.includes('cidadã') && opLower !== 'null' && opLower !== 'undefined';
+            
+            let solicitanteHTML = '';
+            if (isOpValido) {
+                solicitanteHTML = `<span class="font-medium text-slate-700 dark:text-slate-200"><b>Operador:</b> ${opVal}</span>`;
+            } else {
+                const munVal = String(os.municipe || os.municipeNome || '').trim();
+                solicitanteHTML = `<span class="font-medium text-slate-700 dark:text-slate-200"><b>Munícipe:</b> ${munVal || 'Não informado'}</span>`;
+            }
+
+            // Exibição dos pontos (Endereço > Plaqueta > Coordenada)
+            const pontosFormattedHtml = pontos.map(pt => {
+                const endStr = (pt.endereco || pt.enderecoInicial || '').trim();
+                const plaqStr = (pt.plaqueta || pt.plaquetaInicial || '').trim();
+                const hasPlaq = plaqStr && plaqStr !== '[---]' && plaqStr !== '-';
+
+                // Se o endereço for apenas uma string sintética de plaqueta/coordenadas, trata como plaqueta pura
+                const endLower = endStr.toLowerCase();
+                const isEnderecoSintetico = endLower.startsWith('plaqueta:') || endLower.startsWith('coord:') || endLower.includes('| coord:');
+
+                if (hasPlaq && isEnderecoSintetico) {
+                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
+                }
+
+                if (endStr && endStr !== '[---]' && endStr !== '-' && !isEnderecoSintetico) {
+                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5" title="${endStr}">📍 ${endStr}${hasPlaq ? ` <span class="text-slate-500 dark:text-slate-400 font-semibold">(Plaqueta: <b>${plaqStr}</b>)</span>` : ''}</div>`;
+                }
+                
+                if (hasPlaq) {
+                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
+                }
+
+                const lat = pt.lat || pt.latitude;
+                const lng = pt.lng || pt.longitude;
+                if (lat && lng) {
+                    return `<div class="whitespace-normal break-words text-[11px] font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}</div>`;
+                }
+                const coordStr = (pt.coordenada || pt.coordenadaInicial || '').trim();
+                if (coordStr) {
+                    return `<div class="whitespace-normal break-words text-[11px] font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${coordStr}</div>`;
+                }
+                return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">📍 Localização registrada</div>`;
+            }).join('');
+
+            const stLower = (os.status || "Aberta").toLowerCase();
+            let badgeAging = "";
+            if (stLower.includes('cancel')) {
+                badgeAging = '<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white bg-error">❌ Cancelada</span>';
+            } else if (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
+                badgeAging = '<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white bg-secondary">✅ Concluída</span>';
+            } else {
+                const d = grpOS.diasEmAberto || 0;
+                let corAging = "bg-[#188038]";
+                if (d > 7) corAging = "bg-[#d93025]";
+                else if (d > 3) corAging = "bg-[#f2994a]";
+                badgeAging = `<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white ${corAging}">⏱️ ${d}d</span>`;
+            }
+
+            let btnAcaoAdmin = "";
+            if (currentUserRole === 'admin') {
+                if (stLower.includes('cancel') || stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
+                    btnAcaoAdmin = `<button type="button" onclick="solicitarReversaoOS('${os.protocolo}')" class="py-1.5 px-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] sm:text-[11px] font-bold rounded-lg border border-slate-300 dark:border-slate-600 transition-all flex items-center justify-center gap-0.5 cursor-pointer active:scale-95" title="Reabrir OS">
+                        <span class="material-symbols-outlined text-[14px]">undo</span>
+                        <span>Reabrir</span>
+                    </button>`;
+                } else {
+                    btnAcaoAdmin = `<button type="button" onclick="solicitarCancelamentoOS('${os.protocolo}')" class="py-1.5 px-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-[10px] sm:text-[11px] font-bold rounded-lg border border-rose-200 dark:border-rose-800/60 transition-all flex items-center justify-center gap-0.5 cursor-pointer active:scale-95" title="Cancelar OS">
+                        <span class="material-symbols-outlined text-[14px]">close</span>
+                        <span>Cancelar</span>
+                    </button>`;
+                }
+            }
+
+            htmlCards += `
+            <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl p-2.5 shadow-lg hover:border-blue-500 transition-all flex flex-col justify-between space-y-1.5 overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-1.5">
+                    <span class="font-bold text-xs sm:text-sm text-blue-600 dark:text-blue-400 truncate">#${os.protocolo}</span>
+                    ${badgeAging}
+                </div>
+                <div class="text-[11px] sm:text-xs text-slate-800 dark:text-slate-200 space-y-0.5">
+                    <div>📅 <b>Data:</b> ${dataStr}</div>
+                    <div class="truncate">👤 ${solicitanteHTML}</div>
+                    <div class="pt-0.5">
+                        <div class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Pontos (${pontos.length}):</div>
+                        <div class="pl-1.5 space-y-0.5 border-l-2 border-blue-400/40 max-h-24 overflow-hidden">
+                            ${pontosFormattedHtml}
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-1 flex items-center gap-1">
+                    <button type="button" onclick="abrirModalDetalhesPrincipal('${os.protocolo}')" class="flex-1 py-1.5 px-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] sm:text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95">
+                        <span class="material-symbols-outlined text-[14px]">visibility</span>
+                        <span>+ Detalhes</span>
+                    </button>
+                    ${btnAcaoAdmin}
+                </div>
+            </div>`;
+        });
+
+        const popupHTML = `
+        <div class="popup-duplicados-container bg-slate-900/95 border border-slate-700 rounded-2xl p-2.5 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-rose-500/30 px-1">
+                <div class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-rose-400 text-[16px]">warning</span>
+                    <strong class="text-xs text-rose-300 font-bold">${totalUnicas} Chamados Distintos Neste Local</strong>
+                </div>
+            </div>
+            <div class="flex flex-row gap-2 overflow-hidden p-0.5">
+                ${htmlCards}
+            </div>
+        </div>`;
+
+        // Reposiciona suavemente a câmera do mapa para garantir que o ponto fique visível com espaço suficiente para o popup
+        if (mapOSsInstance) {
+            mapOSsInstance.easeTo({
+                center: lngLat,
+                offset: [0, 120],
+                duration: 300
+            });
+        }
+
+        const screenMaxW = Math.min(window.innerWidth - 30, 980);
+        const targetW = totalUnicas === 1 ? 340 : (totalUnicas === 2 ? 640 : (totalUnicas === 3 ? 740 : 880));
+        const maxWidthPopup = `${Math.min(screenMaxW, targetW)}px`;
+
+        popupDuplicadosAtual = new mapboxgl.Popup({ closeOnClick: true, maxWidth: maxWidthPopup, offset: 25, anchor: 'bottom' })
+            .setLngLat(lngLat)
+            .setHTML(popupHTML)
+            .addTo(mapOSsInstance);
+
+        // Arredonda as coordenadas translate(x, y) do popup para números inteiros (elimina desfoque de subpixel no Chrome)
+        const snapPopupTransform = () => {
+            if (popupDuplicadosAtual && popupDuplicadosAtual._container) {
+                const style = popupDuplicadosAtual._container.style;
+                if (style.transform) {
+                    style.transform = style.transform.replace(
+                        /translate\(([\d.-]+)px,\s*([\d.-]+)px\)/g,
+                        (_, x, y) => `translate(${Math.round(parseFloat(x))}px, ${Math.round(parseFloat(y))}px)`
+                    );
+                }
+            }
+        };
+
+        snapPopupTransform();
+        if (mapOSsInstance) {
+            mapOSsInstance.on('render', snapPopupTransform);
+        }
     }
 
     function exibirDetalhesGrupoDuplicadoCard(grp) {
@@ -2610,7 +2861,246 @@
             if (mapOSsInstance.getSource('rota-viaria-source')) mapOSsInstance.removeSource('rota-viaria-source');
         }
     }
+
+    // ==========================================
+    // MODAL DE DETALHES PRINCIPAL E GALERIA DE FOTOS
+    // ==========================================
+    var galeriaFotosAtualList = [];
+    var galeriaFotosIndexAtual = 0;
+
+    window.abrirModalDetalhesPrincipal = function(protocolo) {
+        if (popupDuplicadosAtual) {
+            popupDuplicadosAtual.remove();
+            popupDuplicadosAtual = null;
+        }
+
+        let item = (window.chamadosListCache || []).find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+
+        if (!item && dadosOSsAbertasCache) {
+            const rawObj = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+            if (rawObj) {
+                item = rawObj._originalModel || rawObj;
+            }
+        }
+        
+        if (!item) return;
+
+        if (!(item instanceof window.ChamadoModel) && window.ChamadoModel) {
+            item = new window.ChamadoModel(item);
+        }
+
+        const elProt = document.getElementById('detalheModalProtocolo');
+        if (elProt) elProt.innerText = `Protocolo #${item.protocolo}`;
+        
+        const elSub = document.getElementById('detalheModalDataSub');
+        if (elSub) {
+            const dataAb = item.dataAbertura ? (item.dataAbertura.toLocaleDateString ? item.dataAbertura.toLocaleDateString('pt-BR') : item.dataAbertura) : (item.data || '--/--/----');
+            const dataConc = item.dataConclusao ? (item.dataConclusao.toLocaleDateString ? item.dataConclusao.toLocaleDateString('pt-BR') : item.dataConclusao) : 'Em aberto';
+            elSub.innerText = `Abertura: ${dataAb} | Conclusão: ${dataConc}`;
+        }
+
+        const elStatusBadge = document.getElementById('detalheModalStatusBadge');
+        if (elStatusBadge) {
+            elStatusBadge.innerText = item.statusBadgeLabel || item.status || 'Em aberto';
+            const stNorm = item.normalizedStatus || (item.status || '').toLowerCase();
+            if (stNorm.includes('conclu') || stNorm.includes('resolv') || stNorm.includes('fechad')) {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#dcfce7] text-[#166534]';
+            } else if (stNorm.includes('cancel')) {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700';
+            } else if (stNorm.includes('rejeit')) {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-100 text-rose-800 border border-rose-300';
+            } else {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container';
+            }
+        }
+
+        const elAuditBadge = document.getElementById('detalheModalAuditBadge');
+        if (elAuditBadge) {
+            elAuditBadge.classList.add('hidden');
+        }
+
+        const container = document.getElementById('detalheModalConteudo');
+        if (container) {
+            container.innerHTML = construirHtmlModalDetalhesPrincipal(item);
+        }
+
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (modal && box) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('scale-95', 'opacity-0');
+                box.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+    };
+
+    window.fecharDetalhesOSModal = function() {
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (!modal || !box) return;
+        box.classList.remove('scale-100', 'opacity-100');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    window.construirHtmlModalDetalhesPrincipal = function(item) {
+        if (window.PainelController && typeof window.PainelController.prototype.buildDetalhesOSModalHtml === 'function') {
+            const ctrl = window.painelController || new window.PainelController();
+            return ctrl.buildDetalhesOSModalHtml(item);
+        }
+        return '';
+    };
+
+    window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
+        if (!dadosOSsAbertasCache) return;
+        const os = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase());
+        if (!os || !os.fotos || os.fotos.length === 0) return;
+
+        galeriaFotosAtualList = os.fotos;
+        galeriaFotosIndexAtual = (indexInicial >= 0 && indexInicial < os.fotos.length) ? indexInicial : 0;
+
+        const modal = document.getElementById('modalGaleriaFotosCloudinary');
+        const elProt = document.getElementById('galeriaModalProtocolo');
+        if (elProt) elProt.innerText = `Fotos da OS #${os.protocolo}`;
+
+        atualizarModalGaleriaVisualizacao();
+
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    };
+
+    window.fecharGaleriaFotosModal = function() {
+        const modal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+    };
+
+    window.navegarGaleriaFotos = function(delta) {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        let novo = galeriaFotosIndexAtual + delta;
+        if (novo < 0) novo = galeriaFotosAtualList.length - 1;
+        if (novo >= galeriaFotosAtualList.length) novo = 0;
+        galeriaFotosIndexAtual = novo;
+        atualizarModalGaleriaVisualizacao();
+    };
+
+    function atualizarModalGaleriaVisualizacao() {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+        
+        const elImg = document.getElementById('galeriaModalImgPrincipal');
+        if (elImg) elImg.src = foto.url || foto.link || foto;
+
+        const elTitulo = document.getElementById('galeriaModalTituloFoto');
+        if (elTitulo) elTitulo.innerText = foto.titulo || foto.estagio || `Foto ${galeriaFotosIndexAtual + 1}`;
+
+        const elCounter = document.getElementById('galeriaModalCounter');
+        if (elCounter) elCounter.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+
+        const strip = document.getElementById('galeriaModalThumbnailsStrip');
+        if (strip) {
+            strip.innerHTML = galeriaFotosAtualList.map((f, idx) => `
+                <div onclick="galeriaFotosIndexAtual = ${idx}; atualizarModalGaleriaVisualizacao();" class="w-12 h-12 rounded-lg overflow-hidden border-2 cursor-pointer flex-shrink-0 transition-all ${idx === galeriaFotosIndexAtual ? 'border-amber-400 scale-105 opacity-100' : 'border-transparent opacity-60 hover:opacity-100'}">
+                    <img src="${f.url || f.link || f}" class="w-full h-full object-cover" />
+                </div>
+            `).join('');
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            fecharDetalhesOSModal();
+            fecharGaleriaFotosModal();
+        }
+    });
 </script>
+
+<!-- Modal Detalhes OS Auditoria/Painel -->
+<div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) fecharDetalhesOSModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modalDetalhesOSBox" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">assignment</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="detalheModalProtocolo">Protocolo #---</h3>
+                        <span id="detalheModalStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Concluída</span>
+                        <span id="detalheModalAuditBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">Auditoria Pendente</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md mt-0.5" id="detalheModalDataSub">Abertura: --/--/---- | Conclusão: --/--/----</p>
+                </div>
+            </div>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5" id="detalheModalConteudo">
+            <div class="flex items-center justify-center py-12 text-on-surface-variant text-sm">
+                Carregando detalhes do protocolo...
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
+            <span class="text-[11px] text-on-surface-variant/70 font-medium hidden sm:inline">Clique em qualquer foto para visualizar em tela cheia na galeria</span>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Galeria de Fotos Cloudinary (Lightbox) -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[70000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Principal -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Thumbnails geradas via JS -->
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

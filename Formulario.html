@@ -697,35 +697,59 @@
         return window.supabaseClient;
       }
 
-      function enviarSupabaseDiretoFrontend(tabela, dadosRecord) {
+      async function enviarSupabaseDiretoFrontend(tabela, dadosRecord) {
         var client = obterSupabaseClient();
         if (!client) return Promise.resolve(null);
         console.log("⚡ [Supabase Direct Frontend] Enviando dados para '" + tabela + "':", dadosRecord);
-        return client.from(tabela).insert([dadosRecord])
-          .then(function(res) {
-            if (res.error) console.error("❌ [Supabase Direct Error]:", res.error);
-            else console.log("✅ [Supabase Direct Success]:", res.data);
-            return res;
-          })
-          .catch(function(err) {
-            console.error("❌ [Supabase Direct Exception]:", err);
-          });
+        var payloadAtual = Object.assign({}, dadosRecord);
+        var res = await client.from(tabela).insert([payloadAtual]);
+
+        while (res.error && res.error.message && res.error.message.indexOf("Could not find the") !== -1) {
+          var match = res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+          if (match && match[1]) {
+            var colAusente = match[1];
+            console.warn("⚠️ [Supabase Direct Insert] Coluna '" + colAusente + "' não existe na tabela '" + tabela + "'. Removendo do payload e tentando novamente...");
+            delete payloadAtual[colAusente];
+            res = await client.from(tabela).insert([payloadAtual]);
+          } else {
+            break;
+          }
+        }
+
+        if (res.error) console.error("❌ [Supabase Direct Error]:", res.error);
+        else console.log("✅ [Supabase Direct Success]:", res.data);
+        return res;
       }
 
-      function atualizarSupabaseDiretoFrontend(tabela, idOuProtocolo, dadosRecord) {
+      async function atualizarSupabaseDiretoFrontend(tabela, idOuProtocolo, dadosRecord) {
         var client = obterSupabaseClient();
         if (!client) return Promise.resolve(null);
         console.log("⚡ [Supabase Direct Frontend] Atualizando dados em '" + tabela + "':", dadosRecord);
-        var query = typeof idOuProtocolo === 'number' ? client.from(tabela).update(dadosRecord).eq('id', idOuProtocolo) : client.from(tabela).update(dadosRecord).eq('protocolo', idOuProtocolo);
-        return query
-          .then(function(res) {
-            if (res.error) console.error("❌ [Supabase Direct Update Error]:", res.error);
-            else console.log("✅ [Supabase Direct Update Success]:", res.data);
-            return res;
-          })
-          .catch(function(err) {
-            console.error("❌ [Supabase Direct Update Exception]:", err);
-          });
+        var payloadAtual = Object.assign({}, dadosRecord);
+
+        function executarUpdate() {
+          return typeof idOuProtocolo === 'number'
+            ? client.from(tabela).update(payloadAtual).eq('id', idOuProtocolo)
+            : client.from(tabela).update(payloadAtual).eq('protocolo', idOuProtocolo);
+        }
+
+        var res = await executarUpdate();
+
+        while (res.error && res.error.message && res.error.message.indexOf("Could not find the") !== -1) {
+          var match = res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+          if (match && match[1]) {
+            var colAusente = match[1];
+            console.warn("⚠️ [Supabase Direct Update] Coluna '" + colAusente + "' não existe na tabela '" + tabela + "'. Removendo do payload e tentando novamente...");
+            delete payloadAtual[colAusente];
+            res = await executarUpdate();
+          } else {
+            break;
+          }
+        }
+
+        if (res.error) console.error("❌ [Supabase Direct Update Error]:", res.error);
+        else console.log("✅ [Supabase Direct Update Success]:", res.data);
+        return res;
       }
 
       // =========================================================================
@@ -2660,7 +2684,7 @@
           btn.innerText = "Atualizando OS de Praça no Supabase...";
           var payloadUpdatePraca = {
             prioridade: dados.prioridade,
-            municipe: dados.municipe,
+            municipe_nome: dados.municipe,
             telefone_fixo: dados.telefoneFixo,
             telefone_celular: dados.telefoneCelular,
             praca_nome: dados.pracaNome,
@@ -2708,7 +2732,7 @@
                   protocolo: protExtraido,
                   status: (forcarSalvar === true) ? "Pendente" : "Aberta",
                   prioridade: dados.prioridade,
-                  municipe: dados.municipe,
+                  municipe_nome: dados.municipe,
                   telefone_fixo: dados.telefoneFixo,
                   telefone_celular: dados.telefoneCelular,
                   praca_nome: dados.pracaNome,
@@ -3018,12 +3042,12 @@
           btn.innerText = "Atualizando OS no Supabase...";
           var payloadUpdate = {
             prioridade: dadosFinais.prioridade,
-            municipe: dadosFinais.municipe,
+            municipe_nome: dadosFinais.municipe,
             telefone_fixo: dadosFinais.telefoneFixo,
             telefone_celular: dadosFinais.telefoneCelular,
             quantidade: parseInt(dadosFinais.quantidade) || 1,
             descricao: dadosFinais.descricao,
-            pontos: dadosFinais.pontos
+            pontos_inicial: dadosFinais.pontos
           };
           
           atualizarSupabaseDiretoFrontend('ordens_servico', osRecordEmEdicao.id, payloadUpdate)
@@ -3059,12 +3083,12 @@
                   protocolo: protExtraido,
                   status: (forcarSalvar === true) ? "Pendente" : "Aberta",
                   prioridade: dadosFinais.prioridade,
-                  municipe: dadosFinais.municipe,
+                  municipe_nome: dadosFinais.municipe,
                   telefone_fixo: dadosFinais.telefoneFixo,
                   telefone_celular: dadosFinais.telefoneCelular,
                   quantidade: parseInt(dadosFinais.quantidade) || 1,
                   descricao: dadosFinais.descricao,
-                  pontos: dadosFinais.pontos,
+                  pontos_inicial: dadosFinais.pontos,
                   data_abertura: new Date().toISOString()
                 });
               }

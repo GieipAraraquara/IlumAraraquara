@@ -48,34 +48,40 @@ class PainelController {
             if (card3) card3.innerHTML = '<div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>';
         }
 
-        const tbody = document.querySelector('#os-table tbody');
-        const noResultsRow = document.getElementById('no-audit-results');
-        if (tbody) {
-            if (noResultsRow) noResultsRow.classList.add('hidden');
+        const tbodyMain = document.querySelector('#os-table tbody');
+        const tbodyPendentes = document.querySelector('#pendentes-os-table tbody');
+        const noResultsRowMain = document.getElementById('no-audit-results');
+        const noResultsRowPendentes = document.getElementById('no-pendentes-results');
 
-            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-                if (tr.id !== 'no-audit-results') tr.remove();
-            });
-
-            for (let i = 0; i < 5; i++) {
-                const tr = document.createElement('tr');
-                tr.className = 'skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle';
-                tr.innerHTML = `
-                    <td class="py-3.5 px-5 align-middle"><div class="h-4 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
-                    <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
-                    <td class="py-3.5 px-5 align-middle"><div class="h-4 w-48 bg-surface-container-high animate-pulse rounded"></div></td>
-                    <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
-                    <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
-                    <td class="py-3.5 px-5 align-middle text-center">
-                        <div class="flex items-center justify-center gap-2">
-                            <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
-                            <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
-                        </div>
-                    </td>
-                `;
-                tbody.appendChild(tr);
+        [
+            { tbody: tbodyMain, noResults: noResultsRowMain },
+            { tbody: tbodyPendentes, noResults: noResultsRowPendentes }
+        ].forEach(({ tbody, noResults }) => {
+            if (tbody) {
+                if (noResults) noResults.classList.add('hidden');
+                Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                    if (tr.id !== 'no-audit-results' && tr.id !== 'no-pendentes-results') tr.remove();
+                });
+                for (let i = 0; i < 3; i++) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle';
+                    tr.innerHTML = `
+                        <td class="py-3.5 px-5 align-middle"><div class="h-4 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
+                        <td class="py-3.5 px-5 align-middle"><div class="h-4 w-12 bg-surface-container-high animate-pulse rounded"></div></td>
+                        <td class="py-3.5 px-5 align-middle"><div class="h-4 w-48 bg-surface-container-high animate-pulse rounded"></div></td>
+                        <td class="py-3.5 px-5 align-middle"><div class="h-7 w-36 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                        <td class="py-3.5 px-5 align-middle"><div class="h-7 w-32 bg-surface-container-high animate-pulse rounded-full"></div></td>
+                        <td class="py-3.5 px-5 align-middle text-center">
+                            <div class="flex items-center justify-center gap-2">
+                                <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                                <div class="h-6 w-6 bg-surface-container-high animate-pulse rounded"></div>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                }
             }
-        }
+        });
     }
 
     /**
@@ -137,37 +143,70 @@ class PainelController {
      * Renders filtered chamados into table tbody
      */
     renderTable() {
-        const tbody = document.querySelector('#os-table tbody');
-        const noResultsRow = document.getElementById('no-audit-results');
-        if (!tbody) return;
+        const tbodyMain = document.querySelector('#os-table tbody');
+        const tbodyPendentes = document.querySelector('#pendentes-os-table tbody');
+        const containerPendentes = document.getElementById('container-pendentes-aprovacao');
+        const noResultsRowMain = document.getElementById('no-audit-results');
+        const noResultsRowPendentes = document.getElementById('no-pendentes-results');
+
+        if (!tbodyMain && !tbodyPendentes) return;
 
         const filteredList = this.service.filterChamados(this.chamadosList, this.activeFilters);
 
-        // Remove old dynamic rows (preserving #no-audit-results)
-        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
-            if (tr.id !== 'no-audit-results') {
-                tr.remove();
-            }
-        });
+        // Separate pending items matching current filters
+        const pendentesList = filteredList.filter(item => item.normalizedStatus === 'pendente');
 
-        if (filteredList.length === 0) {
-            if (noResultsRow) noResultsRow.classList.remove('hidden');
-            return;
+        // Check if system has any pending approval records
+        const hasAnyPendingInSystem = (this.chamadosList || []).some(item => item.normalizedStatus === 'pendente');
+
+        // Dynamically toggle Pendentes section visibility: visible ONLY when there is at least one pending OS
+        if (containerPendentes) {
+            if (hasAnyPendingInSystem && pendentesList.length > 0) {
+                containerPendentes.classList.remove('hidden');
+            } else {
+                containerPendentes.classList.add('hidden');
+            }
         }
 
-        if (noResultsRow) noResultsRow.classList.add('hidden');
+        // 1. Render Pendentes Table
+        if (tbodyPendentes) {
+            Array.from(tbodyPendentes.querySelectorAll('tr')).forEach(tr => {
+                if (tr.id !== 'no-pendentes-results') tr.remove();
+            });
 
-        // Create table rows for each item
-        filteredList.forEach(item => {
-            const tr = this.createRowElement(item);
-            tbody.appendChild(tr);
-        });
+            if (pendentesList.length === 0) {
+                if (noResultsRowPendentes) noResultsRowPendentes.classList.remove('hidden');
+            } else {
+                if (noResultsRowPendentes) noResultsRowPendentes.classList.add('hidden');
+                pendentesList.forEach(item => {
+                    const tr = this.createRowElement(item, true);
+                    tbodyPendentes.appendChild(tr);
+                });
+            }
+        }
+
+        // 2. Render Main OS Table (Ordens de Serviço Recentes)
+        if (tbodyMain) {
+            Array.from(tbodyMain.querySelectorAll('tr')).forEach(tr => {
+                if (tr.id !== 'no-audit-results') tr.remove();
+            });
+
+            if (filteredList.length === 0) {
+                if (noResultsRowMain) noResultsRowMain.classList.remove('hidden');
+            } else {
+                if (noResultsRowMain) noResultsRowMain.classList.add('hidden');
+                filteredList.forEach(item => {
+                    const tr = this.createRowElement(item);
+                    tbodyMain.appendChild(tr);
+                });
+            }
+        }
     }
 
     /**
      * Creates a HTMLTableRowElement for a ChamadoModel entity
      */
-    createRowElement(item) {
+    createRowElement(item, isPendentesTable = false) {
         const tr = document.createElement('tr');
         const isCancelada = item.normalizedStatus === 'cancelada';
         const isRejeitada = item.normalizedStatus === 'rejeitada';
@@ -187,11 +226,22 @@ class PainelController {
         if (item.isDireto) {
             const tecNome = item.operadorFinalizacao || item.operador || 'Técnico';
             tdProtocolo.innerHTML = `
-                <div class="flex flex-col gap-0.5">
-                    <span class="font-mono font-bold text-amber-900" title="${item.protocolo}">${item.protocolo}</span>
-                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold w-fit border border-amber-200">
-                        <span class="material-symbols-outlined text-[11px] text-amber-600">electric_bolt</span>
-                        <span>Emergencial (${tecNome})</span>
+                <div class="flex flex-col gap-0.5 max-w-full overflow-hidden">
+                    <span class="font-mono font-bold text-amber-900 truncate" title="${item.protocolo}">${item.protocolo}</span>
+                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-amber-200">
+                        <span class="material-symbols-outlined text-[11px] text-amber-600 shrink-0">electric_bolt</span>
+                        <span class="truncate">Emergencial (${tecNome})</span>
+                    </span>
+                    ${(!isPendentesTable && item.motivoAprovacao) ? `<span class="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-purple-200" title="${item.motivoAprovacao}"><span class="material-symbols-outlined text-[11px] text-purple-600 shrink-0">info</span><span class="truncate">${item.motivoAprovacao}</span></span>` : ''}
+                </div>
+            `;
+        } else if (!isPendentesTable && item.motivoAprovacao) {
+            tdProtocolo.innerHTML = `
+                <div class="flex flex-col gap-0.5 max-w-full overflow-hidden">
+                    <span class="font-mono font-bold text-on-surface truncate" title="${item.protocolo}">${item.protocolo}</span>
+                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-amber-200" title="${item.motivoAprovacao}">
+                        <span class="material-symbols-outlined text-[11px] text-amber-600 shrink-0">warning</span>
+                        <span class="truncate">${item.motivoAprovacao}</span>
                     </span>
                 </div>
             `;
@@ -290,7 +340,7 @@ class PainelController {
             const problemText = problemLabels[probVal] || item.problemaInicial || 'Outro';
 
             tdProblema.innerHTML = `
-                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] ${selectBgColor}">
+                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] max-w-full truncate ${selectBgColor}">
                     ${problemText}
                 </span>
             `;
@@ -303,7 +353,7 @@ class PainelController {
             if (probVal === 'lampada-quebrada') selectBgColor = 'bg-[#ffedd5] text-[#9a3412]';
 
             tdProblema.innerHTML = `
-                <div class="relative inline-block w-[160px]" onclick="event.stopPropagation()">
+                <div class="relative inline-block w-[160px] max-w-full" onclick="event.stopPropagation()">
                     <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none [background-image:none] bg-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.id}', this)">
                         <option value="lampada-queimada" ${probVal === 'lampada-queimada' ? 'selected' : ''}>Lâmpada Queimada</option>
                         <option value="acesa-dia" ${probVal === 'acesa-dia' ? 'selected' : ''}>Acesa Dia</option>
@@ -315,23 +365,42 @@ class PainelController {
             `;
         }
 
-        // Status Badge
+        // Status / Motivo Column
         const tdStatus = document.createElement('td');
         tdStatus.className = 'py-3 px-5 whitespace-nowrap truncate align-middle';
 
-        let badgeClass = 'bg-error-container text-on-error-container'; // Aberto
-        if (isEmAndamento) badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
-        if (item.statusBadgeLabel === 'Iniciado') badgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
-        if (isConcluida) badgeClass = 'bg-[#dcfce7] text-[#166534]';
-        if (isCancelada) badgeClass = 'bg-slate-200 text-slate-700';
-        if (isRejeitada) badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
-        if (isPendente) badgeClass = 'bg-surface-container-high text-on-surface';
+        if (isPendentesTable) {
+            const motivoFull = item.motivoAprovacao || 'Sem motivo registrado';
+            const motivoCurto = item.motivoResumido || 'Sem motivo registrado';
+            const hasMotivo = Boolean(item.motivoAprovacao);
 
-        tdStatus.innerHTML = `
-            <span class="status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] transition-colors ${badgeClass}" data-status="${item.normalizedStatus}">
-                ${item.statusBadgeLabel}
-            </span>
-        `;
+            if (hasMotivo) {
+                tdStatus.innerHTML = `
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full truncate shadow-2xs" title="${motivoFull}">
+                        <span class="material-symbols-outlined text-[15px] text-amber-600 shrink-0">info</span>
+                        <span class="truncate">${motivoCurto}</span>
+                    </span>
+                `;
+            } else {
+                tdStatus.innerHTML = `
+                    <span class="text-on-surface-variant/60 text-xs font-normal italic">Sem motivo informado</span>
+                `;
+            }
+        } else {
+            let badgeClass = 'bg-error-container text-on-error-container'; // Aberto
+            if (isEmAndamento) badgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
+            if (item.statusBadgeLabel === 'Iniciado') badgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
+            if (isConcluida) badgeClass = 'bg-[#dcfce7] text-[#166534]';
+            if (isCancelada) badgeClass = 'bg-slate-200 text-slate-700';
+            if (isRejeitada) badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
+            if (isPendente) badgeClass = 'bg-surface-container-high text-on-surface';
+
+            tdStatus.innerHTML = `
+                <span class="status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[150px] max-w-full truncate transition-colors ${badgeClass}" data-status="${item.normalizedStatus}">
+                    ${item.statusBadgeLabel}
+                </span>
+            `;
+        }
 
         // Actions Column
         const tdAcoes = document.createElement('td');
@@ -835,6 +904,7 @@ class PainelController {
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
+                ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">${item.motivoAprovacao}</span></div>` : ''}
             </div>
 
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2">
@@ -879,7 +949,6 @@ class PainelController {
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
                     <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
-                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
             </div>
 
             <!-- Resumo Rápido -->
@@ -890,7 +959,42 @@ class PainelController {
 
             <!-- Lista Estruturada dos Pontos -->
             <div class="space-y-2">
-                ${(item.pontosDetalhados || []).map(p => `
+                ${(item.pontosDetalhados || []).map(p => {
+                    const isRealAddr = (val) => window.ChamadoModel ? window.ChamadoModel.isRealAddress(val) : (val && !String(val).toLowerCase().includes('coord'));
+
+                    const buildNavLinks = (coordVal, enderecoVal) => {
+                        let lat = null, lng = null;
+                        if (coordVal) {
+                            if (typeof coordVal === 'string') {
+                                const parts = coordVal.split(',').map(s => s.trim());
+                                if (parts.length >= 2) {
+                                    const pLat = parseFloat(parts[0]);
+                                    const pLng = parseFloat(parts[1]);
+                                    if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) { lat = pLat; lng = pLng; }
+                                }
+                            } else if (typeof coordVal === 'object' && coordVal.lat && coordVal.lng) {
+                                const pLat = parseFloat(coordVal.lat);
+                                const pLng = parseFloat(coordVal.lng);
+                                if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) { lat = pLat; lng = pLng; }
+                            }
+                        }
+                        let gmaps = '#', waze = '#';
+                        if (lat !== null && lng !== null) {
+                            gmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                            waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+                        } else if (isRealAddr(enderecoVal)) {
+                            const addr = String(enderecoVal).trim();
+                            const queryEnc = encodeURIComponent(addr + (addr.toLowerCase().includes('araraquara') ? '' : ', Araraquara - SP'));
+                            gmaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+                            waze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
+                        }
+                        return { gmaps, waze, hasNav: gmaps !== '#' };
+                    };
+
+                    const navIni = buildNavLinks(p.coordenadaInicial, p.enderecoInicial);
+                    const navFin = buildNavLinks(p.coordenadaFinal, p.enderecoFinal || p.enderecoInicial);
+
+                    return `
                     <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
                         <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1">
                             <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
@@ -902,35 +1006,75 @@ class PainelController {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             <!-- Coluna Abertura (Inicial) -->
-                            <div class="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
-                                <div class="font-bold text-slate-700 text-[11px] border-b border-slate-200/60 pb-0.5">📌 Abertura (Inicial)</div>
-                                <div><b class="text-slate-600 font-medium">Plaqueta:</b> <span class="font-semibold text-primary">${p.plaquetaInicial || 'Não informada'}</span></div>
-                                <div><b class="text-slate-600 font-medium">Coordenada:</b> <span class="font-mono text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
-                                <div><b class="text-slate-600 font-medium">Problema:</b> <span class="text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
-                                ${p.enderecoInicial ? `<div class="text-[11px] text-slate-600 pt-0.5"><b class="text-slate-600 font-medium">Endereço:</b> ${p.enderecoInicial}</div>` : ''}
+                            <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs flex flex-col justify-between">
+                                <div class="space-y-1.5">
+                                    <div class="font-bold text-slate-700 text-xs border-b border-slate-200/60 pb-1">📌 Abertura (Inicial)</div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta:</b> <span class="font-semibold text-slate-800">${p.plaquetaInicial || 'Não informada'}</span></div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada:</b> <span class="font-medium text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema:</b> <span class="font-medium text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
+                                    ${isRealAddr(p.enderecoInicial) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço:</b> <span class="font-medium text-slate-800">${p.enderecoInicial}</span></div>` : ''}
+                                </div>
+                                ${navIni.hasNav ? `
+                                <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1.5">
+                                    <span class="text-[10.5px] font-semibold text-slate-500 flex items-center gap-0.5">
+                                        <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
+                                    </span>
+                                    <a href="${navIni.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
+                                        <span>Maps</span>
+                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                    </a>
+                                    <a href="${navIni.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
+                                        <span>Waze</span>
+                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                    </a>
+                                </div>
+                                ` : ''}
                             </div>
 
                             <!-- Coluna Conclusão (Final / Reparo) -->
                             ${p.hasFinalData ? `
-                                <div class="p-2 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1">
-                                    <div class="font-bold text-emerald-800 text-[11px] border-b border-emerald-200/60 pb-0.5">✅ Conclusão (Reparo)</div>
-                                    <div><b class="text-slate-600 font-medium">Plaqueta Final:</b> <span class="font-semibold text-primary">${p.plaquetaFinal || 'Não informada'}</span></div>
-                                    <div><b class="text-slate-600 font-medium">Coordenada Reparo:</b> <span class="font-mono text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
-                                    <div><b class="text-slate-600 font-medium">Problema Encontrado:</b> <span class="text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
-                                    ${p.materiais && p.materiais.length > 0 ? `<div><b class="text-slate-600 font-medium">Materiais:</b> <span class="text-slate-800 font-medium">${p.materiais.join(', ')}</span></div>` : ''}
+                                <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1.5 text-xs flex flex-col justify-between">
+                                    <div class="space-y-1.5">
+                                        <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Conclusão (Reparo)</div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta Final:</b> <span class="font-semibold text-slate-800">${p.plaquetaFinal || 'Não informada'}</span></div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada Reparo:</b> <span class="font-medium text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema Encontrado:</b> <span class="font-medium text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
+                                        ${isRealAddr(p.enderecoFinal) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço Reparo:</b> <span class="font-medium text-slate-800">${p.enderecoFinal}</span></div>` : ''}
+                                        ${p.materiais && p.materiais.length > 0 ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Materiais:</b> <span class="font-medium text-slate-800">${p.materiais.join(', ')}</span></div>` : ''}
+                                    </div>
+                                    ${navFin.hasNav ? `
+                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
+                                        <span class="text-[10.5px] font-semibold text-emerald-700 flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
+                                        </span>
+                                        <a href="${navFin.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
+                                            <span>Maps</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                        <a href="${navFin.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
+                                            <span>Waze</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             ` : `
-                                <div class="p-2 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1 flex flex-col justify-center items-center text-center min-h-[90px]">
-                                    <div class="font-bold text-amber-800 text-[11px] flex items-center gap-1">
+                                <div class="p-2.5 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1.5 flex flex-col justify-center items-center text-center min-h-[90px] text-xs">
+                                    <div class="font-bold text-amber-800 text-xs flex items-center gap-1">
                                         <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
                                         <span>Conclusão (Reparo)</span>
                                     </div>
-                                    <span class="text-[11px] text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
+                                    <span class="text-xs text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
                                 </div>
                             `}
                         </div>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         </div>
 
@@ -1029,7 +1173,7 @@ class PainelController {
             </div>`;
         })()}
 
-        <!-- Seção 4: Ações & Navegação do Protocolo -->
+        <!-- Seção 4: Ações Administrativas -->
         ${(() => {
             let isAdminUser = false;
             let isManutentorUser = false;
@@ -1058,92 +1202,49 @@ class PainelController {
                 }
             } catch(e) {}
 
-            let linkGoogleMaps = '#';
-            let linkWaze = '#';
-
-            const coordIni = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaInicial) : { lat: '--', lng: '--' };
-            const coordFin = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaReparo) : { lat: '--', lng: '--' };
-
-            let targetLat = null;
-            let targetLng = null;
-
-            if (coordFin && coordFin.lat !== '--' && coordFin.lng !== '--') {
-                targetLat = coordFin.lat;
-                targetLng = coordFin.lng;
-            } else if (coordIni && coordIni.lat !== '--' && coordIni.lng !== '--') {
-                targetLat = coordIni.lat;
-                targetLng = coordIni.lng;
-            }
-
-            if (targetLat && targetLng) {
-                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
-                linkWaze = `https://waze.com/ul?ll=${targetLat},${targetLng}&navigate=yes`;
-            } else if (item.endereco && item.endereco.trim()) {
-                const queryEnc = encodeURIComponent(item.endereco.trim() + ', Araraquara - SP');
-                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
-                linkWaze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
-            }
-
             const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
             const isJaCancelada = (item.normalizedStatus === 'cancelada');
             const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
             const isConcluida = (item.normalizedStatus === 'concluida');
+            const isPendente = (item.normalizedStatus === 'pendente');
+
+            if (!isAdminUser && !isManutentorUser) return '';
 
             return `
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2 pt-3">
                 <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
                     <span class="flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px]">touch_app</span>
-                        <span>Ações & Navegação</span>
+                        <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                        <span>Ações Administrativas</span>
                     </span>
                     ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>` : ''}
                 </div>
                 
-                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <!-- Botões de Navegação (Disponíveis para Todos os Usuários) -->
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
-                            <span class="material-symbols-outlined text-[14px]">explore</span> Navegar:
-                        </span>
-                        ${linkGoogleMaps !== '#' ? `
-                        <a href="${linkGoogleMaps}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                            <span class="material-symbols-outlined text-[15px] text-blue-600">map</span>
-                            <span>Maps</span>
-                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
-                        </a>` : `
-                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">map</span>
-                            <span>Maps</span>
-                        </button>`}
-
-                        ${linkWaze !== '#' ? `
-                        <a href="${linkWaze}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                            <span class="material-symbols-outlined text-[15px] text-cyan-600">navigation</span>
-                            <span>Waze</span>
-                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
-                        </a>` : `
-                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">navigation</span>
-                            <span>Waze</span>
-                        </button>`}
-                    </div>
-
+                <div class="flex flex-wrap items-center gap-2 pt-1">
                     <!-- Botões de Ações (Manutentor & Admin) -->
-                    <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
-                        ${isManutentorUser ? `
-                            ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
-                            <button type="button" onclick="window.rejeitarOSManutentor('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">thumb_down</span>
-                                <span>Rejeitar OS</span>
-                            </button>` : (isJaRejeitada ? `
-                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 opacity-70 cursor-not-allowed">
-                                <span class="material-symbols-outlined text-[15px]">thumb_down</span>
-                                <span>OS Rejeitada</span>
-                            </button>` : '')}
-                        ` : ''}
+                    ${isManutentorUser ? `
+                        ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
+                        <button type="button" onclick="window.rejeitarOSManutentor('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">thumb_down</span>
+                            <span>Rejeitar OS</span>
+                        </button>` : (isJaRejeitada ? `
+                        <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 opacity-70 cursor-not-allowed">
+                            <span class="material-symbols-outlined text-[15px]">thumb_down</span>
+                            <span>OS Rejeitada</span>
+                        </button>` : '')}
+                    ` : ''}
 
-                        ${isAdminUser ? `
-                            ${!isJaUrgente ? `
+                    ${isAdminUser ? `
+                        <!-- Aprovar (se Pendente) -->
+                        ${isPendente ? `
+                        <button type="button" onclick="window.aprovarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">check</span>
+                            <span>Aprovar OS</span>
+                        </button>` : ''}
+
+                        <!-- Priorizar para Urgente (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
+                        ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
+                            !isJaUrgente ? `
                             <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">priority_high</span>
                                 <span>Priorizar para Urgente</span>
@@ -1151,9 +1252,19 @@ class PainelController {
                             <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
                                 <span class="material-symbols-outlined text-[15px]">check_circle</span>
                                 <span>Já é Urgente</span>
-                            </button>`}
+                            </button>`
+                        ) : ''}
 
-                            ${!isJaCancelada ? `
+                        <!-- Reabrir OS (exibido se Concluída, Cancelada ou Rejeitada) -->
+                        ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
+                        <button type="button" onclick="window.reabrirOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">undo</span>
+                            <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
+                        </button>` : ''}
+
+                        <!-- Cancelar OS (NÃO exibido se Concluída) -->
+                        ${!isConcluida ? (
+                            !isJaCancelada ? `
                             <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">block</span>
                                 <span>Cancelar OS</span>
@@ -1161,9 +1272,9 @@ class PainelController {
                             <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
                                 <span class="material-symbols-outlined text-[15px]">block</span>
                                 <span>OS Cancelada</span>
-                            </button>`}
-                        ` : ''}
-                    </div>
+                            </button>`
+                        ) : ''}
+                    ` : ''}
                 </div>
             </div>`;
         })()}
@@ -1182,8 +1293,100 @@ window.abrirDetalhesOSModal = function(id) {
     }
 };
 
+window.aprovarOSAdmin = function(osId) {
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const protocol = item ? item.protocolo : osId;
+
+    const doApprove = async () => {
+        try {
+            const repo = new window.ChamadosRepository();
+            await repo.updateStatus(osId || protocol, 'Aberta');
+            if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                await window.painelController.loadData();
+            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                await window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+                await window.carregarDadosMapaOSs();
+            } else {
+                window.location.reload();
+            }
+        } catch(err) {
+            alert('Erro ao aprovar a Ordem de Serviço: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: 'Aprovar OS',
+            message: `Deseja aprovar a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Seu status mudará para <strong class="text-emerald-700 font-bold">Em aberto</strong>.`,
+            icon: 'check',
+            iconBgClass: 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: 'Aprovar',
+            onConfirm: doApprove
+        });
+    } else {
+        if (confirm(`Deseja aprovar a OS #${protocol}?`)) {
+            doApprove();
+        }
+    }
+};
+
+window.reabrirOSAdmin = function(osId) {
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const protocol = item ? item.protocolo : osId;
+    const isCancelada = item && item.normalizedStatus === 'cancelada';
+    const isConcluida = item && item.normalizedStatus === 'concluida';
+    const isRejeitada = item && item.normalizedStatus === 'rejeitada';
+
+    let actionTitle = 'Reabrir Ordem de Serviço';
+    if (isCancelada) actionTitle = 'Reabrir OS Cancelada';
+    else if (isConcluida) actionTitle = 'Reabrir OS Concluída';
+    else if (isRejeitada) actionTitle = 'Reabrir OS Rejeitada';
+
+    const doReopen = async (justification) => {
+        try {
+            const repo = new window.ChamadosRepository();
+            await repo.updateStatus(osId || protocol, 'Aberta', justification);
+            if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                await window.painelController.loadData();
+            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                await window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+                await window.carregarDadosMapaOSs();
+            } else {
+                window.location.reload();
+            }
+        } catch(err) {
+            alert('Erro ao reabrir a Ordem de Serviço: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: actionTitle,
+            message: `Deseja realmente reabrir a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Seu status voltará para <strong class="text-emerald-700 font-bold">Em aberto</strong>.`,
+            icon: 'undo',
+            iconBgClass: 'bg-blue-100 text-blue-700',
+            confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+            confirmText: 'Reabrir OS',
+            onConfirm: doReopen
+        });
+    } else {
+        if (confirm(`Deseja reabrir a OS #${protocol}?`)) {
+            doReopen();
+        }
+    }
+};
+
 window.priorizarOSUrgente = function(osId) {
-    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
     const protocol = item ? item.protocolo : osId;
 
@@ -1197,6 +1400,8 @@ window.priorizarOSUrgente = function(osId) {
                 await window.painelController.loadData();
             } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+                await window.carregarDadosMapaOSs();
             } else {
                 window.location.reload();
             }
@@ -1223,7 +1428,7 @@ window.priorizarOSUrgente = function(osId) {
 };
 
 window.rejeitarOSManutentor = function(osId) {
-    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
     const protocol = item ? item.protocolo : osId;
 
@@ -1237,6 +1442,8 @@ window.rejeitarOSManutentor = function(osId) {
                 await window.painelController.loadData();
             } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+                await window.carregarDadosMapaOSs();
             } else {
                 window.location.reload();
             }
@@ -1264,7 +1471,7 @@ window.rejeitarOSManutentor = function(osId) {
 };
 
 window.cancelarOSAdmin = function(osId) {
-    const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
     const protocol = item ? item.protocolo : osId;
 
@@ -1278,6 +1485,8 @@ window.cancelarOSAdmin = function(osId) {
                 await window.painelController.loadData();
             } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+                await window.carregarDadosMapaOSs();
             } else {
                 window.location.reload();
             }

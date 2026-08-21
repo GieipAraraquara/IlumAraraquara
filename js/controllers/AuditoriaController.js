@@ -981,7 +981,6 @@ class AuditoriaController {
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
                     <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
-                ${linkMaps !== '#' ? `<a href="${linkMaps}" target="_blank" class="text-[11px] text-blue-600 hover:underline flex items-center gap-0.5">Abrir Maps <span class="material-symbols-outlined text-[12px]">open_in_new</span></a>` : ''}
             </div>
 
             <!-- Resumo Rápido -->
@@ -992,7 +991,42 @@ class AuditoriaController {
 
             <!-- Lista Estruturada dos Pontos -->
             <div class="space-y-2">
-                ${(item.pontosDetalhados || []).map(p => `
+                ${(item.pontosDetalhados || []).map(p => {
+                    const isRealAddr = (val) => window.ChamadoModel ? window.ChamadoModel.isRealAddress(val) : (val && !String(val).toLowerCase().includes('coord'));
+
+                    const buildNavLinks = (coordVal, enderecoVal) => {
+                        let lat = null, lng = null;
+                        if (coordVal) {
+                            if (typeof coordVal === 'string') {
+                                const parts = coordVal.split(',').map(s => s.trim());
+                                if (parts.length >= 2) {
+                                    const pLat = parseFloat(parts[0]);
+                                    const pLng = parseFloat(parts[1]);
+                                    if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) { lat = pLat; lng = pLng; }
+                                }
+                            } else if (typeof coordVal === 'object' && coordVal.lat && coordVal.lng) {
+                                const pLat = parseFloat(coordVal.lat);
+                                const pLng = parseFloat(coordVal.lng);
+                                if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) { lat = pLat; lng = pLng; }
+                            }
+                        }
+                        let gmaps = '#', waze = '#';
+                        if (lat !== null && lng !== null) {
+                            gmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                            waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+                        } else if (isRealAddr(enderecoVal)) {
+                            const addr = String(enderecoVal).trim();
+                            const queryEnc = encodeURIComponent(addr + (addr.toLowerCase().includes('araraquara') ? '' : ', Araraquara - SP'));
+                            gmaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+                            waze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
+                        }
+                        return { gmaps, waze, hasNav: gmaps !== '#' };
+                    };
+
+                    const navIni = buildNavLinks(p.coordenadaInicial, p.enderecoInicial);
+                    const navFin = buildNavLinks(p.coordenadaFinal, p.enderecoFinal || p.enderecoInicial);
+
+                    return `
                     <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
                         <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1">
                             <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
@@ -1004,35 +1038,75 @@ class AuditoriaController {
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                             <!-- Coluna Abertura (Inicial) -->
-                            <div class="p-2 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
-                                <div class="font-bold text-slate-700 text-[11px] border-b border-slate-200/60 pb-0.5">📌 Abertura (Inicial)</div>
-                                <div><b class="text-slate-600 font-medium">Plaqueta:</b> <span class="font-semibold text-primary">${p.plaquetaInicial || 'Não informada'}</span></div>
-                                <div><b class="text-slate-600 font-medium">Coordenada:</b> <span class="font-mono text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
-                                <div><b class="text-slate-600 font-medium">Problema:</b> <span class="text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
-                                ${p.enderecoInicial ? `<div class="text-[11px] text-slate-600 pt-0.5"><b class="text-slate-600 font-medium">Endereço:</b> ${p.enderecoInicial}</div>` : ''}
+                            <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs flex flex-col justify-between">
+                                <div class="space-y-1.5">
+                                    <div class="font-bold text-slate-700 text-xs border-b border-slate-200/60 pb-1">📌 Abertura (Inicial)</div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta:</b> <span class="font-semibold text-slate-800">${p.plaquetaInicial || 'Não informada'}</span></div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada:</b> <span class="font-medium text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
+                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema:</b> <span class="font-medium text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
+                                    ${isRealAddr(p.enderecoInicial) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço:</b> <span class="font-medium text-slate-800">${p.enderecoInicial}</span></div>` : ''}
+                                </div>
+                                ${navIni.hasNav ? `
+                                <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1.5">
+                                    <span class="text-[10.5px] font-semibold text-slate-500 flex items-center gap-0.5">
+                                        <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
+                                    </span>
+                                    <a href="${navIni.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
+                                        <span>Maps</span>
+                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                    </a>
+                                    <a href="${navIni.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
+                                        <span>Waze</span>
+                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                    </a>
+                                </div>
+                                ` : ''}
                             </div>
 
                             <!-- Coluna Conclusão (Final / Reparo) -->
                             ${p.hasFinalData ? `
-                                <div class="p-2 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1">
-                                    <div class="font-bold text-emerald-800 text-[11px] border-b border-emerald-200/60 pb-0.5">✅ Conclusão (Reparo)</div>
-                                    <div><b class="text-slate-600 font-medium">Plaqueta Final:</b> <span class="font-semibold text-primary">${p.plaquetaFinal || 'Não informada'}</span></div>
-                                    <div><b class="text-slate-600 font-medium">Coordenada Reparo:</b> <span class="font-mono text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
-                                    <div><b class="text-slate-600 font-medium">Problema Encontrado:</b> <span class="text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
-                                    ${p.materiais && p.materiais.length > 0 ? `<div><b class="text-slate-600 font-medium">Materiais:</b> <span class="text-slate-800 font-medium">${p.materiais.join(', ')}</span></div>` : ''}
+                                <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1.5 text-xs flex flex-col justify-between">
+                                    <div class="space-y-1.5">
+                                        <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Conclusão (Reparo)</div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta Final:</b> <span class="font-semibold text-slate-800">${p.plaquetaFinal || 'Não informada'}</span></div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada Reparo:</b> <span class="font-medium text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
+                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema Encontrado:</b> <span class="font-medium text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
+                                        ${isRealAddr(p.enderecoFinal) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço Reparo:</b> <span class="font-medium text-slate-800">${p.enderecoFinal}</span></div>` : ''}
+                                        ${p.materiais && p.materiais.length > 0 ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Materiais:</b> <span class="font-medium text-slate-800">${p.materiais.join(', ')}</span></div>` : ''}
+                                    </div>
+                                    ${navFin.hasNav ? `
+                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
+                                        <span class="text-[10.5px] font-semibold text-emerald-700 flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
+                                        </span>
+                                        <a href="${navFin.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
+                                            <span>Maps</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                        <a href="${navFin.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
+                                            <span>Waze</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                    </div>
+                                    ` : ''}
                                 </div>
                             ` : `
-                                <div class="p-2 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1 flex flex-col justify-center items-center text-center min-h-[90px]">
-                                    <div class="font-bold text-amber-800 text-[11px] flex items-center gap-1">
+                                <div class="p-2.5 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1.5 flex flex-col justify-center items-center text-center min-h-[90px] text-xs">
+                                    <div class="font-bold text-amber-800 text-xs flex items-center gap-1">
                                         <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
                                         <span>Conclusão (Reparo)</span>
                                     </div>
-                                    <span class="text-[11px] text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
+                                    <span class="text-xs text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
                                 </div>
                             `}
                         </div>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         </div>
 
@@ -1204,7 +1278,7 @@ class AuditoriaController {
             </div>`;
         })()}
 
-        <!-- Seção 6: Ações & Navegação do Protocolo -->
+        <!-- Seção 6: Ações Administrativas -->
         ${(() => {
             let isAdminUser = false;
             try {
@@ -1221,78 +1295,35 @@ class AuditoriaController {
                 }
             } catch(e) {}
 
-            let linkGoogleMaps = '#';
-            let linkWaze = '#';
-
-            const coordIni = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaInicial) : { lat: '--', lng: '--' };
-            const coordFin = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(item.coordenadaReparo) : { lat: '--', lng: '--' };
-
-            let targetLat = null;
-            let targetLng = null;
-
-            if (coordFin && coordFin.lat !== '--' && coordFin.lng !== '--') {
-                targetLat = coordFin.lat;
-                targetLng = coordFin.lng;
-            } else if (coordIni && coordIni.lat !== '--' && coordIni.lng !== '--') {
-                targetLat = coordIni.lat;
-                targetLng = coordIni.lng;
-            }
-
-            if (targetLat && targetLng) {
-                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${targetLat},${targetLng}`;
-                linkWaze = `https://waze.com/ul?ll=${targetLat},${targetLng}&navigate=yes`;
-            } else if (item.endereco && item.endereco.trim()) {
-                const queryEnc = encodeURIComponent(item.endereco.trim() + ', Araraquara - SP');
-                linkGoogleMaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
-                linkWaze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
-            }
-
             const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
             const isJaCancelada = (item.normalizedStatus === 'cancelada');
+            const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
+            const isConcluida = (item.normalizedStatus === 'concluida');
+            const isPendente = (item.normalizedStatus === 'pendente');
+
+            if (!isAdminUser) return '';
 
             return `
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2 pt-3">
                 <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
                     <span class="flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px]">touch_app</span>
-                        <span>Ações & Navegação</span>
+                        <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                        <span>Ações Administrativas</span>
                     </span>
-                    ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>` : ''}
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>
                 </div>
                 
-                <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-                    <!-- Botões de Navegação (Disponíveis para Todos os Usuários) -->
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-[11px] font-medium text-on-surface-variant flex items-center gap-1">
-                            <span class="material-symbols-outlined text-[14px]">explore</span> Navegar:
-                        </span>
-                        ${linkGoogleMaps !== '#' ? `
-                        <a href="${linkGoogleMaps}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                            <span class="material-symbols-outlined text-[15px] text-blue-600">map</span>
-                            <span>Maps</span>
-                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
-                        </a>` : `
-                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">map</span>
-                            <span>Maps</span>
-                        </button>`}
+                <div class="flex flex-wrap items-center gap-2 pt-1">
+                    <!-- Aprovar (se Pendente) -->
+                    ${isPendente ? `
+                    <button type="button" onclick="window.aprovarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">check</span>
+                        <span>Aprovar OS</span>
+                    </button>` : ''}
 
-                        ${linkWaze !== '#' ? `
-                        <a href="${linkWaze}" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                            <span class="material-symbols-outlined text-[15px] text-cyan-600">navigation</span>
-                            <span>Waze</span>
-                            <span class="material-symbols-outlined text-[11px] opacity-70">open_in_new</span>
-                        </a>` : `
-                        <button type="button" onclick="alert('Coordenadas ou endereço não disponíveis para esta OS.')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">navigation</span>
-                            <span>Waze</span>
-                        </button>`}
-                    </div>
-
-                    <!-- Botões Exclusivos do Administrador -->
-                    ${isAdminUser ? `
-                    <div class="flex items-center gap-2 flex-wrap sm:ml-auto">
-                        ${!isJaUrgente ? `
+                    <!-- Priorizar para Urgente (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
+                    ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
+                        !isJaUrgente ? `
                         <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">priority_high</span>
                             <span>Priorizar para Urgente</span>
@@ -1300,9 +1331,19 @@ class AuditoriaController {
                         <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
                             <span class="material-symbols-outlined text-[15px]">check_circle</span>
                             <span>Já é Urgente</span>
-                        </button>`}
+                        </button>`
+                    ) : ''}
 
-                        ${!isJaCancelada ? `
+                    <!-- Reabrir OS (exibido se Concluída, Cancelada ou Rejeitada) -->
+                    ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
+                    <button type="button" onclick="window.reabrirOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">undo</span>
+                        <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
+                    </button>` : ''}
+
+                    <!-- Cancelar OS (NÃO exibido se Concluída) -->
+                    ${!isConcluida ? (
+                        !isJaCancelada ? `
                         <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">block</span>
                             <span>Cancelar OS</span>
@@ -1310,8 +1351,8 @@ class AuditoriaController {
                         <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
                             <span class="material-symbols-outlined text-[15px]">block</span>
                             <span>OS Cancelada</span>
-                        </button>`}
-                    </div>` : ''}
+                        </button>`
+                    ) : ''}
                 </div>
             </div>`;
         })()}

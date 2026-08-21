@@ -76,10 +76,12 @@
       // Aplicação instantânea do layout salvo do Modo Rápido (Evita FOUC / Carregamento rápido do formulário padrão)
       (function() {
         try {
-          var isSmall = window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+          var isInIframe = window.self !== window.top;
+          var topWidth = (window.top && window.top.innerWidth) ? window.top.innerWidth : window.innerWidth;
+          var isSmall = topWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
           var editProt = (new URLSearchParams(window.location.search)).get('edit') || (new URLSearchParams(window.location.search)).get('protocolo') || sessionStorage.getItem('os_para_edicao');
           var salvo = localStorage.getItem('os_modo_rapido_ativo');
-          if (isSmall && !editProt && salvo === 'true') {
+          if (!isInIframe && isSmall && !editProt && salvo === 'true') {
             document.write('<style id="styleModoRapidoEarly">#painelModoPadrao { display: none; } #painelModoRapido { display: block; } #footerAbrir { display: none; }</style>');
           }
         } catch(e) {}
@@ -2311,7 +2313,12 @@
       };
 
       function isDispositivoMobile() {
-        var isSmallScreen = window.innerWidth <= 768;
+        // Se a página estiver rodando dentro de um iframe (ex: modal no Painel.html), desativa o Modo Rápido
+        if (window.self !== window.top) {
+          return false;
+        }
+        var topWidth = (window.top && window.top.innerWidth) ? window.top.innerWidth : window.innerWidth;
+        var isSmallScreen = topWidth <= 768;
         var isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         return isSmallScreen || isMobileUA;
       }
@@ -2833,6 +2840,20 @@
         var protExtraido = gerarNovoProtocolo('iluminacao');
         var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
 
+        var motivoAprovacaoRapida = null;
+        if (statusOS === "Pendente") {
+          var listaDupR = window.protocolosConsolidadosRapido || (typeof protocolosConsolidados !== 'undefined' ? protocolosConsolidados : []);
+          if (listaDupR && listaDupR.length > 0) {
+            var listaProtsR = listaDupR.map(function(p) {
+              var pStr = String(p.protocolo || p.id || '').trim();
+              return pStr.startsWith('#') ? pStr : ('#' + pStr);
+            }).join(', ');
+            motivoAprovacaoRapida = "Duplicata " + listaProtsR;
+          } else {
+            motivoAprovacaoRapida = "Duplicata";
+          }
+        }
+
         var plaq = (modo === 'plaqueta') ? (estadoPontoRapido.plaqueta || '') : '';
         var end = (modo === 'endereco') ? (estadoPontoRapido.endereco || '') : (estadoPontoRapido.endereco || '');
 
@@ -2858,6 +2879,7 @@
         var payloadOSViaria = {
           protocolo: protExtraido,
           status: statusOS,
+          motivo_aprovacao: motivoAprovacaoRapida,
           prioridade: 'Normal',
           municipe_nome: userAuth.nome || 'Servidor',
           operador: userAuth.nome || 'Servidor',
@@ -2872,6 +2894,29 @@
           cpf_solicitante: userAuth.cpf || null,
           data_abertura: new Date().toISOString()
         };
+
+        if (forcarSalvar !== true && navigator.onLine) {
+          btnSalvar.innerHTML = '<span>Verificando duplicidade... 🔍</span>';
+          try {
+            var osProximasRapido = await checarDuplicidadeBackend(lat6, lng6, 0, false);
+            if (osProximasRapido && osProximasRapido.length > 0) {
+              window.protocolosConsolidadosRapido = osProximasRapido;
+              var htmlModalRapido = "";
+              osProximasRapido.forEach(function(osItem, k) {
+                var txtLoc = osItem.enderecoTexto || osItem.endereco;
+                htmlModalRapido += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + osItem.protocolo + '</strong> (' + osItem.distancia + 'm)<br><span class="text-slate-600 font-medium">' + txtLoc + '</span></div>';
+              });
+              document.getElementById('listaProtocolosModal').innerHTML = htmlModalRapido;
+              document.getElementById('modalProximidade').style.display = 'flex';
+              btnSalvar.disabled = false;
+              btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
+              descongelarGpsRapido();
+              return;
+            }
+          } catch(eDupRapido) {
+            console.warn("⚠️ [Duplicidade Rápida] Erro ao checar duplicidade:", eDupRapido);
+          }
+        }
 
         var isGovBrUser = userAuth.isGovBr || 
                           sessionStorage.getItem('govbr_user_authenticated') === 'true' || 
@@ -4565,15 +4610,8 @@
           if (inputModo) modoSel = inputModo.value;
         } catch(e) {}
 
-        var plaq = "";
-        var end = "";
-        if (modoSel === 'plaqueta') {
-          var elPlaq = document.getElementById('inputPlaqueta_' + idx);
-          if (elPlaq) plaq = elPlaq.value.toUpperCase().trim();
-        } else if (modoSel === 'endereco') {
-          var elEnd = document.getElementById('endereco_' + idx);
-          if (elEnd) end = elEnd.value.trim();
-        }
+        var plaq = (modoSel === 'plaqueta') ? (document.getElementById('inputPlaqueta_' + idx)?.value.toUpperCase().trim() || pt.plaqueta || "") : (pt.plaqueta || "");
+        var end = (modoSel === 'endereco') ? (document.getElementById('endereco_' + idx)?.value.trim() || pt.endereco || "") : (pt.endereco || "");
 
         var latNum = parseFloat(lat);
         var lngNum = parseFloat(lng);
@@ -4584,33 +4622,45 @@
           if (client) {
             // 1. Consultar Ordens de Serviço Viárias abertas no Supabase
             var resViarias = await client.from('ordens_servico')
-              .select('id, protocolo, status, pontos, data_abertura')
-              .not('status', 'in', '("Concluída","Concluido","Concluida","Cancelada","Finalizada")');
+              .select('id, protocolo, status, pontos_inicial, data_abertura')
+              .in('status', ['Aberta', 'Pendente']);
 
             if (resViarias.data && resViarias.data.length > 0) {
               resViarias.data.forEach(function(os) {
                 var pontosArray = [];
-                if (Array.isArray(os.pontos)) {
-                  pontosArray = os.pontos;
-                } else if (typeof os.pontos === 'string') {
-                  try { pontosArray = JSON.parse(os.pontos); } catch(e) {}
+                if (Array.isArray(os.pontos_inicial)) {
+                  pontosArray = os.pontos_inicial;
+                } else if (typeof os.pontos_inicial === 'string') {
+                  try { pontosArray = JSON.parse(os.pontos_inicial); } catch(e) {}
                 }
 
                 pontosArray.forEach(function(ponto) {
                   var matchPlaqueta = false;
-                  if (plaq && ponto.plaqueta && ponto.plaqueta.toString().toUpperCase().trim() === plaq) {
+                  if (plaq && ponto.plaqueta && ponto.plaqueta.toString().toUpperCase().trim() === plaq.toUpperCase().trim()) {
                     matchPlaqueta = true;
+                  }
+
+                  var matchEndereco = false;
+                  if (end && ponto.endereco && ponto.endereco.toLowerCase().trim() === end.toLowerCase().trim()) {
+                    matchEndereco = true;
                   }
 
                   var pLat = parseFloat(ponto.lat || ponto.latitude);
                   var pLng = parseFloat(ponto.lng || ponto.longitude);
-                  var distMeters = null;
+                  if ((isNaN(pLat) || isNaN(pLng)) && ponto.coordenada) {
+                    var parts = ponto.coordenada.split(',');
+                    if (parts.length >= 2) {
+                      pLat = parseFloat(parts[0]);
+                      pLng = parseFloat(parts[1]);
+                    }
+                  }
 
+                  var distMeters = null;
                   if (!isNaN(pLat) && !isNaN(pLng) && !isNaN(latNum) && !isNaN(lngNum)) {
                     distMeters = calcularDistanciaMetros(latNum, lngNum, pLat, pLng);
                   }
 
-                  if (matchPlaqueta || (distMeters !== null && distMeters <= 30)) {
+                  if (matchPlaqueta || matchEndereco || (distMeters !== null && distMeters <= 50)) {
                     var distFinal = distMeters !== null ? distMeters : 0;
                     var coordStr = (!isNaN(pLat) && !isNaN(pLng)) ? (pLat + ", " + pLng) : (latNum + ", " + lngNum);
                     var endExibicao = ponto.endereco || (ponto.plaqueta ? ("Plaqueta " + ponto.plaqueta) : ("Local: " + coordStr));
@@ -4631,24 +4681,40 @@
             // 2. Consultar Ordens de Serviço de Praças abertas no Supabase
             var resPracas = await client.from('ordens_servico_pracas')
               .select('id, protocolo, status, praca_nome, endereco, coordenada, data_abertura')
-              .not('status', 'in', '("Concluída","Concluido","Concluida","Cancelada","Finalizada")');
+              .in('status', ['Aberta', 'Pendente']);
 
             if (resPracas.data && resPracas.data.length > 0) {
               resPracas.data.forEach(function(os) {
-                var coordsParsed = extrairCoordenadasPlaquetaRow(os);
-                if (coordsParsed && !isNaN(latNum) && !isNaN(lngNum)) {
-                  var distMeters = calcularDistanciaMetros(latNum, lngNum, coordsParsed.lat, coordsParsed.lng);
-                  if (distMeters <= 30) {
-                    var coordStr = coordsParsed.lat + ", " + coordsParsed.lng;
-                    osProximas.push({
-                      protocolo: os.protocolo || ('OS Praça #' + os.id),
-                      distancia: distMeters,
-                      endereco: coordStr,
-                      enderecoTexto: os.praca_nome || os.endereco || ("Local: " + coordStr),
-                      status: os.status || 'Aberta',
-                      data: os.data_abertura
-                    });
+                var pLat = null, pLng = null;
+                if (os.coordenada) {
+                  var parts = os.coordenada.split(',');
+                  if (parts.length >= 2) {
+                    pLat = parseFloat(parts[0]);
+                    pLng = parseFloat(parts[1]);
                   }
+                }
+
+                var matchEnderecoPraca = false;
+                if (end && os.endereco && os.endereco.toLowerCase().trim() === end.toLowerCase().trim()) {
+                  matchEnderecoPraca = true;
+                }
+
+                var distMeters = null;
+                if (pLat !== null && pLng !== null && !isNaN(latNum) && !isNaN(lngNum)) {
+                  distMeters = calcularDistanciaMetros(latNum, lngNum, pLat, pLng);
+                }
+
+                if (matchEnderecoPraca || (distMeters !== null && distMeters <= 50)) {
+                  var distFinal = distMeters !== null ? distMeters : 0;
+                  var coordStr = (pLat !== null && pLng !== null) ? (pLat + ", " + pLng) : (latNum + ", " + lngNum);
+                  osProximas.push({
+                    protocolo: os.protocolo || ('OS Praça #' + os.id),
+                    distancia: distFinal,
+                    endereco: coordStr,
+                    enderecoTexto: os.praca_nome || os.endereco || ("Local: " + coordStr),
+                    status: os.status || 'Aberta',
+                    data: os.data_abertura
+                  });
                 }
               });
             }
@@ -4674,6 +4740,7 @@
         if (autoSave) {
           validarProximoAsync(idx + 1);
         }
+        return osProximasUnicas;
       }
 
       var dadosTempPraca = null;
@@ -4962,7 +5029,7 @@
         checarDuplicidadePracaBackend(dadosFinaisPraca);
       }
 
-      function executarEnvioFinalPraca(dados, forcarSalvar) {
+      async function executarEnvioFinalPraca(dados, forcarSalvar) {
         var btn = document.getElementById('btnSalvar');
         var msg = document.getElementById('mensagem');
         btn.disabled = true;
@@ -5002,14 +5069,101 @@
           return;
         }
 
+        if (!forcarSalvar && !isModoEdicao && navigator.onLine) {
+          dadosTempPraca = dados;
+          btn.innerText = "Verificando duplicidade de Praça...";
+          var client = obterSupabaseClient();
+          if (client) {
+            try {
+              var resPracasCheck = await client.from('ordens_servico_pracas')
+                .select('id, protocolo, status, praca_nome, endereco, coordenada, data_abertura')
+                .in('status', ['Aberta', 'Pendente']);
+
+              if (resPracasCheck.data && resPracasCheck.data.length > 0) {
+                var latNumP = null, lngNumP = null;
+                if (dados.pracaCoordenada) {
+                  var pParts = dados.pracaCoordenada.split(',');
+                  if (pParts.length >= 2) {
+                    latNumP = parseFloat(pParts[0]);
+                    lngNumP = parseFloat(pParts[1]);
+                  }
+                }
+                var nomeP = dados.pracaNome ? dados.pracaNome.toLowerCase().trim() : "";
+                var endP = dados.pracaEndereco ? dados.pracaEndereco.toLowerCase().trim() : "";
+                var dupPracas = [];
+
+                resPracasCheck.data.forEach(function(osP) {
+                  var matchNome = (nomeP && osP.praca_nome && osP.praca_nome.toLowerCase().trim() === nomeP);
+                  var matchEnd = (endP && osP.endereco && osP.endereco.toLowerCase().trim() === endP);
+
+                  var pLat = null, pLng = null;
+                  if (osP.coordenada) {
+                    var cParts = osP.coordenada.split(',');
+                    if (cParts.length >= 2) {
+                      pLat = parseFloat(cParts[0]);
+                      pLng = parseFloat(cParts[1]);
+                    }
+                  }
+                  var distM = null;
+                  if (pLat !== null && pLng !== null && latNumP !== null && lngNumP !== null && !isNaN(latNumP) && !isNaN(lngNumP)) {
+                    distM = calcularDistanciaMetros(latNumP, lngNumP, pLat, pLng);
+                  }
+
+                  if (matchNome || matchEnd || (distM !== null && distM <= 50)) {
+                    var dFinal = distM !== null ? distM : 0;
+                    dupPracas.push({
+                      protocolo: osP.protocolo || ('OS Praça #' + osP.id),
+                      distancia: dFinal,
+                      enderecoTexto: osP.praca_nome || osP.endereco || "Praça"
+                    });
+                  }
+                });
+
+                if (dupPracas.length > 0) {
+                  dadosTempPraca._dupPracas = dupPracas;
+                  window.protocolosConsolidadosPraca = dupPracas;
+                  var htmlP = "";
+                  dupPracas.forEach(function(osItem, k) {
+                    htmlP += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + osItem.protocolo + '</strong> (' + osItem.distancia + 'm)<br><span class="text-slate-600 font-medium">' + osItem.enderecoTexto + '</span></div>';
+                  });
+                  document.getElementById('listaProtocolosModal').innerHTML = htmlP;
+                  document.getElementById('modalProximidade').style.display = 'flex';
+                  resetarBotaoSalvar();
+                  return;
+                }
+              }
+            } catch(eCheckP) {
+              console.warn("⚠️ [Duplicidade Praça] Erro na verificação:", eCheckP);
+            }
+          }
+        }
+
         btn.innerText = "Gravando OS de Praça...";
         var protExtraido = gerarNovoProtocolo('praca');
         var userAuth = window.usuarioLogadoSupabase || {};
-        var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
+        var isOutraPraca = (dados && (dados.idPraca === 'outra' || !dados.idPraca));
+        var statusOS = (forcarSalvar === true || isOutraPraca) ? "Pendente" : "Aberta";
+
+        var motivoAprovacaoPraca = null;
+        if (statusOS === "Pendente") {
+          var listaDupP = (dados && dados._dupPracas) || window.protocolosConsolidadosPraca || [];
+          if (listaDupP && listaDupP.length > 0) {
+            var listaProtsP = listaDupP.map(function(p) {
+              var pStr = String(p.protocolo || p.id || '').trim();
+              return pStr.startsWith('#') ? pStr : ('#' + pStr);
+            }).join(', ');
+            motivoAprovacaoPraca = "Duplicata " + listaProtsP;
+          } else if (isOutraPraca) {
+            motivoAprovacaoPraca = "Nova Praça (" + (dados.pracaNome || 'Não cadastrada') + ")";
+          } else {
+            motivoAprovacaoPraca = "Duplicata";
+          }
+        }
 
         var payloadPraca = {
           protocolo: protExtraido,
           status: statusOS,
+          motivo_aprovacao: motivoAprovacaoPraca,
           prioridade: dados.prioridade,
           municipe_nome: dados.municipe || userAuth.nome || null,
           operador: document.getElementById('operador')?.value || userAuth.nome || 'Servidor',
@@ -5199,8 +5353,7 @@
                  }
              }
          }
-
-         var mapaVistos = {};
+        var mapaVistos = {};
          protocolosConsolidados = [];
          listaConsolidada.forEach(function(os) {
            if (!mapaVistos[os.protocolo]) {
@@ -5233,11 +5386,17 @@
 
       function confirmarSalvamento() {
         fecharModal();
-        var tipoOS = document.querySelector('input[name="tipoOS"]:checked')?.value;
-        if (tipoOS === 'praca' && dadosTempPraca) {
-          executarEnvioFinalPraca(dadosTempPraca, true);
+        var elRapido = document.getElementById('blocoModoRapido');
+        var isModoRapidoActive = (elRapido && elRapido.style.display !== 'none');
+        if (isModoRapidoActive) {
+          validarEEnviarOSRapida(true);
         } else {
-          executarEnvioFinalMultiplo(true);
+          var tipoOS = document.querySelector('input[name="tipoOS"]:checked')?.value;
+          if (tipoOS === 'praca' && dadosTempPraca) {
+            executarEnvioFinalPraca(dadosTempPraca, true);
+          } else {
+            executarEnvioFinalMultiplo(true);
+          }
         }
       }
 
@@ -5433,9 +5592,23 @@
         var userAuth = window.usuarioLogadoSupabase || {};
         var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
 
+        var motivoAprovacaoViaria = null;
+        if (statusOS === "Pendente") {
+          if (typeof protocolosConsolidados !== 'undefined' && protocolosConsolidados && protocolosConsolidados.length > 0) {
+            var listaProtsV = protocolosConsolidados.map(function(p) {
+              var pStr = String(p.protocolo || p.id || '').trim();
+              return pStr.startsWith('#') ? pStr : ('#' + pStr);
+            }).join(', ');
+            motivoAprovacaoViaria = "Duplicata " + listaProtsV;
+          } else {
+            motivoAprovacaoViaria = "Duplicata";
+          }
+        }
+
         var payloadOSViaria = {
           protocolo: protExtraido,
           status: statusOS,
+          motivo_aprovacao: motivoAprovacaoViaria,
           prioridade: dadosFinais.prioridade,
           municipe_nome: dadosFinais.municipe || userAuth.nome || null,
           operador: document.getElementById('operador')?.value || userAuth.nome || 'Servidor',

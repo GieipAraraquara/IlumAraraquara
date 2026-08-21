@@ -83,7 +83,7 @@ class ChamadoModel {
         this.materialUtilizado = data.material_utilizado || data.materiais || '';
         this.statusAuditoria = data.status_auditoria || (data.auditoria_concluida === true ? 'Concluída' : 'Pendente');
         this.dataConclusaoAuditoria = data.data_conclusao_auditoria ? new Date(data.data_conclusao_auditoria) : null;
-        this.audit = data.audit || null;
+        this.motivoAprovacao = cleanVal(data.motivo_aprovacao) || cleanVal(data.motivo_pendencia) || cleanVal(data.motivo) || '';
         this.audit = data.audit || null;
         this.cpfSolicitante = data.cpf_solicitante || data.user_cpf || '';
         this.evidencias = data.evidencias || null;
@@ -93,6 +93,20 @@ class ChamadoModel {
         this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
+    }
+
+    /**
+     * Retorna a versão resumida do motivo para exibição em tabelas
+     */
+    get motivoResumido() {
+        const full = String(this.motivoAprovacao || '').trim();
+        if (!full) return '';
+        if (full.toLowerCase().includes('duplicata')) return 'Duplicata';
+        if (full.includes('#')) {
+            const part = full.split('#')[0].trim();
+            if (part) return part;
+        }
+        return full;
     }
 
     /**
@@ -520,11 +534,11 @@ class ChamadoModel {
 
             result.push({
                 numero: i + 1,
-                enderecoInicial: ChamadoModel.formatLocationText(endIni),
+                enderecoInicial: ChamadoModel.isRealAddress(endIni) ? ChamadoModel.formatLocationText(endIni) : '',
                 plaquetaInicial: ChamadoModel.formatLocationText(plqIni),
                 coordenadaInicial: ChamadoModel.formatLocationText(coordIni),
                 problemaInicial: ChamadoModel.formatLocationText(probIni),
-                enderecoFinal: ChamadoModel.formatLocationText(endFin),
+                enderecoFinal: ChamadoModel.isRealAddress(endFin) ? ChamadoModel.formatLocationText(endFin) : '',
                 plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
                 coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
                 problemaEncontrado: ChamadoModel.formatLocationText(probFin),
@@ -928,6 +942,20 @@ class ChamadoModel {
     static isValidLocationText(val) {
         const formatted = ChamadoModel.formatLocationText(val);
         return formatted.length > 0 && formatted !== '[---]' && formatted !== '---' && formatted !== 'null';
+    }
+
+    /**
+     * Helper to validate if a string is a real human-readable address (and not empty, placeholder, or coordinate string)
+     */
+    static isRealAddress(val) {
+        if (val === null || val === undefined) return false;
+        const str = ChamadoModel.formatLocationText(val).trim();
+        if (!str || str === '[---]' || str === '---' || str === 'null' || str === 'undefined') return false;
+        const lower = str.toLowerCase();
+        if (lower === 'não informado' || lower === 'nao informado' || lower === 'endereço não informado' || lower === 'endereco nao informado') return false;
+        if (lower.startsWith('coord:') || lower.startsWith('coordenada:') || lower.startsWith('coord ')) return false;
+        if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(str)) return false;
+        return true;
     }
 
     /**

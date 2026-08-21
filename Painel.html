@@ -314,16 +314,99 @@
         </div>
     </div>
 
+    <!-- Tabela Nova: Pendentes para aprovação -->
+    <div id="container-pendentes-aprovacao" class="hidden grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-card-gap opacity-0 animate-fade-in-up [animation-delay:550ms]">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-600 text-[20px]">pending_actions</span>
+                    <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Pendentes para aprovação</h3>
+                </div>
+            </div>
+            
+            <div class="w-full min-h-[120px]">
+                <table class="w-full text-left border-collapse table-fixed max-w-full" id="pendentes-os-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
+                            <!-- Column 1: Protocolo -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
+                                <div class="relative inline-block text-left group/protocol-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-protocol-filter-trigger" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-protocol-filter-indicator"></span>
+                                    </button>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 2: Data -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 120px; min-width: 120px;" data-col="1">
+                                <div class="relative inline-block text-left group/date-filter">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-date-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Data</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-filter-active-indicator"></span>
+                                    </button>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 3: Ponto / Localização -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" data-col="2">
+                                <div class="flex items-center gap-1">Ponto / Localização</div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 4: Problema -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 200px; min-width: 200px;" data-col="3">
+                                <div class="relative inline-block text-left">
+                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-problem-filter-trigger">
+                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-problem-filter-indicator"></span>
+                                    </button>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 5: Motivo -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 200px; min-width: 200px;" data-col="4">
+                                <div class="flex items-center gap-1">Motivo</div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Column 6: Ações -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 160px; min-width: 160px;" data-col="5">
+                                Ações
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
+                        <tr id="no-pendentes-results" class="hidden">
+                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
+                                    <span class="text-xs">Nenhum protocolo pendente de aprovação para os filtros selecionados.</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
             </div>
             
-            <div class="w-full min-h-[300px] overflow-visible">
-                <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="os-table">
+            <div class="w-full min-h-[300px]">
+                <table class="w-full text-left border-collapse table-fixed max-w-full" id="os-table">
                     <thead>
-                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
                             <!-- Column 1: Protocolo com Filtro -->
                             <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
                                 <div class="relative inline-block text-left group/protocol-filter">
@@ -505,7 +588,7 @@
                             </th>
                             
                             <!-- Column 6 -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 120px; min-width: 120px;" data-col="5">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 160px; min-width: 160px;" data-col="5">
                                 Ações
                             </th>
                         </tr>
@@ -1255,109 +1338,147 @@
 </script>
 
 <script>
-    // Column Resizing Logic with Neighbor Push-Pull & Strict Bounds
+    // Column Resizing Logic with Neighbor Push-Pull & Strict Bounds (Independent per table)
     document.addEventListener('DOMContentLoaded', function () {
-        const table = document.getElementById('os-table');
-        if (!table) return;
+        const tables = document.querySelectorAll('#os-table, #pendentes-os-table');
+        if (tables.length === 0) return;
 
-        const cols = table.querySelectorAll('th');
+        const minWidths = { '0': 120, '1': 100, '2': 160, '3': 150, '4': 150, '5': 160 };
+        const maxWidths = { '0': 300, '1': 220, '2': 800, '3': 350, '4': 300, '5': 240 };
+        const defaultWidths = { '0': 160, '1': 120, '2': 380, '3': 200, '4': 200, '5': 160 };
 
-        // Limites estritamente seguros de largura (min/max em px) por coluna
-        const minWidths = { '0': 120, '1': 100, '2': 160, '3': 150, '4': 150, '5': 120 };
-        const maxWidths = { '0': 300, '1': 220, '2': 600, '3': 350, '4': 300, '5': 220 };
+        tables.forEach((table) => {
+            const tableId = table.id || 'os-table';
+            const storageKey = `tableColWidths_${tableId}`;
+            const tableSavedWidths = JSON.parse(localStorage.getItem(storageKey)) || {};
+            const savedWidths = Object.assign({}, defaultWidths, tableSavedWidths);
 
-        // Carrega larguras salvas e valida contra limites
-        const savedWidths = JSON.parse(localStorage.getItem('tableColWidths')) || {};
-        cols.forEach((col) => {
-            const dataCol = col.getAttribute('data-col');
-            if (dataCol !== null) {
-                const minW = minWidths[dataCol] || 100;
-                const maxW = maxWidths[dataCol] || 400;
-                let w = savedWidths[dataCol] ? parseInt(savedWidths[dataCol], 10) : col.offsetWidth;
-                if (isNaN(w) || w < minW) w = minW;
-                if (w > maxW) w = maxW;
-
-                col.style.width = w + 'px';
-                col.style.minWidth = w + 'px';
-                col.style.maxWidth = w + 'px';
+            let containerW = table.parentElement ? table.parentElement.offsetWidth : 0;
+            if (!containerW || containerW === 0) {
+                const mainTable = document.querySelector('#os-table');
+                if (mainTable && mainTable.parentElement && mainTable.parentElement.offsetWidth > 0) {
+                    containerW = mainTable.parentElement.offsetWidth;
+                } else {
+                    containerW = 1140;
+                }
             }
-        });
 
-        const resizers = table.querySelectorAll('.resizer');
-        let startX, startWA, startWB, currentResizer, colA, colB, colAIndex, colBIndex;
-        let minWA, maxWA, minWB, maxWB;
+            const cols = Array.from(table.querySelectorAll('th'));
+            let rawWidths = {};
+            let totalRaw = 0;
 
-        const mouseMoveHandler = function (e) {
-            if (!colA || !colB) return;
-            const dx = e.clientX - startX;
-            
-            let delta = dx;
+            cols.forEach((col) => {
+                const dataCol = col.getAttribute('data-col');
+                if (dataCol !== null) {
+                    const minW = minWidths[dataCol] || 100;
+                    const maxW = maxWidths[dataCol] || 400;
+                    
+                    let w;
+                    if (savedWidths[dataCol]) {
+                        w = parseInt(savedWidths[dataCol], 10);
+                    } else if (col.offsetWidth > 0) {
+                        w = col.offsetWidth;
+                    } else if (col.style.width) {
+                        w = parseInt(col.style.width, 10);
+                    } else {
+                        w = defaultWidths[dataCol] || 160;
+                    }
 
-            // Restringe delta para não violar os limites de colA
-            if (startWA + delta < minWA) delta = minWA - startWA;
-            if (startWA + delta > maxWA) delta = maxWA - startWA;
+                    if (isNaN(w) || w < minW) w = minW;
+                    if (w > maxW) w = maxW;
+                    rawWidths[dataCol] = w;
+                    totalRaw += w;
+                }
+            });
 
-            // Restringe delta para não violar os limites de colB (ao expandir colA, colB encolhe)
-            if (startWB - delta < minWB) delta = startWB - minWB;
-            if (startWB - delta > maxWB) delta = startWB - maxWB;
+            const scale = (containerW > 0 && totalRaw > containerW) ? (containerW / totalRaw) : 1;
 
-            const newWA = startWA + delta;
-            const newWB = startWB - delta;
+            cols.forEach((col) => {
+                const dataCol = col.getAttribute('data-col');
+                if (dataCol !== null && rawWidths[dataCol] !== undefined) {
+                    const finalW = Math.floor(rawWidths[dataCol] * scale);
+                    col.style.width = finalW + 'px';
+                    col.style.minWidth = finalW + 'px';
+                    col.style.maxWidth = finalW + 'px';
+                }
+            });
 
-            colA.style.width = `${newWA}px`;
-            colA.style.minWidth = `${newWA}px`;
-            colA.style.maxWidth = `${newWA}px`;
+            const resizers = table.querySelectorAll('.resizer');
+            let startX, startWA, startWB, currentResizer, colA, colB, colAIndex, colBIndex;
+            let minWA, maxWA, minWB, maxWB;
 
-            colB.style.width = `${newWB}px`;
-            colB.style.minWidth = `${newWB}px`;
-            colB.style.maxWidth = `${newWB}px`;
-
-            // Salva no localStorage
-            const widths = JSON.parse(localStorage.getItem('tableColWidths')) || {};
-            widths[colAIndex] = newWA;
-            widths[colBIndex] = newWB;
-            localStorage.setItem('tableColWidths', JSON.stringify(widths));
-        };
-
-        const mouseUpHandler = function () {
-            document.removeEventListener('mousemove', mouseMoveHandler);
-            document.removeEventListener('mouseup', mouseUpHandler);
-            if (currentResizer) currentResizer.classList.remove('resizing');
-            colA = null;
-            colB = null;
-            currentResizer = null;
-            document.body.style.cursor = 'default';
-        };
-
-        resizers.forEach(function (resizer) {
-            resizer.addEventListener('mousedown', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
+            const mouseMoveHandler = function (e) {
+                if (!colA || !colB) return;
+                const dx = e.clientX - startX;
                 
-                currentResizer = e.target;
-                colA = currentResizer.parentElement;
-                colAIndex = parseInt(colA.getAttribute('data-col'), 10);
-                
-                // Pega a próxima coluna adjacente (à direita)
-                colB = table.querySelector(`th[data-col="${colAIndex + 1}"]`);
-                if (!colB) return;
+                // Strictly clamp delta between allowed bounds for both colA and colB
+                const minDeltaA = minWA - startWA;
+                const maxDeltaA = maxWA - startWA;
+                const minDeltaB = startWB - maxWB;
+                const maxDeltaB = startWB - minWB;
 
-                colBIndex = colAIndex + 1;
+                const allowedMinDelta = Math.max(minDeltaA, minDeltaB);
+                const allowedMaxDelta = Math.min(maxDeltaA, maxDeltaB);
 
-                minWA = minWidths[colAIndex] || 100;
-                maxWA = maxWidths[colAIndex] || 400;
-                minWB = minWidths[colBIndex] || 100;
-                maxWB = maxWidths[colBIndex] || 400;
+                const delta = Math.max(allowedMinDelta, Math.min(allowedMaxDelta, dx));
 
-                startX = e.clientX;
-                startWA = colA.offsetWidth;
-                startWB = colB.offsetWidth;
+                const newWA = startWA + delta;
+                const newWB = startWB - delta;
 
-                currentResizer.classList.add('resizing');
-                document.body.style.cursor = 'col-resize';
+                // Update columns strictly inside current target table
+                colA.style.width = `${newWA}px`;
+                colA.style.minWidth = `${newWA}px`;
+                colA.style.maxWidth = `${newWA}px`;
 
-                document.addEventListener('mousemove', mouseMoveHandler);
-                document.addEventListener('mouseup', mouseUpHandler);
+                colB.style.width = `${newWB}px`;
+                colB.style.minWidth = `${newWB}px`;
+                colB.style.maxWidth = `${newWB}px`;
+
+                const widths = JSON.parse(localStorage.getItem(storageKey)) || {};
+                widths[colAIndex] = newWA;
+                widths[colBIndex] = newWB;
+                localStorage.setItem(storageKey, JSON.stringify(widths));
+            };
+
+            const mouseUpHandler = function () {
+                document.removeEventListener('mousemove', mouseMoveHandler);
+                document.removeEventListener('mouseup', mouseUpHandler);
+                if (currentResizer) currentResizer.classList.remove('resizing');
+                colA = null;
+                colB = null;
+                currentResizer = null;
+                document.body.style.cursor = 'default';
+            };
+
+            resizers.forEach(function (resizer) {
+                resizer.addEventListener('mousedown', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    currentResizer = e.target;
+                    colA = currentResizer.parentElement;
+                    colAIndex = parseInt(colA.getAttribute('data-col'), 10);
+                    
+                    colB = table.querySelector(`th[data-col="${colAIndex + 1}"]`);
+                    if (!colB) return;
+
+                    colBIndex = colAIndex + 1;
+
+                    minWA = minWidths[colAIndex] || 100;
+                    maxWA = maxWidths[colAIndex] || 400;
+                    minWB = minWidths[colBIndex] || 100;
+                    maxWB = maxWidths[colBIndex] || 400;
+
+                    startX = e.clientX;
+                    startWA = colA.offsetWidth || parseInt(colA.style.width, 10) || defaultWidths[colAIndex] || 150;
+                    startWB = colB.offsetWidth || parseInt(colB.style.width, 10) || defaultWidths[colBIndex] || 150;
+
+                    currentResizer.classList.add('resizing');
+                    document.body.style.cursor = 'col-resize';
+
+                    document.addEventListener('mousemove', mouseMoveHandler);
+                    document.addEventListener('mouseup', mouseUpHandler);
+                });
             });
         });
     });
@@ -1376,24 +1497,32 @@
 
         // Date Filter Elements
         const dateTrigger = document.getElementById('date-filter-trigger');
+        const pendentesDateTrigger = document.getElementById('pendentes-date-filter-trigger');
         const dateDropdown = document.getElementById('date-filter-dropdown');
         const dateIndicator = document.getElementById('filter-active-indicator');
+        const pendentesDateIndicator = document.getElementById('pendentes-filter-active-indicator');
 
         // Protocol Filter Elements
         const protocolTrigger = document.getElementById('protocol-filter-trigger');
+        const pendentesProtocolTrigger = document.getElementById('pendentes-protocol-filter-trigger');
         const protocolDropdown = document.getElementById('protocol-filter-dropdown');
         const protocolIndicator = document.getElementById('protocol-filter-indicator');
+        const pendentesProtocolIndicator = document.getElementById('pendentes-protocol-filter-indicator');
         const protocolSearchInput = document.getElementById('protocol-search-input');
 
         // Status Filter Elements
         const statusTrigger = document.getElementById('status-filter-trigger');
+        const pendentesStatusTrigger = document.getElementById('pendentes-status-filter-trigger');
         const statusDropdown = document.getElementById('status-filter-dropdown');
         const statusIndicator = document.getElementById('status-filter-indicator');
+        const pendentesStatusIndicator = document.getElementById('pendentes-status-filter-indicator');
 
         // Problem Filter Elements
         const problemTrigger = document.getElementById('problem-filter-trigger');
+        const pendentesProblemTrigger = document.getElementById('pendentes-problem-filter-trigger');
         const problemDropdown = document.getElementById('problem-filter-dropdown');
         const problemIndicator = document.getElementById('problem-filter-indicator');
+        const pendentesProblemIndicator = document.getElementById('pendentes-problem-filter-indicator');
 
         function initFilterPortals() {
             [
@@ -1463,19 +1592,19 @@
 
         // Close dropdowns on outside click
         document.addEventListener('click', (e) => {
-            if (dateDropdown && !dateDropdown.contains(e.target) && !dateTrigger?.contains(e.target)) {
+            if (dateDropdown && !dateDropdown.contains(e.target) && !dateTrigger?.contains(e.target) && !pendentesDateTrigger?.contains(e.target)) {
                 dateDropdown.classList.add('hidden');
                 dateDropdown.style.display = 'none';
             }
-            if (protocolDropdown && !protocolDropdown.contains(e.target) && !protocolTrigger?.contains(e.target)) {
+            if (protocolDropdown && !protocolDropdown.contains(e.target) && !protocolTrigger?.contains(e.target) && !pendentesProtocolTrigger?.contains(e.target)) {
                 protocolDropdown.classList.add('hidden');
                 protocolDropdown.style.display = 'none';
             }
-            if (statusDropdown && !statusDropdown.contains(e.target) && !statusTrigger?.contains(e.target)) {
+            if (statusDropdown && !statusDropdown.contains(e.target) && !statusTrigger?.contains(e.target) && !pendentesStatusTrigger?.contains(e.target)) {
                 statusDropdown.classList.add('hidden');
                 statusDropdown.style.display = 'none';
             }
-            if (problemDropdown && !problemDropdown.contains(e.target) && !problemTrigger?.contains(e.target)) {
+            if (problemDropdown && !problemDropdown.contains(e.target) && !problemTrigger?.contains(e.target) && !pendentesProblemTrigger?.contains(e.target)) {
                 problemDropdown.classList.add('hidden');
                 problemDropdown.style.display = 'none';
             }
@@ -1491,20 +1620,36 @@
             e.stopPropagation();
             openFloatingDropdown(dateTrigger, dateDropdown, false);
         });
+        pendentesDateTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pendentesDateTrigger, dateDropdown, false);
+        });
 
         protocolTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(protocolTrigger, protocolDropdown, false);
+        });
+        pendentesProtocolTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pendentesProtocolTrigger, protocolDropdown, false);
         });
 
         statusTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(statusTrigger, statusDropdown, false);
         });
+        pendentesStatusTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pendentesStatusTrigger, statusDropdown, false);
+        });
 
         problemTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(problemTrigger, problemDropdown, false);
+        });
+        pendentesProblemTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(pendentesProblemTrigger, problemDropdown, false);
         });
 
         // Close open dropdown popups on window scroll or resize, unless user is typing inside a filter input
@@ -1590,74 +1735,102 @@
 
         window.activeProtocolPrefix = '';
 
+        function checkRowMatchesFilters(row, currentPrefix) {
+            // 1. Date Filter (Col 1)
+            if (activeDatePredicate) {
+                const dateStr = row.cells[1]?.textContent.trim() || '';
+                const rowDate = parseTableDate(dateStr);
+                if (!rowDate || !activeDatePredicate(rowDate)) {
+                    return false;
+                }
+            }
+
+            // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
+            if (currentPrefix) {
+                const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
+                if (!protText.startsWith(currentPrefix.toUpperCase())) {
+                    return false;
+                }
+            }
+
+            // 2b. Protocol Specific Search Filter (Column 0)
+            if (!matchColumnText(row, 0, protocolSearchQuery)) {
+                return false;
+            }
+
+            // 3. Status Filter
+            if (activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+                const statusBadge = row.querySelector('.status-badge');
+                const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
+                if (!activeStatusFilter.includes(rowStatus)) {
+                    return false;
+                }
+            }
+
+            // 4. Problem Filter
+            if (activeProblemFilter.length > 0 && !activeProblemFilter.includes('all')) {
+                const problemSelect = row.querySelector('.problem-select');
+                const rowProblem = problemSelect ? problemSelect.value : '';
+                if (!activeProblemFilter.includes(rowProblem)) {
+                    return false;
+                }
+            }
+
+            // 5. Global Text Search Filter
+            if (!matchRowGlobalText(row, searchQuery)) {
+                return false;
+            }
+
+            return true;
+        }
+
         function applyCombinedFilters() {
-            const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
-            let visibleCount = 0;
             const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
 
-            rows.forEach(row => {
-                let showRow = true;
-
-                // 1. Date Filter (Col 1)
-                if (activeDatePredicate) {
-                    const dateStr = row.cells[1]?.textContent.trim() || '';
-                    const rowDate = parseTableDate(dateStr);
-                    if (!rowDate || !activeDatePredicate(rowDate)) {
-                        showRow = false;
-                    }
-                }
-
-                // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
-                if (showRow && currentPrefix) {
-                    const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
-                    if (!protText.startsWith(currentPrefix.toUpperCase())) {
-                        showRow = false;
-                    }
-                }
-
-                // 2b. Protocol Specific Search Filter (Column 0)
-                if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
-                    showRow = false;
-                }
-
-                // 3. Status Filter
-                if (showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
-                    const statusBadge = row.querySelector('.status-badge');
-                    const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
-                    if (!activeStatusFilter.includes(rowStatus)) {
-                        showRow = false;
-                    }
-                }
-
-                // 4. Problem Filter
-                if (showRow && activeProblemFilter.length > 0 && !activeProblemFilter.includes('all')) {
-                    const problemSelect = row.querySelector('.problem-select');
-                    const rowProblem = problemSelect ? problemSelect.value : '';
-                    if (!activeProblemFilter.includes(rowProblem)) {
-                        showRow = false;
-                    }
-                }
-
-                // 5. Global Text Search Filter
-                if (showRow && !matchRowGlobalText(row, searchQuery)) {
-                    showRow = false;
-                }
-
+            // 1. Main OS Table Rows
+            const mainRows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
+            let visibleMainCount = 0;
+            mainRows.forEach(row => {
+                const showRow = checkRowMatchesFilters(row, currentPrefix);
                 row.style.display = showRow ? '' : 'none';
-                if (showRow) visibleCount++;
+                if (showRow) visibleMainCount++;
             });
 
-            // Toggle No Results Row
-            const noResultsRow = document.getElementById('no-audit-results');
-            if (noResultsRow) {
-                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            // 2. Pendentes OS Table Rows
+            const pendentesRows = document.querySelectorAll('#pendentes-os-table tbody tr:not(#no-pendentes-results)');
+            let visiblePendentesCount = 0;
+            pendentesRows.forEach(row => {
+                const showRow = checkRowMatchesFilters(row, currentPrefix);
+                row.style.display = showRow ? '' : 'none';
+                if (showRow) visiblePendentesCount++;
+            });
+
+            // Toggle No Results Rows
+            const noResultsRowMain = document.getElementById('no-audit-results');
+            if (noResultsRowMain) {
+                noResultsRowMain.classList.toggle('hidden', visibleMainCount > 0);
+            }
+            const noResultsRowPendentes = document.getElementById('no-pendentes-results');
+            if (noResultsRowPendentes) {
+                noResultsRowPendentes.classList.toggle('hidden', visiblePendentesCount > 0);
+            }
+
+            // Toggle Pendentes Container Visibility
+            const pendentesContainer = document.getElementById('container-pendentes-aprovacao');
+            if (pendentesContainer) {
+                const totalPendingCount = pendentesRows.length;
+                if (totalPendingCount > 0 && visiblePendentesCount > 0) {
+                    pendentesContainer.classList.remove('hidden');
+                } else {
+                    pendentesContainer.classList.add('hidden');
+                }
             }
 
             // Indicators update
-            if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
-            if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !currentPrefix);
-            if (statusIndicator) statusIndicator.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 4);
-            if (problemIndicator) problemIndicator.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4);
+            [dateIndicator, pendentesDateIndicator].forEach(ind => ind?.classList.toggle('hidden', !activeDatePredicate));
+            [protocolIndicator, pendentesProtocolIndicator].forEach(ind => ind?.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !currentPrefix));
+            [statusIndicator, pendentesStatusIndicator].forEach(ind => ind?.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 4));
+            [problemIndicator, pendentesProblemIndicator].forEach(ind => ind?.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4));
         }
 
         window.toggleProtocolPrefix = function(prefix) {
@@ -1685,7 +1858,7 @@
             const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
             const btnPraca = document.getElementById('protocol-btn-praca');
             const btnViaria = document.getElementById('protocol-btn-viaria');
-            const indicator = document.getElementById('protocol-filter-indicator');
+            const indicators = [document.getElementById('protocol-filter-indicator'), document.getElementById('pendentes-protocol-filter-indicator')];
             const searchVal = document.getElementById('protocol-search-input')?.value || '';
 
             if (btnPraca) {
@@ -1704,13 +1877,15 @@
                 }
             }
 
-            if (indicator) {
-                if (currentPrefix || searchVal.trim()) {
-                    indicator.classList.remove('hidden');
-                } else {
-                    indicator.classList.add('hidden');
+            indicators.forEach(ind => {
+                if (ind) {
+                    if (currentPrefix || searchVal.trim()) {
+                        ind.classList.remove('hidden');
+                    } else {
+                        ind.classList.add('hidden');
+                    }
                 }
-            }
+            });
         };
 
         // Protocol Search Input handler
