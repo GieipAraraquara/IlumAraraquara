@@ -1338,153 +1338,6 @@
         return res;
       }
 
-      /**
-       * Consulta o Supabase em busca de OSs ativas ("Aberta" ou "Pendente") no mesmo local, endereço ou plaqueta.
-       * @param {'iluminacao'|'praca'} tipoOS
-       * @param {Object|Array} dadosOuPontos Payload ou array de pontos a serem verificados
-       * @returns {Promise<Array>} Lista de OSs duplicadas/próximas encontradas
-       */
-      async function verificarProximidadeSupabase(tipoOS, dadosOuPontos) {
-        var client = obterSupabaseClient();
-        if (!client) return [];
-
-        try {
-          if (tipoOS === 'praca') {
-            var resP = await client.from('ordens_servico_pracas')
-              .select('protocolo, status, praca_nome, endereco, coordenada, problemas, data_abertura')
-              .in('status', ['Aberta', 'Pendente']);
-            
-            if (resP.error || !resP.data) return [];
-            var ordensPraca = resP.data;
-
-            var pracaNomeNovo = (dadosOuPontos.pracaNome || dadosOuPontos.praca_nome || '').toString().trim().toLowerCase();
-            var enderecoNovo = (dadosOuPontos.pracaEndereco || dadosOuPontos.endereco || '').toString().trim().toLowerCase();
-            var coordStrNovo = dadosOuPontos.pracaCoordenada || dadosOuPontos.coordenada || '';
-            var latNovo = null, lngNovo = null;
-            if (coordStrNovo) {
-              var parts = coordStrNovo.split(',');
-              if (parts.length >= 2) {
-                latNovo = parseFloat(parts[0]);
-                lngNovo = parseFloat(parts[1]);
-              }
-            }
-
-            var encontradosPraca = [];
-
-            ordensPraca.forEach(function(os) {
-              var osPracaNome = (os.praca_nome || '').toString().trim().toLowerCase();
-              var osEndereco = (os.endereco || '').toString().trim().toLowerCase();
-              var matchNome = (pracaNomeNovo && osPracaNome && pracaNomeNovo !== 'outra' && pracaNomeNovo === osPracaNome);
-              var matchEnd = (enderecoNovo && osEndereco && enderecoNovo.length > 5 && osEndereco.length > 5 && (enderecoNovo.indexOf(osEndereco) !== -1 || osEndereco.indexOf(enderecoNovo) !== -1));
-              
-              var dist = 99999;
-              if (latNovo !== null && lngNovo !== null && os.coordenada) {
-                var pOs = os.coordenada.split(',');
-                if (pOs.length >= 2) {
-                  var osLat = parseFloat(pOs[0]);
-                  var osLng = parseFloat(pOs[1]);
-                  if (!isNaN(osLat) && !isNaN(osLng) && window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
-                    dist = window.ChamadoModel.calcularDistanciaMetros(`${latNovo}, ${lngNovo}`, `${osLat}, ${osLng}`);
-                  }
-                }
-              }
-
-              if (matchNome || matchEnd || dist <= 100) {
-                var motivo = matchNome ? ("Mesma Praça: " + os.praca_nome) : (matchEnd ? "Mesmo Endereço" : ("Distância: " + Math.round(dist) + "m"));
-                encontradosPraca.push({
-                  protocolo: os.protocolo,
-                  status: os.status,
-                  motivo: motivo,
-                  endereco: os.endereco || os.praca_nome || 'Praça Pública',
-                  distancia: (dist < 9000) ? Math.round(dist) : 0
-                });
-              }
-            });
-
-            return encontradosPraca;
-          } else {
-            var resV = await client.from('ordens_servico')
-              .select('protocolo, status, municipe_nome, data_abertura, pontos_inicial')
-              .in('status', ['Aberta', 'Pendente']);
-
-            if (resV.error || !resV.data) return [];
-            var ordensViarias = resV.data;
-
-            var novosPontos = Array.isArray(dadosOuPontos) ? dadosOuPontos : (dadosOuPontos.pontos_inicial || dadosOuPontos.pontos || []);
-            if (!novosPontos || novosPontos.length === 0) return [];
-
-            var encontradosViaria = [];
-            var protAdicionados = {};
-
-            ordensViarias.forEach(function(os) {
-              var ptsExistentes = os.pontos_inicial || [];
-              if (typeof ptsExistentes === 'string') {
-                try { ptsExistentes = JSON.parse(ptsExistentes); } catch(e) { ptsExistentes = []; }
-              }
-              if (!Array.isArray(ptsExistentes)) ptsExistentes = [];
-
-              novosPontos.forEach(function(np) {
-                var npPlaq = (np.plaqueta || '').toString().trim().toUpperCase();
-                var npEnd = (np.endereco || '').toString().trim().toLowerCase();
-                var npLat = np.lat ? parseFloat(np.lat) : null;
-                var npLng = np.lng ? parseFloat(np.lng) : null;
-                if ((npLat === null || npLng === null) && np.coordenada) {
-                  var p = np.coordenada.split(',');
-                  if (p.length >= 2) { npLat = parseFloat(p[0]); npLng = parseFloat(p[1]); }
-                }
-
-                ptsExistentes.forEach(function(ep) {
-                  var epPlaq = (ep.plaqueta || '').toString().trim().toUpperCase();
-                  var epEnd = (ep.endereco || '').toString().trim().toLowerCase();
-                  var epLat = ep.lat ? parseFloat(ep.lat) : null;
-                  var epLng = ep.lng ? parseFloat(ep.lng) : null;
-                  if ((epLat === null || epLng === null) && ep.coordenada) {
-                    var p = ep.coordenada.split(',');
-                    if (p.length >= 2) { epLat = parseFloat(p[0]); epLng = parseFloat(p[1]); }
-                  }
-
-                  var matchPlaqueta = (npPlaq && epPlaq && npPlaq !== '---' && npPlaq === epPlaq);
-                  var matchEndereco = (npEnd && epEnd && npEnd.length > 8 && epEnd.length > 8 && (npEnd.indexOf(epEnd) !== -1 || epEnd.indexOf(npEnd) !== -1));
-                  
-                  var dist = 99999;
-                  if (npLat !== null && npLng !== null && epLat !== null && epLng !== null && !isNaN(npLat) && !isNaN(epLat)) {
-                    if (window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
-                      dist = window.ChamadoModel.calcularDistanciaMetros(`${npLat}, ${npLng}`, `${epLat}, ${epLng}`);
-                    } else {
-                      var R = 6371000;
-                      var dLat = (epLat - npLat) * Math.PI / 180;
-                      var dLng = (epLng - npLng) * Math.PI / 180;
-                      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                              Math.cos(npLat * Math.PI / 180) * Math.cos(epLat * Math.PI / 180) *
-                              Math.sin(dLng/2) * Math.sin(dLng/2);
-                      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-                      dist = R * c;
-                    }
-                  }
-
-                  if ((matchPlaqueta || matchEndereco || dist <= 50) && !protAdicionados[os.protocolo]) {
-                    protAdicionados[os.protocolo] = true;
-                    var motivo = matchPlaqueta ? ("Mesma Plaqueta (" + epPlaq + ")") : (matchEndereco ? "Mesmo Endereço" : ("Distância: " + Math.round(dist) + "m"));
-                    encontradosViaria.push({
-                      protocolo: os.protocolo,
-                      status: os.status,
-                      motivo: motivo,
-                      endereco: epEnd || epPlaq || 'Iluminação Viária',
-                      distancia: (dist < 9000) ? Math.round(dist) : 0
-                    });
-                  }
-                });
-              });
-            });
-
-            return encontradosViaria;
-          }
-        } catch(err) {
-          console.warn("⚠️ [Verificacao Proximidade Supabase Error]:", err);
-          return [];
-        }
-      }
-
       async function atualizarSupabaseDiretoFrontend(tabela, idOuProtocolo, dadosRecord) {
         var client = obterSupabaseClient();
         if (!client) throw new Error("Cliente Supabase não inicializado.");
@@ -3001,30 +2854,6 @@
             enderecoValidado: true
           }
         ];
-
-        // VERIFICAÇÃO DE DUPLICIDADE EM TEMPO REAL NO SUPABASE
-        if (!forcarSalvar && navigator.onLine) {
-          try {
-            var osDuplicadas = await verificarProximidadeSupabase('iluminacao', arrPontos);
-            if (osDuplicadas && osDuplicadas.length > 0) {
-              btnSalvar.disabled = false;
-              btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
-              var html = "";
-              osDuplicadas.forEach(function(os, k) {
-                html += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + (os.motivo || os.distancia + 'm') + ')<br><span class="text-slate-600 font-medium">' + (os.endereco || '') + '</span></div>';
-              });
-              document.getElementById('listaProtocolosModal').innerHTML = html;
-              window._funcaoConfirmarDuplicidade = function() {
-                validarEEnviarOSRapida(true);
-              };
-              document.getElementById('modalProximidade').style.display = 'flex';
-              descongelarGpsRapido();
-              return;
-            }
-          } catch(errDup) {
-            console.warn("⚠️ Erro ao verificar duplicidade no Supabase:", errDup);
-          }
-        }
 
         var payloadOSViaria = {
           protocolo: protExtraido,
@@ -5198,28 +5027,6 @@
           data_abertura: new Date().toISOString()
         };
 
-        // VERIFICAÇÃO DE DUPLICIDADE EM TEMPO REAL NO SUPABASE PARA PRAÇA PÚBLICA
-        if (!isModoEdicao && !forcarSalvar && navigator.onLine) {
-          try {
-            var osDuplicadasP = await verificarProximidadeSupabase('praca', dados);
-            if (osDuplicadasP && osDuplicadasP.length > 0) {
-              resetarBotaoSalvar();
-              var htmlP = "";
-              osDuplicadasP.forEach(function(os, k) {
-                htmlP += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + (os.motivo || os.distancia + 'm') + ')<br><span class="text-slate-600 font-medium">' + (os.endereco || '') + '</span></div>';
-              });
-              document.getElementById('listaProtocolosModal').innerHTML = htmlP;
-              window._funcaoConfirmarDuplicidade = function() {
-                executarEnvioFinalPraca(dados, true);
-              };
-              document.getElementById('modalProximidade').style.display = 'flex';
-              return;
-            }
-          } catch(errDupP) {
-            console.warn("⚠️ Erro ao verificar duplicidade de Praça no Supabase:", errDupP);
-          }
-        }
-
         var isGovBrUser = userAuth.isGovBr || 
                           sessionStorage.getItem('govbr_user_authenticated') === 'true' || 
                           localStorage.getItem('govbr_user_authenticated') === 'true' || 
@@ -5419,23 +5226,13 @@
 
       function fecharModal() {
         document.getElementById('modalProximidade').style.display = 'none';
-        var mapaComp = document.getElementById("mapaComparativo");
-        if (mapaComp) mapaComp.style.display = "none";
-        var legMapa = document.getElementById("legendaMapa");
-        if (legMapa) legMapa.style.display = "none";
-        var btnLoad = document.getElementById("btnLoadMap");
-        if (btnLoad) btnLoad.style.display = "block";
-        window._funcaoConfirmarDuplicidade = null;
+        document.getElementById("mapaComparativo").style.display = "none";
+        document.getElementById("legendaMapa").style.display = "none";
+        document.getElementById("btnLoadMap").style.display = "block";
       }
 
       function confirmarSalvamento() {
         fecharModal();
-        if (typeof window._funcaoConfirmarDuplicidade === 'function') {
-          var fn = window._funcaoConfirmarDuplicidade;
-          window._funcaoConfirmarDuplicidade = null;
-          fn();
-          return;
-        }
         var tipoOS = document.querySelector('input[name="tipoOS"]:checked')?.value;
         if (tipoOS === 'praca' && dadosTempPraca) {
           executarEnvioFinalPraca(dadosTempPraca, true);
@@ -5653,28 +5450,6 @@
           cpf_solicitante: userAuth.cpf || dadosFinais.cpfSolicitante || null,
           data_abertura: new Date().toISOString()
         };
-
-        // VERIFICAÇÃO DE DUPLICIDADE EM TEMPO REAL NO SUPABASE PARA VIÁRIA
-        if (!isModoEdicao && !forcarSalvar && navigator.onLine) {
-          try {
-            var osDuplicadasV = await verificarProximidadeSupabase('iluminacao', dadosFinais.pontos);
-            if (osDuplicadasV && osDuplicadasV.length > 0) {
-              resetarBotaoSalvar();
-              var htmlV = "";
-              osDuplicadasV.forEach(function(os, k) {
-                htmlV += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + (os.motivo || os.distancia + 'm') + ')<br><span class="text-slate-600 font-medium">' + (os.endereco || '') + '</span></div>';
-              });
-              document.getElementById('listaProtocolosModal').innerHTML = htmlV;
-              window._funcaoConfirmarDuplicidade = function() {
-                executarEnvioFinalMultiplo(true);
-              };
-              document.getElementById('modalProximidade').style.display = 'flex';
-              return;
-            }
-          } catch(errDupV) {
-            console.warn("⚠️ Erro ao verificar duplicidade Viária no Supabase:", errDupV);
-          }
-        }
 
         var isGovBrUser = userAuth.isGovBr || 
                           sessionStorage.getItem('govbr_user_authenticated') === 'true' || 
