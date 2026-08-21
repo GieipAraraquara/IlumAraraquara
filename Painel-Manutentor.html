@@ -848,7 +848,7 @@
 
 <script>
     // Confirmation Modal System
-    let pendingActionCallback = null;
+    var pendingActionCallback = null;
 
     window.setModalJustification = function(text, targetId = 'modal-justification-input') {
         const input = document.getElementById(targetId);
@@ -1133,7 +1133,7 @@
     });
 
     // Sort Functionality
-    let sortDirection = true;
+    var sortDirection = true;
     window.sortTable = function(colIndex) {
         const table = document.getElementById("os-table");
         const tbody = table.querySelector("tbody");

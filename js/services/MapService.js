@@ -1,8 +1,6 @@
-/**
- * Service Layer - Map Service
- * Manages shared Mapbox modal instance and address point visualization.
- * Uses a single persistent Mapbox map instance to avoid re-initialization and conserve API quota.
- */
+(function() {
+    if (window.MapServiceLoaded) return;
+    window.MapServiceLoaded = true;
 
 const MAPBOX_TOKEN_SHARED = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
 
@@ -437,7 +435,8 @@ window.closeMapaPontoModal = function() {
 };
 
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
+    if (event && event.key === 'Escape') {
         window.closeMapaPontoModal();
     }
 });
+})();

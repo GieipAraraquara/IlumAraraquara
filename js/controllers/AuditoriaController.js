@@ -1,7 +1,5 @@
-/**
- * Controller Layer - Auditoria Controller
- * Orchestrates data loading, rendering, and interaction logic for Auditoria.html.
- */
+(function() {
+    if (window.AuditoriaController) return;
 
 class AuditoriaController {
     constructor() {
@@ -1373,6 +1371,7 @@ window.abrirDetalhesOSModal = function(id) {
 
 // Instantiate controller globally
 window.AuditoriaController = AuditoriaController;
+})();
 document.addEventListener('DOMContentLoaded', () => {
     window.auditoriaController = new AuditoriaController();
     window.auditoriaController.init();

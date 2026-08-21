@@ -380,11 +380,7 @@ function loadScriptIfNeeded(src) {
     });
 
     if (existingScript) {
-        if (existingScript.getAttribute('src') === src) {
-            return Promise.resolve();
-        } else {
-            existingScript.remove();
-        }
+        return Promise.resolve();
     }
 
     return new Promise((resolve) => {

@@ -1,7 +1,5 @@
-/**
- * Infrastructure Layer - Chamados Repository
- * Handles direct database operations against Supabase table 'chamados'.
- */
+(function() {
+    if (window.ChamadosRepository) return;
 
 class ChamadosRepository {
     constructor() {
@@ -371,3 +369,4 @@ class ChamadosRepository {
 }
 
 window.ChamadosRepository = ChamadosRepository;
+})();

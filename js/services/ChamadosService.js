@@ -1,7 +1,5 @@
-/**
- * Application / Business Service Layer - Chamados Service
- * Manages domain logic, calculations, filtering, and data transformations.
- */
+(function() {
+    if (window.ChamadosService) return;
 
 class ChamadosService {
     constructor(repository) {
@@ -270,3 +268,4 @@ class ChamadosService {
 }
 
 window.ChamadosService = ChamadosService;
+})();

@@ -1,7 +1,5 @@
-/**
- * Presentation Layer - Painel Controller
- * Binds UI DOM elements in Painel.html to domain services, renders dynamic data, and handles user interactions.
- */
+(function() {
+    if (window.PainelController) return;
 
 class PainelController {
     constructor() {
@@ -1644,3 +1642,4 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 window.PainelController = PainelController;
+})();

@@ -1,7 +1,5 @@
-/**
- * Domain Layer - Chamado Entity & Mapper
- * Encapsulates Work Order (Chamado/OS) data structure and formatting methods.
- */
+(function() {
+    if (window.ChamadoModel) return;
 
 class ChamadoModel {
     constructor(data = {}) {
@@ -1180,3 +1178,4 @@ class ChamadoModel {
 }
 
 window.ChamadoModel = ChamadoModel;
+})();
