@@ -1841,6 +1841,34 @@
             return;
           }
 
+          // Determina se é protocolo emergencial direto (ex: IGOR, FERNANDO) e gera o protocolo final previamente
+          var isDireto = NOMES_DIRETOS_ADMITIDOS.includes(prot);
+          var protFinal = prot;
+
+          function gerarNovoProtocoloEmergencial(tecnicoNome) {
+            var agora = new Date();
+            var dia = agora.getDate().toString().padStart(2, '0');
+            var mes = (agora.getMonth() + 1).toString().padStart(2, '0');
+            var ano = agora.getFullYear().toString().slice(-2);
+            var dateStr = dia + mes + ano;
+            
+            var prefixo = 'IP';
+            var digitoRandom = Math.floor(Math.random() * 10).toString();
+            
+            var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            var randomCode = '';
+            for (var i = 0; i < 4; i++) {
+              randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+
+            var tecUpper = String(tecnicoNome || 'DIRETO').trim().toUpperCase();
+            return prefixo + digitoRandom + randomCode + dateStr + '-' + tecUpper;
+          }
+
+          if (isDireto) {
+            protFinal = gerarNovoProtocoloEmergencial(prot); // ex: IP93T1Y200826-IGOR
+          }
+
           // Build pontos payload with Cloudinary upload for evidences
           var arrPontosPayload = [];
           for (var i = 0; i < qtdAtual; i++) {
@@ -1861,7 +1889,7 @@
                   } else if (window.cloudinaryService) {
                     btnTexto.innerText = `☁️ Enviando foto Ponto #${i + 1} (${estagio})...`;
                     try {
-                      var nomeFoto = window.cloudinaryService.gerarNomePadraoFoto(prot, plaq, estagio);
+                      var nomeFoto = window.cloudinaryService.gerarNomePadraoFoto(protFinal, plaq, estagio);
                       var cdnUrl = await window.cloudinaryService.uploadImage(rawFoto, 'viaria_fotos', nomeFoto);
                       evidenciasUrls[estagio] = cdnUrl;
                     } catch (uploadErr) {
@@ -1888,8 +1916,6 @@
           }
 
           var firstPoint = arrPontosPayload[0] || {};
-          var isDireto = NOMES_DIRETOS_ADMITIDOS.includes(prot);
-          var protFinal = prot;
 
           var payloadUpdate = {
             status: "Concluída",
@@ -1907,29 +1933,8 @@
             payloadUpdate.coordenada_reparo = firstPoint.coordenada || (firstPoint.lat + ', ' + firstPoint.lng);
           }
 
-      function gerarNovoProtocoloEmergencial(tecnicoNome) {
-        var agora = new Date();
-        var dia = agora.getDate().toString().padStart(2, '0');
-        var mes = (agora.getMonth() + 1).toString().padStart(2, '0');
-        var ano = agora.getFullYear().toString().slice(-2);
-        var dateStr = dia + mes + ano;
-        
-        var prefixo = 'IP';
-        var digitoRandom = Math.floor(Math.random() * 10).toString();
-        
-        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        var randomCode = '';
-        for (var i = 0; i < 4; i++) {
-          randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-
-        var tecUpper = String(tecnicoNome || 'DIRETO').trim().toUpperCase();
-        return prefixo + digitoRandom + randomCode + dateStr + '-' + tecUpper;
-      }
-
           if (isDireto) {
             var dataAgora = new Date();
-            protFinal = gerarNovoProtocoloEmergencial(prot); // ex: IP2VGOA270726-IGOR
             payloadUpdate.protocolo = protFinal;
             payloadUpdate.data_abertura = dataAgora.toISOString();
             payloadUpdate.operador = prot;
