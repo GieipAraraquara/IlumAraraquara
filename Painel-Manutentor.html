@@ -954,10 +954,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            window.painelController.handleStatusAction(protocol || osId, 'aberto', event);
             return;
         }
 
@@ -971,7 +971,7 @@
             onConfirm: async () => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta');
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -988,10 +988,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'rejeitada', event);
+            window.painelController.handleStatusAction(protocol || osId, 'rejeitada', event);
             return;
         }
 
@@ -1005,7 +1005,7 @@
             onConfirm: async (justification) => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Rejeitada', justification);
+                    await repo.updateStatus(protocol || osId, 'Rejeitada', justification);
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -1022,11 +1022,11 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         let item = null;
         if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
-            item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(protocol));
+            item = window.painelController.chamadosList.find(c => String(c.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(c.id || "") === String(osId));
         }
 
         if (typeof window.abrirModalFinalizarOS === 'function') {
@@ -1038,10 +1038,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            window.painelController.handleStatusAction(protocol || osId, 'aberto', event);
             return;
         }
 
@@ -1055,7 +1055,7 @@
             onConfirm: async () => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta');
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {

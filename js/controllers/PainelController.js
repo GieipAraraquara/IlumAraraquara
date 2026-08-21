@@ -216,7 +216,7 @@ class PainelController {
         const isAberto = item.normalizedStatus === 'aberto';
 
         tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${(isCancelada || isRejeitada) ? 'opacity-70' : ''}`;
-        const targetId = item.id || item.protocolo || '';
+        const targetId = item.protocolo || item.id || '';
         tr.setAttribute('data-id', targetId);
         tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${targetId}')`);
 
@@ -231,17 +231,6 @@ class PainelController {
                     <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-amber-200">
                         <span class="material-symbols-outlined text-[11px] text-amber-600 shrink-0">electric_bolt</span>
                         <span class="truncate">Emergencial (${tecNome})</span>
-                    </span>
-                    ${(!isPendentesTable && item.motivoAprovacao) ? `<span class="inline-flex items-center gap-1 bg-purple-100 text-purple-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-purple-200" title="${item.motivoAprovacao}"><span class="material-symbols-outlined text-[11px] text-purple-600 shrink-0">info</span><span class="truncate">${item.motivoAprovacao}</span></span>` : ''}
-                </div>
-            `;
-        } else if (!isPendentesTable && item.motivoAprovacao) {
-            tdProtocolo.innerHTML = `
-                <div class="flex flex-col gap-0.5 max-w-full overflow-hidden">
-                    <span class="font-mono font-bold text-on-surface truncate" title="${item.protocolo}">${item.protocolo}</span>
-                    <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-amber-200" title="${item.motivoAprovacao}">
-                        <span class="material-symbols-outlined text-[11px] text-amber-600 shrink-0">warning</span>
-                        <span class="truncate">${item.motivoAprovacao}</span>
                     </span>
                 </div>
             `;
@@ -281,7 +270,7 @@ class PainelController {
                     </div>
                     <div class="extra-points hidden flex-col gap-1 font-medium text-on-surface whitespace-nowrap mt-1 w-full">
                         ${points.slice(1).map((p, idx) => `
-                            <button onclick="window.abrirMapaPonto('${item.id}', ${idx + 1}, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                            <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', ${idx + 1}, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
                                 <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
                                 <span class="font-medium truncate group-hover/loc:underline" title="${p}">${p}</span>
                             </button>
@@ -292,7 +281,7 @@ class PainelController {
         } else {
             const pointText = points[0] || 'Endereço não informado';
             tdEndereco.innerHTML = `
-                <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
                     <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
                     <span class="font-medium truncate group-hover/loc:underline" title="${pointText}">${pointText}</span>
                 </button>
@@ -354,7 +343,7 @@ class PainelController {
 
             tdProblema.innerHTML = `
                 <div class="relative inline-block w-[160px] max-w-full" onclick="event.stopPropagation()">
-                    <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none [background-image:none] bg-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.id}', this)">
+                    <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none [background-image:none] bg-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.protocolo || item.id}', this)">
                         <option value="lampada-queimada" ${probVal === 'lampada-queimada' ? 'selected' : ''}>Lâmpada Queimada</option>
                         <option value="acesa-dia" ${probVal === 'acesa-dia' ? 'selected' : ''}>Acesa Dia</option>
                         <option value="lampada-quebrada" ${probVal === 'lampada-quebrada' ? 'selected' : ''}>Lâmpada Quebrada</option>
@@ -408,29 +397,29 @@ class PainelController {
         tdAcoes.setAttribute('onclick', 'event.stopPropagation()');
 
         const editButtonHtml = isManutentorView ? '' : `
-            <button class="btn-edit text-on-surface-variant hover:text-secondary hover:bg-surface-container-high p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida ? 'hidden' : ''}" onclick="window.painelController.abrirEdicaoOS('${item.id}', event)" title="Editar Ordem de Serviço">
+            <button class="btn-edit text-on-surface-variant hover:text-secondary hover:bg-surface-container-high p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida ? 'hidden' : ''}" onclick="window.painelController.abrirEdicaoOS('${item.protocolo || item.id}', event)" title="Editar Ordem de Serviço">
                 <span class="material-symbols-outlined text-[20px]">edit</span>
             </button>
         `;
 
         const rejectButtonHtml = isManutentorView ? `
-            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'rejeitada', event)" title="Rejeitar Ordem de Serviço (Rejeitada)">
+            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'rejeitada', event)" title="Rejeitar Ordem de Serviço (Rejeitada)">
                 <span class="material-symbols-outlined text-[20px]">thumb_down</span>
             </button>
         ` : `
-            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento || isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'cancelada', event)" title="Cancelar (Cancelada)">
+            <button class="btn-reject text-error hover:bg-error-container p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento || isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'cancelada', event)" title="Cancelar (Cancelada)">
                 <span class="material-symbols-outlined text-[20px]">close</span>
             </button>
         `;
 
         const approveButtonHtml = isManutentorView ? '' : `
-            <button class="btn-approve text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Aprovar (Em aberto)">
+            <button class="btn-approve text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isPendente ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'aberto', event)" title="Aprovar (Em aberto)">
                 <span class="material-symbols-outlined text-[20px]">check</span>
             </button>
         `;
 
         const revertButtonHtml = isManutentorView ? '' : `
-            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada || isRejeitada || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'aberto', event)" title="Reverter para Em aberto">
+            <button class="btn-revert text-secondary hover:bg-secondary/10 p-1 rounded transition-all duration-200 active:scale-90 ${isConcluida || isCancelada || isRejeitada || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'aberto', event)" title="Reverter para Em aberto">
                 <span class="material-symbols-outlined text-[20px]">undo</span>
             </button>
         `;
@@ -439,7 +428,7 @@ class PainelController {
             <div class="flex items-center justify-center gap-1 action-buttons">
                 ${approveButtonHtml}
                 ${rejectButtonHtml}
-                <button class="btn-complete text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.id}', 'concluida', event)" title="Concluir / Finalizar OS">
+                <button class="btn-complete text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'concluida', event)" title="Concluir / Finalizar OS">
                     <span class="material-symbols-outlined text-[20px]">task_alt</span>
                 </button>
                 ${revertButtonHtml}
@@ -573,8 +562,8 @@ class PainelController {
      */
     handleStatusAction(id, targetUIStatus, event) {
         if (event) event.stopPropagation();
-        const item = this.chamadosList.find(c => String(c.id) === String(id));
-        const protocol = item ? item.protocolo : 'esta OS';
+        const item = this.chamadosList.find(c => String(c.protocolo || "").toUpperCase() === String(id || "").toUpperCase() || String(c.id || "") === String(id));
+        const protocol = item ? item.protocolo : id;
 
         if (targetUIStatus === 'concluida') {
             if (typeof window.abrirModalFinalizarOS === 'function') {
@@ -633,7 +622,7 @@ class PainelController {
             confirmText: confirmText,
             onConfirm: async (justification) => {
                 try {
-                    const targetId = (item && item.id) ? item.id : id;
+                    const targetId = (item && item.protocolo) ? item.protocolo : id;
                     await this.service.changeChamadoStatus(targetId, targetUIStatus, justification);
                     await this.loadData();
                 } catch (err) {
@@ -1224,7 +1213,7 @@ class PainelController {
                     <!-- Botões de Ações (Manutentor & Admin) -->
                     ${isManutentorUser ? `
                         ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
-                        <button type="button" onclick="window.rejeitarOSManutentor('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <button type="button" onclick="window.rejeitarOSManutentor('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">thumb_down</span>
                             <span>Rejeitar OS</span>
                         </button>` : (isJaRejeitada ? `
@@ -1237,27 +1226,27 @@ class PainelController {
                     ${isAdminUser ? `
                         <!-- Aprovar (se Pendente) -->
                         ${isPendente ? `
-                        <button type="button" onclick="window.aprovarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">check</span>
                             <span>Aprovar OS</span>
                         </button>` : ''}
 
-                        <!-- Priorizar para Urgente (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
+                        <!-- Priorizar para Urgente / Retornar para Normal (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
                         ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                             !isJaUrgente ? `
-                            <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Urgente')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">priority_high</span>
                                 <span>Priorizar para Urgente</span>
                             </button>` : `
-                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
-                                <span class="material-symbols-outlined text-[15px]">check_circle</span>
-                                <span>Já é Urgente</span>
+                            <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Normal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+                                <span>Retornar para Normal</span>
                             </button>`
                         ) : ''}
 
                         <!-- Reabrir OS (exibido se Concluída, Cancelada ou Rejeitada) -->
                         ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
-                        <button type="button" onclick="window.reabrirOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <button type="button" onclick="window.reabrirOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">undo</span>
                             <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
                         </button>` : ''}
@@ -1265,7 +1254,7 @@ class PainelController {
                         <!-- Cancelar OS (NÃO exibido se Concluída) -->
                         ${!isConcluida ? (
                             !isJaCancelada ? `
-                            <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <button type="button" onclick="window.cancelarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">block</span>
                                 <span>Cancelar OS</span>
                             </button>` : `
@@ -1295,13 +1284,13 @@ window.abrirDetalhesOSModal = function(id) {
 
 window.aprovarOSAdmin = function(osId) {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
-    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? item.protocolo : osId;
 
     const doApprove = async () => {
         try {
             const repo = new window.ChamadosRepository();
-            await repo.updateStatus(osId || protocol, 'Aberta');
+            await repo.updateStatus(protocol || osId, 'Aberta');
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
@@ -1337,7 +1326,7 @@ window.aprovarOSAdmin = function(osId) {
 
 window.reabrirOSAdmin = function(osId) {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
-    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? item.protocolo : osId;
     const isCancelada = item && item.normalizedStatus === 'cancelada';
     const isConcluida = item && item.normalizedStatus === 'concluida';
@@ -1350,8 +1339,17 @@ window.reabrirOSAdmin = function(osId) {
 
     const doReopen = async (justification) => {
         try {
+            if (item) {
+                item.status = 'Aberta';
+                item.rawStatus = 'Aberta';
+                item.normalizedStatus = 'aberto';
+                if (item._originalModel) {
+                    item._originalModel.rawStatus = 'Aberta';
+                    item._originalModel.normalizedStatus = 'aberto';
+                }
+            }
             const repo = new window.ChamadosRepository();
-            await repo.updateStatus(osId || protocol, 'Aberta', justification);
+            await repo.updateStatus(protocol || osId, 'Aberta', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
@@ -1385,57 +1383,99 @@ window.reabrirOSAdmin = function(osId) {
     }
 };
 
-window.priorizarOSUrgente = function(osId) {
+window.alterarPrioridadeOS = function(osId, targetPriority = 'Urgente') {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
-    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? item.protocolo : osId;
+    const isTargetUrgente = (targetPriority === 'Urgente');
 
     const doPrioritize = async () => {
         try {
-            const repo = new window.ChamadosRepository();
-            await repo.updatePriority(osId || protocol, 'Urgente');
+            // 1. Atualização otimista na memória para reflexão instantânea na UI
+            if (item) {
+                item.prioridade = targetPriority;
+                if (item._originalModel) item._originalModel.prioridade = targetPriority;
+            }
+            if (window.dadosOSsAbertasCache) {
+                const rawObj = window.dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(osId));
+                if (rawObj) {
+                    rawObj.prioridade = targetPriority;
+                    if (rawObj._originalModel) rawObj._originalModel.prioridade = targetPriority;
+                }
+            }
+            if (window.chamadosListCache) {
+                const modelObj = window.chamadosListCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(osId));
+                if (modelObj) {
+                    modelObj.prioridade = targetPriority;
+                }
+            }
+
+            // 2. Re-renderização instantânea dos marcadores no mapa (se na página de Mapa)
+            if (typeof window.renderizarMapaOSs === 'function' && typeof window.obterListaFiltradaPorStatus === 'function' && window.dadosOSsAbertasCache) {
+                const statusFiltro = window.filtroStatusAtual || 'todas';
+                const filtradas = window.obterListaFiltradaPorStatus(window.dadosOSsAbertasCache, statusFiltro);
+                window.renderizarMapaOSs(filtradas);
+            }
+
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+            
+            const repo = new window.ChamadosRepository();
+            await repo.updatePriority(protocol || osId, targetPriority);
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
             } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
+            } else if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas();
             } else if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
-            } else {
-                window.location.reload();
             }
         } catch(err) {
             alert('Erro ao atualizar prioridade: ' + (err.message || err));
         }
     };
 
+    const title = isTargetUrgente ? 'Priorizar para Urgente' : 'Retornar para Normal';
+    const message = isTargetUrgente
+        ? `Deseja alterar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-amber-600 font-bold">URGENTE</strong>?`
+        : `Deseja retornar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-emerald-700 font-bold">NORMAL</strong>?`;
+    const icon = isTargetUrgente ? 'warning' : 'restart_alt';
+    const iconBgClass = isTargetUrgente ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+    const confirmBtnClass = isTargetUrgente ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white';
+    const confirmText = isTargetUrgente ? 'Definir como Urgente' : 'Retornar para Normal';
+
     if (typeof window.showConfirmModal === 'function') {
         window.showConfirmModal({
-            title: 'Priorizar para Urgente',
-            message: `Deseja alterar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-amber-600 font-bold">URGENTE</strong>?`,
-            icon: 'warning',
-            iconBgClass: 'bg-amber-100 text-amber-700',
-            confirmBtnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
-            confirmText: 'Definir como Urgente',
-            onConfirm: doPrioritize
+            title,
+            message,
+            icon,
+            iconBgClass,
+            confirmBtnClass,
+            confirmText,
+            onConfirm: doPrioritize,
+            showJustification: false
         });
     } else {
-        if (confirm(`Deseja alterar a prioridade da OS #${protocol} para URGENTE?`)) {
+        if (confirm(`Deseja alterar a prioridade da OS #${protocol} para ${targetPriority.toUpperCase()}?`)) {
             doPrioritize();
         }
     }
 };
 
+window.priorizarOSUrgente = function(osId) {
+    window.alterarPrioridadeOS(osId, 'Urgente');
+};
+
 window.rejeitarOSManutentor = function(osId) {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
-    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? item.protocolo : osId;
 
     const doReject = async (justification) => {
         try {
             const repo = new window.ChamadosRepository();
-            await repo.updateStatus(osId || protocol, 'Rejeitada', justification);
+            await repo.updateStatus(protocol || osId, 'Rejeitada', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
@@ -1472,13 +1512,13 @@ window.rejeitarOSManutentor = function(osId) {
 
 window.cancelarOSAdmin = function(osId) {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
-    const item = list.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? item.protocolo : osId;
 
     const doCancel = async (justification) => {
         try {
             const repo = new window.ChamadosRepository();
-            await repo.updateStatus(osId || protocol, 'Cancelada', justification);
+            await repo.updateStatus(protocol || osId, 'Cancelada', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {

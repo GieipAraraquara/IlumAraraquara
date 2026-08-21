@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v100';
+const CACHE_NAME = 'sistema-os-pwa-v109';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',

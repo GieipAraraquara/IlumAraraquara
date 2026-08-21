@@ -333,7 +333,7 @@ class AuditoriaController {
         const isCompleted = item.isAuditoriaConcluida;
 
         return `
-            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.id}" data-completed="${isCompleted}" onclick="window.abrirDetalhesOSModal('${item.id}')">
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.protocolo || item.id}" data-completed="${isCompleted}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
                 <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}</td>
                 <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
@@ -689,7 +689,7 @@ class AuditoriaController {
         `;
 
         return `
-            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="${item.id}" onclick="window.abrirDetalhesOSModal('${item.id}')">
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="${item.protocolo || item.id}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
                 ${protocolTdHtml}
                 <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">${dateConclusaoText}</td>
                 ${col2TdHtml}
@@ -1316,27 +1316,27 @@ class AuditoriaController {
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <!-- Aprovar (se Pendente) -->
                     ${isPendente ? `
-                    <button type="button" onclick="window.aprovarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                    <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                         <span class="material-symbols-outlined text-[16px]">check</span>
                         <span>Aprovar OS</span>
                     </button>` : ''}
 
-                    <!-- Priorizar para Urgente (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
+                    <!-- Priorizar para Urgente / Retornar para Normal (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
                     ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                         !isJaUrgente ? `
-                        <button type="button" onclick="window.priorizarOSUrgente('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Urgente')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">priority_high</span>
                             <span>Priorizar para Urgente</span>
                         </button>` : `
-                        <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300 opacity-70 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">check_circle</span>
-                            <span>Já é Urgente</span>
+                        <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Normal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+                            <span>Retornar para Normal</span>
                         </button>`
                     ) : ''}
 
                     <!-- Reabrir OS (exibido se Concluída, Cancelada ou Rejeitada) -->
                     ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
-                    <button type="button" onclick="window.reabrirOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                    <button type="button" onclick="window.reabrirOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                         <span class="material-symbols-outlined text-[16px]">undo</span>
                         <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
                     </button>` : ''}
@@ -1344,7 +1344,7 @@ class AuditoriaController {
                     <!-- Cancelar OS (NÃO exibido se Concluída) -->
                     ${!isConcluida ? (
                         !isJaCancelada ? `
-                        <button type="button" onclick="window.cancelarOSAdmin('${item.id || item.protocolo}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                        <button type="button" onclick="window.cancelarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                             <span class="material-symbols-outlined text-[16px]">block</span>
                             <span>Cancelar OS</span>
                         </button>` : `

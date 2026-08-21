@@ -132,25 +132,15 @@
     </script>
     
     <style>
-        /* Mapbox Popup Overrides & Anti-Blur Pixel Snapping */
+        /* Mapbox Popup Overrides */
         .mapboxgl-popup {
             z-index: 9999 !important;
-            -webkit-font-smoothing: subpixel-antialiased !important;
-            -moz-osx-font-smoothing: auto !important;
-            text-rendering: geometricPrecision !important;
-            will-change: auto !important;
         }
         .mapboxgl-popup-content {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
             padding: 0 !important;
-            transform: none !important;
-        }
-        .card-ponto-duplicado {
-            transform: translateZ(0);
-            backface-visibility: hidden;
-            -webkit-font-smoothing: antialiased;
         }
         .mapboxgl-popup-close-button {
             font-size: 20px !important;
@@ -564,6 +554,39 @@
         <div class="flex gap-3">
             <button type="button" onclick="fecharModalConfirmacaoPrioridade()" class="flex-1 py-2 px-4 rounded-xl border border-outline-variant text-on-surface font-semibold hover:bg-surface-container-low transition-colors">Cancelar</button>
             <button type="button" id="btnConfirmarPrioridadeModal" onclick="executarTrocaPrioridadeConfirmada()" class="flex-1 py-2 px-4 rounded-xl text-white font-semibold shadow-md hover:opacity-90 transition-all">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Confirmação Genérico (showConfirmModal) -->
+<div id="confirm-modal" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
+        <div class="flex items-start gap-4">
+            <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700">
+                <span id="modal-icon" class="material-symbols-outlined text-[24px]">check</span>
+            </div>
+            <div class="flex-1">
+                <h3 id="modal-title" class="text-title-md font-title-md font-bold text-on-surface mb-1">Confirmar Ação</h3>
+                <p id="modal-message" class="text-body-md text-on-surface-variant leading-relaxed">Deseja prosseguir com essa alteração?</p>
+            </div>
+        </div>
+        
+        <!-- Campo de Justificativa / Observação (Opcional, ocultado se showJustification = false) -->
+        <div class="mt-4" id="modal-justification-container">
+            <label for="modal-justification-input" class="block text-label-sm font-medium text-on-surface-variant mb-1.5">
+                Justificativa / Observação <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+            
+            <textarea id="modal-justification-input" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors text-xs" placeholder="Informe o motivo ou observação..."></textarea>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer">
+                Confirmar
+            </button>
         </div>
     </div>
 </div>
@@ -1479,6 +1502,30 @@
 
                 if (marker) todosMarkersOSsAbertas.push(marker);
             });
+
+            if (popupDuplicadosAtual && ultimoGrupoLngLat) {
+                let grupoCorrespondente = null;
+                let menorDist = Infinity;
+
+                for (const grp of gruposPontos) {
+                    const rep = grp[0];
+                    const distM = calcularDistancia(ultimoGrupoLngLat[1], ultimoGrupoLngLat[0], rep.lat, rep.lng);
+                    if (distM < 50 && distM < menorDist) {
+                        menorDist = distM;
+                        grupoCorrespondente = grp;
+                    }
+                }
+
+                if (grupoCorrespondente && grupoCorrespondente.length > 0) {
+                    exibirPopupQuadradosFlutuantesDuplicados(grupoCorrespondente, [grupoCorrespondente[0].lng, grupoCorrespondente[0].lat], false);
+                } else {
+                    if (popupDuplicadosAtual) {
+                        popupDuplicadosAtual.remove();
+                        popupDuplicadosAtual = null;
+                        ultimoGrupoLngLat = null;
+                    }
+                }
+            }
         }
 
         if (modoVisaoMapaAtual === 'heatmap' && featuresHeatmap.length > 0) {
@@ -1536,12 +1583,15 @@
     }
 
     let popupDuplicadosAtual = null;
+    let ultimoGrupoLngLat = null;
 
-    function exibirPopupQuadradosFlutuantesDuplicados(grp, lngLat) {
+    function exibirPopupQuadradosFlutuantesDuplicados(grp, lngLat, autoEase = true) {
         if (popupDuplicadosAtual) {
             popupDuplicadosAtual.remove();
             popupDuplicadosAtual = null;
         }
+
+        ultimoGrupoLngLat = lngLat;
 
         // Agrupa os itens por OS única
         const osMap = new Map();
@@ -1556,11 +1606,7 @@
 
         const totalUnicas = osMap.size;
 
-        let cardWidthClass = "w-64";
-        if (totalUnicas === 1) cardWidthClass = "w-72 sm:w-80";
-        else if (totalUnicas === 2) cardWidthClass = "w-64 sm:w-72";
-        else if (totalUnicas === 3) cardWidthClass = "w-52 sm:w-56";
-        else if (totalUnicas >= 4) cardWidthClass = "w-44 sm:w-48";
+        let cardWidthClass = "w-64 sm:w-72";
 
         let htmlCards = '';
         osMap.forEach(grpOS => {
@@ -1592,108 +1638,138 @@
                 const isEnderecoSintetico = endLower.startsWith('plaqueta:') || endLower.startsWith('coord:') || endLower.includes('| coord:');
 
                 if (hasPlaq && isEnderecoSintetico) {
-                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
+                    return `<div class="whitespace-normal break-words text-xs leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
                 }
 
                 if (endStr && endStr !== '[---]' && endStr !== '-' && !isEnderecoSintetico) {
-                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5" title="${endStr}">📍 ${endStr}${hasPlaq ? ` <span class="text-slate-500 dark:text-slate-400 font-semibold">(Plaqueta: <b>${plaqStr}</b>)</span>` : ''}</div>`;
+                    return `<div class="whitespace-normal break-words text-xs leading-tight text-slate-700 dark:text-slate-300 py-0.5" title="${endStr}">📍 ${endStr}${hasPlaq ? ` <span class="text-slate-500 dark:text-slate-400 font-semibold">(Plaqueta: <b>${plaqStr}</b>)</span>` : ''}</div>`;
                 }
                 
                 if (hasPlaq) {
-                    return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
+                    return `<div class="whitespace-normal break-words text-xs leading-tight text-slate-700 dark:text-slate-300 py-0.5">🏷️ Plaqueta: <b>${plaqStr}</b></div>`;
                 }
 
                 const lat = pt.lat || pt.latitude;
                 const lng = pt.lng || pt.longitude;
                 if (lat && lng) {
-                    return `<div class="whitespace-normal break-words text-[11px] font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}</div>`;
+                    return `<div class="whitespace-normal break-words text-xs font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}</div>`;
                 }
                 const coordStr = (pt.coordenada || pt.coordenadaInicial || '').trim();
                 if (coordStr) {
-                    return `<div class="whitespace-normal break-words text-[11px] font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${coordStr}</div>`;
+                    return `<div class="whitespace-normal break-words text-xs font-mono leading-tight text-blue-600 dark:text-blue-400 py-0.5">🌐 ${coordStr}</div>`;
                 }
-                return `<div class="whitespace-normal break-words text-[11px] leading-tight text-slate-700 dark:text-slate-300 py-0.5">📍 Localização registrada</div>`;
+                return `<div class="whitespace-normal break-words text-xs leading-tight text-slate-700 dark:text-slate-300 py-0.5">📍 Localização registrada</div>`;
             }).join('');
 
             const stLower = (os.status || "Aberta").toLowerCase();
             let badgeAging = "";
             if (stLower.includes('cancel')) {
-                badgeAging = '<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white bg-error">❌ Cancelada</span>';
+                badgeAging = '<span class="px-2 py-0.5 rounded-full font-bold text-xs text-white bg-error">❌ Cancelada</span>';
             } else if (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
-                badgeAging = '<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white bg-secondary">✅ Concluída</span>';
+                badgeAging = '<span class="px-2 py-0.5 rounded-full font-bold text-xs text-white bg-secondary">✅ Concluída</span>';
             } else {
                 const d = grpOS.diasEmAberto || 0;
                 let corAging = "bg-[#188038]";
                 if (d > 7) corAging = "bg-[#d93025]";
                 else if (d > 3) corAging = "bg-[#f2994a]";
-                badgeAging = `<span class="px-1.5 py-0.5 rounded-full font-bold text-[9px] text-white ${corAging}">⏱️ ${d}d</span>`;
+                badgeAging = `<span class="px-2 py-0.5 rounded-full font-bold text-xs text-white ${corAging}">⏱️ ${d}d</span>`;
             }
 
             let btnAcaoAdmin = "";
             if (currentUserRole === 'admin') {
                 if (stLower.includes('cancel') || stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad')) {
-                    btnAcaoAdmin = `<button type="button" onclick="solicitarReversaoOS('${os.protocolo}')" class="py-1.5 px-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-[10px] sm:text-[11px] font-bold rounded-lg border border-slate-300 dark:border-slate-600 transition-all flex items-center justify-center gap-0.5 cursor-pointer active:scale-95" title="Reabrir OS">
-                        <span class="material-symbols-outlined text-[14px]">undo</span>
+                    btnAcaoAdmin = `<button type="button" onclick="solicitarReversaoOS('${os.protocolo}')" class="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-600 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 flex-shrink-0" title="Reabrir OS">
+                        <span class="material-symbols-outlined text-[16px]">undo</span>
                         <span>Reabrir</span>
                     </button>`;
                 } else {
-                    btnAcaoAdmin = `<button type="button" onclick="solicitarCancelamentoOS('${os.protocolo}')" class="py-1.5 px-1.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-[10px] sm:text-[11px] font-bold rounded-lg border border-rose-200 dark:border-rose-800/60 transition-all flex items-center justify-center gap-0.5 cursor-pointer active:scale-95" title="Cancelar OS">
-                        <span class="material-symbols-outlined text-[14px]">close</span>
-                        <span>Cancelar</span>
+                    btnAcaoAdmin = `<button type="button" onclick="solicitarCancelamentoOS('${os.protocolo}')" class="py-2 px-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-600 dark:text-rose-400 text-xs font-bold rounded-xl border border-rose-200 dark:border-rose-800/60 transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 flex-shrink-0" title="Cancelar OS">
+                        <span class="material-symbols-outlined text-[16px]">close</span>
                     </button>`;
                 }
             }
 
+            // Verifica se a OS é um protocolo de ponto único (1 ponto cadastrado)
+            const isPontoUnico = (os.pontos ? os.pontos.length : (grpOS.pontos ? grpOS.pontos.length : 1)) <= 1;
+
+            let btnMapsHTML = "";
+            if (isPontoUnico) {
+                const ptRef = (grpOS.pontos && grpOS.pontos.length > 0) ? grpOS.pontos[0] : (os.pontos && os.pontos.length > 0 ? os.pontos[0] : null);
+                let linkGmaps = "#";
+                if (ptRef) {
+                    const pLat = ptRef.lat || ptRef.latitude;
+                    const pLng = ptRef.lng || ptRef.longitude;
+                    const pEnd = (ptRef.endereco || ptRef.enderecoInicial || '').trim();
+
+                    if (pLat && pLng && !isNaN(pLat) && !isNaN(pLng)) {
+                        linkGmaps = `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`;
+                    } else if (pEnd && pEnd !== '[---]' && pEnd !== '-' && !pEnd.toLowerCase().startsWith('plaqueta:')) {
+                        const endClean = pEnd.split('|')[0].trim();
+                        const queryEnc = encodeURIComponent(`${endClean}, Araraquara, SP`);
+                        linkGmaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
+                    }
+                }
+
+                if (linkGmaps && linkGmaps !== '#') {
+                    btnMapsHTML = `<a href="${linkGmaps}" target="_blank" rel="noopener noreferrer" title="Navegar via Google Maps" class="py-2 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md active:scale-95 ${btnAcaoAdmin ? 'flex-shrink-0' : 'flex-1'} no-underline">
+                        <span class="material-symbols-outlined text-[16px]">map</span>
+                    </a>`;
+                }
+            }
+
+            const isIconOnlyDetails = Boolean(btnMapsHTML || btnAcaoAdmin);
+            const btnDetalhesHTML = `<button type="button" onclick="abrirModalDetalhesPrincipal('${os.protocolo}')" title="Ver Detalhes da OS" class="py-2 px-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shadow-md active:scale-95 ${isIconOnlyDetails ? 'flex-1' : 'w-full'}">
+                <span class="material-symbols-outlined text-[16px]">visibility</span>
+            </button>`;
+
             htmlCards += `
-            <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 rounded-xl p-2.5 shadow-lg hover:border-blue-500 transition-all flex flex-col justify-between space-y-1.5 overflow-hidden">
-                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-1.5">
-                    <span class="font-bold text-xs sm:text-sm text-blue-600 dark:text-blue-400 truncate">#${os.protocolo}</span>
+            <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-md hover:border-blue-500 transition-all flex flex-col justify-between space-y-2 overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+                    <span class="font-bold text-sm text-blue-600 dark:text-blue-400">#${os.protocolo}</span>
                     ${badgeAging}
                 </div>
-                <div class="text-[11px] sm:text-xs text-slate-800 dark:text-slate-200 space-y-0.5">
+                <div class="text-xs text-slate-800 dark:text-slate-200 space-y-1">
                     <div>📅 <b>Data:</b> ${dataStr}</div>
-                    <div class="truncate">👤 ${solicitanteHTML}</div>
-                    <div class="pt-0.5">
-                        <div class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Pontos (${pontos.length}):</div>
-                        <div class="pl-1.5 space-y-0.5 border-l-2 border-blue-400/40 max-h-24 overflow-hidden">
+                    <div>👤 ${solicitanteHTML}</div>
+                    <div class="pt-1">
+                        <div class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Pontos (${pontos.length}):</div>
+                        <div class="pl-1.5 space-y-0.5 border-l-2 border-blue-400/40">
                             ${pontosFormattedHtml}
                         </div>
                     </div>
                 </div>
-                <div class="mt-1 flex items-center gap-1">
-                    <button type="button" onclick="abrirModalDetalhesPrincipal('${os.protocolo}')" class="flex-1 py-1.5 px-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] sm:text-[11px] font-bold rounded-lg transition-all flex items-center justify-center gap-0.5 cursor-pointer shadow-sm active:scale-95">
-                        <span class="material-symbols-outlined text-[14px]">visibility</span>
-                        <span>+ Detalhes</span>
-                    </button>
+                <div class="mt-2 flex items-center gap-1.5">
+                    ${btnDetalhesHTML}
+                    ${btnMapsHTML}
                     ${btnAcaoAdmin}
                 </div>
             </div>`;
         });
 
         const popupHTML = `
-        <div class="popup-duplicados-container bg-slate-900/95 border border-slate-700 rounded-2xl p-2.5 shadow-2xl overflow-hidden">
-            <div class="flex items-center justify-between mb-2 pb-1.5 border-b border-rose-500/30 px-1">
+        <div class="popup-duplicados-container bg-slate-900 border border-slate-700/80 rounded-2xl p-3 shadow-lg overflow-hidden text-slate-100 font-sans">
+            <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-rose-500/30 px-1">
                 <div class="flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-rose-400 text-[16px]">warning</span>
+                    <span class="material-symbols-outlined text-rose-400 text-[18px]">warning</span>
                     <strong class="text-xs text-rose-300 font-bold">${totalUnicas} Chamados Distintos Neste Local</strong>
                 </div>
             </div>
-            <div class="flex flex-row gap-2 overflow-hidden p-0.5">
+            <div class="flex flex-row gap-3 overflow-x-auto overflow-y-auto max-h-[60vh] sm:max-h-[460px] p-1">
                 ${htmlCards}
             </div>
         </div>`;
 
         // Reposiciona suavemente a câmera do mapa para garantir que o ponto fique visível com espaço suficiente para o popup
-        if (mapOSsInstance) {
+        if (autoEase && mapOSsInstance) {
             mapOSsInstance.easeTo({
                 center: lngLat,
-                offset: [0, 120],
+                offset: [0, 140],
                 duration: 300
             });
         }
 
-        const screenMaxW = Math.min(window.innerWidth - 30, 980);
-        const targetW = totalUnicas === 1 ? 340 : (totalUnicas === 2 ? 640 : (totalUnicas === 3 ? 740 : 880));
+        const screenMaxW = Math.min(window.innerWidth - 30, 1200);
+        const targetW = totalUnicas === 1 ? 340 : (totalUnicas === 2 ? 650 : (totalUnicas === 3 ? 960 : 1200));
         const maxWidthPopup = `${Math.min(screenMaxW, targetW)}px`;
 
         popupDuplicadosAtual = new mapboxgl.Popup({ closeOnClick: true, maxWidth: maxWidthPopup, offset: 25, anchor: 'bottom' })
@@ -1701,23 +1777,12 @@
             .setHTML(popupHTML)
             .addTo(mapOSsInstance);
 
-        // Arredonda as coordenadas translate(x, y) do popup para números inteiros (elimina desfoque de subpixel no Chrome)
-        const snapPopupTransform = () => {
-            if (popupDuplicadosAtual && popupDuplicadosAtual._container) {
-                const style = popupDuplicadosAtual._container.style;
-                if (style.transform) {
-                    style.transform = style.transform.replace(
-                        /translate\(([\d.-]+)px,\s*([\d.-]+)px\)/g,
-                        (_, x, y) => `translate(${Math.round(parseFloat(x))}px, ${Math.round(parseFloat(y))}px)`
-                    );
-                }
-            }
-        };
+        popupDuplicadosAtual.on('close', () => {
+            popupDuplicadosAtual = null;
+            ultimoGrupoLngLat = null;
+        });
 
-        snapPopupTransform();
-        if (mapOSsInstance) {
-            mapOSsInstance.on('render', snapPopupTransform);
-        }
+        // Popup instanciado normalmente sem mutações de transform
     }
 
     function exibirDetalhesGrupoDuplicadoCard(grp) {
@@ -1988,6 +2053,12 @@
         // Atualização Otimista da Interface
         if (osEncontrada) {
             osEncontrada.status = "Aberta";
+            osEncontrada.rawStatus = "Aberta";
+            osEncontrada.normalizedStatus = "aberto";
+            if (osEncontrada._originalModel) {
+                osEncontrada._originalModel.rawStatus = "Aberta";
+                osEncontrada._originalModel.normalizedStatus = "aberto";
+            }
             const dataHora = new Date().toLocaleString('pt-BR');
             const logLinha = `${dataHora} - Reaberta: ${obs || "Sem justificativa"}`;
             osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
@@ -1999,17 +2070,115 @@
 
         // Atualização no Supabase via ChamadosService
         try {
-            if (osEncontrada && osEncontrada.id) {
-                await chamadosService.changeChamadoStatus(osEncontrada.id, 'aberto', obs);
+            const targetIdOrProtocol = osEncontrada ? (osEncontrada.protocolo || osEncontrada.id) : prot;
+            if (targetIdOrProtocol) {
+                if (window.chamadosService && typeof window.chamadosService.changeChamadoStatus === 'function') {
+                    await window.chamadosService.changeChamadoStatus(targetIdOrProtocol, 'aberto', obs);
+                } else if (window.ChamadosRepository) {
+                    const repo = new window.ChamadosRepository();
+                    await repo.updateStatus(targetIdOrProtocol, 'Aberta', obs);
+                }
             }
         } catch(e) {
             console.warn("⚠️ Falha ao sincronizar reabertura no Supabase:", e);
         }
     }
 
+    let pendingActionCallback = null;
+
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true }) {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        const modalIconBg = document.getElementById('modal-icon-bg');
+        const modalIcon = document.getElementById('modal-icon');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalJustificationInput = document.getElementById('modal-justification-input');
+        const justificationContainer = document.getElementById('modal-justification-container');
+
+        if (!modal || !modalBox) return;
+
+        if (modalTitle) modalTitle.textContent = title || 'Confirmar Ação';
+        if (modalMessage) modalMessage.innerHTML = message || 'Deseja prosseguir?';
+        if (modalIcon) modalIcon.textContent = icon || 'help';
+        if (modalIconBg) modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
+        if (modalConfirmBtn) {
+            modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+            modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        }
+
+        if (justificationContainer) {
+            if (showJustification === false) {
+                justificationContainer.classList.add('hidden');
+            } else {
+                justificationContainer.classList.remove('hidden');
+            }
+        }
+
+        if (modalJustificationInput) {
+            modalJustificationInput.value = '';
+        }
+
+        if (modalConfirmBtn) {
+            modalConfirmBtn.onclick = () => {
+                const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
+                if (typeof pendingActionCallback === 'function') {
+                    pendingActionCallback(justification);
+                }
+                window.closeConfirmModal();
+            };
+        }
+
+        pendingActionCallback = onConfirm;
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+            if (showJustification !== false && modalJustificationInput) modalJustificationInput.focus();
+        }, 10);
+    };
+
+    window.closeConfirmModal = function() {
+        const modal = document.getElementById('confirm-modal');
+        const modalBox = document.getElementById('confirm-modal-box');
+        if (!modal || !modalBox) return;
+
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        modalBox.classList.add('scale-95', 'opacity-0');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            pendingActionCallback = null;
+        }, 200);
+    };
+
     let osPrioridadePendente = null;
 
     function solicitarTrocaPrioridade(protocolo, novaPrioridade) {
+        if (typeof window.showConfirmModal === 'function') {
+            const isUrgente = (novaPrioridade === "Urgente");
+            window.showConfirmModal({
+                title: isUrgente ? 'Priorizar para Urgente' : 'Retornar para Normal',
+                message: isUrgente
+                    ? `Tem certeza que deseja alterar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocolo}</strong> para <strong class="text-amber-600 font-bold">URGENTE</strong>?`
+                    : `Deseja retornar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocolo}</strong> para <strong class="text-emerald-700 font-bold">NORMAL</strong>?`,
+                icon: isUrgente ? 'warning' : 'restart_alt',
+                iconBgClass: isUrgente ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700',
+                confirmBtnClass: isUrgente ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                confirmText: isUrgente ? 'Definir como Urgente' : 'Retornar para Normal',
+                showJustification: false,
+                onConfirm: async () => {
+                    osPrioridadePendente = { protocolo: protocolo, prioridade: novaPrioridade };
+                    await executarTrocaPrioridadeConfirmada();
+                }
+            });
+            return;
+        }
+
         osPrioridadePendente = { protocolo: protocolo, prioridade: novaPrioridade };
         const modal = document.getElementById('modalConfirmacaoPrioridade');
         const icon = document.getElementById('iconModalPrioridade');
@@ -2017,27 +2186,29 @@
         const msg = document.getElementById('msgModalPrioridade');
         const btn = document.getElementById('btnConfirmarPrioridadeModal');
 
-        if (novaPrioridade === "Urgente") {
-            icon.innerHTML = "⚡";
-            titulo.innerText = "Priorizar para Urgente";
-            titulo.className = "text-lg font-bold text-error mb-2";
-            msg.innerHTML = `Tem certeza que deseja alterar a <b>OS #${protocolo}</b> para prioridade <span class="text-error font-bold">URGENTE</span>?`;
-            btn.className = "flex-1 py-2 px-4 rounded-xl bg-error text-white font-semibold shadow-md hover:bg-error/90 transition-all";
-            btn.innerText = "Sim, Urgente!";
-        } else {
-            icon.innerHTML = "🟢";
-            titulo.innerText = "Reverter para Normal";
-            titulo.className = "text-lg font-bold text-[#188038] mb-2";
-            msg.innerHTML = `Deseja reverter a <b>OS #${protocolo}</b> para a prioridade <span class="text-[#188038] font-bold">NORMAL</span>?`;
-            btn.className = "flex-1 py-2 px-4 rounded-xl bg-[#188038] text-white font-semibold shadow-md hover:bg-[#188038]/90 transition-all";
-            btn.innerText = "Confirmar Normal";
+        if (modal && icon && titulo && msg && btn) {
+            if (novaPrioridade === "Urgente") {
+                icon.innerHTML = "⚡";
+                titulo.innerText = "Priorizar para Urgente";
+                titulo.className = "text-lg font-bold text-error mb-2";
+                msg.innerHTML = `Tem certeza que deseja alterar a <b>OS #${protocolo}</b> para prioridade <span class="text-error font-bold">URGENTE</span>?`;
+                btn.className = "flex-1 py-2 px-4 rounded-xl bg-error text-white font-semibold shadow-md hover:bg-error/90 transition-all";
+                btn.innerText = "Sim, Urgente!";
+            } else {
+                icon.innerHTML = "🟢";
+                titulo.innerText = "Reverter para Normal";
+                titulo.className = "text-lg font-bold text-[#188038] mb-2";
+                msg.innerHTML = `Deseja reverter a <b>OS #${protocolo}</b> para a prioridade <span class="text-[#188038] font-bold">NORMAL</span>?`;
+                btn.className = "flex-1 py-2 px-4 rounded-xl bg-[#188038] text-white font-semibold shadow-md hover:bg-[#188038]/90 transition-all";
+                btn.innerText = "Confirmar Normal";
+            }
+            modal.style.display = 'flex';
         }
-
-        modal.style.display = 'flex';
     }
 
     function fecharModalConfirmacaoPrioridade() {
-        document.getElementById('modalConfirmacaoPrioridade').style.display = 'none';
+        const modal = document.getElementById('modalConfirmacaoPrioridade');
+        if (modal) modal.style.display = 'none';
         osPrioridadePendente = null;
     }
 
@@ -2052,20 +2223,38 @@
         const prio = osPrioridadePendente.prioridade;
         fecharModalConfirmacaoPrioridade();
 
-        const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
+        // 1. Atualização otimista na memória para dadosOSsAbertasCache
+        const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "").toUpperCase() === String(prot).toUpperCase()) : null;
 
         if (osEncontrada) {
             osEncontrada.prioridade = prio;
+            if (osEncontrada._originalModel) {
+                osEncontrada._originalModel.prioridade = prio;
+            }
         }
+
+        // 2. Atualização otimista no window.chamadosListCache (ChamadoModel)
+        if (window.chamadosListCache) {
+            const modelObj = window.chamadosListCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "").toUpperCase() === String(prot).toUpperCase());
+            if (modelObj) {
+                modelObj.prioridade = prio;
+            }
+        }
+
+        // 3. Re-renderização instantânea no mapa
         const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
         renderizarMapaOSs(filtradas);
+
         const painelLat = document.getElementById('painelLateralOS');
         if (painelLat) painelLat.style.display = 'none';
 
         try {
-            if (osEncontrada && osEncontrada.id && chamadosService.repository) {
-                const client = chamadosService.repository.getClient();
-                await client.from('chamados').update({ prioridade: prio }).eq('id', osEncontrada.id);
+            const targetIdOrProtocol = osEncontrada ? (osEncontrada.protocolo || osEncontrada.id) : prot;
+            if (window.ChamadosRepository) {
+                const repo = new window.ChamadosRepository();
+                await repo.updatePriority(targetIdOrProtocol, prio);
+            } else if (chamadosService && chamadosService.repository) {
+                await chamadosService.repository.updatePriority(targetIdOrProtocol, prio);
             }
         } catch(e) {
             console.warn("⚠️ Falha ao sincronizar prioridade no Supabase:", e);
@@ -2115,6 +2304,12 @@
 
         if (osEncontrada) {
             osEncontrada.status = "Cancelada";
+            osEncontrada.rawStatus = "Cancelada";
+            osEncontrada.normalizedStatus = "cancelada";
+            if (osEncontrada._originalModel) {
+                osEncontrada._originalModel.rawStatus = "Cancelada";
+                osEncontrada._originalModel.normalizedStatus = "cancelada";
+            }
             const dataHora = new Date().toLocaleString('pt-BR');
             const logLinha = `${dataHora} - Cancelada: ${obs || "Sem justificativa"}`;
             osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
@@ -2125,8 +2320,14 @@
         if (painelLat) painelLat.style.display = 'none';
 
         try {
-            if (osEncontrada && osEncontrada.id) {
-                await chamadosService.changeChamadoStatus(osEncontrada.id, 'cancelada', obs);
+            const targetIdOrProtocol = osEncontrada ? (osEncontrada.protocolo || osEncontrada.id) : prot;
+            if (targetIdOrProtocol) {
+                if (window.chamadosService && typeof window.chamadosService.changeChamadoStatus === 'function') {
+                    await window.chamadosService.changeChamadoStatus(targetIdOrProtocol, 'cancelada', obs);
+                } else if (window.ChamadosRepository) {
+                    const repo = new window.ChamadosRepository();
+                    await repo.updateStatus(targetIdOrProtocol, 'Cancelada', obs);
+                }
             }
         } catch(e) {
             console.warn("⚠️ Falha ao sincronizar cancelamento no Supabase:", e);

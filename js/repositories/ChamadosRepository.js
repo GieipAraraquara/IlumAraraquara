@@ -180,38 +180,39 @@ class ChamadosRepository {
                 return res;
             };
 
-            const tablesToTry = [this.primaryTable, this.pracasTable];
+            const strVal = String(idOrProtocol || '').trim();
+            const isPraca = strVal.toUpperCase().startsWith('P');
+            const isNumeric = /^\d+$/.test(strVal);
+
+            const tablesToTry = isPraca
+                ? [this.pracasTable, this.primaryTable]
+                : [this.primaryTable, this.pracasTable];
+
             let updatedData = null;
             let lastError = null;
 
             for (const tableName of tablesToTry) {
-                // 1. Tenta atualizar por ID
-                let res = await executeUpdate(tableName, 'id', idOrProtocol, updatePayload);
+                const fieldsToTry = isNumeric ? ['id', 'protocolo'] : ['protocolo', 'id'];
 
-                if (res.data && res.data.length > 0) {
-                    updatedData = res.data;
-                    lastError = null;
-                    console.log(`✅ [ChamadosRepository] Status atualizado na tabela "${tableName}" por ID=${idOrProtocol}:`, updatedData);
-                    break;
-                } else if (res.error) {
-                    lastError = res.error;
-                    console.warn(`⚠️ [ChamadosRepository] Aviso ao atualizar na tabela "${tableName}" por ID=${idOrProtocol}:`, res.error);
-                }
+                for (const field of fieldsToTry) {
+                    try {
+                        const res = await executeUpdate(tableName, field, strVal, updatePayload);
 
-                // 2. Se não atualizou por ID, tenta por Protocolo
-                if (idOrProtocol) {
-                    res = await executeUpdate(tableName, 'protocolo', idOrProtocol, updatePayload);
-
-                    if (res.data && res.data.length > 0) {
-                        updatedData = res.data;
-                        lastError = null;
-                        console.log(`✅ [ChamadosRepository] Status atualizado na tabela "${tableName}" por Protocolo=${idOrProtocol}:`, updatedData);
-                        break;
-                    } else if (res.error) {
-                        lastError = res.error;
-                        console.warn(`⚠️ [ChamadosRepository] Aviso ao atualizar na tabela "${tableName}" por Protocolo=${idOrProtocol}:`, res.error);
+                        if (res.data && res.data.length > 0) {
+                            updatedData = res.data;
+                            lastError = null;
+                            console.log(`✅ [ChamadosRepository] Status atualizado na tabela "${tableName}" por ${field}=${strVal}:`, updatedData);
+                            break;
+                        } else if (res.error) {
+                            lastError = res.error;
+                            console.warn(`⚠️ [ChamadosRepository] Aviso ao atualizar na tabela "${tableName}" por ${field}=${strVal}:`, res.error);
+                        }
+                    } catch (e) {
+                        lastError = e;
                     }
                 }
+
+                if (updatedData && updatedData.length > 0) break;
             }
 
             if (!updatedData || updatedData.length === 0) {
@@ -239,38 +240,41 @@ class ChamadosRepository {
             const client = this.getClient();
             const updatePayload = { prioridade: newPriority };
 
-            const tablesToTry = [this.primaryTable, this.pracasTable];
+            const strVal = String(idOrProtocol || '').trim();
+            const isPraca = strVal.toUpperCase().startsWith('P');
+            const isNumeric = /^\d+$/.test(strVal);
+
+            const tablesToTry = isPraca
+                ? [this.pracasTable, this.primaryTable]
+                : [this.primaryTable, this.pracasTable];
+
             let updatedData = null;
             let lastError = null;
 
             for (const tableName of tablesToTry) {
-                let res = await client
-                    .from(tableName)
-                    .update(updatePayload)
-                    .eq('id', idOrProtocol)
-                    .select();
+                const fieldsToTry = isNumeric ? ['id', 'protocolo'] : ['protocolo', 'id'];
 
-                if (res.data && res.data.length > 0) {
-                    updatedData = res.data;
-                    break;
-                } else if (res.error) {
-                    lastError = res.error;
-                }
+                for (const field of fieldsToTry) {
+                    try {
+                        const res = await client
+                            .from(tableName)
+                            .update(updatePayload)
+                            .eq(field, strVal)
+                            .select();
 
-                if (idOrProtocol) {
-                    res = await client
-                        .from(tableName)
-                        .update(updatePayload)
-                        .eq('protocolo', idOrProtocol)
-                        .select();
-
-                    if (res.data && res.data.length > 0) {
-                        updatedData = res.data;
-                        break;
-                    } else if (res.error) {
-                        lastError = res.error;
+                        if (res.data && res.data.length > 0) {
+                            updatedData = res.data;
+                            lastError = null;
+                            break;
+                        } else if (res.error) {
+                            lastError = res.error;
+                        }
+                    } catch (e) {
+                        lastError = e;
                     }
                 }
+
+                if (updatedData && updatedData.length > 0) break;
             }
 
             if (!updatedData || updatedData.length === 0) {

@@ -1033,7 +1033,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1052,12 +1052,21 @@
         modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
         modalConfirmBtn.textContent = confirmText || 'Confirmar';
 
+        const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
+        if (justificationContainer) {
+            if (showJustification === false) {
+                justificationContainer.classList.add('hidden');
+            } else {
+                justificationContainer.classList.remove('hidden');
+            }
+        }
+
         if (modalJustificationInput) {
             modalJustificationInput.value = '';
         }
 
         modalConfirmBtn.onclick = () => {
-            const justification = modalJustificationInput ? modalJustificationInput.value.trim() : '';
+            const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
             if (typeof pendingActionCallback === 'function') {
                 pendingActionCallback(justification);
             }
@@ -1070,7 +1079,7 @@
         setTimeout(() => {
             modalBox.classList.remove('scale-95', 'opacity-0');
             modalBox.classList.add('scale-100', 'opacity-100');
-            if (modalJustificationInput) modalJustificationInput.focus();
+            if (showJustification !== false && modalJustificationInput) modalJustificationInput.focus();
         }, 10);
     };
 
@@ -1133,10 +1142,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            window.painelController.handleStatusAction(protocol || osId, 'aberto', event);
             return;
         }
 
@@ -1150,7 +1159,7 @@
             onConfirm: async () => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta');
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -1167,10 +1176,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'cancelada', event);
+            window.painelController.handleStatusAction(protocol || osId, 'cancelada', event);
             return;
         }
 
@@ -1184,7 +1193,7 @@
             onConfirm: async () => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Cancelada');
+                    await repo.updateStatus(protocol || osId, 'Cancelada');
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -1201,11 +1210,11 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         let item = null;
         if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
-            item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(protocol));
+            item = window.painelController.chamadosList.find(c => String(c.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(c.id || "") === String(osId));
         }
 
         if (typeof window.abrirModalFinalizarOS === 'function') {
@@ -1217,10 +1226,10 @@
         if (event) event.stopPropagation();
         const row = btn.closest('tr');
         const osId = row ? row.getAttribute('data-id') : null;
-        const protocol = row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS';
+        const protocol = osId || (row ? (row.cells[0]?.textContent.trim() || 'esta OS') : 'esta OS');
 
         if (window.painelController && typeof window.painelController.handleStatusAction === 'function') {
-            window.painelController.handleStatusAction(osId || protocol, 'aberto', event);
+            window.painelController.handleStatusAction(protocol || osId, 'aberto', event);
             return;
         }
 
@@ -1234,7 +1243,7 @@
             onConfirm: async () => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(osId || protocol, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta');
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
