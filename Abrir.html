@@ -22,7 +22,13 @@
         });
       }
 
-      let deferredPwaPrompt = null;
+      window.deferredPwaPrompt = null;
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPwaPrompt = e;
+        checarVisibilidadeBotaoInstalarPwa();
+      });
 
       function checarVisibilidadeBotaoInstalarPwa() {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -41,12 +47,6 @@
         }
       }
 
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPwaPrompt = e;
-        checarVisibilidadeBotaoInstalarPwa();
-      });
-
       document.addEventListener('DOMContentLoaded', () => {
         checarVisibilidadeBotaoInstalarPwa();
       });
@@ -56,11 +56,12 @@
       });
 
       async function dispararInstalacaoPWA() {
-        if (deferredPwaPrompt) {
-          deferredPwaPrompt.prompt();
-          const { outcome } = await deferredPwaPrompt.userChoice;
+        const pwaPrompt = window.deferredPwaPrompt;
+        if (pwaPrompt) {
+          pwaPrompt.prompt();
+          const { outcome } = await pwaPrompt.userChoice;
           console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
-          deferredPwaPrompt = null;
+          window.deferredPwaPrompt = null;
           fecharBannerPWA();
         } else {
           const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -83,7 +84,7 @@
 
       window.addEventListener('appinstalled', () => {
         console.log('⚡ [PWA] Aplicativo instalado com sucesso!');
-        deferredPwaPrompt = null;
+        window.deferredPwaPrompt = null;
         fecharBannerPWA();
       });
 

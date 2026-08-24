@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v109';
+const CACHE_NAME = 'sistema-os-pwa-v110';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -10,6 +10,8 @@ const ASSETS_TO_CACHE = [
   './Auditoria.html',
   './Mapa.html',
   './manifest.json',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
   './fonts/material-symbols.css',
   './fonts/material-symbols-outlined.woff2',
   './js/config/supabaseClient.js',
