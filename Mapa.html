@@ -436,13 +436,12 @@
                     <span class="material-symbols-outlined text-[15px]">route</span>
                     <span>Rota Viária</span>
                 </button>
-                <button type="button" id="btnModoRotasOperador" onclick="togglePainelRotasOperador()" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-emerald-600 hover:border-emerald-600 transition-all flex items-center gap-1 active:scale-95">
+                <button type="button" id="btnModoRotasOperador" onclick="togglePainelRotasOperador()" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-emerald-600 hover:border-emerald-600 transition-all flex items-center gap-1 active:scale-95 hidden">
                     <span class="material-symbols-outlined text-[15px]">engineering</span>
-                    <span>Rotas Operador</span>
+                    <span>Operador</span>
                 </button>
-                <button type="button" onclick="carregarMapaOSsAbertas()" class="px-2.5 py-1 text-xs rounded-lg font-semibold bg-secondary text-on-secondary hover:bg-secondary-container transition-all active:scale-95 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[14px]">refresh</span>
-                    <span>Atualizar</span>
+                <button type="button" onclick="carregarMapaOSsAbertas()" class="px-2 py-1 text-xs rounded-lg font-semibold bg-secondary text-on-secondary hover:bg-secondary-container transition-all active:scale-95 flex items-center justify-center cursor-pointer" title="Atualizar">
+                    <span class="material-symbols-outlined text-[15px]">refresh</span>
                 </button>
             </div>
         </div>
@@ -1020,6 +1019,22 @@
 
     function aplicarFiltrosMapa() {
         const stAtual = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+
+        const btnRotasOp = document.getElementById('btnModoRotasOperador');
+        if (btnRotasOp) {
+            const permitirOperador = (stAtual === 'resolvidas' || stAtual === 'todas');
+            if (permitirOperador) {
+                btnRotasOp.classList.remove('hidden');
+                btnRotasOp.style.display = '';
+            } else {
+                btnRotasOp.classList.add('hidden');
+                btnRotasOp.style.display = 'none';
+                if (typeof fecharPainelRotasOperador === 'function') {
+                    fecharPainelRotasOperador();
+                }
+            }
+        }
+
         const osCache = window.dadosOSsAbertasCache || (typeof dadosOSsAbertasCache !== 'undefined' ? dadosOSsAbertasCache : []);
 
         if (osCache && osCache.length > 0) {
@@ -3496,7 +3511,7 @@
         const operadoresArr = Array.from(operadoresSet).sort();
         const valorAtual = select.value;
 
-        select.innerHTML = '<option value="ALL">-- Todos os Operadores --</option>';
+        select.innerHTML = '<option value="ALL">Todos</option>';
         operadoresArr.forEach(op => {
             const opt = document.createElement('option');
             opt.value = op;
