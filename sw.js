@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-pwa-v112';
+const CACHE_NAME = 'luz-araraquara-pwa-v115';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -29,9 +29,10 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  console.log('⚡ [Service Worker] Instalando PWA Luz Araraquara...');
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('⚡ [Service Worker] Instalando PWA...');
       for (const url of ASSETS_TO_CACHE) {
         try {
           await cache.add(url);
@@ -39,7 +40,7 @@ self.addEventListener('install', (event) => {
           console.warn('⚠️ [Service Worker] Ignorando asset com falha no pré-cache:', url);
         }
       }
-    }).then(() => self.skipWaiting())
+    })
   );
 });
 
@@ -61,10 +62,8 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const request = event.request;
 
-  if (request.method !== 'GET') return;
-
-  // Ignora requisições externas do Mapbox e Supabase para permitir manuseio nativo de CORS e tiles pelo navegador
-  if (request.url.includes('mapbox.com') || request.url.includes('supabase.co')) {
+  if (request.method !== 'GET' || request.url.includes('mapbox.com') || request.url.includes('supabase.co')) {
+    event.respondWith(fetch(request));
     return;
   }
 
