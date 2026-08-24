@@ -2,13 +2,29 @@
 <html lang="pt-BR">
   <head>
     <base target="_top">
-    <title>OS Iluminação e Praças - Araraquara</title>
+    <title>Abertura de Chamados - Luz Araraquara</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <!-- PWA Manifest & Meta Tags -->
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+
+    <!-- Listener de Instalação PWA Imediato (Captura no HEAD) -->
+    <script>
+      window.deferredPwaPrompt = window.deferredPwaPrompt || null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso no HEAD!');
+        window.deferredPwaPrompt = e;
+        if (typeof checarVisibilidadeBotaoInstalarPwa === 'function') {
+          checarVisibilidadeBotaoInstalarPwa();
+        }
+      });
+    </script>
 
     <script>
       // Registro do Service Worker PWA e Gerenciador de Instalação
@@ -28,15 +44,6 @@
       } else {
         window.addEventListener('load', registrarSW);
       }
-
-      window.deferredPwaPrompt = null;
-
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso!');
-        window.deferredPwaPrompt = e;
-        checarVisibilidadeBotaoInstalarPwa();
-      });
 
       function checarVisibilidadeBotaoInstalarPwa() {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -901,7 +908,7 @@
                 <span class="material-symbols-outlined text-xl">install_mobile</span>
               </div>
               <div>
-                <h3 class="font-bold text-xs sm:text-sm leading-tight text-white">Instalar App Sistema OS</h3>
+                <h3 class="font-bold text-xs sm:text-sm leading-tight text-white">Instalar App Luz Araraquara</h3>
                 <p class="text-[11px] text-blue-100/90 mt-0.5">Instale no seu celular para abrir chamados de forma rápida.</p>
               </div>
             </div>

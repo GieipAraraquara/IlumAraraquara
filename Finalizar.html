@@ -3,14 +3,30 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Finalizar Ordem de Serviço - Sistema OS Manager</title>
-    <meta name="description" content="Interface de Finalização e Auditoria de Ordens de Serviço de Iluminação Viária e Praças Públicas." />
+    <title>Finalizar Ordem de Serviço - Luz Araraquara</title>
+    <meta name="description" content="Interface de Finalização e Auditoria de Ordens de Serviço - Luz Araraquara." />
 
-    <!-- PWA Manifest & Meta Tags -->
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <link rel="manifest" href="manifest.json" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+    <!-- Listener de Instalação PWA Imediato (Captura no HEAD) -->
+    <script>
+      window.deferredPwaPrompt = window.deferredPwaPrompt || null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso no HEAD!');
+        window.deferredPwaPrompt = e;
+        if (typeof checarVisibilidadeBotaoInstalarPwa === 'function') {
+          checarVisibilidadeBotaoInstalarPwa();
+        }
+      });
+    </script>
 
     <!-- Supabase JS Client & Auth Guard Layer -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -28,7 +44,6 @@
     <script src="js/domain/ChamadoModel.js?v=31"></script>
     <script src="js/services/MapService.js?v=73"></script>
 
-    <script>
       // Registro do Service Worker PWA e Gerenciador de Instalação
       function registrarSW() {
         if ('serviceWorker' in navigator) {
@@ -45,15 +60,6 @@
       } else {
         window.addEventListener('load', registrarSW);
       }
-
-      window.deferredPwaPrompt = null;
-
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso!');
-        window.deferredPwaPrompt = e;
-        checarVisibilidadeBotaoInstalarPwa();
-      });
 
       function checarVisibilidadeBotaoInstalarPwa() {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -320,7 +326,7 @@
                     <span class="material-symbols-outlined text-2xl">install_mobile</span>
                 </div>
                 <div>
-                    <h3 class="font-bold text-sm leading-tight text-white">Instalar App Sistema OS</h3>
+                    <h3 class="font-bold text-sm leading-tight text-white">Instalar App Luz Araraquara</h3>
                     <p class="text-xs text-blue-100/90 mt-0.5">Instale no celular ou computador para acesso rápido e modo offline.</p>
                 </div>
             </div>

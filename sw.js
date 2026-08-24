@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v111';
+const CACHE_NAME = 'luz-araraquara-pwa-v112';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -10,6 +10,7 @@ const ASSETS_TO_CACHE = [
   './Auditoria.html',
   './Mapa.html',
   './manifest.json',
+  './favicon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './fonts/material-symbols.css',
