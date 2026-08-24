@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-pwa-v115';
+const CACHE_NAME = 'luz-araraquara-pwa-v120';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',

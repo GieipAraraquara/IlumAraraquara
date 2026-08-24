@@ -10,7 +10,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="manifest" href="manifest.json?v=3" />
+    <link rel="manifest" href="manifest.json?v=4" />
     <meta name="theme-color" content="#1a73e8" />
     <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -1092,7 +1092,9 @@
           const auth = await window.AuthGuard.requireAuth();
           if (auth && auth.user) {
             const userLabel = document.getElementById('userEmailLabel');
-            if (userLabel) userLabel.innerText = auth.profile?.nome || auth.user.email || 'Servidor';
+            const userNome = auth.profile?.nome || auth.user.user_metadata?.nome || auth.user.email || 'Servidor';
+            if (userLabel) userLabel.innerText = userNome;
+            window.operadorLogadoNome = userNome;
           }
         }
 
@@ -1737,6 +1739,17 @@
         });
       }
 
+      function obterNomeOperadorLogado() {
+        if (window.operadorLogadoNome) return window.operadorLogadoNome;
+        var userLabel = document.getElementById('userEmailLabel')?.innerText;
+        if (userLabel && userLabel !== 'Servidor Autenticado' && userLabel !== 'Servidor') return userLabel;
+        var localNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || localStorage.getItem('nome_operador');
+        if (localNome && localNome !== 'null' && localNome !== 'undefined') return localNome;
+        var localEmail = localStorage.getItem('user_email') || localStorage.getItem('email');
+        if (localEmail && localEmail.includes('@')) return localEmail.split('@')[0];
+        return 'Técnico';
+      }
+
       // =========================================================================
       // ENVIO E FINALIZAÇÃO DE OS VIÁRIA NO SUPABASE
       // =========================================================================
@@ -1965,9 +1978,15 @@
 
           var firstPoint = arrPontosPayload[0] || {};
 
+          var nomeOperadorFinalizacao = obterNomeOperadorLogado();
+
           var payloadUpdate = {
             status: "Concluída",
             data_fechamento: new Date().toISOString(),
+            operador_finalizacao: nomeOperadorFinalizacao,
+            usuario_finalizacao: nomeOperadorFinalizacao,
+            finalizado_por: nomeOperadorFinalizacao,
+            tecnico: nomeOperadorFinalizacao,
             materiais: carrinhoMateriais,
             descricao: document.getElementById('descricao').value.trim() || null,
             pontos_final: arrPontosPayload,
