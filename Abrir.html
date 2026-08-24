@@ -24,36 +24,52 @@
 
       let deferredPwaPrompt = null;
 
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPwaPrompt = e;
-
+      function checarVisibilidadeBotaoInstalarPwa() {
         const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        if (window.self === window.top && !isStandalone) {
-          const banner = document.getElementById('pwaInstallBanner');
-          const btnHeader = document.getElementById('btnInstalarPwaHeader');
+        const isInIframe = window.self !== window.top;
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+
+        const banner = document.getElementById('pwaInstallBanner');
+
+        if (!isStandalone && !isInIframe && isMobileDevice) {
           if (banner && sessionStorage.getItem('pwa_banner_dismissed') !== 'true') {
             banner.classList.remove('hidden');
             banner.classList.add('flex');
           }
-          if (btnHeader) {
-            btnHeader.classList.remove('hidden');
-            btnHeader.classList.add('inline-flex');
-          }
+        } else {
+          if (banner) banner.classList.add('hidden');
         }
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPwaPrompt = e;
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      window.addEventListener('resize', () => {
+        checarVisibilidadeBotaoInstalarPwa();
       });
 
       async function dispararInstalacaoPWA() {
-        if (!deferredPwaPrompt) {
-          alert('Para instalar o aplicativo, abra o menu do seu navegador (três pontos ou compartilhar) e selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
-          return;
+        if (deferredPwaPrompt) {
+          deferredPwaPrompt.prompt();
+          const { outcome } = await deferredPwaPrompt.userChoice;
+          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+          deferredPwaPrompt = null;
+          fecharBannerPWA();
+        } else {
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          if (isIOS) {
+            alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
+          } else {
+            alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
+          }
         }
-
-        deferredPwaPrompt.prompt();
-        const { outcome } = await deferredPwaPrompt.userChoice;
-        console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
-        deferredPwaPrompt = null;
-        fecharBannerPWA();
       }
 
       function fecharBannerPWA() {
@@ -69,8 +85,6 @@
         console.log('⚡ [PWA] Aplicativo instalado com sucesso!');
         deferredPwaPrompt = null;
         fecharBannerPWA();
-        const btnHeader = document.getElementById('btnInstalarPwaHeader');
-        if (btnHeader) btnHeader.classList.add('hidden');
       });
 
       // Aplicação instantânea do layout salvo do Modo Rápido (Evita FOUC / Carregamento rápido do formulário padrão)
@@ -827,19 +841,10 @@
               <span class="material-symbols-outlined text-[22px]">add_task</span>
             </div>
             <div>
-              <h2 class="text-base font-bold text-slate-800 leading-tight">Abertura de Ordem de Serviço</h2>
-              <p class="text-xs text-slate-500 font-medium" id="headerSubtitulo">Portal do Cidadão - Iluminação Araraquara</p>
+              <h2 class="text-base font-bold text-slate-800 leading-tight">Abertura</h2>
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <!-- Botão de Instalação PWA no Cabeçalho -->
-            <button type="button" 
-                    id="btnInstalarPwaHeader"
-                    onclick="dispararInstalacaoPWA()"
-                    class="hidden px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 border border-blue-200 transition-colors items-center gap-1 cursor-pointer" title="Instalar Aplicativo">
-              <span class="material-symbols-outlined text-[18px] text-blue-600">download</span>
-              <span class="hidden sm:inline">Instalar App</span>
-            </button>
             <button type="button" id="btnHeaderLogout" onclick="if(window.AuthGuard)window.AuthGuard.logout();else window.location.href='Login.html';" class="text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors" title="Sair do Sistema">
               <span class="material-symbols-outlined text-[18px]">logout</span>
               <span class="hidden sm:inline">Sair</span>
@@ -853,8 +858,8 @@
         <!-- CORPO DO POPUP (CONTEÚDO FORMULÁRIO ROLÁVEL NA PÁGINA) -->
         <div id="corpoFormularioModal" class="flex-1 min-h-0 p-5 sm:p-7 space-y-4">
 
-          <!-- BANNER PROMPT DE INSTALAÇÃO DO PWA -->
-          <div id="pwaInstallBanner" class="hidden bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-3.5 shadow-md border border-blue-500/30 flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 animate-fade-in mb-3">
+          <!-- BANNER PROMPT DE INSTALAÇÃO DO PWA (Apenas Mobile) -->
+          <div id="pwaInstallBanner" class="hidden md:hidden bg-gradient-to-r from-blue-600 to-indigo-700 text-white rounded-2xl p-3.5 shadow-md border border-blue-500/30 flex-col sm:flex-row items-start sm:items-center justify-between gap-3 transition-all duration-300 animate-fade-in mb-3">
             <div class="flex items-center gap-3 min-w-0">
               <div class="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white flex-shrink-0 border border-white/20">
                 <span class="material-symbols-outlined text-xl">install_mobile</span>
@@ -1437,7 +1442,7 @@
         if (tabTipoOS) tabTipoOS.style.display = 'none';
 
         // Atualiza título do cabeçalho
-        var h1Title = document.querySelector('#appPrincipal h1');
+        var h1Title = document.querySelector('#appPrincipal h1, #appPrincipal h2');
         if (h1Title) h1Title.textContent = 'Editar Ordem de Serviço';
 
         var banner = document.getElementById('bannerModoEdicao');
@@ -1706,30 +1711,37 @@
         // Helper para travar ou destravar campos do solicitante
         function aplicarBloqueioCamposGovBr(bloquear, nome, cpf) {
           if (municipeInput) {
-            if (nome) municipeInput.value = nome;
-            municipeInput.readOnly = bloquear;
-            municipeInput.disabled = bloquear;
             if (bloquear) {
+              if (nome) municipeInput.value = nome;
+              municipeInput.readOnly = true;
+              municipeInput.disabled = true;
               municipeInput.classList.remove('bg-white');
               municipeInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-700', 'font-semibold');
             } else {
+              municipeInput.value = '';
+              municipeInput.readOnly = false;
+              municipeInput.disabled = false;
               municipeInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-700', 'font-semibold');
               municipeInput.classList.add('bg-white');
             }
           }
 
           if (cpfInput) {
-            if (cpf) {
-              var cleanCpf = String(cpf).replace(/\D/g, '');
-              cpfInput.dataset.rawCpf = cleanCpf;
-              cpfInput.value = ocultarCPFParaLGPD(cleanCpf);
-            }
-            cpfInput.readOnly = bloquear;
-            cpfInput.disabled = bloquear;
             if (bloquear) {
+              if (cpf) {
+                var cleanCpf = String(cpf).replace(/\D/g, '');
+                cpfInput.dataset.rawCpf = cleanCpf;
+                cpfInput.value = ocultarCPFParaLGPD(cleanCpf);
+              }
+              cpfInput.readOnly = true;
+              cpfInput.disabled = true;
               cpfInput.classList.remove('bg-white');
               cpfInput.classList.add('bg-slate-100', 'cursor-not-allowed', 'text-slate-700', 'font-semibold');
             } else {
+              cpfInput.dataset.rawCpf = '';
+              cpfInput.value = '';
+              cpfInput.readOnly = false;
+              cpfInput.disabled = false;
               cpfInput.classList.remove('bg-slate-100', 'cursor-not-allowed', 'text-slate-700', 'font-semibold');
               cpfInput.classList.add('bg-white');
             }
@@ -1952,8 +1964,8 @@
         var banner = document.getElementById('bannerModoEdicao');
         if (banner) banner.remove();
 
-        var h1Title = document.querySelector('#appPrincipal h1');
-        if (h1Title) h1Title.textContent = 'Abertura de Ordem de Serviço';
+        var h1Title = document.querySelector('#appPrincipal h1, #appPrincipal h2');
+        if (h1Title) h1Title.textContent = 'Abertura';
 
         var btnSalvar = document.getElementById('btnSalvar');
         if (btnSalvar) btnSalvar.innerText = 'Salvar';
@@ -2881,7 +2893,7 @@
           status: statusOS,
           motivo_aprovacao: motivoAprovacaoRapida,
           prioridade: 'Normal',
-          municipe_nome: userAuth.nome || 'Servidor',
+          municipe_nome: userAuth.isGovBr ? (userAuth.nome || null) : null,
           operador: userAuth.nome || 'Servidor',
           telefone_fixo: null,
           telefone_celular: null,
@@ -5165,7 +5177,7 @@
           status: statusOS,
           motivo_aprovacao: motivoAprovacaoPraca,
           prioridade: dados.prioridade,
-          municipe_nome: dados.municipe || userAuth.nome || null,
+          municipe_nome: dados.municipe || (userAuth.isGovBr ? userAuth.nome : null),
           operador: document.getElementById('operador')?.value || userAuth.nome || 'Servidor',
           telefone_fixo: dados.telefoneFixo || null,
           telefone_celular: dados.telefoneCelular || null,
@@ -5610,7 +5622,7 @@
           status: statusOS,
           motivo_aprovacao: motivoAprovacaoViaria,
           prioridade: dadosFinais.prioridade,
-          municipe_nome: dadosFinais.municipe || userAuth.nome || null,
+          municipe_nome: dadosFinais.municipe || (userAuth.isGovBr ? userAuth.nome : null),
           operador: document.getElementById('operador')?.value || userAuth.nome || 'Servidor',
           telefone_fixo: dadosFinais.telefoneFixo || null,
           telefone_celular: dadosFinais.telefoneCelular || null,

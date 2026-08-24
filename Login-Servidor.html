@@ -19,7 +19,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
-      // Registro do Service Worker PWA
+      // Registro do Service Worker PWA e Gerenciador de Instalação
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('./sw.js').then(function(reg) {
@@ -29,6 +29,62 @@
           });
         });
       }
+
+      let deferredPwaPrompt = null;
+
+      function checarVisibilidadeBotaoInstalarPwa() {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isInIframe = window.self !== window.top;
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+
+        const btnLogin = document.getElementById('btnInstalarPwaLogin');
+        if (!btnLogin) return;
+
+        if (!isStandalone && !isInIframe && isMobileDevice) {
+          btnLogin.classList.remove('hidden');
+          btnLogin.classList.add('flex');
+        } else {
+          btnLogin.classList.add('hidden');
+          btnLogin.classList.remove('flex');
+        }
+      }
+
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPwaPrompt = e;
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      window.addEventListener('resize', () => {
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      async function dispararInstalacaoPWA() {
+        if (deferredPwaPrompt) {
+          deferredPwaPrompt.prompt();
+          const { outcome } = await deferredPwaPrompt.userChoice;
+          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+          deferredPwaPrompt = null;
+        } else {
+          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+          if (isIOS) {
+            alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
+          } else {
+            alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
+          }
+        }
+      }
+
+      window.addEventListener('appinstalled', () => {
+        console.log('⚡ [PWA] Aplicativo instalado com sucesso!');
+        deferredPwaPrompt = null;
+        const btnLogin = document.getElementById('btnInstalarPwaLogin');
+        if (btnLogin) btnLogin.classList.add('hidden');
+      });
     </script>
 
     <!-- Fonts & Icons -->
@@ -240,6 +296,15 @@
                 <span class="material-symbols-outlined text-[18px]">person_add</span>
                 <span>Solicitar Cadastro</span>
             </a>
+
+            <!-- Botão de Instalação do PWA no Celular -->
+            <button type="button" 
+                    id="btnInstalarPwaLogin"
+                    onclick="dispararInstalacaoPWA()"
+                    class="hidden md:hidden w-full py-2.5 px-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-semibold rounded-xl text-xs shadow-sm hover:shadow transition-all items-center justify-center gap-2 cursor-pointer mb-3">
+                <span class="material-symbols-outlined text-[18px] text-blue-600">download</span>
+                <span>Instalar App no Celular</span>
+            </button>
             
             <p class="text-xs text-on-surface-variant mt-3">
                 É um cidadão? 
