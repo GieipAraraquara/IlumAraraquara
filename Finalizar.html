@@ -1481,6 +1481,7 @@
       // GERENCIAMENTO DE MATERIAIS (SUPABASE: materiais_contrato)
       // =========================================================================
       var materiaisPadraoFallback = [
+        "ELETRICISTA COM ENCARGOS COMPLEMENTARES (H)",
         "INTRAL - LÂMPADA LED 50W (UN)",
         "INTRAL - LÂMPADA LED 100W (UN)",
         "INTRAL - LÂMPADA LED 150W (UN)",
@@ -1546,10 +1547,16 @@
               return valFinal.trim();
             }).filter(Boolean).sort();
 
+            // Garantir que o item essencial de horas de eletricista esteja na lista
+            var itemEletricista = "ELETRICISTA COM ENCARGOS COMPLEMENTARES (H)";
+            if (!opcoesMateriais.some(m => m.toUpperCase().includes('ELETRICISTA COM ENCARGOS'))) {
+              opcoesMateriais.unshift(itemEletricista);
+            }
+
             console.log("🎉 [MATERIAIS CONTRATO] Lista final processada (" + opcoesMateriais.length + " itens):", opcoesMateriais);
             localStorage.setItem('os_cached_materiais', JSON.stringify(opcoesMateriais));
           } else {
-            console.warn("⚠️ [MATERIAIS CONTRATO] Tabela retornou array vazio ([]). Isso ocorre quando a tabela não possui linhas inseridas ou a política de RLS (Row Level Security) impede a leitura.");
+            console.warn("⚠️ [MATERIAIS CONTRATO] Tabela retornou array vazio ([]). Usando fallback com item de horas de eletricista.");
             usarFallbackMateriais();
           }
         } catch (err) {
@@ -1965,6 +1972,8 @@
               }
             }
 
+            var ocrTexto = stObj.textoAuditoriaOCR || null;
+
             arrPontosPayload.push({
               ponto: i + 1,
               plaqueta: plaq,
@@ -1973,13 +1982,16 @@
               lng: lngVal,
               coordenada: coordStr,
               data_reparo: dataReparo,
-              evidencias: evidenciasUrls
+              evidencias: evidenciasUrls,
+              texto_auditoria_ocr: ocrTexto
             });
           }
 
           var firstPoint = arrPontosPayload[0] || {};
 
           var nomeOperadorFinalizacao = obterNomeOperadorLogado();
+
+          var ocrGeral = arrPontosPayload.map(p => p.texto_auditoria_ocr).filter(t => t && t !== "Nenhuma leitura realizada").join(' | ') || (firstPoint.texto_auditoria_ocr || null);
 
           var payloadUpdate = {
             status: "Concluída",
@@ -1991,7 +2003,8 @@
             materiais: carrinhoMateriais,
             descricao: document.getElementById('descricao').value.trim() || null,
             pontos_final: arrPontosPayload,
-            status_auditoria: "Pendente"
+            status_auditoria: "Pendente",
+            texto_auditoria_ocr: ocrGeral
           };
 
           if (firstPoint.plaqueta) {

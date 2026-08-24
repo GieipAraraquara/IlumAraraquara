@@ -81,12 +81,13 @@ class AppSidebar extends HTMLElement {
         const menuItems = isRestrictedMode ? [
             { id: 'painel-manutentor', label: 'Acompanhamento', icon: 'dashboard', href: 'Painel-Manutentor.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
+            { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";', mtAuto: true }
         ] : [
             { id: 'painel', label: 'Acompanhamento', icon: 'dashboard', href: 'Painel.html' },
             { id: 'auditoria', label: 'Auditoria', icon: 'fact_check', href: 'Auditoria.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
-            { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: '#' },
+            { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
             { id: 'configuracoes', label: 'Configurações', icon: 'settings', href: '#', mtAuto: true },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";' }
         ];
@@ -102,7 +103,10 @@ class AppSidebar extends HTMLElement {
     </button>`;
 
         const navLinksHtml = menuItems.map(item => {
-            const isActive = item.id === activePage || (activePage === 'painel' && item.id === 'painel-manutentor') || (activePage === 'painel-manutentor' && item.id === 'painel-manutentor');
+            const isActive = item.id === activePage || 
+                             (activePage.includes('relat') && item.id === 'relatorios') ||
+                             (activePage === 'painel' && item.id === 'painel-manutentor') || 
+                             (activePage === 'painel-manutentor' && item.id === 'painel-manutentor');
             const activeClasses = 'text-secondary font-bold border-r-4 border-secondary bg-surface-container-high';
             const inactiveClasses = 'text-on-surface-variant hover:bg-surface-container-low';
             const extraClasses = item.mtAuto ? 'mt-auto' : '';
@@ -401,8 +405,8 @@ function updateSidebarActiveState(targetUrl) {
     if (lower.includes('manutentor')) activeId = 'painel-manutentor';
     else if (lower.includes('auditoria')) activeId = 'auditoria';
     else if (lower.includes('mapa')) activeId = 'mapa';
-    else if (lower.includes('relatorios')) activeId = 'relatorios';
-    else if (lower.includes('configuracoes')) activeId = 'configuracoes';
+    else if (lower.includes('relat')) activeId = 'relatorios';
+    else if (lower.includes('config')) activeId = 'configuracoes';
 
     sidebar.setAttribute('active', activeId);
 
@@ -413,7 +417,10 @@ function updateSidebarActiveState(targetUrl) {
     links.forEach(a => {
         const href = a.getAttribute('href') || '';
         const linkClean = href.split('?')[0].toLowerCase();
-        const isThisActive = linkClean === lower || (activeId === 'painel' && linkClean.includes('painel'));
+        const isThisActive = linkClean === lower || 
+                             (activeId === 'relatorios' && linkClean.includes('relat')) ||
+                             (activeId === 'painel' && linkClean.includes('painel') && !linkClean.includes('manutentor')) ||
+                             (activeId === 'painel-manutentor' && linkClean.includes('manutentor'));
 
         if (isThisActive) {
             inactiveClasses.forEach(c => a.classList.remove(c));
@@ -475,8 +482,19 @@ function reinitPageControllers(targetUrl) {
         }
     } else if (page.includes('mapa')) {
         window.mapOSsInstance = null;
+        if (!window.chamadosService && typeof window.ChamadosService === 'function') {
+            window.chamadosService = new window.ChamadosService();
+        }
         if (typeof window.carregarMapaOSsAbertas === 'function') {
             window.carregarMapaOSsAbertas();
+        }
+    } else if (page.includes('relat')) {
+        const Controller = window.RelatorioController || (typeof RelatorioController !== 'undefined' ? RelatorioController : null);
+        if (Controller) {
+            window.relatorioController = new Controller();
+            window.relatorioController.init();
+        } else {
+            console.warn('⚠️ [SPA] RelatorioController não disponível para inicialização.');
         }
     }
 }
@@ -524,7 +542,7 @@ window.navigateSPA = async function(targetUrl, pushState = true) {
         const scripts = Array.from(doc.querySelectorAll('script[src]'));
         for (const s of scripts) {
             const src = s.getAttribute('src');
-            if (src && !src.includes('tailwindcss') && !src.includes('three') && !src.includes('sidebar.js') && !src.includes('header.js') && !src.includes('mapbox-gl.js')) {
+            if (src && !src.includes('tailwindcss') && !src.includes('three') && !src.includes('sidebar.js') && !src.includes('header.js')) {
                 await loadScriptIfNeeded(src);
             }
         }
@@ -641,7 +659,7 @@ document.addEventListener('click', (e) => {
     // Se for link para páginas HTML internas do app (Painel.html, Auditoria.html, Mapa.html, Painel-Manutentor.html)
     if (href.endsWith('.html') || href.includes('.html?')) {
         const cleanHref = href.split('?')[0].toLowerCase();
-        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor')) {
+        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor') || cleanHref.includes('relat')) {
             e.preventDefault();
             window.navigateSPA(href, true);
         }

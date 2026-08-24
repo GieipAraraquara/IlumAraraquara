@@ -63,9 +63,34 @@ class ChamadoModel {
             if (!probFinExtraido) probFinExtraido = p0Fin.problema || '';
         }
 
+        const parseProblems = (val) => {
+            if (!val) return '';
+            let arr = val;
+            if (typeof val === 'string') {
+                const trimmed = val.trim();
+                if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try { arr = JSON.parse(trimmed); } catch(e) {}
+                }
+            }
+            if (Array.isArray(arr)) {
+                return arr.map(p => {
+                    if (!p) return '';
+                    if (typeof p === 'string') return p;
+                    if (typeof p === 'object') {
+                        const prob = p.problema || p.descricao || p.tipo || p.nome;
+                        const qtd = p.quantidade || p.qtd;
+                        if (prob) return (qtd && parseInt(qtd, 10) > 1) ? `${prob} (x${qtd})` : prob;
+                    }
+                    return JSON.stringify(p);
+                }).filter(Boolean).join(' | ');
+            }
+            return String(val);
+        };
+
+        const probPracaExt = parseProblems(data.problemas);
         this.plaquetaInicial = plaqExtraida;
         this.plaquetaFinal = plaqFinExtraida || '';
-        this.problemaInicial = data.problema_inicial || (ptsInicial && ptsInicial[0]?.problema) || '';
+        this.problemaInicial = data.problema_inicial || probPracaExt || (ptsInicial && ptsInicial[0]?.problema) || '';
         this.problemaEncontrado = probFinExtraido || data.problema_encontrado || (ptsFinal && ptsFinal[0]?.problema) || '';
         this.qtdInicial = parseInt(data.qtd_inicial, 10) || (ptsInicial ? ptsInicial.length : (data.quantidade ? parseInt(data.quantidade, 10) : 1));
         this.qtdFinal = parseInt(data.qtd_final, 10) || (ptsFinal ? ptsFinal.length : this.qtdInicial);
@@ -91,6 +116,7 @@ class ChamadoModel {
         this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
+        this.textoAuditoriaOCR = data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
     }
 
     /**
@@ -418,6 +444,30 @@ class ChamadoModel {
             });
         }
 
+        // 5. Array de fotos genérico ou campos legados (this.fotos, rawRow.fotos, etc.)
+        const extraFotos = this.fotos || (this.rawRow && (this.rawRow.fotos || this.rawRow.fotos_evidencias || this.rawRow.foto));
+        if (extraFotos) {
+            let arr = extraFotos;
+            if (typeof arr === 'string') {
+                try { arr = JSON.parse(arr); } catch(e) { arr = [arr]; }
+            }
+            if (Array.isArray(arr)) {
+                arr.forEach((f, idx) => {
+                    const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
+                    const t = typeof f === 'object' && f ? (f.titulo || f.estagio || f.tipo || `Foto #${idx + 1}`) : `Foto #${idx + 1}`;
+                    if (u && typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:'))) {
+                        if (!list.some(item => item.url === u)) {
+                            list.push({ url: u, titulo: t, origem: 'Fotos OS' });
+                        }
+                    }
+                });
+            } else if (typeof arr === 'string' && (arr.startsWith('http') || arr.startsWith('data:'))) {
+                if (!list.some(item => item.url === arr)) {
+                    list.push({ url: arr, titulo: 'Foto OS', origem: 'Fotos OS' });
+                }
+            }
+        }
+
         return list;
     }
 
@@ -464,11 +514,11 @@ class ChamadoModel {
      */
     get displayOperadorFinalizacao() {
         const val = String(this.operadorFinalizacao || '').trim();
-        if (val && val !== 'null' && val !== 'undefined') return val;
+        if (val && val !== 'null' && val !== 'undefined' && val !== 'Técnico Responsável') return val;
 
         if (this.audit && this.audit.usuario_finalizacao) {
             const auditUser = String(this.audit.usuario_finalizacao).trim();
-            if (auditUser) return auditUser;
+            if (auditUser && auditUser !== 'null' && auditUser !== 'undefined') return auditUser;
         }
 
         if (this.sessoesList && this.sessoesList.length > 0) {
@@ -476,6 +526,11 @@ class ChamadoModel {
             if (lastSession && lastSession.tecnico && lastSession.tecnico !== 'Técnico' && lastSession.tecnico !== 'Não informado') {
                 return String(lastSession.tecnico).trim();
             }
+        }
+
+        const opGeral = String(this.operador || this.operadorAbertura || '').trim();
+        if (opGeral && opGeral !== 'null' && opGeral !== 'undefined' && opGeral !== 'Técnico Responsável') {
+            return opGeral;
         }
 
         const stNorm = this.normalizedStatus;
@@ -643,9 +698,14 @@ class ChamadoModel {
     get isProblemaDivergente() {
         if (this.isDireto) return false;
         if (this.problemaInicial && this.problemaEncontrado) {
-            const pIni = ChamadoModel.formatLocationText(this.problemaInicial).trim().toLowerCase();
-            const pFin = ChamadoModel.formatLocationText(this.problemaEncontrado).trim().toLowerCase();
-            if (pIni && pFin && pIni !== pFin) return true;
+            const catIni = ChamadoModel.obterCategoriaProblema(this.problemaInicial);
+            const catFin = ChamadoModel.obterCategoriaProblema(this.problemaEncontrado);
+
+            // Regra: se o problema de abertura ou de finalização for 'OUTROS', sempre dispara auditoria (divergente)
+            if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
+
+            if (catIni && catFin && catIni !== catFin) return true;
+            if (catIni && catFin && catIni === catFin) return false;
         }
         if (this.audit && this.audit.problema_divergente !== undefined && this.audit.problema_divergente !== null) {
             return Boolean(this.audit.problema_divergente);
@@ -903,17 +963,229 @@ class ChamadoModel {
     }
 
     /**
-     * Retorna a lista parseada de materiais utilizados como um Array de strings formatadas
+     * Retorna a lista parseada de materiais utilizados acumulada do campo principal, dos pontos individuais (pontos_inicial/pontos_final/pontos) e das sessões
      */
     get materialsList() {
-        return ChamadoModel.parseMaterialsList(this.materialUtilizado);
+        let list = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+
+        // Agrega materiais de cada ponto em pontosDetalhados (pontos_inicial / pontos_final / pontos)
+        if (this.pontosDetalhados && this.pontosDetalhados.length > 0) {
+            this.pontosDetalhados.forEach(p => {
+                if (p.materiais && Array.isArray(p.materiais)) {
+                    p.materiais.forEach(m => {
+                        if (!m) return;
+                        const parsed = ChamadoModel.parseMaterialsList(m);
+                        parsed.forEach(pMat => {
+                            if (pMat && !list.includes(pMat)) list.push(pMat);
+                        });
+                    });
+                }
+            });
+        }
+
+        // Agrega materiais de cada sessão (sessoesList)
+        if (this.sessoesList && this.sessoesList.length > 0) {
+            this.sessoesList.forEach(s => {
+                if (s.materiais && Array.isArray(s.materiais)) {
+                    s.materiais.forEach(m => {
+                        if (!m) return;
+                        const parsed = ChamadoModel.parseMaterialsList(m);
+                        parsed.forEach(pMat => {
+                            if (pMat && !list.includes(pMat)) list.push(pMat);
+                        });
+                    });
+                }
+            });
+        }
+
+        return list;
+    }
+
+    /**
+     * Retorna a lista formatada de materiais separados por pipe (ex: "LAMPADA LED 100W | REATOR 150W (x2)")
+     */
+    get materiais() {
+        return this.materialsList.length > 0 ? this.materialsList.join(' | ') : '';
     }
 
     /**
      * Returns human readable material string from JSONB/Text field
      */
     get formattedMaterialUtilizado() {
-        return this.materialsList.length > 0 ? this.materialsList.join(', ') : '';
+        return this.materiais;
+    }
+
+    /**
+     * Retorna a representação formatada em texto de todos os pontos de abertura (pontos_inicial / pontos)
+     */
+    get pontosIniciaisFormatted() {
+        const list = this.pontosDetalhados;
+        if (!list || list.length === 0) return '';
+        return list.map(p => {
+            const parts = [];
+            if (p.enderecoInicial) parts.push(p.enderecoInicial);
+            if (p.plaquetaInicial) parts.push(`Plaqueta: ${p.plaquetaInicial}`);
+            if (p.problemaInicial) parts.push(`Prob: ${p.problemaInicial}`);
+            if (p.coordenadaInicial) parts.push(`Coord: ${p.coordenadaInicial}`);
+            return parts.length > 0 ? `Ponto #${p.numero}: ${parts.join(' - ')}` : null;
+        }).filter(Boolean).join(' | ');
+    }
+
+    /**
+     * Retorna a representação formatada em texto de todos os pontos de conclusão (pontos_final)
+     */
+    get pontosFinaisFormatted() {
+        const list = this.pontosDetalhados;
+        if (!list || list.length === 0) return '';
+        return list.filter(p => p.hasFinalData).map(p => {
+            const parts = [];
+            if (p.enderecoFinal) parts.push(p.enderecoFinal);
+            if (p.plaquetaFinal) parts.push(`Plaqueta: ${p.plaquetaFinal}`);
+            if (p.problemaEncontrado) parts.push(`Prob: ${p.problemaEncontrado}`);
+            if (p.coordenadaFinal) parts.push(`Coord: ${p.coordenadaFinal}`);
+            if (p.materiais && p.materiais.length > 0) parts.push(`Materiais: ${p.materiais.join(', ')}`);
+            return parts.length > 0 ? `Ponto #${p.numero}: ${parts.join(' - ')}` : null;
+        }).filter(Boolean).join(' | ');
+    }
+
+    /**
+     * Retorna a lista formatada de todas as plaquetas de abertura/iniciais (da OS e dos pontos) sem duplicatas
+     */
+    get formattedPlaquetaInicial() {
+        const list = [];
+        const topPlq = ChamadoModel.formatLocationText(this.plaquetaInicial);
+        if (topPlq && topPlq !== 'Não informada' && topPlq !== '---' && topPlq !== 'null') {
+            list.push(topPlq);
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.plaquetaInicial && p.plaquetaInicial !== 'Não informada' && p.plaquetaInicial !== '---' && p.plaquetaInicial !== 'null') {
+                    if (!list.includes(p.plaquetaInicial)) list.push(p.plaquetaInicial);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : (topPlq || '');
+    }
+
+    /**
+     * Retorna a lista formatada de todas as plaquetas de conclusão/finais (da OS e dos pontos) sem duplicatas
+     */
+    get formattedPlaquetaFinal() {
+        const list = [];
+        const topPlq = ChamadoModel.formatLocationText(this.plaquetaFinal);
+        if (topPlq && topPlq !== 'Não informada' && topPlq !== '---' && topPlq !== 'null') {
+            list.push(topPlq);
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.plaquetaFinal && p.plaquetaFinal !== 'Não informada' && p.plaquetaFinal !== '---' && p.plaquetaFinal !== 'null') {
+                    if (!list.includes(p.plaquetaFinal)) list.push(p.plaquetaFinal);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : (topPlq || '');
+    }
+
+    /**
+     * Retorna a lista formatada de todos os problemas de abertura (da OS, da praça e dos pontos) sem duplicatas
+     */
+    get formattedProblemaInicial() {
+        const list = [];
+        if (this.problemaInicial) {
+            list.push(ChamadoModel.formatLocationText(this.problemaInicial));
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.problemaInicial && !list.includes(p.problemaInicial)) {
+                    list.push(p.problemaInicial);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : '';
+    }
+
+    /**
+     * Retorna a lista formatada de todos os problemas encontrados na finalização (da OS e dos pontos) sem duplicatas
+     */
+    get formattedProblemaEncontrado() {
+        const list = [];
+        if (this.problemaEncontrado) {
+            list.push(ChamadoModel.formatLocationText(this.problemaEncontrado));
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.problemaEncontrado && !list.includes(p.problemaEncontrado)) {
+                    list.push(p.problemaEncontrado);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : '';
+    }
+
+    /**
+     * Retorna a lista formatada de todas as coordenadas iniciais/abertura sem duplicatas
+     */
+    get formattedCoordenadaInicial() {
+        const list = [];
+        const topCoord = ChamadoModel.formatLocationText(this.coordenadaInicial);
+        if (topCoord && topCoord !== 'Sem coordenadas') {
+            list.push(topCoord);
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.coordenadaInicial && p.coordenadaInicial !== 'Sem coordenadas' && !list.includes(p.coordenadaInicial)) {
+                    list.push(p.coordenadaInicial);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : (topCoord || '');
+    }
+
+    /**
+     * Retorna a lista formatada de todas as coordenadas de reparo/conclusão sem duplicatas
+     */
+    get formattedCoordenadaReparo() {
+        const list = [];
+        const topCoord = ChamadoModel.formatLocationText(this.coordenadaReparo);
+        if (topCoord && topCoord !== 'Sem coordenadas') {
+            list.push(topCoord);
+        }
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            pts.forEach(p => {
+                if (p.coordenadaFinal && p.coordenadaFinal !== 'Sem coordenadas' && !list.includes(p.coordenadaFinal)) {
+                    list.push(p.coordenadaFinal);
+                }
+            });
+        }
+        return list.length > 0 ? list.join(' | ') : (topCoord || '');
+    }
+
+    /**
+     * Retorna a lista de sessões de execução (Praça Pública) formatadas para exportação legível
+     */
+    get sessoesFormatted() {
+        if (!this.sessoesList || this.sessoesList.length === 0) return '';
+        return this.sessoesList.map(s => {
+            const parts = [];
+            parts.push(`Sessão #${s.numero}`);
+            if (s.tecnico) parts.push(`Técnico: ${s.tecnico}`);
+            if (s.status) parts.push(`Status: ${s.status}`);
+            if (s.inicioStr) parts.push(`Início: ${s.inicioStr}`);
+            if (s.fimStr) parts.push(`Fim: ${s.fimStr}`);
+            if (s.duracao_minutos) parts.push(`Duração: ${s.duracao_minutos} min`);
+            if (s.qtd_eletricistas) parts.push(`Eletricistas: ${s.qtd_eletricistas}`);
+            if (s.materiais && s.materiais.length > 0) {
+                const matParsed = ChamadoModel.parseMaterialsList(s.materiais);
+                if (matParsed.length > 0) parts.push(`Materiais: ${matParsed.join(', ')}`);
+            }
+            return parts.join(' - ');
+        }).join(' | ');
     }
 
     /**
@@ -988,6 +1260,37 @@ class ChamadoModel {
             console.error('Erro ao processar addressPoints:', err);
             return ['Ponto não informado'];
         }
+    }
+
+    /**
+     * Normaliza uma string de problema para sua categoria canônica
+     */
+    static obterCategoriaProblema(texto) {
+        if (!texto) return '';
+        const t = ChamadoModel.formatLocationText(texto).trim().toLowerCase();
+        if (!t) return '';
+
+        if (t.includes('outro')) {
+            return 'OUTROS';
+        }
+
+        if (t.includes('queimada') || t.includes('apagada') || t.includes('sem luz')) {
+            return 'LAMPADA_APAGADA';
+        }
+
+        if (t.includes('intermitente')) {
+            return 'INTERMITENTE';
+        }
+
+        if (t.includes('acesa')) {
+            return 'ACESA_DIA';
+        }
+
+        if (t.includes('braco') || t.includes('braço')) {
+            return 'BRACO_QUEBRADO';
+        }
+
+        return t;
     }
 
     /**
@@ -1100,7 +1403,7 @@ class ChamadoModel {
             headerText1: 'Problema',
             headerText2: 'Divergente?',
             modelProperty: 'isProblemaDivergente',
-            explicacao: 'O problema cadastrado na abertura da ordem de serviço é diferente do problema identificado na finalização.'
+            explicacao: 'O problema cadastrado na abertura difere do identificado na finalização, ou o problema é "Outros" (exigindo verificação manual).'
         },
         {
             key: 'plaquetaDivergente',

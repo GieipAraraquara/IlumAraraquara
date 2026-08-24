@@ -1128,6 +1128,50 @@ class PainelController {
         </div>
         ` : '')}
 
+        <!-- Seção: Fotos & Evidências -->
+        ${(() => {
+            const fotosList = (item.fotosEvidencias && item.fotosEvidencias.length > 0)
+                ? item.fotosEvidencias
+                : (window.Mapa && typeof window.Mapa.obterFotosEvidenciasOS === 'function' ? window.Mapa.obterFotosEvidenciasOS(item) : ((item.fotos && Array.isArray(item.fotos)) ? item.fotos : []));
+
+            if (!fotosList || fotosList.length === 0) {
+                return `
+                <div class="p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-center text-on-surface-variant text-xs italic">
+                    <span class="material-symbols-outlined text-[20px] align-middle text-outline mr-1">no_photography</span>
+                    <span>Nenhuma foto de evidência anexada para este protocolo.</span>
+                </div>`;
+            }
+
+            let cardsHtml = '';
+            fotosList.forEach((foto, fIdx) => {
+                const fotoUrl = typeof foto === 'string' ? foto : (foto.url || foto.link || foto.foto || '#');
+                const fotoTitulo = typeof foto === 'string' ? `Evidência #${fIdx + 1}` : (foto.titulo || foto.estagio || `Evidência #${fIdx + 1}`);
+                cardsHtml += `
+                <div class="relative group rounded-lg overflow-hidden border border-outline-variant/60 cursor-pointer shadow-2xs hover:shadow-md transition-all aspect-video bg-slate-900" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', ${fIdx})">
+                    <img src="${fotoUrl}" alt="${fotoTitulo}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
+                        <span class="text-[9.5px] font-semibold text-white truncate drop-shadow">${fotoTitulo}</span>
+                    </div>
+                    <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
+                        <span class="material-symbols-outlined text-[14px]">zoom_in</span>
+                    </div>
+                </div>`;
+            });
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/60 rounded-xl shadow-2xs space-y-2">
+                <div class="flex items-center justify-between">
+                    <strong class="text-xs font-bold text-secondary flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] text-amber-500">photo_library</span>
+                        <span>Fotos & Evidências (${fotosList.length})</span>
+                    </strong>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
+                    ${cardsHtml}
+                </div>
+            </div>`;
+        })()}
+
         <!-- Seção 3: Observações & Histórico -->
         ${(() => {
             const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();

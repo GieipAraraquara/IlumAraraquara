@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Relatórios & Análise de Execução - Luz Araraquara</title>
+    
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
+    
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=30"></script>
+    <script src="js/domain/ChamadoModel.js?v=43"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=30"></script>
+    <script src="js/services/ChamadosService.js?v=30"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="js/controllers/RelatorioController.js?v=11"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined' !important;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga' 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga' 1;
+            text-rendering: optimizeLegibility;
+        }
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+        }
+        #main-content {
+            overflow-x: hidden !important;
+        }
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { width: calc(100% - 80px); left: 80px; margin-left: 0; }
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
+
+<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    const vertexShader = `
+        varying vec2 v_texCoord;
+        void main() {
+            v_texCoord = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float t = u_time * 0.2;
+            vec3 color1 = vec3(0.988, 0.973, 0.98); 
+            vec3 color2 = vec3(0.957, 0.941, 0.953);
+            vec3 accent = vec3(0.059, 0.09, 0.165); 
+            
+            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
+            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
+            vec3 base = mix(color1, color2, w1 * w2);
+            
+            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
+            vec3 finalColor = mix(base, accent, edge * 0.02);
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `;
+    
+    const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() }
+    };
+    
+    const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    function animate(time) {
+        uniforms.u_time.value = time * 0.001;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+</script>
+
+<app-sidebar active="relatorios"></app-sidebar>
+
+<app-header placeholder="Buscar no Dashboard por Protocolo, Plaqueta ou Endereço..." search-id="relatorio-search-input"></app-header>
+
+<main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
+
+    <!-- Page Header & Tab Navigation -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-4 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="material-symbols-outlined text-secondary text-[28px]">bar_chart</span>
+                <h2 class="font-headline-md text-headline-md text-on-surface">Relatórios & Medição de Execução</h2>
+            </div>
+            <p class="font-body-md text-body-md text-on-surface-variant">Análise gráfica de chamados, relatórios operacionais e medição mensal de materiais e contrato</p>
+        </div>
+        
+        <!-- Tab Navigation Buttons -->
+        <div class="flex items-center border-b border-outline-variant/60 bg-surface-container-lowest/80 backdrop-blur-sm rounded-xl p-1 shadow-sm">
+            <button id="btn-tab-geral" onclick="window.relatorioController.switchTab('geral')" class="py-2.5 px-4 border-b-2 border-secondary font-bold text-secondary text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-all">
+                <span class="material-symbols-outlined text-[18px]">dashboard</span>
+                <span>Geral</span>
+            </button>
+            <button id="btn-tab-medicao" onclick="window.relatorioController.switchTab('medicao')" class="py-2.5 px-4 border-b-2 border-transparent font-medium text-on-surface-variant hover:text-on-surface text-xs sm:text-sm flex items-center gap-2 cursor-pointer transition-all">
+                <span class="material-symbols-outlined text-[18px]">inventory</span>
+                <span>Materiais</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 1: VISÃO GERAL & GRÁFICOS DE EXECUÇÃO                                -->
+    <!-- ========================================================================= -->
+    <div id="view-tab-geral" class="space-y-card-gap">
+
+        <!-- ========================================================================= -->
+        <!-- BARRA DE CONTROLE GLOBAL DO DASHBOARD (Apenas na Aba Geral)              -->
+        <!-- ========================================================================= -->
+        <div class="bg-surface-container-lowest/90 backdrop-blur-md rounded-2xl border border-outline-variant/80 p-4 shadow-sm mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:150ms]">
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                
+                <!-- Titulo / Indicador de Filtro Ativo -->
+                <div class="flex items-center gap-2.5 min-w-[200px]">
+                    <div class="w-9 h-9 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center font-bold">
+                        <span class="material-symbols-outlined text-[20px]">tune</span>
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold text-on-surface uppercase tracking-wider">Controle do Dashboard</h3>
+                        <span id="dashboard-filter-indicator" class="text-[11px] font-semibold text-secondary flex items-center gap-1">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                            <span id="indicator-text">Carregando dados...</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Grid de 5 Colunas -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
+                    
+                    <!-- 1º: Tipo de Iluminação -->
+                    <div class="flex flex-col gap-0.5">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Iluminação</label>
+                        <select id="dash-filter-type" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                            <option value="all">Todas as Áreas</option>
+                            <option value="praca">Praça Pública (P)</option>
+                            <option value="viaria">Via Pública (I)</option>
+                        </select>
+                    </div>
+
+                    <!-- 2º: Status da OS -->
+                    <div class="flex flex-col gap-0.5">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Status</label>
+                        <select id="dash-filter-status" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                            <option value="all">Todos os Status</option>
+                            <option value="aberto">Em Aberto</option>
+                            <option value="em_andamento">Em Andamento</option>
+                            <option value="concluida">Concluídas</option>
+                            <option value="pendente">Pendentes</option>
+                            <option value="cancelada">Canceladas</option>
+                        </select>
+                    </div>
+
+                    <!-- 3º: Período -->
+                    <div class="flex flex-col gap-0.5">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Período</label>
+                        <select id="dash-filter-period" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                            <option value="all">Todo o Histórico</option>
+                            <option value="hoje">Hoje</option>
+                            <option value="ontem">Ontem</option>
+                            <option value="7dias">Últimos 7 dias</option>
+                            <option value="15dias">Últimos 15 dias</option>
+                            <option value="30dias">Últimos 30 dias</option>
+                            <option value="mes_atual">Mês Atual</option>
+                            <option value="mes_anterior">Mês Anterior</option>
+                            <option value="ano_atual">Ano Atual</option>
+                            <option value="custom">Personalizado...</option>
+                        </select>
+                    </div>
+
+                    <!-- 4º: Data Início com Widget + Máscara DD/MM/YYYY -->
+                    <div id="box-dash-filter-start" class="flex flex-col gap-0.5 opacity-40 pointer-events-none transition-all duration-200">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">De (Início)</label>
+                        <div class="relative w-full flex items-center">
+                            <input type="text" id="dash-filter-start" disabled placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg pl-2.5 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs disabled:bg-surface-container-low disabled:cursor-not-allowed"/>
+                            <input type="date" id="picker-dash-filter-start" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
+                            <button type="button" id="btn-picker-dash-start" disabled title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer disabled:cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 5º: Data Fim com Widget + Máscara DD/MM/YYYY -->
+                    <div id="box-dash-filter-end" class="flex flex-col gap-0.5 opacity-40 pointer-events-none transition-all duration-200">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Até (Fim)</label>
+                        <div class="relative w-full flex items-center">
+                            <input type="text" id="dash-filter-end" disabled placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg pl-2.5 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs disabled:bg-surface-container-low disabled:cursor-not-allowed"/>
+                            <input type="date" id="picker-dash-filter-end" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
+                            <button type="button" id="btn-picker-dash-end" disabled title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer disabled:cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex items-center justify-end gap-2 border-t xl:border-t-0 xl:border-l border-outline-variant/60 pt-2 xl:pt-0 xl:pl-3">
+                    <button id="btn-reset-dash-filters" title="Limpar todos os filtros do dashboard" class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/50 hover:bg-error/5 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">restart_alt</span>
+                        <span class="hidden sm:inline">Limpar</span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- KPI Summary Grid -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto">
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de OS no Período</div>
+                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-total-os">---</div>
+                <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">analytics</span><span class="font-label-sm text-label-sm">Base filtrada atual</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Aberto / Pendentes</div>
+                <div class="font-headline-lg text-headline-lg text-error overflow-visible" id="kpi-abertas">---</div>
+                <div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Necessita atendimento</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Concluídas</div>
+                <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible" id="kpi-concluidas">---</div>
+                <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm" id="kpi-rate">--- taxa</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Tempo Médio de Atendimento</div>
+                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-avg-time">---</div>
+                <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">schedule</span><span class="font-label-sm text-label-sm">Média de conclusão</span></div>
+            </div>
+        </div>
+
+        <!-- Quick Export Presets Cards -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:550ms]">
+            <div class="col-span-12">
+                <div class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary text-[22px]">table_chart</span>
+                            <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface">Atalhos de Exportação de Relatórios CSV</h3>
+                        </div>
+                        <span class="text-label-sm text-on-surface-variant">Arquivos otimizados com codificação UTF-8 (Excel)</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Preset 1 -->
+                        <button onclick="window.relatorioController.exportarTodosCSV()" class="flex flex-col items-start p-4 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-secondary/10 hover:border-secondary/40 transition-all text-left group cursor-pointer active:scale-95">
+                            <div class="w-9 h-9 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                <span class="material-symbols-outlined text-[20px]">dataset</span>
+                            </div>
+                            <span class="font-semibold text-on-surface text-sm mb-1 group-hover:text-secondary">Base Completa</span>
+                            <span class="text-xs text-on-surface-variant leading-relaxed">Exporta todas as Ordens de Serviço com todos os campos disponíveis.</span>
+                        </button>
+
+                        <!-- Preset 2 -->
+                        <button onclick="window.relatorioController.exportarAbertasPendentesCSV()" class="flex flex-col items-start p-4 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-amber-50 hover:border-amber-300 transition-all text-left group cursor-pointer active:scale-95">
+                            <div class="w-9 h-9 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+                            </div>
+                            <span class="font-semibold text-on-surface text-sm mb-1 group-hover:text-amber-800">Em Aberto & Pendentes</span>
+                            <span class="text-xs text-on-surface-variant leading-relaxed">Lista filtrada de chamados que requerem atendimento em campo.</span>
+                        </button>
+
+                        <!-- Preset 3 -->
+                        <button onclick="window.relatorioController.exportarConcluidasCSV()" class="flex flex-col items-start p-4 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-emerald-50 hover:border-emerald-300 transition-all text-left group cursor-pointer active:scale-95">
+                            <div class="w-9 h-9 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                <span class="material-symbols-outlined text-[20px]">task_alt</span>
+                            </div>
+                            <span class="font-semibold text-on-surface text-sm mb-1 group-hover:text-emerald-800">OSs Concluídas</span>
+                            <span class="text-xs text-on-surface-variant leading-relaxed">Histórico de atendimentos executados com datas e materiais.</span>
+                        </button>
+
+                        <!-- Preset 4 -->
+                        <button onclick="window.relatorioController.exportarResumoExecucaoCSV()" class="flex flex-col items-start p-4 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-purple-50 hover:border-purple-300 transition-all text-left group cursor-pointer active:scale-95">
+                            <div class="w-9 h-9 rounded-lg bg-purple-100 text-purple-800 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                                <span class="material-symbols-outlined text-[20px]">pie_chart</span>
+                            </div>
+                            <span class="font-semibold text-on-surface text-sm mb-1 group-hover:text-purple-800">Resumo de Métricas</span>
+                            <span class="text-xs text-on-surface-variant leading-relaxed">Relatório consolidado com contadores por status e problema.</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Visual Charts Grid -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
+            <!-- Chart 1: Status Distribution -->
+            <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[20px]">donut_small</span>
+                        <h4 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">Distribuição por Status</h4>
+                    </div>
+                </div>
+                <div class="h-64 relative w-full flex items-center justify-center">
+                    <canvas id="chart-status"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: Top Problems -->
+            <div class="col-span-12 lg:col-span-6 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[20px]">equalizer</span>
+                        <h4 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">Frequência por Tipo de Problema</h4>
+                    </div>
+                </div>
+                <div class="h-64 relative w-full flex items-center justify-center">
+                    <canvas id="chart-problemas"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Timeline Execution -->
+            <div class="col-span-12 lg:col-span-7 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[20px]">show_chart</span>
+                        <h4 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">Evolução de Atendimentos no Tempo</h4>
+                    </div>
+                </div>
+                <div class="h-64 relative w-full">
+                    <canvas id="chart-timeline"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4: Praça vs Viária -->
+            <div class="col-span-12 lg:col-span-5 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[20px]">park</span>
+                        <h4 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">Tipo de Iluminação (Praça vs Viária)</h4>
+                    </div>
+                </div>
+                <div class="h-64 relative w-full flex items-center justify-center">
+                    <canvas id="chart-tipo-iluminacao"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filters & Custom Exporter Section (Com Customização por Período de Datas Visível) -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:650ms]">
+            <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-outline-variant/60 pb-4">
+                    <div>
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">filter_alt</span>
+                            Filtros e Exportação Personalizada de CSV por Período
+                        </h3>
+                        <p class="font-body-md text-body-md text-on-surface-variant">Defina o período (intervalo de datas), status, tipo de iluminação e as colunas desejadas para exportar</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="count-filtered-badge" class="px-3 py-1.5 bg-secondary/10 text-secondary font-bold text-xs rounded-full">---</span>
+                        <button onclick="window.relatorioController.exportarFiltradoPersonalizadoCSV()" class="bg-[#059669] hover:bg-[#047857] text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer">
+                            <span class="material-symbols-outlined text-[18px]">download_for_offline</span>
+                            <span>Baixar Planilha CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filter Controls Bar com Customização Direta por Período na Mesma Ordem -->
+                <div class="flex flex-wrap items-end gap-3 mb-5">
+                    
+                    <!-- 1º: Tipo de Iluminação -->
+                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Tipo Iluminação</label>
+                        <select id="relatorio-type-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
+                            <option value="all">Todas as Áreas</option>
+                            <option value="praca">Praça Pública (P)</option>
+                            <option value="viaria">Iluminação Viária (I)</option>
+                        </select>
+                    </div>
+
+                    <!-- 2º: Status da OS -->
+                    <div class="flex flex-col gap-1 min-w-[150px] flex-1">
+                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Status da OS</label>
+                        <select id="relatorio-status-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
+                            <option value="all">Todos os Status</option>
+                            <option value="aberto">Em Aberto</option>
+                            <option value="em_andamento">Em Andamento</option>
+                            <option value="concluida">Concluída</option>
+                            <option value="pendente">Pendente de Aprovação</option>
+                            <option value="cancelada">Cancelada</option>
+                            <option value="rejeitada">Rejeitada</option>
+                        </select>
+                    </div>
+
+                    <!-- 3º: Período -->
+                    <div class="flex flex-col gap-1 min-w-[160px] flex-1">
+                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Atalho de Período</label>
+                        <select id="relatorio-date-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
+                            <option value="all">Todo o Histórico</option>
+                            <option value="hoje">Hoje</option>
+                            <option value="ontem">Ontem</option>
+                            <option value="7dias">Últimos 7 dias</option>
+                            <option value="15dias">Últimos 15 dias</option>
+                            <option value="30dias">Últimos 30 dias</option>
+                            <option value="mes_atual">Mês Atual</option>
+                            <option value="mes_anterior">Mês Anterior</option>
+                            <option value="ano_atual">Ano Atual</option>
+                            <option value="custom">Personalizado...</option>
+                        </select>
+                    </div>
+
+                    <!-- Considerar Data -->
+                    <div class="flex flex-col gap-1 min-w-[150px] flex-1">
+                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Considerar Data</label>
+                        <select id="relatorio-date-field-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
+                            <option value="abertura">Data de Abertura</option>
+                            <option value="conclusao">Data de Conclusão</option>
+                            <option value="ambas">Abertura ou Conclusão</option>
+                        </select>
+                    </div>
+
+                    <!-- Data Inicial customizada CSV (dd/mm/aaaa) -->
+                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                        <label for="relatorio-range-start" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Data Inicial (dd/mm/aaaa)</label>
+                        <div class="relative w-full flex items-center">
+                            <input type="text" id="relatorio-range-start" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer"/>
+                            <input type="date" id="picker-relatorio-range-start" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
+                            <button type="button" id="btn-picker-relatorio-start" title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer">
+                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Data Final customizada CSV (dd/mm/aaaa) -->
+                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
+                        <label for="relatorio-range-end" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Data Final (dd/mm/aaaa)</label>
+                        <div class="relative w-full flex items-center">
+                            <input type="text" id="relatorio-range-end" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer"/>
+                            <input type="date" id="picker-relatorio-range-end" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
+                            <button type="button" id="btn-picker-relatorio-end" title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer">
+                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Column Checkboxes for Custom CSV Exporter -->
+                <div class="p-4 rounded-xl bg-surface-container-low/60 border border-outline-variant/60">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-secondary">view_column</span>
+                            Selecione as Colunas para Exportar no CSV:
+                        </span>
+                        <div class="flex items-center gap-3 text-xs">
+                            <button type="button" id="btn-select-all-cols" class="text-secondary font-bold hover:underline cursor-pointer">Marcar Todas</button>
+                            <span class="text-outline-variant">|</span>
+                            <button type="button" id="btn-deselect-all-cols" class="text-error font-bold hover:underline cursor-pointer">Desmarcar Todas</button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-tipo-os" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Tipo OS</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-protocolo" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Protocolo</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-praca-nome" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Nome da Praça</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-data-abertura" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Data Abertura</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-data-conclusao" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Data Conclusão</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-status" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Status</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-prioridade" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Prioridade</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-problema-inicial" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Problema Inicial</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-problema-encontrado" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Problema Encontrado</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-plaqueta" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Plaqueta Inicial</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-plaqueta-final" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Plaqueta Final</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-endereco" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Endereço / Local</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-operador" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Operador Abertura</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-operador-finalizacao" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Operador Finalização</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-municipe" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Munícipe</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-coordenadas" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Coordenada Inicial</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-coordenada-reparo" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Coordenada Reparo</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-eletricistas" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Eletricistas (Praça)</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-tempo-total" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Tempo Total (Praça)</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-sessoes" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Sessões (Praça)</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-pontos-iniciais" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Pontos Iniciais (JSON)</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-pontos-finais" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Pontos Finais (JSON)</span></label>
+                        <label class="flex items-center gap-2 cursor-pointer font-medium"><input type="checkbox" id="col-materiais" checked class="col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer"><span>Materiais Utilizados</span></label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- ABA 2: MEDIÇÃO MENSAL DE MATERIAIS & CONTRATO                            -->
+    <!-- ========================================================================= -->
+    <div id="view-tab-medicao" class="hidden space-y-card-gap">
+
+        <!-- KPI Measurement Cards -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto">
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de Materiais Medidos</div>
+                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-medicao-itens">---</div>
+                <div class="flex items-center gap-1 mt-2 text-secondary"><span class="material-symbols-outlined text-[16px]">inventory_2</span><span class="font-label-sm text-label-sm">Soma de unidades utilizadas</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
+                <div class="font-label-md text-label-md text-purple-900 font-bold mb-1 uppercase tracking-wider">Horas de Eletricista (Praça)</div>
+                <div class="font-headline-lg text-headline-lg text-purple-700 overflow-visible" id="kpi-medicao-horas">---</div>
+                <div class="flex items-center gap-1 mt-2 text-purple-800"><span class="material-symbols-outlined text-[16px]">engineering</span><span class="font-label-sm text-label-sm font-semibold">ELETRICISTA C/ ENCARGOS (H)</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">OSs Medidas no Período</div>
+                <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible" id="kpi-medicao-oss">---</div>
+                <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">task_alt</span><span class="font-label-sm text-label-sm font-semibold">Ordens com materiais ou sessões</span></div>
+            </div>
+            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Itens Distintos do Contrato</div>
+                <div class="font-headline-lg text-headline-lg text-on-surface overflow-visible" id="kpi-medicao-tipos">---</div>
+                <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">category</span><span class="font-label-sm text-label-sm">Variedade de insumos</span></div>
+            </div>
+        </div>
+
+        <!-- Monthly Measurement Table & Export Card -->
+        <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto">
+            <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-outline-variant/60 pb-4">
+                    <div>
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
+                            <span class="material-symbols-outlined text-purple-700">payments</span>
+                            Relatório de Medição Mensal para Pagamento
+                        </h3>
+                        <p class="font-body-md text-body-md text-on-surface-variant">Consolidação de materiais e horas de equipe acumulados no mês selecionado para prestação de contas</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="window.relatorioController.exportarMedicaoMensalCSV()" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer" title="Exportar tabela de medição mensal formatada em CSV">
+                            <span class="material-symbols-outlined text-[18px]">download_for_offline</span>
+                            <span>Exportar Medição Mensal (CSV)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Measurement Filter Controls: Campo Único e Elegante de Mês no Calendário -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-5 items-end">
+                    
+                    <!-- Seletor de Mês da Medição com Botões de Navegação -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between min-h-[22px]">
+                            <label for="medicao-month-select" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[16px] text-purple-700">calendar_month</span>
+                                <span>Mês da Medição</span>
+                            </label>
+                            <span id="medicao-periodo-badge" class="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md whitespace-nowrap">Período: --/--/---- a --/--/----</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" id="btn-medicao-prev" onclick="window.relatorioController.alterarMesMedicao(-1)" class="h-9 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 rounded-lg border border-outline-variant/80 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-xs" title="Mês Anterior">
+                                <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                            </button>
+                            
+                            <select id="medicao-month-select" class="h-9 w-full text-xs font-bold border border-outline-variant/80 rounded-lg px-3 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                                <!-- Preenchido dinamicamente via JS -->
+                            </select>
+                            
+                            <button type="button" id="btn-medicao-next" onclick="window.relatorioController.alterarMesMedicao(1)" class="h-9 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 rounded-lg border border-outline-variant/80 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-xs" title="Mês Seguinte">
+                                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filter Status OS (Concluídas x Todas) -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex items-center justify-between min-h-[22px]">
+                            <label for="medicao-status-select" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[16px] text-purple-700">filter_alt</span>
+                                <span>Status das OSs</span>
+                            </label>
+                        </div>
+                        <select id="medicao-status-select" class="h-9 w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-3 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                            <option value="concluida">Apenas OSs Concluídas (Padrão para Pagamento)</option>
+                            <option value="all">Todas as OSs (Concluídas e em Andamento)</option>
+                        </select>
+                    </div>
+
+                    <!-- Info Box: Alinhado na altura dos campos e expansível sem sobrar espaço vertical -->
+                    <div class="flex flex-col justify-end">
+                        <div class="min-h-[36px] py-1.5 text-xs text-on-surface-variant bg-purple-50/80 border border-purple-200/80 px-3 rounded-lg w-full flex items-center gap-2">
+                            <span class="material-symbols-outlined text-purple-700 text-[18px] shrink-0">info</span>
+                            <span class="text-xs text-on-surface-variant">As horas de sessões de praça são agregadas no item <b>ELETRICISTA (H)</b>.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Measurement Detailed Table -->
+                <div class="w-full overflow-x-auto border border-outline-variant/60 rounded-xl">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant text-on-surface-variant font-label-md uppercase tracking-wider">
+                                <th class="py-3 px-4 w-28">Marca</th>
+                                <th class="py-3 px-4">Descrição do Item de Contrato / Material</th>
+                                <th class="py-3 px-4 text-center w-20">Unid.</th>
+                                <th class="py-3 px-4 text-right w-36">Qtd. Medida</th>
+                                <th class="py-3 px-4 text-center w-24">OSs Aplicadas</th>
+                                <th class="py-3 px-4">Origem / Categoria</th>
+                                <th class="py-3 px-4">Protocolos OSs</th>
+                            </tr>
+                        </thead>
+                        <tbody id="medicao-tbody" class="divide-y divide-outline-variant/40 bg-surface-container-lowest font-data-tabular">
+                            <!-- Linhas de materiais e horas injetadas pelo RelatorioController.js -->
+                        </tbody>
+                    </table>
+                    <div id="medicao-empty-state" class="hidden py-8 text-center text-on-surface-variant/70">
+                        <div class="flex flex-col items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40">inventory_2</span>
+                            <span class="text-xs font-medium">Nenhum registro de material ou sessão encontrado para este mês.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</main>
+
+</body>
+</html>

@@ -243,13 +243,30 @@
             cursor: pointer; z-index: 40;
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .marker-rota-step-badge:hover {
-            transform: scale(1.25);
-            box-shadow: 0 6px 16px rgba(0, 81, 213, 0.6);
+        .marker-operador-step-badge {
+            width: 30px; height: 30px;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            color: #ffffff; border: 2.5px solid #ffffff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800;
+            box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
+            cursor: pointer; z-index: 45;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
-        .marker-rota-inicio-badge {
-            background: linear-gradient(135deg, #188038 0%, #2e7d32 100%) !important;
-            box-shadow: 0 4px 12px rgba(24, 128, 56, 0.45) !important;
+        .marker-operador-step-badge:hover {
+            transform: scale(1.25);
+            box-shadow: 0 6px 18px rgba(16, 185, 129, 0.7);
+        }
+        .marker-operador-arrow {
+            width: 22px; height: 22px;
+            color: #059669;
+            background: rgba(255, 255, 255, 0.92);
+            border: 1.5px solid #10b981;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            pointer-events: none;
+            z-index: 35;
         }
     </style>
 </head>
@@ -419,6 +436,10 @@
                     <span class="material-symbols-outlined text-[15px]">route</span>
                     <span>Rota Viária</span>
                 </button>
+                <button type="button" id="btnModoRotasOperador" onclick="togglePainelRotasOperador()" class="px-2.5 py-1 text-xs rounded-lg font-bold border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-emerald-600 hover:border-emerald-600 transition-all flex items-center gap-1 active:scale-95">
+                    <span class="material-symbols-outlined text-[15px]">engineering</span>
+                    <span>Rotas Operador</span>
+                </button>
                 <button type="button" onclick="carregarMapaOSsAbertas()" class="px-2.5 py-1 text-xs rounded-lg font-semibold bg-secondary text-on-secondary hover:bg-secondary-container transition-all active:scale-95 flex items-center gap-1">
                     <span class="material-symbols-outlined text-[14px]">refresh</span>
                     <span>Atualizar</span>
@@ -537,6 +558,95 @@
                         <span id="badgeAgingMaisAntigoRota" class="text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold"></span>
                     </h4>
                     <div id="listaSequenciaRotaContainer" class="space-y-1.5 max-h-60 overflow-y-auto pr-1">
+                        <!-- Itens inseridos dinamicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PAINEL FLUTUANTE DE ACOMPANHAMENTO DE OPERADOR (ROTAS CONCLUÍDAS) -->
+        <div id="painelRotasOperador" class="glass-overlay absolute top-3 right-3 bottom-16 w-[460px] max-w-[calc(100vw-24px)] z-30 rounded-xl p-4 hidden shadow-2xl border border-white/80 font-body-md text-xs flex flex-col transition-all duration-300">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-outline-variant/60 pb-2.5 flex-none">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-emerald-600 text-xl">engineering</span>
+                    <div>
+                        <h3 class="font-bold text-sm text-on-surface leading-tight">Acompanhamento de Operador</h3>
+                        <p class="text-[11px] text-on-surface-variant font-medium">Rotas de OSs Concluídas no Dia</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharPainelRotasOperador()" class="text-on-surface-variant hover:text-on-surface p-1 rounded-lg hover:bg-surface-container-high transition-colors">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <!-- Filtros de Operador, Data e Botões (TODOS NA MESMA LINHA) -->
+            <div class="mt-3 bg-surface-container-lowest/80 p-3 rounded-lg border border-outline-variant/50 flex-none space-y-2.5">
+                <div class="grid grid-cols-12 gap-2 items-end">
+                    <!-- Seleção de Operador (5 cols) -->
+                    <div class="col-span-5">
+                        <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate" title="Operador de Finalização">Operador:</label>
+                        <select id="selectOperadorRota" onchange="aoMudarOperadorRota()" class="w-full text-xs font-medium border border-outline-variant rounded-lg p-1.5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer truncate h-[32px]">
+                            <option value="">Carregando...</option>
+                        </select>
+                    </div>
+
+                    <!-- Seleção de Data (3 cols) -->
+                    <div class="col-span-3">
+                        <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate" title="Data de Conclusão">Data:</label>
+                        <div class="relative">
+                            <input type="text" id="inputDataRotaOperadorDisplay" readonly class="w-full text-xs font-medium border border-outline-variant rounded-lg p-1.5 pr-6 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer text-center h-[32px]" placeholder="DD/MM/YYYY" />
+                            <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[15px] pointer-events-none">calendar_today</span>
+                            <input type="date" id="inputDataRotaOperador" onchange="aoAtualizarDataBRInput(); aoMudarOperadorRota()" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" />
+                        </div>
+                    </div>
+
+                    <!-- Botão Exibir (2 cols) -->
+                    <div class="col-span-2">
+                        <button type="button" onclick="calcularERenderizarRotaOperador()" class="w-full py-1.5 px-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer h-[32px]" title="Exibir Rota Concluída">
+                            <span class="material-symbols-outlined text-[16px]">map</span>
+                            <span>Exibir</span>
+                        </button>
+                    </div>
+
+                    <!-- Botão Limpar (2 cols) -->
+                    <div class="col-span-2">
+                        <button type="button" onclick="limparRotaOperadorAtual()" class="w-full py-1.5 px-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1 h-[32px]" title="Limpar Rota">
+                            <span class="material-symbols-outlined text-[16px]">cleaning_services</span>
+                            <span>Limpar</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Animação / Setas de Fluxo -->
+                <div class="flex items-center justify-between pt-0.5">
+                    <label for="checkFluxoAnimado" class="text-[11px] font-semibold text-on-surface flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" id="checkFluxoAnimado" checked onchange="aoAlternarFluxoAnimado()" class="w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500 cursor-pointer" />
+                        <span>Exibir Fluxo Animado ⚡</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Container de Resultados da Rota do Operador (Preenche todo o espaço vertical restante) -->
+            <div id="containerResultadoRotaOperador" class="hidden flex-1 flex flex-col min-h-0 mt-2.5 space-y-2">
+                <div class="bg-emerald-500/10 border border-emerald-500/30 p-2 rounded-lg flex items-center justify-between text-xs flex-none">
+                    <div>
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-700 block">OSs Encerradas</span>
+                        <span id="resumenQtdePontosOperador" class="font-bold text-on-surface">0 OSs</span>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[9.5px] font-bold uppercase tracking-wider text-emerald-700 block">Distância Total</span>
+                        <span id="resumenDistanciaOperador" class="font-bold text-on-surface">0 km</span>
+                    </div>
+                </div>
+
+                <!-- Timeline de Atendimento -->
+                <div class="border-t border-outline-variant/60 pt-2 flex-1 flex flex-col min-h-0">
+                    <h4 class="font-bold text-xs text-on-surface mb-1.5 flex items-center justify-between flex-none">
+                        <span>Ordem das Conclusões:</span>
+                        <span id="badgeHorarioOperador" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-800 font-bold"></span>
+                    </h4>
+                    <div id="listaSequenciaOperadorContainer" class="flex-1 overflow-y-auto pr-1 space-y-1.5 min-h-0 mt-1">
                         <!-- Itens inseridos dinamicamente -->
                     </div>
                 </div>
@@ -722,22 +832,50 @@
 <!-- LÓGICA DE DADOS E EVENTOS DO MAPA -->
 <script>
     var MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
-    mapboxgl.accessToken = MAPBOX_TOKEN;
+    if (typeof mapboxgl !== 'undefined') {
+        mapboxgl.accessToken = MAPBOX_TOKEN;
+    }
 
-    var mapOSsInstance = null;
-    var todosMarkersOSsAbertas = [];
-    var dadosOSsAbertasCache = [];
-    var filtroStatusAtual = 'abertas';
-    var modoVisaoMapaAtual = 'pinos';
-    var chamadosService = new window.ChamadosService();
-    var currentUserRole = 'operador';
+    window.mapOSsInstance = window.mapOSsInstance || null;
+    window.todosMarkersOSsAbertas = window.todosMarkersOSsAbertas || [];
+    window.dadosOSsAbertasCache = window.dadosOSsAbertasCache || [];
+    window.filtroStatusAtual = window.filtroStatusAtual || 'abertas';
+    window.modoVisaoMapaAtual = window.modoVisaoMapaAtual || 'pinos';
 
-    var filtroDataMapaState = {
-        tipo: 'ativas',
-        start: null,
-        end: null,
-        label: 'Somente Ativas'
-    };
+    var mapOSsInstance = window.mapOSsInstance;
+    var todosMarkersOSsAbertas = window.todosMarkersOSsAbertas;
+    var dadosOSsAbertasCache = window.dadosOSsAbertasCache;
+    var filtroStatusAtual = window.filtroStatusAtual;
+    var modoVisaoMapaAtual = window.modoVisaoMapaAtual;
+
+    function getFiltroStatusAtual() {
+        if (!window.filtroStatusAtual) {
+            window.filtroStatusAtual = 'abertas';
+        }
+        return window.filtroStatusAtual;
+    }
+
+    function getChamadosService() {
+        if (!window.chamadosService && typeof window.ChamadosService === 'function') {
+            window.chamadosService = new window.ChamadosService();
+        }
+        return window.chamadosService;
+    }
+    var chamadosService = getChamadosService();
+    var currentUserRole = window.currentUserRole || 'operador';
+
+    function getFiltroDataMapaState() {
+        if (!window.filtroDataMapaState) {
+            window.filtroDataMapaState = {
+                tipo: 'ativas',
+                start: null,
+                end: null,
+                label: 'Somente Ativas'
+            };
+        }
+        return window.filtroDataMapaState;
+    }
+    var filtroDataMapaState = getFiltroDataMapaState();
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarMapaOSsAbertas();
@@ -780,10 +918,11 @@
             '365dias': 'Este Ano (365d)'
         };
 
-        filtroDataMapaState.tipo = tipo;
-        filtroDataMapaState.start = null;
-        filtroDataMapaState.end = null;
-        filtroDataMapaState.label = labels[tipo] || 'Somente Ativas';
+        const state = getFiltroDataMapaState();
+        state.tipo = tipo;
+        state.start = null;
+        state.end = null;
+        state.label = labels[tipo] || 'Somente Ativas';
 
         atualizarUIFiltroDataMapa();
         fecharDropdownFiltroDataMapa();
@@ -807,10 +946,11 @@
         const fmtStart = new Date(startVal + 'T00:00:00').toLocaleDateString('pt-BR');
         const fmtEnd = new Date(endVal + 'T00:00:00').toLocaleDateString('pt-BR');
 
-        filtroDataMapaState.tipo = 'custom';
-        filtroDataMapaState.start = startVal;
-        filtroDataMapaState.end = endVal;
-        filtroDataMapaState.label = `${fmtStart} - ${fmtEnd}`;
+        const state = getFiltroDataMapaState();
+        state.tipo = 'custom';
+        state.start = startVal;
+        state.end = endVal;
+        state.label = `${fmtStart} - ${fmtEnd}`;
 
         atualizarUIFiltroDataMapa();
         fecharDropdownFiltroDataMapa();
@@ -818,7 +958,8 @@
     }
 
     function limparFiltroDataMapa() {
-        filtroDataMapaState = { tipo: 'ativas', start: null, end: null, label: 'Somente Ativas' };
+        window.filtroDataMapaState = { tipo: 'ativas', start: null, end: null, label: 'Somente Ativas' };
+        if (typeof filtroDataMapaState !== 'undefined') filtroDataMapaState = window.filtroDataMapaState;
         const inputStart = document.getElementById('mapa-range-start');
         const inputEnd = document.getElementById('mapa-range-end');
         if (inputStart) inputStart.value = '';
@@ -830,13 +971,14 @@
     }
 
     function atualizarUIFiltroDataMapa() {
+        const state = getFiltroDataMapaState();
         const labelEl = document.getElementById('labelFiltroDataMapa');
         const indicador = document.getElementById('indicadorFiltroDataMapa');
 
-        if (labelEl) labelEl.textContent = filtroDataMapaState.label;
+        if (labelEl) labelEl.textContent = state.label;
 
         if (indicador) {
-            if (filtroDataMapaState.tipo !== 'ativas') {
+            if (state.tipo !== 'ativas') {
                 indicador.classList.remove('hidden');
             } else {
                 indicador.classList.add('hidden');
@@ -853,7 +995,8 @@
     });
 
     function alterarFiltroStatus(status) {
-        filtroStatusAtual = status;
+        window.filtroStatusAtual = status;
+        if (typeof filtroStatusAtual !== 'undefined') filtroStatusAtual = status;
         const statusList = ['abertas', 'resolvidas', 'canceladas', 'todas'];
         statusList.forEach(s => {
             const btnId = 'chipStatus' + s.charAt(0).toUpperCase() + s.slice(1);
@@ -867,7 +1010,8 @@
             }
         });
 
-        if (status !== 'abertas' && filtroDataMapaState.tipo === 'ativas') {
+        const state = getFiltroDataMapaState();
+        if (status !== 'abertas' && state.tipo === 'ativas') {
             aplicarFiltroDataRapidoMapa('30dias');
         } else {
             aplicarFiltrosMapa();
@@ -875,8 +1019,11 @@
     }
 
     function aplicarFiltrosMapa() {
-        if (dadosOSsAbertasCache && dadosOSsAbertasCache.length > 0) {
-            const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        const stAtual = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+        const osCache = window.dadosOSsAbertasCache || (typeof dadosOSsAbertasCache !== 'undefined' ? dadosOSsAbertasCache : []);
+
+        if (osCache && osCache.length > 0) {
+            const filtradas = obterListaFiltradaPorStatus(osCache, stAtual);
             const globalInput = document.getElementById('global-search-input');
             const termo = globalInput ? globalInput.value.toLowerCase().trim() : '';
 
@@ -893,7 +1040,7 @@
             }
 
             const stat = document.getElementById('statMapaOSsAbertas');
-            if (stat) stat.innerHTML = `Exibindo ${listaFinal.length} OSs (${filtroStatusAtual.toUpperCase()})`;
+            if (stat) stat.innerHTML = `Exibindo ${listaFinal.length} OSs (${stAtual.toUpperCase()})`;
             renderizarMapaOSs(listaFinal);
         } else {
             carregarMapaOSsAbertas();
@@ -1005,8 +1152,20 @@
         if (painelDetalhes) painelDetalhes.style.display = 'none';
 
         try {
+            let service = (typeof getChamadosService === 'function' ? getChamadosService() : null) || window.chamadosService;
+            if (!service && typeof window.ChamadosService === 'function') {
+                window.chamadosService = new window.ChamadosService();
+                service = window.chamadosService;
+            }
+
+            if (!service) {
+                console.warn("⚠️ [Mapa] chamadosService ainda não está instanciado. Tentando novamente em 150ms...");
+                setTimeout(() => carregarMapaOSsAbertas(), 150);
+                return;
+            }
+
             // Carrega a lista de chamados via ChamadosService (idêntico ao Painel.html)
-            const chamadosList = await chamadosService.getChamadosList();
+            const chamadosList = await service.getChamadosList();
             window.chamadosListCache = chamadosList;
             
             // Converte as entidades ChamadoModel para a estrutura de renderização do mapa
@@ -1192,37 +1351,39 @@
 
             // 2. Filtro de Data / Período
             const dataOS = obterDataObjetoOS(os);
-            if (filtroDataMapaState.tipo !== 'ativas') {
+            const filterState = (typeof getFiltroDataMapaState === 'function' ? getFiltroDataMapaState() : null) || window.filtroDataMapaState || { tipo: 'ativas' };
+
+            if (filterState.tipo !== 'ativas') {
                 if (!dataOS) return false;
 
                 const dataZero = new Date(dataOS);
                 dataZero.setHours(0, 0, 0, 0);
 
-                if (filtroDataMapaState.tipo === 'hoje') {
+                if (filterState.tipo === 'hoje') {
                     if (dataZero.getTime() !== hoje.getTime()) return false;
-                } else if (filtroDataMapaState.tipo === 'ontem') {
+                } else if (filterState.tipo === 'ontem') {
                     const ontem = new Date(hoje);
                     ontem.setDate(hoje.getDate() - 1);
                     if (dataZero.getTime() !== ontem.getTime()) return false;
-                } else if (filtroDataMapaState.tipo === '7dias') {
+                } else if (filterState.tipo === '7dias') {
                     const limite = new Date(hoje);
                     limite.setDate(hoje.getDate() - 7);
                     if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filtroDataMapaState.tipo === '30dias') {
+                } else if (filterState.tipo === '30dias') {
                     const limite = new Date(hoje);
                     limite.setDate(hoje.getDate() - 30);
                     if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filtroDataMapaState.tipo === '90dias') {
+                } else if (filterState.tipo === '90dias') {
                     const limite = new Date(hoje);
                     limite.setDate(hoje.getDate() - 90);
                     if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filtroDataMapaState.tipo === '365dias') {
+                } else if (filterState.tipo === '365dias') {
                     const limite = new Date(hoje);
                     limite.setDate(hoje.getDate() - 365);
                     if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filtroDataMapaState.tipo === 'custom' && filtroDataMapaState.start && filtroDataMapaState.end) {
-                    const startDt = new Date(filtroDataMapaState.start + 'T00:00:00');
-                    const endDt = new Date(filtroDataMapaState.end + 'T23:59:59');
+                } else if (filterState.tipo === 'custom' && filterState.start && filterState.end) {
+                    const startDt = new Date(filterState.start + 'T00:00:00');
+                    const endDt = new Date(filterState.end + 'T23:59:59');
                     if (dataOS < startDt || dataOS > endDt) return false;
                 }
             }
@@ -1313,6 +1474,11 @@
         atualizarKPIsMapa(listaOSs);
 
         if (!mapOSsInstance) {
+            if (typeof mapboxgl === 'undefined') {
+                console.warn("⚠️ [Mapa] mapboxgl ainda não está disponível no DOM. Aguardando carregamento do script...");
+                setTimeout(() => renderizarMapaOSs(listaOSs), 150);
+                return;
+            }
             mapOSsInstance = new mapboxgl.Map({
                 container: 'canvasMapaOSsAbertas',
                 style: 'mapbox://styles/mapbox/streets-v12',
@@ -1880,6 +2046,119 @@
         painel.innerHTML = html;
     }
 
+    function obterPaddingMapaParaPainel(padBase = 60) {
+        const painelRotasOp = document.getElementById('painelRotasOperador');
+        const painelRotasVi = document.getElementById('painelRoteirizacaoOS');
+        const painelLat = document.getElementById('painelLateralOS');
+        
+        let padRight = padBase;
+        let padLeft = padBase;
+
+        if (painelRotasOp && !painelRotasOp.classList.contains('hidden') && painelRotasOp.offsetWidth > 0) {
+            padRight = Math.max(padRight, painelRotasOp.offsetWidth + 40);
+        }
+        if (painelRotasVi && !painelRotasVi.classList.contains('hidden') && painelRotasVi.offsetWidth > 0) {
+            padRight = Math.max(padRight, painelRotasVi.offsetWidth + 40);
+        }
+        if (painelLat && painelLat.style.display !== 'none' && !painelLat.classList.contains('hidden') && painelLat.offsetWidth > 0) {
+            if (painelLat.classList.contains('left-3')) {
+                padLeft = Math.max(padLeft, painelLat.offsetWidth + 40);
+            } else {
+                padRight = Math.max(padRight, painelLat.offsetWidth + 40);
+            }
+        }
+
+        return {
+            top: padBase + 20,
+            bottom: padBase + 20,
+            left: padLeft,
+            right: padRight
+        };
+    }
+
+    function ajustarPosicaoPainelLateralOS() {
+        const painelLat = document.getElementById('painelLateralOS');
+        const painelRotasOp = document.getElementById('painelRotasOperador');
+        const painelRotasVi = document.getElementById('painelRoteirizacaoOS');
+        if (!painelLat) return;
+
+        const temPainelRotasAberto = (painelRotasOp && !painelRotasOp.classList.contains('hidden')) || 
+                                     (painelRotasVi && !painelRotasVi.classList.contains('hidden'));
+
+        if (temPainelRotasAberto) {
+            painelLat.classList.remove('right-3');
+            painelLat.classList.add('left-3', 'z-40');
+        } else {
+            painelLat.classList.remove('left-3', 'z-40');
+            painelLat.classList.add('right-3');
+        }
+    }
+
+    function obterFotosEvidenciasOS(os) {
+        if (!os) return [];
+
+        const m = os._originalModel || os;
+
+        if (os.fotos && Array.isArray(os.fotos) && os.fotos.length > 0) {
+            return os.fotos;
+        }
+
+        if (m && m.fotosEvidencias && Array.isArray(m.fotosEvidencias) && m.fotosEvidencias.length > 0) {
+            return m.fotosEvidencias;
+        }
+
+        const list = [];
+        const rawPontos = os.pontos_final || os.pontosFinal || m.pontos_final || m.rawPontos || os.pontos;
+        let pts = [];
+        if (Array.isArray(rawPontos)) pts = rawPontos;
+        else if (typeof rawPontos === 'string') {
+            try { pts = JSON.parse(rawPontos); } catch(e) {}
+        }
+
+        if (pts && pts.length > 0) {
+            pts.forEach((p, idx) => {
+                if (!p) return;
+                let ev = p.evidencias || p.fotosEstagios || p.fotos;
+                if (typeof ev === 'string') {
+                    try { ev = JSON.parse(ev); } catch(e) {}
+                }
+                if (typeof ev === 'object' && ev !== null) {
+                    for (const estagio in ev) {
+                        const url = ev[estagio];
+                        if (url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:'))) {
+                            if (!list.some(item => item.url === url)) {
+                                list.push({
+                                    url: url,
+                                    titulo: `${estagio} (Ponto #${idx + 1})`,
+                                    pontoIndex: idx + 1
+                                });
+                            }
+                        }
+                    }
+                }
+                const fotoUnica = p.foto || p.url_foto || p.foto_url;
+                if (fotoUnica && typeof fotoUnica === 'string' && (fotoUnica.startsWith('http') || fotoUnica.startsWith('data:'))) {
+                    if (!list.some(item => item.url === fotoUnica)) {
+                        list.push({
+                            url: fotoUnica,
+                            titulo: `Foto Ponto #${idx + 1}`,
+                            pontoIndex: idx + 1
+                        });
+                    }
+                }
+            });
+        }
+
+        const fotoEnt = os.foto_entrada || os.fotoEntrada || m.foto_entrada || m.fotoEntrada;
+        if (fotoEnt && typeof fotoEnt === 'string' && (fotoEnt.startsWith('http') || fotoEnt.startsWith('data:'))) {
+            if (!list.some(item => item.url === fotoEnt)) {
+                list.unshift({ url: fotoEnt, titulo: 'Foto de Entrada' });
+            }
+        }
+
+        return list;
+    }
+
     function exibirDetalhesOSCardByProt(protocolo) {
         if (!dadosOSsAbertasCache) return;
         const osObj = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase());
@@ -1890,6 +2169,7 @@
     }
 
     function exibirDetalhesOSCard(os, pt, diasEmAberto) {
+        ajustarPosicaoPainelLateralOS();
         const painel = document.getElementById('painelLateralOS');
         if (!painel) return;
         painel.style.display = 'block';
@@ -1968,19 +2248,21 @@
             </div>`;
         }
 
-        // BLOCO DE FOTOS E EVIDÊNCIAS
-        if (os.fotos && Array.isArray(os.fotos) && os.fotos.length > 0) {
+        // BLOCO DE FOTOS E EVIDÊNCIAS (Robusto)
+        const listaFotos = obterFotosEvidenciasOS(os);
+        if (listaFotos && Array.isArray(listaFotos) && listaFotos.length > 0) {
+            os.fotos = listaFotos;
             html += `
             <div class="mt-3 p-2.5 bg-surface-container-low border border-outline-variant/60 rounded-xl shadow-sm">
                 <div class="flex items-center justify-between mb-2">
                     <strong class="text-xs font-bold text-secondary flex items-center gap-1.5">
                         <span class="material-symbols-outlined text-[16px] text-amber-500">photo_library</span>
-                        <span>Fotos & Evidências (${os.fotos.length})</span>
+                        <span>Fotos & Evidências (${listaFotos.length})</span>
                     </strong>
                 </div>
                 <div class="grid grid-cols-2 gap-2">`;
             
-            os.fotos.forEach((foto, fIdx) => {
+            listaFotos.forEach((foto, fIdx) => {
                 html += `
                 <div class="relative group rounded-lg overflow-hidden border border-outline-variant/60 cursor-pointer shadow-sm hover:shadow-md transition-all aspect-video bg-slate-900" onclick="abrirGaleriaFotosModal('${os.protocolo}', ${fIdx})">
                     <img src="${foto.url}" alt="${foto.titulo || 'Foto Evidência'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
@@ -2064,7 +2346,8 @@
             const logLinha = `${dataHora} - Reaberta: ${obs || "Sem justificativa"}`;
             osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
         }
-        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        const stAtual = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, stAtual);
         renderizarMapaOSs(filtradas);
         const painelLat = document.getElementById('painelLateralOS');
         if (painelLat) painelLat.style.display = 'none';
@@ -2243,7 +2526,8 @@
         }
 
         // 3. Re-renderização instantânea no mapa
-        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        const stAtualPrio = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, stAtualPrio);
         renderizarMapaOSs(filtradas);
 
         const painelLat = document.getElementById('painelLateralOS');
@@ -2254,8 +2538,11 @@
             if (window.ChamadosRepository) {
                 const repo = new window.ChamadosRepository();
                 await repo.updatePriority(targetIdOrProtocol, prio);
-            } else if (chamadosService && chamadosService.repository) {
-                await chamadosService.repository.updatePriority(targetIdOrProtocol, prio);
+            } else {
+                const service = (typeof getChamadosService === 'function' ? getChamadosService() : null) || window.chamadosService;
+                if (service && service.repository) {
+                    await service.repository.updatePriority(targetIdOrProtocol, prio);
+                }
             }
         } catch(e) {
             console.warn("⚠️ Falha ao sincronizar prioridade no Supabase:", e);
@@ -2315,7 +2602,8 @@
             const logLinha = `${dataHora} - Cancelada: ${obs || "Sem justificativa"}`;
             osEncontrada.logs = osEncontrada.logs ? (osEncontrada.logs + "\n" + logLinha) : logLinha;
         }
-        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, filtroStatusAtual);
+        const stAtualCanc = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+        const filtradas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, stAtualCanc);
         renderizarMapaOSs(filtradas);
         const painelLat = document.getElementById('painelLateralOS');
         if (painelLat) painelLat.style.display = 'none';
@@ -2346,12 +2634,14 @@
 
     function abrirGaleriaFotosModal(protocolo, indexInicial) {
         const osObj = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase()) : null;
-        if (!osObj || !osObj.fotos || osObj.fotos.length === 0) {
+        const fotos = obterFotosEvidenciasOS(osObj);
+        if (!fotos || fotos.length === 0) {
             alert("Nenhuma foto disponível para esta Ordem de Serviço.");
             return;
         }
 
-        galeriaFotosAtualList = osObj.fotos;
+        galeriaFotosAtualList = fotos;
+        if (osObj) osObj.fotos = fotos;
         galeriaFotosIndexAtual = indexInicial || 0;
         galeriaProtocoloAtual = protocolo;
 
@@ -2938,8 +3228,12 @@
             
             el.onclick = (e) => {
                 e.stopPropagation();
-                mapOSsInstance.flyTo({ center: [pt.lng, pt.lat], zoom: 16 });
-                if (window.exibirDetalhesOSCardByProt) {
+                if (mapOSsInstance) {
+                    mapOSsInstance.flyTo({ center: [pt.lng, pt.lat], zoom: 16, padding: obterPaddingMapaParaPainel() });
+                }
+                if (window.abrirDetalhesOSModal) {
+                    window.abrirDetalhesOSModal(pt.os.protocolo);
+                } else if (window.exibirDetalhesOSCardByProt) {
                     exibirDetalhesOSCardByProt(pt.os.protocolo);
                 }
             };
@@ -2953,7 +3247,7 @@
         });
 
         if (!bounds.isEmpty()) {
-            mapOSsInstance.fitBounds(bounds, { padding: 60, maxZoom: 15 });
+            mapOSsInstance.fitBounds(bounds, { padding: obterPaddingMapaParaPainel(70), maxZoom: 15 });
         }
     }
 
@@ -2989,10 +3283,7 @@
                 itemDiv.className = "bg-surface-container-lowest border border-outline-variant/60 hover:border-secondary p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all hover:bg-secondary/5";
                 itemDiv.onclick = () => {
                     if (mapOSsInstance) {
-                        mapOSsInstance.flyTo({ center: [p.lng, p.lat], zoom: 16 });
-                    }
-                    if (window.exibirDetalhesOSCardByProt) {
-                        exibirDetalhesOSCardByProt(p.os.protocolo);
+                        mapOSsInstance.flyTo({ center: [p.lng, p.lat], zoom: 16, padding: obterPaddingMapaParaPainel() });
                     }
                 };
 
@@ -3061,6 +3352,725 @@
             if (mapOSsInstance.getLayer('rota-viaria-line')) mapOSsInstance.removeLayer('rota-viaria-line');
             if (mapOSsInstance.getLayer('rota-viaria-casing')) mapOSsInstance.removeLayer('rota-viaria-casing');
             if (mapOSsInstance.getSource('rota-viaria-source')) mapOSsInstance.removeSource('rota-viaria-source');
+        }
+    }
+
+    // ==========================================
+    // ACOMPANHAMENTO DE OPERADORES (ROTAS CONCLUÍDAS)
+    // ==========================================
+    var rotaOperadorAtual = null;
+    var markersRotaOperador = [];
+    var markersArrowsOperador = [];
+    var animAnimationFrameId = null;
+
+    function formatarDataBR(val) {
+        if (!val) return '';
+        if (typeof val === 'string' && val.includes('-')) {
+            const parts = val.split('T')[0].split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+        }
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return String(val);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        return `${dd}/${mm}/${yyyy}`;
+    }
+
+    function aoAtualizarDataBRInput() {
+        const inpDate = document.getElementById('inputDataRotaOperador');
+        const inpDisp = document.getElementById('inputDataRotaOperadorDisplay');
+        if (inpDate && inpDisp) {
+            inpDisp.value = inpDate.value ? formatarDataBR(inpDate.value) : '';
+        }
+    }
+
+    function extrairOperadorDeTexto(texto) {
+        if (!texto || typeof texto !== 'string') return '';
+        const match = texto.match(/(?:conclu[íi]do|finalizado|encerrado|executado|reparado)\s+por[:\s]+([^\n\r,.-]+)/i);
+        if (match && match[1]) {
+            return match[1].trim();
+        }
+        return '';
+    }
+
+    function obterNomeOperadorOS(os, m) {
+        // 1. Prioridade absoluta: Quem FINALIZOU / CONCLUIU a OS
+        const finalizacaoCandidatos = [
+            m?.operadorFinalizacao,
+            m?.audit?.usuario_finalizacao,
+            (m?.sessoesList && m.sessoesList.length > 0) ? m.sessoesList[m.sessoesList.length - 1].tecnico : null,
+            os?.operador_finalizacao,
+            os?.finalizado_por,
+            os?.usuario_finalizacao,
+            os?.fechado_por,
+            os?.usuario_conclusao,
+            os?.tecnico,
+            extrairOperadorDeTexto(m?.observacaoFinal || os?.observacao_final || os?.descricao || os?.observacao)
+        ];
+
+        for (let c of finalizacaoCandidatos) {
+            const s = String(c || '').trim();
+            if (s && s !== 'null' && s !== 'undefined' && s !== 'Técnico Responsável' && s !== 'Técnico' && s !== 'Não informado' && s !== 'Pendente finalização' && s !== 'Sistema') {
+                return s;
+            }
+        }
+
+        // 2. Se a propriedade displayOperadorFinalizacao do modelo não for genérica
+        if (m && m.displayOperadorFinalizacao) {
+            const disp = String(m.displayOperadorFinalizacao).trim();
+            if (disp && disp !== 'null' && disp !== 'undefined' && disp !== 'Técnico Responsável' && disp !== 'Pendente finalização') {
+                return disp;
+            }
+        }
+
+        // 3. Fallback apenas se nenhuma finalização for encontrada
+        const fallbackCandidatos = [
+            os?.operador,
+            m?.operador,
+            m?.operadorAbertura,
+            os?.usuario_cadastro,
+            os?.user_email
+        ];
+        for (let c of fallbackCandidatos) {
+            const s = String(c || '').trim();
+            if (s && s !== 'null' && s !== 'undefined' && s !== 'Técnico Responsável' && s !== 'Técnico' && s !== 'Não informado' && s !== 'Pendente finalização' && s !== 'Sistema') {
+                return s;
+            }
+        }
+
+        return 'Técnico Responsável';
+    }
+
+    function togglePainelRotasOperador() {
+        const painel = document.getElementById('painelRotasOperador');
+        if (!painel) return;
+
+        if (painel.classList.contains('hidden')) {
+            painel.classList.remove('hidden');
+            
+            // Oculta outros painéis se abertos
+            const pRot = document.getElementById('painelRoteirizacaoOS');
+            if (pRot) pRot.classList.add('hidden');
+            const pLat = document.getElementById('painelLateralOS');
+            if (pLat) pLat.classList.add('hidden');
+
+            carregarOpcoesOperadoresRota();
+
+            // Configura a data atual como default se estiver vazio
+            const inpData = document.getElementById('inputDataRotaOperador');
+            if (inpData && !inpData.value) {
+                const hoje = new Date().toISOString().split('T')[0];
+                inpData.value = hoje;
+            }
+            aoAtualizarDataBRInput();
+        } else {
+            fecharPainelRotasOperador();
+        }
+    }
+
+    function fecharPainelRotasOperador() {
+        const painel = document.getElementById('painelRotasOperador');
+        if (painel) painel.classList.add('hidden');
+        limparCamadasRotaOperador();
+        ajustarPosicaoPainelLateralOS();
+    }
+
+    function carregarOpcoesOperadoresRota() {
+        const select = document.getElementById('selectOperadorRota');
+        if (!select) return;
+
+        const lista = dadosOSsAbertasCache || window.chamadosListCache || [];
+        const operadoresSet = new Set();
+
+        lista.forEach(os => {
+            const m = os._originalModel || os;
+            const cleanOp = obterNomeOperadorOS(os, m);
+            if (cleanOp && cleanOp !== 'Técnico Responsável' && cleanOp !== 'Não informado' && cleanOp !== 'Pendente finalização' && cleanOp !== 'Técnico') {
+                operadoresSet.add(cleanOp);
+            }
+        });
+
+        const operadoresArr = Array.from(operadoresSet).sort();
+        const valorAtual = select.value;
+
+        select.innerHTML = '<option value="ALL">-- Todos os Operadores --</option>';
+        operadoresArr.forEach(op => {
+            const opt = document.createElement('option');
+            opt.value = op;
+            opt.innerText = op;
+            select.appendChild(opt);
+        });
+
+        if (valorAtual && Array.from(select.options).some(o => o.value === valorAtual)) {
+            select.value = valorAtual;
+        }
+    }
+
+    function aoMudarOperadorRota() {
+        aoAtualizarDataBRInput();
+        calcularERenderizarRotaOperador();
+    }
+
+    function aoAlternarFluxoAnimado() {
+        if (rotaOperadorAtual) {
+            renderizarRotaOperadorNoMapa(rotaOperadorAtual);
+        }
+    }
+
+    function calcularAnguloBearing(lat1, lng1, lat2, lng2) {
+        const dLng = (lng2 - lng1) * Math.PI / 180;
+        const lat1Rad = lat1 * Math.PI / 180;
+        const lat2Rad = lat2 * Math.PI / 180;
+        const y = Math.sin(dLng) * Math.cos(lat2Rad);
+        const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+        const brng = Math.atan2(y, x) * 180 / Math.PI;
+        return (brng + 360) % 360;
+    }
+
+    // Cores para sub-rotas/segmentos do operador (quando houver intervalos > 1h30)
+    const CORES_ROTAS_OPERADOR = [
+        { name: 'Verde Esmeralda', line: '#10b981', casing: '#064e3b', dash: '#a7f3d0', badgeBg: 'bg-emerald-500/20', badgeText: 'text-emerald-900', border: 'border-emerald-500/40', hex: '#10b981' },
+        { name: 'Azul Celeste', line: '#2563eb', casing: '#1e3a8a', dash: '#93c5fd', badgeBg: 'bg-blue-500/20', badgeText: 'text-blue-900', border: 'border-blue-500/40', hex: '#2563eb' },
+        { name: 'Laranja Âmbar', line: '#f59e0b', casing: '#78350f', dash: '#fde68a', badgeBg: 'bg-amber-500/20', badgeText: 'text-amber-900', border: 'border-amber-500/40', hex: '#f59e0b' },
+        { name: 'Roxo Violeta', line: '#8b5cf6', casing: '#4c1d95', dash: '#ddd6fe', badgeBg: 'bg-purple-500/20', badgeText: 'text-purple-900', border: 'border-purple-500/40', hex: '#8b5cf6' },
+        { name: 'Rosa Choque', line: '#ec4899', casing: '#831843', dash: '#fbcfe8', badgeBg: 'bg-pink-500/20', badgeText: 'text-pink-900', border: 'border-pink-500/40', hex: '#ec4899' },
+        { name: 'Ciano Turquesa', line: '#06b6d4', casing: '#164e63', dash: '#a5f3fc', badgeBg: 'bg-cyan-500/20', badgeText: 'text-cyan-900', border: 'border-cyan-500/40', hex: '#06b6d4' },
+        { name: 'Vermelho Rosado', line: '#f43f5e', casing: '#881337', dash: '#fecdd3', badgeBg: 'bg-rose-500/20', badgeText: 'text-rose-900', border: 'border-rose-500/40', hex: '#f43f5e' }
+    ];
+
+    async function calcularERenderizarRotaOperador() {
+        const lista = dadosOSsAbertasCache || window.chamadosListCache || [];
+        if (!lista || lista.length === 0) {
+            alert("Nenhuma Ordem de Serviço carregada no mapa para analisar rotas.");
+            return;
+        }
+
+        const selectOp = document.getElementById('selectOperadorRota');
+        const inputData = document.getElementById('inputDataRotaOperador');
+        const opSelecionado = selectOp ? selectOp.value : 'ALL';
+        const dataSelecionadaStr = inputData ? inputData.value : '';
+
+        aoAtualizarDataBRInput();
+
+        // 1. Filtrar OSs Concluídas/Resolvidas do Operador e Data
+        const concluidasDoOperador = [];
+
+        lista.forEach(os => {
+            const m = os._originalModel || os;
+            const stNorm = m.normalizedStatus || (os.status || '').toLowerCase();
+            const isResolv = stNorm.includes('conclu') || stNorm.includes('resolv') || stNorm.includes('fechad');
+            if (!isResolv) return;
+
+            const cleanOp = obterNomeOperadorOS(os, m);
+
+            if (opSelecionado !== 'ALL' && cleanOp !== opSelecionado) return;
+
+            const dataConc = m.dataConclusao || m.dataFechamento || m.dataAbertura || os.dataObjeto;
+            if (dataSelecionadaStr && dataConc) {
+                const dObj = new Date(dataConc);
+                if (!isNaN(dObj.getTime())) {
+                    const yyyy = dObj.getFullYear();
+                    const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+                    const dd = String(dObj.getDate()).padStart(2, '0');
+                    const osDataStr = `${yyyy}-${mm}-${dd}`;
+                    if (osDataStr !== dataSelecionadaStr) return;
+                }
+            }
+
+            // Extrai coordenadas do ponto de finalização/reparo ou da OS principal
+            let lat = null, lng = null;
+            if (m.coordenadasReparoList && m.coordenadasReparoList.length > 0) {
+                lat = parseFloat(m.coordenadasReparoList[0].lat);
+                lng = parseFloat(m.coordenadasReparoList[0].lng);
+            } else if (os.pontos && os.pontos.length > 0) {
+                lat = parseFloat(os.pontos[0].lat);
+                lng = parseFloat(os.pontos[0].lng);
+            }
+
+            if (!isNaN(lat) && !isNaN(lng) && lat !== null && lng !== null) {
+                concluidasDoOperador.push({
+                    os: os,
+                    model: m,
+                    lat: lat,
+                    lng: lng,
+                    dataConclusao: dataConc ? new Date(dataConc) : new Date(0),
+                    operador: cleanOp || 'Técnico',
+                    endereco: os.pontos && os.pontos[0]?.endereco ? os.pontos[0].endereco : (os.endereco || m.endereco || 'Araraquara, SP')
+                });
+            }
+        });
+
+        if (concluidasDoOperador.length === 0) {
+            const dtBR = formatarDataBR(dataSelecionadaStr);
+            alert(`Nenhuma OS concluída localizada para ${opSelecionado === 'ALL' ? 'os operadores' : 'o operador ' + opSelecionado} na data ${dtBR}.`);
+            limparRotaOperadorAtual();
+            return;
+        }
+
+        // 2. Ordena cronologicamente por horário de conclusão
+        concluidasDoOperador.sort((a, b) => a.dataConclusao.getTime() - b.dataConclusao.getTime());
+
+        // 2.1 Análise do tempo entre um ponto e outro (> 1 hora e meia = 90 min) para divisão de rotas
+        const THRESHOLD_PAUSA_MS = 90 * 60 * 1000; // 1.5 horas (90 min)
+        const segmentos = [];
+        let segAtual = [];
+
+        concluidasDoOperador.forEach((pt, idx) => {
+            pt.globalIdx = idx;
+            if (idx === 0) {
+                pt.tempoIntervaloMs = 0;
+                pt.isNovoSegmento = true;
+                segAtual.push(pt);
+            } else {
+                const ptAnterior = concluidasDoOperador[idx - 1];
+                const diffMs = pt.dataConclusao.getTime() - ptAnterior.dataConclusao.getTime();
+                pt.tempoIntervaloMs = diffMs;
+
+                if (diffMs > THRESHOLD_PAUSA_MS) {
+                    segmentos.push(segAtual);
+                    segAtual = [pt];
+                    pt.isNovoSegmento = true;
+                } else {
+                    pt.isNovoSegmento = false;
+                    segAtual.push(pt);
+                }
+            }
+        });
+        if (segAtual.length > 0) {
+            segmentos.push(segAtual);
+        }
+
+        // Atribui propriedades de segmento e cores a cada ponto
+        segmentos.forEach((seg, sIdx) => {
+            const corObj = CORES_ROTAS_OPERADOR[sIdx % CORES_ROTAS_OPERADOR.length];
+            seg.index = sIdx;
+            seg.cor = corObj;
+            seg.pontos = seg;
+            seg.distanciaKm = 0;
+            seg.duracaoMin = 0;
+            seg.geometry = null;
+
+            seg.forEach(pt => {
+                pt.segmentoIndex = sIdx;
+                pt.corSegmento = corObj;
+            });
+        });
+
+        // 3. Busca traçado pelas ruas via Mapbox Directions API para cada segmento de rota
+        let distanciaTotalKm = 0;
+        let duracaoEstimadaMin = 0;
+
+        for (let sIdx = 0; sIdx < segmentos.length; sIdx++) {
+            const seg = segmentos[sIdx];
+            if (seg.length >= 2) {
+                try {
+                    const coordsString = seg.map(p => `${p.lng},${p.lat}`).join(';');
+                    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+                    const resp = await fetch(directionsUrl);
+                    const data = await resp.json();
+
+                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                        const route = data.routes[0];
+                        seg.geometry = route.geometry;
+                        if (route.distance) {
+                            seg.distanciaKm = route.distance / 1000;
+                            distanciaTotalKm += seg.distanciaKm;
+                        }
+                        if (route.duration) {
+                            seg.duracaoMin = Math.round(route.duration / 60);
+                            duracaoEstimadaMin += seg.duracaoMin;
+                        }
+                        if (route.legs && Array.isArray(route.legs)) {
+                            route.legs.forEach((leg, legIdx) => {
+                                if (seg[legIdx + 1]) {
+                                    seg[legIdx + 1].trechoLeg = {
+                                        duracaoMin: leg.duration ? Math.round(leg.duration / 60) : 0,
+                                        distanciaKm: leg.distance ? parseFloat((leg.distance / 1000).toFixed(1)) : 0
+                                    };
+                                }
+                            });
+                        }
+                    }
+                } catch (err) {
+                    console.warn(`⚠️ Erro ao consultar Mapbox Directions para segmento ${sIdx + 1}:`, err);
+                }
+
+                if (seg.distanciaKm === 0) {
+                    let dSeg = 0;
+                    for (let i = 0; i < seg.length - 1; i++) {
+                        dSeg += calcularDistanciaKm(seg[i].lat, seg[i].lng, seg[i+1].lat, seg[i+1].lng);
+                    }
+                    seg.distanciaKm = dSeg;
+                    distanciaTotalKm += dSeg;
+                }
+            }
+        }
+
+        const googleMapsUrl = construirUrlGoogleMapsRota(concluidasDoOperador);
+
+        rotaOperadorAtual = {
+            sequencia: concluidasDoOperador,
+            segmentos: segmentos,
+            distanciaTotalKm: distanciaTotalKm,
+            duracaoEstimadaMin: duracaoEstimadaMin,
+            googleMapsUrl: googleMapsUrl,
+            operador: opSelecionado === 'ALL' ? 'Todos os Operadores' : opSelecionado,
+            dataStr: dataSelecionadaStr
+        };
+
+        renderizarRotaOperadorNoMapa(rotaOperadorAtual);
+        exibirPainelResultadosRotaOperador(rotaOperadorAtual);
+    }
+
+    function renderizarRotaOperadorNoMapa(rota) {
+        if (!mapOSsInstance || !rota || !rota.sequencia) return;
+
+        limparCamadasRotaOperador();
+
+        const animar = document.getElementById('checkFluxoAnimado')?.checked ?? true;
+        const segmentos = rota.segmentos || [rota.sequencia];
+
+        // 1. Renderiza cada segmento de rota com sua respectiva cor de traço
+        segmentos.forEach((seg, sIdx) => {
+            const pontos = seg.pontos || seg;
+            if (pontos.length < 2) return;
+
+            const cor = seg.cor || CORES_ROTAS_OPERADOR[0];
+            let featureGeometry = seg.geometry;
+            if (!featureGeometry) {
+                const coordsGeoJSON = pontos.map(p => [p.lng, p.lat]);
+                featureGeometry = {
+                    type: 'LineString',
+                    coordinates: coordsGeoJSON
+                };
+            }
+
+            const featureRota = {
+                type: 'Feature',
+                geometry: featureGeometry
+            };
+
+            const sourceId = `rota-operador-source-${sIdx}`;
+            mapOSsInstance.addSource(sourceId, {
+                type: 'geojson',
+                data: featureRota
+            });
+
+            // Linha Casing (Sombra / Contorno)
+            mapOSsInstance.addLayer({
+                id: `rota-operador-casing-${sIdx}`,
+                type: 'line',
+                source: sourceId,
+                paint: {
+                    'line-color': cor.casing,
+                    'line-width': 8,
+                    'line-opacity': 0.5
+                }
+            });
+
+            // Linha Principal (Traço do Segmento)
+            mapOSsInstance.addLayer({
+                id: `rota-operador-line-${sIdx}`,
+                type: 'line',
+                source: sourceId,
+                paint: {
+                    'line-color': cor.line,
+                    'line-width': 5.5,
+                    'line-opacity': 0.95
+                }
+            });
+
+            // Linha Pontilhada Animada (Dash)
+            if (animar) {
+                mapOSsInstance.addLayer({
+                    id: `rota-operador-dash-${sIdx}`,
+                    type: 'line',
+                    source: sourceId,
+                    paint: {
+                        'line-color': cor.dash,
+                        'line-width': 3.5,
+                        'line-dasharray': [0, 4, 4, 4]
+                    }
+                });
+            }
+        });
+
+        // Loop de Animação suave para todas as camadas dash ativas (~12 FPS)
+        if (animar) {
+            let lastAnimTime = 0;
+            let dashOffset = 0;
+            function animateDashFlow(timestamp) {
+                if (!mapOSsInstance) return;
+                if (!lastAnimTime || timestamp - lastAnimTime > 85) {
+                    lastAnimTime = timestamp;
+                    dashOffset = (dashOffset + 0.4) % 12;
+                    const d1 = dashOffset % 6;
+                    segmentos.forEach((seg, sIdx) => {
+                        const dashLayerId = `rota-operador-dash-${sIdx}`;
+                        try {
+                            if (mapOSsInstance.getLayer(dashLayerId)) {
+                                mapOSsInstance.setPaintProperty(dashLayerId, 'line-dasharray', [0, d1, 4, 6 - d1]);
+                            }
+                        } catch(e) {}
+                    });
+                }
+                animAnimationFrameId = requestAnimationFrame(animateDashFlow);
+            }
+            animateDashFlow(performance.now());
+        }
+
+        // Marcadores de Passos Numerados de Conclusão (①, ②, ③...) com cor do segmento
+        const bounds = new mapboxgl.LngLatBounds();
+        rota.sequencia.forEach((pt, idx) => {
+            const stepNum = (pt.globalIdx !== undefined) ? pt.globalIdx + 1 : idx + 1;
+            const dataHoraStr = pt.dataConclusao ? pt.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
+            const cor = pt.corSegmento || CORES_ROTAS_OPERADOR[0];
+
+            let tempoDecorridoTooltip = '';
+            if (pt.isNovoSegmento && pt.globalIdx > 0 && pt.tempoIntervaloMs > 0) {
+                const diffMin = Math.round(pt.tempoIntervaloMs / 60000);
+                const h = Math.floor(diffMin / 60);
+                const m = diffMin % 60;
+                tempoDecorridoTooltip = ` | ⏸️ Intervalo: +${h}h ${m}m (>1h30 - Rota ${pt.segmentoIndex + 1})`;
+            } else if (idx > 0 && pt.dataConclusao && rota.sequencia[idx - 1].dataConclusao) {
+                const tPrev = rota.sequencia[idx - 1].dataConclusao.getTime();
+                const tCurr = pt.dataConclusao.getTime();
+                const diffMs = tCurr - tPrev;
+                if (diffMs > 0) {
+                    const diffMin = Math.round(diffMs / 60000);
+                    const realTxt = diffMin < 60 ? `+${diffMin} min` : `${Math.floor(diffMin/60)}h ${diffMin%60}m`;
+                    const estTxt = (pt.trechoLeg && pt.trechoLeg.duracaoMin > 0) ? ` | 🚗 Est. Trânsito: ~${pt.trechoLeg.duracaoMin} min` : '';
+                    tempoDecorridoTooltip = ` | ⏱️ Real: ${realTxt}${estTxt}`;
+                }
+            }
+
+            const el = document.createElement('div');
+            el.className = 'marker-operador-step-badge';
+            el.innerHTML = stepNum;
+            el.style.background = `linear-gradient(135deg, ${cor.casing} 0%, ${cor.line} 100%)`;
+            el.style.boxShadow = `0 4px 14px ${cor.line}88`;
+            el.title = `[Rota ${pt.segmentoIndex + 1}] Conclusão #${stepNum}: OS #${pt.os.protocolo} (${dataHoraStr}${tempoDecorridoTooltip}) - ${pt.operador}`;
+
+            el.onclick = (e) => {
+                e.stopPropagation();
+                if (mapOSsInstance) {
+                    mapOSsInstance.flyTo({ center: [pt.lng, pt.lat], zoom: 16, padding: obterPaddingMapaParaPainel() });
+                }
+                if (window.abrirDetalhesOSModal) {
+                    window.abrirDetalhesOSModal(pt.os.protocolo);
+                } else if (window.exibirDetalhesOSCardByProt) {
+                    exibirDetalhesOSCardByProt(pt.os.protocolo);
+                }
+            };
+
+            const marker = new mapboxgl.Marker({ element: el })
+                .setLngLat([pt.lng, pt.lat])
+                .addTo(mapOSsInstance);
+
+            markersRotaOperador.push(marker);
+            bounds.extend([pt.lng, pt.lat]);
+        });
+
+        if (!bounds.isEmpty()) {
+            mapOSsInstance.fitBounds(bounds, { padding: obterPaddingMapaParaPainel(70), maxZoom: 15 });
+        }
+    }
+
+    function exibirPainelResultadosRotaOperador(rota) {
+        const container = document.getElementById('containerResultadoRotaOperador');
+        const elQtde = document.getElementById('resumenQtdePontosOperador');
+        const elDist = document.getElementById('resumenDistanciaOperador');
+        const elLinkGmaps = document.getElementById('btnGoogleMapsRotaOperadorLink');
+        const listContainer = document.getElementById('listaSequenciaOperadorContainer');
+        const badgeHorario = document.getElementById('badgeHorarioOperador');
+
+        if (!container) return;
+
+        const numRotas = rota.segmentos ? rota.segmentos.length : 1;
+        if (elQtde) {
+            elQtde.innerText = `${rota.sequencia.length} OSs (${numRotas} Rota${numRotas > 1 ? 's' : ''})`;
+        }
+        
+        if (elDist) {
+            let distText = `~ ${rota.distanciaTotalKm.toFixed(1)} km`;
+            if (rota.duracaoEstimadaMin && rota.duracaoEstimadaMin > 0) {
+                if (rota.duracaoEstimadaMin < 60) {
+                    distText += ` (🚗 ~${rota.duracaoEstimadaMin} min de trânsito)`;
+                } else {
+                    const h = Math.floor(rota.duracaoEstimadaMin / 60);
+                    const m = rota.duracaoEstimadaMin % 60;
+                    distText += ` (🚗 ~${h}h ${m}m de trânsito)`;
+                }
+            }
+            elDist.innerText = distText;
+        }
+
+        if (elLinkGmaps) elLinkGmaps.href = rota.googleMapsUrl || '#';
+
+        if (badgeHorario && rota.sequencia.length > 0) {
+            const p1 = rota.sequencia[0];
+            const pN = rota.sequencia[rota.sequencia.length - 1];
+            const h1 = p1.dataConclusao ? p1.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const hN = pN.dataConclusao ? pN.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+            const dataBR = formatarDataBR(rota.dataStr);
+            badgeHorario.innerText = `${dataBR ? dataBR + ' • ' : ''}${h1} ➔ ${hN}`;
+        }
+
+        if (listContainer) {
+            listContainer.innerHTML = '';
+            
+            rota.sequencia.forEach((p, idx) => {
+                const stepNum = (p.globalIdx !== undefined) ? p.globalIdx + 1 : idx + 1;
+                const horaStr = p.dataConclusao ? p.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
+                const cor = p.corSegmento || CORES_ROTAS_OPERADOR[0];
+
+                // Se houver divisão de rota por intervalo > 1h30, insere um divisor visual no timeline
+                if (p.isNovoSegmento && p.globalIdx > 0 && p.tempoIntervaloMs > 0) {
+                    const diffMin = Math.round(p.tempoIntervaloMs / 60000);
+                    const h = Math.floor(diffMin / 60);
+                    const m = diffMin % 60;
+
+                    const dividerDiv = document.createElement('div');
+                    dividerDiv.className = "my-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-900 dark:text-amber-300 animate-fade-in-up";
+                    dividerDiv.innerHTML = `
+                        <div class="flex items-center gap-1.5 font-bold text-[11px]">
+                            <span class="material-symbols-outlined text-[16px] text-amber-600">schedule</span>
+                            <span>Intervalo > 1h30 (${h}h ${m}m)</span>
+                        </div>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-extrabold text-white shadow-xs" style="background-color: ${cor.line}">
+                            Rota ${p.segmentoIndex + 1}
+                        </span>
+                    `;
+                    listContainer.appendChild(dividerDiv);
+                }
+
+                // Cálculo comparativo do tempo executado real vs estimado de trânsito
+                let tempoDecorridoBadge = '';
+                if (p.isNovoSegmento && p.globalIdx > 0 && p.tempoIntervaloMs > 0) {
+                    const diffMin = Math.round(p.tempoIntervaloMs / 60000);
+                    const h = Math.floor(diffMin / 60);
+                    const m = diffMin % 60;
+                    tempoDecorridoBadge = `
+                        <div class="flex items-center gap-1 flex-wrap justify-end">
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-900 font-bold border border-rose-500/30 shadow-xs" title="Intervalo superior a 1h30m - Início de Nova Rota">⏸️ Pausa: +${h}h ${m}m</span>
+                        </div>
+                    `;
+                } else if (idx > 0 && p.dataConclusao && rota.sequencia[idx - 1].dataConclusao) {
+                    const tPrev = rota.sequencia[idx - 1].dataConclusao.getTime();
+                    const tCurr = p.dataConclusao.getTime();
+                    const diffMs = tCurr - tPrev;
+                    
+                    let realBadge = '';
+                    if (diffMs > 0) {
+                        const diffMin = Math.round(diffMs / 60000);
+                        if (diffMin < 60) {
+                            realBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-900 font-bold border border-amber-500/30 shadow-xs" title="Tempo real executado pelo operador desde a OS anterior">⏱️ Real: +${diffMin} min</span>`;
+                        } else {
+                            const h = Math.floor(diffMin / 60);
+                            const m = diffMin % 60;
+                            realBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-900 font-bold border border-amber-500/30 shadow-xs" title="Tempo real executado pelo operador desde a OS anterior">⏱️ Real: +${h}h ${m}m</span>`;
+                        }
+                    }
+
+                    let estBadge = '';
+                    if (p.trechoLeg && p.trechoLeg.duracaoMin > 0) {
+                        if (p.trechoLeg.duracaoMin < 60) {
+                            estBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-900 font-semibold border border-blue-500/30 shadow-xs" title="Tempo estimado de trânsito Mapbox entre estes 2 pontos">🚗 Est: ~${p.trechoLeg.duracaoMin} min</span>`;
+                        } else {
+                            const h = Math.floor(p.trechoLeg.duracaoMin / 60);
+                            const m = p.trechoLeg.duracaoMin % 60;
+                            estBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-900 font-semibold border border-blue-500/30 shadow-xs" title="Tempo estimado de trânsito Mapbox entre estes 2 pontos">🚗 Est: ~${h}h ${m}m</span>`;
+                        }
+                    }
+
+                    tempoDecorridoBadge = `
+                        <div class="flex items-center gap-1 flex-wrap justify-end">
+                            ${realBadge}
+                            ${estBadge}
+                        </div>
+                    `;
+                } else if (idx === 0) {
+                    tempoDecorridoBadge = `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-900 font-bold border border-emerald-500/30 shadow-xs flex items-center gap-0.5">🚀 Ponto Inicial</span>`;
+                }
+
+                const itemDiv = document.createElement('div');
+                itemDiv.className = "bg-surface-container-lowest border border-outline-variant/60 hover:border-emerald-600 p-2.5 rounded-lg flex items-center justify-between cursor-pointer transition-all hover:bg-emerald-500/5 space-y-1";
+                itemDiv.onclick = () => {
+                    if (mapOSsInstance) {
+                        mapOSsInstance.flyTo({ center: [p.lng, p.lat], zoom: 16, padding: obterPaddingMapaParaPainel() });
+                    }
+                };
+
+                itemDiv.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden w-full">
+                        <span class="w-6 h-6 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center flex-shrink-0 shadow-sm" style="background-color: ${cor.line}">
+                            ${stepNum}
+                        </span>
+                        <div class="truncate w-full">
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="font-bold text-on-surface text-xs">#${p.os.protocolo}</span>
+                                    <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-800 font-bold">⏰ ${horaStr}</span>
+                                    <span class="text-[9px] px-1.5 py-0.2 rounded font-bold text-white" style="background-color: ${cor.line}">Rota ${p.segmentoIndex + 1}</span>
+                                </div>
+                                ${tempoDecorridoBadge}
+                            </div>
+                            <div class="flex items-center justify-between text-[10px] text-on-surface-variant">
+                                <p class="truncate text-on-surface-variant font-medium pr-1">${p.endereco}</p>
+                                ${p.operador ? `<span class="font-bold flex-shrink-0" style="color: ${cor.line}">${p.operador}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                listContainer.appendChild(itemDiv);
+            });
+        }
+
+        container.classList.remove('hidden');
+    }
+
+    function limparRotaOperadorAtual() {
+        rotaOperadorAtual = null;
+        limparCamadasRotaOperador();
+        const container = document.getElementById('containerResultadoRotaOperador');
+        if (container) container.classList.add('hidden');
+    }
+
+    function limparCamadasRotaOperador() {
+        if (animAnimationFrameId) {
+            cancelAnimationFrame(animAnimationFrameId);
+            animAnimationFrameId = null;
+        }
+
+        if (markersRotaOperador) {
+            markersRotaOperador.forEach(m => m.remove());
+        }
+        markersRotaOperador = [];
+
+        if (markersArrowsOperador) {
+            markersArrowsOperador.forEach(m => m.remove());
+        }
+        markersArrowsOperador = [];
+
+        if (mapOSsInstance && mapOSsInstance.getStyle()) {
+            const style = mapOSsInstance.getStyle();
+            if (style && style.layers) {
+                style.layers.forEach(layer => {
+                    if (layer.id && layer.id.startsWith('rota-operador-')) {
+                        try { mapOSsInstance.removeLayer(layer.id); } catch(e){}
+                    }
+                });
+            }
+            if (style && style.sources) {
+                Object.keys(style.sources).forEach(sourceId => {
+                    if (sourceId && sourceId.startsWith('rota-operador-')) {
+                        try { mapOSsInstance.removeSource(sourceId); } catch(e){}
+                    }
+                });
+            }
         }
     }
 
@@ -3157,16 +4167,24 @@
     };
 
     window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
-        if (!dadosOSsAbertasCache) return;
-        const os = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase());
-        if (!os || !os.fotos || os.fotos.length === 0) return;
+        let os = (dadosOSsAbertasCache || []).find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+        if (!os && window.chamadosListCache) {
+            os = window.chamadosListCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+        }
+        if (!os) return;
 
-        galeriaFotosAtualList = os.fotos;
-        galeriaFotosIndexAtual = (indexInicial >= 0 && indexInicial < os.fotos.length) ? indexInicial : 0;
+        const fotosList = (typeof obterFotosEvidenciasOS === 'function')
+            ? obterFotosEvidenciasOS(os)
+            : (os.fotosEvidencias && os.fotosEvidencias.length > 0 ? os.fotosEvidencias : (os.fotos || []));
+
+        if (!fotosList || fotosList.length === 0) return;
+
+        galeriaFotosAtualList = fotosList;
+        galeriaFotosIndexAtual = (indexInicial >= 0 && indexInicial < fotosList.length) ? indexInicial : 0;
 
         const modal = document.getElementById('modalGaleriaFotosCloudinary');
         const elProt = document.getElementById('galeriaModalProtocolo');
-        if (elProt) elProt.innerText = `Fotos da OS #${os.protocolo}`;
+        if (elProt) elProt.innerText = `Fotos da OS #${os.protocolo || protocolo}`;
 
         atualizarModalGaleriaVisualizacao();
 

@@ -141,7 +141,7 @@ class ChamadosRepository {
                 const nowIso = new Date().toISOString();
                 updatePayload.data_conclusao = nowIso;
                 updatePayload.data_fechamento = nowIso;
-            } else if (newStatus === 'Aberta' || newStatus === 'Pendente' || newStatus === 'Cancelada') {
+            } else if (newStatus === 'Aberta' || newStatus === 'Pendente') {
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;
             }
