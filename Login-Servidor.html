@@ -7,27 +7,23 @@
     <meta name="description" content="Portal de Acesso Administrativo e Operacional - Luz Araraquara." />
 
     <!-- Favicon & PWA Icons -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="manifest" href="manifest.json?v=3" />
     <meta name="theme-color" content="#1a73e8" />
     <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
-
-    <link rel="manifest" href="manifest.json?v=3" />
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="apple-touch-icon" href="favicon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
 
     <!-- Listener de Instalação PWA Imediato (Captura antes de carregar bibliotecas externas) -->
     <script>
       window.deferredPwaPrompt = window.deferredPwaPrompt || null;
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
-        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso!');
+        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso no HEAD!');
         window.deferredPwaPrompt = e;
-        const btn = document.getElementById('btnInstalarPwaLogin');
-        if (btn) {
-          btn.classList.remove('hidden');
-          btn.classList.add('flex');
+        if (typeof checarVisibilidadeBotaoInstalarPwa === 'function') {
+          checarVisibilidadeBotaoInstalarPwa();
         }
       });
     </script>
@@ -44,7 +40,7 @@
       function registrarSW() {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('./sw.js').then(function(reg) {
-            console.log('⚡ [PWA] Service Worker registrado:', reg.scope);
+            console.log('⚡ [PWA] Service Worker registrado a partir do Login Servidor:', reg.scope);
           }).catch(function(err) {
             console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
           });
@@ -57,16 +53,76 @@
         window.addEventListener('load', registrarSW);
       }
 
+      function checarVisibilidadeBotaoInstalarPwa() {
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+        const isInIframe = window.self !== window.top;
+        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+
+        const btnLogin = document.getElementById('btnInstalarPwaLogin');
+        if (!btnLogin) return;
+
+        if (!isStandalone && !isInIframe && isMobileDevice) {
+          btnLogin.classList.remove('hidden');
+          btnLogin.classList.add('flex');
+        } else {
+          btnLogin.classList.add('hidden');
+          btnLogin.classList.remove('flex');
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
+      window.addEventListener('resize', () => {
+        checarVisibilidadeBotaoInstalarPwa();
+      });
+
       async function dispararInstalacaoPWA() {
         if (window.deferredPwaPrompt) {
           window.deferredPwaPrompt.prompt();
-          const choiceResult = await window.deferredPwaPrompt.userChoice;
-          if (choiceResult && choiceResult.outcome === 'accepted') {
-            console.log('⚡ [PWA] Usuário aceitou a instalação!');
-            const btnLogin = document.getElementById('btnInstalarPwaLogin');
-            if (btnLogin) btnLogin.classList.add('hidden');
-          }
+          const { outcome } = await window.deferredPwaPrompt.userChoice;
+          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
           window.deferredPwaPrompt = null;
+          const btnLogin = document.getElementById('btnInstalarPwaLogin');
+          if (btnLogin) btnLogin.classList.add('hidden');
+          return;
+        }
+
+        // Se ainda não capturou, aguarda até 1.5s para verificar se o evento é liberado pelo navegador
+        let pwaCapturado = await new Promise((resolve) => {
+          let checagens = 0;
+          const timer = setInterval(() => {
+            checagens++;
+            if (window.deferredPwaPrompt) {
+              clearInterval(timer);
+              resolve(true);
+            } else if (checagens >= 15) {
+              clearInterval(timer);
+              resolve(false);
+            }
+          }, 100);
+        });
+
+        if (pwaCapturado && window.deferredPwaPrompt) {
+          window.deferredPwaPrompt.prompt();
+          const { outcome } = await window.deferredPwaPrompt.userChoice;
+          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+          window.deferredPwaPrompt = null;
+          const btnLogin = document.getElementById('btnInstalarPwaLogin');
+          if (btnLogin) btnLogin.classList.add('hidden');
+          return;
+        }
+
+        const isSecureOrigin = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (!isSecureOrigin) {
+          alert('🌐 [Modo de Segurança do Chrome]\n\nO Chrome requer conexões seguras (HTTPS) ou http://localhost:8000 para abrir o prompt de instalação automática.\n\nPara instalar agora neste ambiente, acesse o menu do Chrome (três pontos ⋮ no topo) e escolha "Instalar aplicativo" ou "Adicionar à tela inicial".');
+        } else if (isIOS) {
+          alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
+        } else {
+          alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
         }
       }
 

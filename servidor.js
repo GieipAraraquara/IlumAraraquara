@@ -47,8 +47,10 @@ const server = http.createServer((req, res) => {
             return;
         }
 
-        const ext = path.extname(filePath).toLowerCase();
-        const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        let contentType = MIME_TYPES[ext] || 'application/octet-stream';
+        if (reqUrl.endsWith('manifest.json')) {
+            contentType = 'application/manifest+json; charset=utf-8';
+        }
 
         res.writeHead(200, {
             'Content-Type': contentType,
