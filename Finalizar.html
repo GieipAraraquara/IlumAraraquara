@@ -7,23 +7,27 @@
     <meta name="description" content="Interface de Finalização e Auditoria de Ordens de Serviço - Luz Araraquara." />
 
     <!-- Favicon & PWA Icons -->
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="manifest" href="manifest.json?v=2" />
-    <meta name="theme-color" content="#1a73e8" />
-    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
+
+    <link rel="manifest" href="manifest.json?v=3" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="favicon.svg" />
 
     <!-- Listener de Instalação PWA Imediato (Captura no HEAD) -->
     <script>
       window.deferredPwaPrompt = window.deferredPwaPrompt || null;
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
-        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso no HEAD!');
+        console.log('⚡ [PWA] Evento beforeinstallprompt capturado no HEAD!');
         window.deferredPwaPrompt = e;
-        if (typeof checarVisibilidadeBotaoInstalarPwa === 'function') {
-          checarVisibilidadeBotaoInstalarPwa();
+        const banner = document.getElementById('pwaInstallBanner');
+        if (banner && sessionStorage.getItem('pwa_banner_dismissed') !== 'true') {
+          banner.classList.remove('hidden');
+          banner.classList.add('flex');
         }
       });
     </script>
@@ -49,7 +53,7 @@
       function registrarSW() {
         if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('./sw.js').then(function(reg) {
-            console.log('⚡ [PWA] Service Worker registrado com sucesso:', reg.scope);
+            console.log('⚡ [PWA] Service Worker registrado:', reg.scope);
           }).catch(function(err) {
             console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
           });
@@ -62,73 +66,15 @@
         window.addEventListener('load', registrarSW);
       }
 
-      function checarVisibilidadeBotaoInstalarPwa() {
-        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-        const isInIframe = window.self !== window.top;
-        const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (window.innerWidth <= 768);
-
-        const banner = document.getElementById('pwaInstallBanner');
-
-        if (!isStandalone && !isInIframe && isMobileDevice) {
-          if (banner && sessionStorage.getItem('pwa_banner_dismissed') !== 'true') {
-            banner.classList.remove('hidden');
-            banner.classList.add('flex');
-          }
-        } else {
-          if (banner) banner.classList.add('hidden');
-        }
-      }
-
-      document.addEventListener('DOMContentLoaded', () => {
-        checarVisibilidadeBotaoInstalarPwa();
-      });
-
-      window.addEventListener('resize', () => {
-        checarVisibilidadeBotaoInstalarPwa();
-      });
-
       async function dispararInstalacaoPWA() {
         if (window.deferredPwaPrompt) {
           window.deferredPwaPrompt.prompt();
-          const { outcome } = await window.deferredPwaPrompt.userChoice;
-          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+          const choiceResult = await window.deferredPwaPrompt.userChoice;
+          if (choiceResult && choiceResult.outcome === 'accepted') {
+            console.log('⚡ [PWA] Usuário aceitou a instalação!');
+            fecharBannerPWA();
+          }
           window.deferredPwaPrompt = null;
-          fecharBannerPWA();
-          return;
-        }
-
-        let pwaCapturado = await new Promise((resolve) => {
-          let checagens = 0;
-          const timer = setInterval(() => {
-            checagens++;
-            if (window.deferredPwaPrompt) {
-              clearInterval(timer);
-              resolve(true);
-            } else if (checagens >= 15) {
-              clearInterval(timer);
-              resolve(false);
-            }
-          }, 100);
-        });
-
-        if (pwaCapturado && window.deferredPwaPrompt) {
-          window.deferredPwaPrompt.prompt();
-          const { outcome } = await window.deferredPwaPrompt.userChoice;
-          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
-          window.deferredPwaPrompt = null;
-          fecharBannerPWA();
-          return;
-        }
-
-        const isSecureOrigin = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-        if (!isSecureOrigin) {
-          alert('🌐 [Modo de Segurança do Chrome]\n\nO Chrome requer conexões seguras (HTTPS) ou http://localhost:8000 para abrir o prompt de instalação automática.\n\nPara instalar agora neste ambiente, acesse o menu do Chrome (três pontos ⋮ no topo) e escolha "Instalar aplicativo" ou "Adicionar à tela inicial".');
-        } else if (isIOS) {
-          alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
-        } else {
-          alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
         }
       }
 
