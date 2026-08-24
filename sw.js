@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-v140';
+const CACHE_NAME = 'luz-araraquara-v150';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,7 +8,9 @@ const ASSETS_TO_CACHE = [
   './Finalizar.html',
   './Painel.html',
   './manifest.json',
-  './favicon.svg'
+  './favicon.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
