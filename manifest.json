@@ -3,13 +3,13 @@
   "name": "Luz Araraquara",
   "icons": [
     {
-      "src": "./favicon.svg",
+      "src": "/favicon.svg",
       "type": "image/svg+xml",
       "sizes": "64x64 192x192 512x512",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "./index.html",
+  "start_url": "/",
   "background_color": "#f8f9fa",
   "theme_color": "#1a73e8",
   "display": "standalone",

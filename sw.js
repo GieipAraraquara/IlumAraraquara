@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-v130';
+const CACHE_NAME = 'luz-araraquara-v140';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
