@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sistema-os-pwa-v110';
+const CACHE_NAME = 'sistema-os-pwa-v111';
 const ASSETS_TO_CACHE = [
   './',
   './Login.html',
@@ -16,11 +16,11 @@ const ASSETS_TO_CACHE = [
   './fonts/material-symbols-outlined.woff2',
   './js/config/supabaseClient.js',
   './js/config/cloudinaryConfig.js',
-  './js/guards/authGuard.js?v=30',
-  './js/domain/ChamadoModel.js?v=43',
-  './js/repositories/ChamadosRepository.js?v=30',
-  './js/services/ChamadosService.js?v=30',
-  './js/controllers/AuditoriaController.js?v=44',
+  './js/guards/authGuard.js',
+  './js/domain/ChamadoModel.js',
+  './js/repositories/ChamadosRepository.js',
+  './js/services/ChamadosService.js',
+  './js/controllers/AuditoriaController.js',
   './js/services/CloudinaryService.js',
   './js/services/OfflineSyncService.js',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap',
@@ -29,11 +29,15 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('⚡ [Service Worker] Instalando PWA e pré-carregando páginas e assets...');
-      return cache.addAll(ASSETS_TO_CACHE).catch((err) => {
-        console.warn('⚠️ [Service Worker] Alguns arquivos falharam no pré-cache inicial, prosseguindo...', err);
-      });
+    caches.open(CACHE_NAME).then(async (cache) => {
+      console.log('⚡ [Service Worker] Instalando PWA...');
+      for (const url of ASSETS_TO_CACHE) {
+        try {
+          await cache.add(url);
+        } catch (err) {
+          console.warn('⚠️ [Service Worker] Ignorando asset com falha no pré-cache:', url);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });

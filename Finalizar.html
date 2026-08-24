@@ -30,20 +30,27 @@
 
     <script>
       // Registro do Service Worker PWA e Gerenciador de Instalação
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function() {
+      function registrarSW() {
+        if ('serviceWorker' in navigator) {
           navigator.serviceWorker.register('./sw.js').then(function(reg) {
             console.log('⚡ [PWA] Service Worker registrado com sucesso:', reg.scope);
           }).catch(function(err) {
             console.warn('⚠️ [PWA] Falha ao registrar Service Worker:', err);
           });
-        });
+        }
+      }
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        registrarSW();
+      } else {
+        window.addEventListener('load', registrarSW);
       }
 
       window.deferredPwaPrompt = null;
 
       window.addEventListener('beforeinstallprompt', (e) => {
         e.preventDefault();
+        console.log('⚡ [PWA] Evento beforeinstallprompt capturado com sucesso!');
         window.deferredPwaPrompt = e;
         checarVisibilidadeBotaoInstalarPwa();
       });
@@ -74,20 +81,47 @@
       });
 
       async function dispararInstalacaoPWA() {
-        const pwaPrompt = window.deferredPwaPrompt;
-        if (pwaPrompt) {
-          pwaPrompt.prompt();
-          const { outcome } = await pwaPrompt.userChoice;
+        if (window.deferredPwaPrompt) {
+          window.deferredPwaPrompt.prompt();
+          const { outcome } = await window.deferredPwaPrompt.userChoice;
           console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
           window.deferredPwaPrompt = null;
           fecharBannerPWA();
+          return;
+        }
+
+        let pwaCapturado = await new Promise((resolve) => {
+          let checagens = 0;
+          const timer = setInterval(() => {
+            checagens++;
+            if (window.deferredPwaPrompt) {
+              clearInterval(timer);
+              resolve(true);
+            } else if (checagens >= 15) {
+              clearInterval(timer);
+              resolve(false);
+            }
+          }, 100);
+        });
+
+        if (pwaCapturado && window.deferredPwaPrompt) {
+          window.deferredPwaPrompt.prompt();
+          const { outcome } = await window.deferredPwaPrompt.userChoice;
+          console.log('⚡ [PWA] Resultado do prompt de instalação:', outcome);
+          window.deferredPwaPrompt = null;
+          fecharBannerPWA();
+          return;
+        }
+
+        const isSecureOrigin = window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+        if (!isSecureOrigin) {
+          alert('🌐 [Modo de Segurança do Chrome]\n\nO Chrome requer conexões seguras (HTTPS) ou http://localhost:8000 para abrir o prompt de instalação automática.\n\nPara instalar agora neste ambiente, acesse o menu do Chrome (três pontos ⋮ no topo) e escolha "Instalar aplicativo" ou "Adicionar à tela inicial".');
+        } else if (isIOS) {
+          alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
         } else {
-          const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-          if (isIOS) {
-            alert('📱 Para instalar no iPhone / iPad:\n\n1. Toque no ícone de Compartilhar 📤 na barra do Safari.\n2. Role para baixo e toque em "Adicionar à Tela de Início" ➕.\n3. Toque em "Adicionar".');
-          } else {
-            alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
-          }
+          alert('📱 Para instalar o aplicativo:\n\n1. Abra o menu do seu navegador (três pontos ⋮ ou compartilhar).\n2. Selecione "Instalar aplicativo" ou "Adicionar à tela de início".');
         }
       }
 
