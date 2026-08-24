@@ -10,7 +10,7 @@
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png" />
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
-    <link rel="manifest" href="manifest.json?v=4" />
+    <link rel="manifest" href="manifest.json?v=5" />
     <meta name="theme-color" content="#1a73e8" />
     <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -2656,6 +2656,9 @@
 
           if (statusFinal === "Concluída") {
             payload.data_fechamento = new Date().toISOString();
+            payload.operador_finalizacao = usuarioAtual;
+            payload.usuario_finalizacao = usuarioAtual;
+            payload.finalizado_por = usuarioAtual;
             if (coordsGpsPracaAtual) {
               payload.coordenada_reparo = coordsGpsPracaAtual;
             }

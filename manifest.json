@@ -1,13 +1,6 @@
 {
   "short_name": "Luz Araraquara",
   "name": "Luz Araraquara",
-  "description": "Gestão e Abertura de Ordens de Serviço de Iluminação Pública - Luz Araraquara.",
-  "start_url": "./",
-  "scope": "./",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#f8fafc",
-  "theme_color": "#1a73e8",
   "icons": [
     {
       "src": "./favicon.svg",
@@ -15,5 +8,10 @@
       "sizes": "64x64 192x192 512x512",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": "./index.html",
+  "background_color": "#f8f9fa",
+  "theme_color": "#1a73e8",
+  "display": "standalone",
+  "orientation": "portrait"
 }
