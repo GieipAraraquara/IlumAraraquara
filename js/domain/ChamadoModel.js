@@ -340,18 +340,57 @@ class ChamadoModel {
     }
 
     /**
+     * Otimiza dynamic delivery de URLs do Cloudinary adicionando f_auto, q_auto e largura opcional.
+     * @param {string} url - URL original do Cloudinary
+     * @param {Object} [options] - Opções ex: { width: 1200, quality: 'auto', format: 'auto' }
+     * @returns {string} URL otimizada
+     */
+    static otimizarUrlCloudinary(url, options = {}) {
+        if (!url || typeof url !== 'string' || !url.includes('cloudinary.com')) {
+            return url;
+        }
+
+        const quality = options.quality || 'auto';
+        const format = options.format || 'auto';
+        const width = options.width ? `,w_${options.width},c_limit` : '';
+        const transformStr = `f_${format},q_${quality}${width}`;
+
+        if (url.includes('/image/upload/f_') || url.includes('/image/upload/q_') || url.includes('/image/upload/w_') || url.includes('/image/upload/c_')) {
+            return url;
+        }
+
+        return url.replace('/image/upload/', `/image/upload/${transformStr}/`);
+    }
+
+    otimizarUrlCloudinary(url, options = {}) {
+        return ChamadoModel.otimizarUrlCloudinary(url, options);
+    }
+
+    /**
      * Extrai e formata a lista completa de fotos/evidências do Cloudinary associadas à OS
      */
     get fotosEvidencias() {
         const list = [];
         
-        // 1. Foto de entrada (Praça Pública ou chamado direto)
-        if (this.fotoEntrada && typeof this.fotoEntrada === 'string' && (this.fotoEntrada.startsWith('http') || this.fotoEntrada.startsWith('data:'))) {
+        const pushItem = (rawUrl, titulo, extra = {}) => {
+            if (!rawUrl || typeof rawUrl !== 'string' || (!rawUrl.startsWith('http') && !rawUrl.startsWith('data:'))) return;
+            if (list.some(item => item.urlOriginal === rawUrl || item.url === rawUrl)) return;
+
+            const urlOtimizada = ChamadoModel.otimizarUrlCloudinary(rawUrl, { width: 1200, quality: 'auto' });
+            const thumbUrl = ChamadoModel.otimizarUrlCloudinary(rawUrl, { width: 350, quality: 'auto' });
+
             list.push({
-                url: this.fotoEntrada,
-                titulo: 'Foto de Entrada',
-                origem: 'Praça Pública'
+                url: urlOtimizada,
+                thumbnailUrl: thumbUrl,
+                urlOriginal: rawUrl,
+                titulo: titulo,
+                ...extra
             });
+        };
+
+        // 1. Foto de entrada (Praça Pública ou chamado direto)
+        if (this.fotoEntrada) {
+            pushItem(this.fotoEntrada, 'Foto de Entrada', { origem: 'Praça Pública' });
         }
 
         // 2. Evidências do objeto principal (dicionário de estágios -> URLs)
@@ -362,16 +401,7 @@ class ChamadoModel {
             }
             if (typeof ev === 'object' && ev !== null) {
                 for (const key in ev) {
-                    const url = ev[key];
-                    if (url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:'))) {
-                        if (!list.some(item => item.url === url)) {
-                            list.push({
-                                url: url,
-                                titulo: key,
-                                origem: 'Evidência OS'
-                            });
-                        }
-                    }
+                    pushItem(ev[key], key, { origem: 'Evidência OS' });
                 }
             }
         }
@@ -392,28 +422,15 @@ class ChamadoModel {
                 }
                 if (typeof pEv === 'object' && pEv !== null) {
                     for (const estagio in pEv) {
-                        const url = pEv[estagio];
-                        if (url && typeof url === 'string' && (url.startsWith('http') || url.startsWith('data:'))) {
-                            if (!list.some(item => item.url === url)) {
-                                list.push({
-                                    url: url,
-                                    titulo: `${estagio} (Ponto #${idx + 1})`,
-                                    pontoIndex: idx + 1,
-                                    estagio: estagio
-                                });
-                            }
-                        }
+                        pushItem(pEv[estagio], `${estagio} (Ponto #${idx + 1})`, {
+                            pontoIndex: idx + 1,
+                            estagio: estagio
+                        });
                     }
                 }
                 const fotoUnica = p.foto || p.url_foto || p.foto_url;
-                if (fotoUnica && typeof fotoUnica === 'string' && (fotoUnica.startsWith('http') || fotoUnica.startsWith('data:'))) {
-                    if (!list.some(item => item.url === fotoUnica)) {
-                        list.push({
-                            url: fotoUnica,
-                            titulo: `Foto Ponto #${idx + 1}`,
-                            pontoIndex: idx + 1
-                        });
-                    }
+                if (fotoUnica) {
+                    pushItem(fotoUnica, `Foto Ponto #${idx + 1}`, { pontoIndex: idx + 1 });
                 }
             });
         }
@@ -422,24 +439,12 @@ class ChamadoModel {
         if (this.sessoesList && this.sessoesList.length > 0) {
             this.sessoesList.forEach((s, sIdx) => {
                 const fotoEnt = s.foto_entrada || s.foto || s.url_foto;
-                if (fotoEnt && typeof fotoEnt === 'string' && (fotoEnt.startsWith('http') || fotoEnt.startsWith('data:'))) {
-                    if (!list.some(item => item.url === fotoEnt)) {
-                        list.push({
-                            url: fotoEnt,
-                            titulo: `Foto de Entrada (Sessão #${s.numero || (sIdx + 1)})`,
-                            origem: 'Sessão de Praça'
-                        });
-                    }
+                if (fotoEnt) {
+                    pushItem(fotoEnt, `Foto de Entrada (Sessão #${s.numero || (sIdx + 1)})`, { origem: 'Sessão de Praça' });
                 }
                 const fotoSai = s.foto_saida;
-                if (fotoSai && typeof fotoSai === 'string' && (fotoSai.startsWith('http') || fotoSai.startsWith('data:'))) {
-                    if (!list.some(item => item.url === fotoSai)) {
-                        list.push({
-                            url: fotoSai,
-                            titulo: `Foto de Encerramento (Sessão #${s.numero || (sIdx + 1)})`,
-                            origem: 'Sessão de Praça'
-                        });
-                    }
+                if (fotoSai) {
+                    pushItem(fotoSai, `Foto de Encerramento (Sessão #${s.numero || (sIdx + 1)})`, { origem: 'Sessão de Praça' });
                 }
             });
         }
@@ -455,16 +460,12 @@ class ChamadoModel {
                 arr.forEach((f, idx) => {
                     const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
                     const t = typeof f === 'object' && f ? (f.titulo || f.estagio || f.tipo || `Foto #${idx + 1}`) : `Foto #${idx + 1}`;
-                    if (u && typeof u === 'string' && (u.startsWith('http') || u.startsWith('data:'))) {
-                        if (!list.some(item => item.url === u)) {
-                            list.push({ url: u, titulo: t, origem: 'Fotos OS' });
-                        }
+                    if (u) {
+                        pushItem(u, t, { origem: 'Fotos OS' });
                     }
                 });
-            } else if (typeof arr === 'string' && (arr.startsWith('http') || arr.startsWith('data:'))) {
-                if (!list.some(item => item.url === arr)) {
-                    list.push({ url: arr, titulo: 'Foto OS', origem: 'Fotos OS' });
-                }
+            } else if (typeof arr === 'string') {
+                pushItem(arr, 'Foto OS', { origem: 'Fotos OS' });
             }
         }
 

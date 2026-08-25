@@ -1429,22 +1429,23 @@
         var file = event.target.files[0];
         if (!file) return;
 
+        var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idImg = 'img_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idBox = 'boxFoto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+
+        var containerEl = document.getElementById(idPreview);
+        var imgEl = document.getElementById(idImg);
+        var boxEl = document.getElementById(idBox);
+
+        // 1. Carrega o preview na tela IMEDIATAMENTE (0ms delay)
         var reader = new FileReader();
         reader.onload = function(e) {
-          var base64 = e.target.result;
+          var rawBase64 = e.target.result;
           if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
-          pontosData[pontoIdx].fotosEstagios[estagio] = base64;
-
-          var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
-          var idImg = 'img_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
-          var idBox = 'boxFoto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
-
-          var containerEl = document.getElementById(idPreview);
-          var imgEl = document.getElementById(idImg);
-          var boxEl = document.getElementById(idBox);
+          pontosData[pontoIdx].fotosEstagios[estagio] = rawBase64;
 
           if (containerEl && imgEl) {
-            imgEl.src = base64;
+            imgEl.src = rawBase64;
             containerEl.classList.remove('hidden');
           }
           if (boxEl) {
@@ -1452,6 +1453,20 @@
             boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
           }
           salvarRascunhoFinalizar();
+
+          // 2. Comprime em segundo plano para otimizar o rascunho e o envio final
+          var service = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+          if (service && typeof service.compressImage === 'function') {
+            service.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
+              if (compressedBase64 && pontosData[pontoIdx]) {
+                pontosData[pontoIdx].fotosEstagios[estagio] = compressedBase64;
+                if (imgEl) imgEl.src = compressedBase64;
+                salvarRascunhoFinalizar();
+              }
+            }).catch(function(err) {
+              console.warn('⚠️ Compressão de segundo plano falhou, mantendo foto original:', err);
+            });
+          }
         };
         reader.readAsDataURL(file);
       }
@@ -2302,12 +2317,26 @@
         var file = event.target.files[0];
         if (!file) return;
         fotoEntradaPracaNome = file.name || "foto_entrada.jpg";
+
         var reader = new FileReader();
         reader.onload = function(e) {
           fotoEntradaPracaBase64 = e.target.result;
           document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
           document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
           salvarRascunhoFinalizar();
+
+          var service = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+          if (service && typeof service.compressImage === 'function') {
+            service.compressImage(fotoEntradaPracaBase64, 1200, 0.75).then(function(compressedBase64) {
+              if (compressedBase64) {
+                fotoEntradaPracaBase64 = compressedBase64;
+                document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+                salvarRascunhoFinalizar();
+              }
+            }).catch(function(err) {
+              console.warn('⚠️ Compressão de segundo plano da praça falhou:', err);
+            });
+          }
         };
         reader.readAsDataURL(file);
       }
