@@ -691,13 +691,14 @@ class RelatorioController {
     }
 
     async carregarMateriaisContrato() {
-        if (this.materiaisContratoCache) return this.materiaisContratoCache;
+        if (this.materiaisContratoCache && this.materiaisContratoCache.length > 0) return this.materiaisContratoCache;
         try {
             const client = window.supabaseClient || (typeof obterSupabaseClient === 'function' ? obterSupabaseClient() : null);
             if (client) {
                 const { data, error } = await client.from('materiais_contrato').select('*');
-                if (!error && Array.isArray(data)) {
+                if (!error && Array.isArray(data) && data.length > 0) {
                     this.materiaisContratoCache = data;
+                    try { localStorage.setItem('os_cached_materiais_raw', JSON.stringify(data)); } catch(e){}
                     console.log(`✅ [RelatorioController] ${data.length} materiais do contrato carregados do Supabase.`);
                     return data;
                 }
@@ -705,15 +706,31 @@ class RelatorioController {
         } catch (e) {
             console.warn('⚠️ [RelatorioController] Falha ao carregar materiais_contrato:', e);
         }
+
+        try {
+            const cached = localStorage.getItem('os_cached_materiais_raw');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    this.materiaisContratoCache = parsed;
+                    return parsed;
+                }
+            }
+        } catch(e) {}
+
         this.materiaisContratoCache = [];
         return [];
     }
 
     resolveMarcaEMaterial(rawNome, defaultUnidade = 'UN') {
-        if (!rawNome) return { marca: 'GENÉRICO', desc: '', unidade: defaultUnidade };
+        if (!rawNome) return { marca: 'PRÓPRIO', desc: '', unidade: defaultUnidade };
 
         let nomeClean = rawNome.replace(/\(x\d+\)/i, '').trim();
-        if (!nomeClean) return { marca: 'GENÉRICO', desc: rawNome, unidade: defaultUnidade };
+        if (!nomeClean) return { marca: 'PRÓPRIO', desc: rawNome, unidade: defaultUnidade };
+
+        // Remover aspas externas e sufixos de unidade como (UN), (M), (H) etc.
+        nomeClean = nomeClean.replace(/^["'\s]+|["'\s]+$/g, '').trim();
+        nomeClean = nomeClean.replace(/\s*\((UN|M|H|KG|PC|PÇ|CJ|JG)\)$/i, '').trim();
 
         // Se for mão de obra de sessão de praça
         if (nomeClean.toUpperCase().includes('ELETRICISTA')) {
@@ -730,15 +747,18 @@ class RelatorioController {
         if (this.materiaisContratoCache && this.materiaisContratoCache.length > 0) {
             for (const row of this.materiaisContratoCache) {
                 const dbMarca = (row.Marca || row.marca || row.Fabricante || row.fabricante || '').trim();
-                const dbDesc = (row['Material/Serviço'] || row.Material || row.Serviço || row.descricao || row.nome || row.material || row.item || '').trim();
-                const dbUnid = (row['Unidade de Medida'] || row.Unidade || row.unidade || row.und || '').trim();
+                const dbDesc = (row['Material/Serviço'] || row.Material || row.Serviço || row.descricao || row.nome || row.material || row.item || row['material_servico'] || row['material/servico'] || '').trim();
+                const dbUnid = (row['Unidade de Medida'] || row.Unidade || row.unidade || row.und || row['unidade_de_medida'] || '').trim();
 
-                if (dbDesc && (cleanUpper === dbDesc.toUpperCase() || cleanUpper.includes(dbDesc.toUpperCase()))) {
-                    return {
-                        marca: dbMarca || 'GENÉRICO',
-                        desc: dbDesc || nomeClean,
-                        unidade: dbUnid || defaultUnidade
-                    };
+                if (dbDesc) {
+                    const dbDescUpper = dbDesc.toUpperCase();
+                    if (cleanUpper === dbDescUpper || cleanUpper.includes(dbDescUpper) || dbDescUpper.includes(cleanUpper)) {
+                        return {
+                            marca: dbMarca || 'PRÓPRIO',
+                            desc: dbDesc,
+                            unidade: dbUnid || defaultUnidade
+                        };
+                    }
                 }
             }
         }
@@ -746,19 +766,29 @@ class RelatorioController {
         // 2. Fallback: se o nome estiver formatado como "MARCA - DESCRICAO"
         if (nomeClean.includes(' - ')) {
             const parts = nomeClean.split(' - ');
-            const extractedMarca = parts[0].trim();
-            const extractedDesc = parts.slice(1).join(' - ').trim();
-            if (extractedMarca && extractedDesc) {
+            const candidateMarca = parts[0].trim();
+            const candidateDesc = parts.slice(1).join(' - ').trim();
+
+            const nonBrandNouns = [
+                'RELÉ', 'RELE', 'LUMINÁRIA', 'LUMINARIA', 'CONECTOR', 'PLACA', 'PLAQUETA',
+                'CABO', 'POSTE', 'REATOR', 'CHAVE', 'DISJUNTOR', 'FITA', 'BRAÇO', 'BRACO',
+                'PARAFUSO', 'TAMPA', 'CAIXA', 'ISOLADOR', 'LÂMPADA', 'LAMPADA', 'SERVIÇO',
+                'SERVICO', 'FORNECIMENTO', 'INSTALAÇÃO', 'INSTALACAO', 'REFLETOR'
+            ];
+
+            const startsWithNoun = nonBrandNouns.some(noun => candidateMarca.toUpperCase().startsWith(noun));
+
+            if (candidateMarca && candidateDesc && !startsWithNoun) {
                 return {
-                    marca: extractedMarca,
-                    desc: extractedDesc,
+                    marca: candidateMarca,
+                    desc: candidateDesc,
                     unidade: defaultUnidade
                 };
             }
         }
 
         return {
-            marca: 'GENÉRICO',
+            marca: 'PRÓPRIO',
             desc: nomeClean,
             unidade: defaultUnidade
         };
@@ -1357,7 +1387,7 @@ class RelatorioController {
                 this.escapeCSVCell(item.formattedPlaquetaFinal || item.plaquetaFinal || ''),
                 this.escapeCSVCell(item.isPraca && item.pracaNome ? `Praça: ${item.pracaNome} - ${item.endereco}` : (item.endereco || '')),
                 this.escapeCSVCell(item.displayOperadorAbertura || item.operador || ''),
-                this.escapeCSVCell(item.displayOperadorFinalizacao || 'Técnico Responsável'),
+                this.escapeCSVCell(item.displayOperadorFinalizacao || 'Não informado'),
                 this.escapeCSVCell(item.formattedCoordenadaReparo || item.coordenadaReparo || ''),
                 this.escapeCSVCell(item.isPraca ? item.qtdEletricistas : ''),
                 this.escapeCSVCell(item.isPraca && item.tempoTotalMinutos !== null ? item.tempoTotalMinutos : ''),

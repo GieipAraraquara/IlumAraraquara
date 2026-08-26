@@ -20,8 +20,14 @@ class ChamadoModel {
 
         this.userEmail = cleanVal(data.user_email);
         this.operadorAbertura = cleanVal(data.operador_abertura) || cleanVal(data.operador) || cleanVal(data.cadastrado_por) || cleanVal(data.usuario_cadastro) || cleanVal(data.user_email) || cleanVal(data.solicitante_operador) || cleanVal(data.criado_por) || cleanVal(data.usuario_abertura) || '';
-        this.operador = cleanVal(data.operador) || this.operadorAbertura || cleanVal(data.user_email) || '';
-        this.operadorFinalizacao = cleanVal(data.operador_finalizacao) || cleanVal(data.finalizado_por) || cleanVal(data.usuario_finalizacao) || cleanVal(data.operador_fechamento) || cleanVal(data.tecnico) || cleanVal(data.fechado_por) || cleanVal(data.usuario_conclusao) || '';
+        this.operadorFinalizacao = cleanVal(data.operador_finalizacao) 
+            || cleanVal(data.finalizado_por) 
+            || cleanVal(data.usuario_finalizacao) 
+            || cleanVal(data.operador_fechamento) 
+            || cleanVal(data.tecnico) 
+            || cleanVal(data.fechado_por) 
+            || cleanVal(data.usuario_conclusao)
+            || '';
         this.municipeNome = cleanVal(data.municipe_nome) || '';
         this.rawPontosInicial = data.pontos_inicial || null;
         this.rawPontosFinal = data.pontos_final || null;
@@ -61,6 +67,16 @@ class ChamadoModel {
             if (!plaqFinExtraida) plaqFinExtraida = p0Fin.plaqueta || '';
             if (!coordRepExtraida) coordRepExtraida = p0Fin.coordenada || (p0Fin.lat && p0Fin.lng ? `${p0Fin.lat}, ${p0Fin.lng}` : '');
             if (!probFinExtraido) probFinExtraido = p0Fin.problema || '';
+
+            if (!this.operadorFinalizacao) {
+                for (let p of ptsFinal) {
+                    const ptOp = cleanVal(p.operador_finalizacao || p.finalizado_por || p.usuario_finalizacao || p.tecnico || p.operador || p.usuario);
+                    if (ptOp) {
+                        this.operadorFinalizacao = ptOp;
+                        break;
+                    }
+                }
+            }
         }
 
         const parseProblems = (val) => {
@@ -239,7 +255,7 @@ class ChamadoModel {
                     fimStr: fimFormatted,
                     duracao_minutos: dur,
                     qtd_eletricistas: parseInt(s.qtd_eletricistas, 10) || this.qtdEletricistas || 1,
-                    tecnico: s.tecnico || this.operador || 'Técnico',
+                    tecnico: s.tecnico || this.operadorFinalizacao || this.operador || '',
                     foto_entrada: s.foto_entrada || s.foto || (idx === 0 ? this.fotoEntrada : null),
                     foto_saida: s.foto_saida || null,
                     coordenada_inicio: s.coordenada_inicio || s.coordenada || null,
@@ -274,7 +290,7 @@ class ChamadoModel {
                         fimStr: 'Em andamento...',
                         duracao_minutos: null,
                         qtd_eletricistas: qtd,
-                        tecnico: this.operador || 'Técnico',
+                        tecnico: this.operadorFinalizacao || this.operador || '',
                         foto_entrada: pairedSessions.length === 0 ? this.fotoEntrada : null
                     };
                 } else if (tag.includes('SAÍDA') || tag.includes('SAIDA') || tag.includes('CONCLU')) {
@@ -286,7 +302,7 @@ class ChamadoModel {
                             fimStr: dateStr,
                             duracao_minutos: null,
                             qtd_eletricistas: qtd,
-                            tecnico: this.operador || 'Técnico',
+                            tecnico: this.operadorFinalizacao || this.operador || '',
                             foto_entrada: null
                         };
                     } else {
@@ -514,29 +530,35 @@ class ChamadoModel {
      * Retorna o nome/email do operador/técnico que finalizou a OS
      */
     get displayOperadorFinalizacao() {
-        const val = String(this.operadorFinalizacao || '').trim();
-        if (val && val !== 'null' && val !== 'undefined' && val !== 'Técnico Responsável') return val;
+        const cleanVal = (v) => {
+            const s = String(v || '').trim();
+            if (!s || s === 'null' || s === 'undefined' || s.toLowerCase() === 'técnico responsável' || s.toLowerCase() === 'tecnico responsavel' || s.toLowerCase() === 'técnico' || s.toLowerCase() === 'tecnico' || s.toLowerCase() === 'não informado' || s.toLowerCase() === 'nao informado' || s.toLowerCase() === 'pendente finalização' || s.toLowerCase() === 'sistema') return '';
+            return s;
+        };
+
+        // 1. Tenta obter o operador que finalizou a OS (operador_finalizacao / usuario_finalizacao)
+        const val = cleanVal(this.operadorFinalizacao);
+        if (val) return val;
 
         if (this.audit && this.audit.usuario_finalizacao) {
-            const auditUser = String(this.audit.usuario_finalizacao).trim();
-            if (auditUser && auditUser !== 'null' && auditUser !== 'undefined') return auditUser;
+            const auditUser = cleanVal(this.audit.usuario_finalizacao);
+            if (auditUser) return auditUser;
         }
 
         if (this.sessoesList && this.sessoesList.length > 0) {
             const lastSession = this.sessoesList[this.sessoesList.length - 1];
-            if (lastSession && lastSession.tecnico && lastSession.tecnico !== 'Técnico' && lastSession.tecnico !== 'Não informado') {
-                return String(lastSession.tecnico).trim();
-            }
+            const sessTec = cleanVal(lastSession?.tecnico);
+            if (sessTec) return sessTec;
         }
 
-        const opGeral = String(this.operador || this.operadorAbertura || '').trim();
-        if (opGeral && opGeral !== 'null' && opGeral !== 'undefined' && opGeral !== 'Técnico Responsável') {
-            return opGeral;
+        if (this.rawRow) {
+            const rawOpFin = cleanVal(this.rawRow.operador_finalizacao || this.rawRow.finalizado_por || this.rawRow.usuario_finalizacao || this.rawRow.operador_fechamento || this.rawRow.fechado_por || this.rawRow.usuario_conclusao);
+            if (rawOpFin) return rawOpFin;
         }
 
         const stNorm = this.normalizedStatus;
-        if (stNorm === 'concluida') {
-            return 'Técnico Responsável';
+        if (stNorm === 'concluida' || Boolean(this.dataConclusao)) {
+            return 'Não informado';
         }
         return 'Pendente finalização';
     }
@@ -565,23 +587,57 @@ class ChamadoModel {
         const iniList = ptsIni.length > 0 ? ptsIni : (ptsLegacy.length > 0 && !this.rawPontosFinal ? ptsLegacy : []);
         const finList = ptsFin.length > 0 ? ptsFin : (ptsLegacy.length > 0 && String(this.rawStatus || '').toLowerCase().includes('conclu') ? ptsLegacy : []);
 
-        const maxLen = Math.max(iniList.length, finList.length, 1);
+        if (iniList.length === 0 && finList.length === 0) {
+            const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
+            const endFin = this.coordenadaReparo || this.plaquetaFinal || this.dataConclusao ? (this.endereco || '') : '';
+            const plqFin = this.plaquetaFinal || '';
+            const coordFin = this.coordenadaReparo || '';
+            const probFin = this.problemaEncontrado || '';
+            const matFin = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+            const hasFinalData = Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado') || (matFin && matFin.length > 0)) || isConcluida;
+
+            return [{
+                numero: 1,
+                enderecoInicial: ChamadoModel.isRealAddress(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : '',
+                plaquetaInicial: ChamadoModel.formatLocationText(this.plaquetaInicial),
+                coordenadaInicial: ChamadoModel.formatLocationText(this.coordenadaInicial),
+                problemaInicial: ChamadoModel.formatLocationText(this.problemaInicial),
+                enderecoFinal: ChamadoModel.isRealAddress(endFin) ? ChamadoModel.formatLocationText(endFin) : '',
+                plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
+                coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
+                problemaEncontrado: ChamadoModel.formatLocationText(probFin),
+                materiais: matFin,
+                hasFinalData: hasFinalData
+            }];
+        }
+
+        const aligned = ChamadoModel.alignPoints(iniList, finList);
         const result = [];
 
-        for (let i = 0; i < maxLen; i++) {
-            const pIni = iniList[i] || null;
-            const pFin = finList[i] || null;
+        aligned.forEach((pair, i) => {
+            const pIni = pair.ini;
+            const pFin = pair.fin;
 
-            let endIni = pIni ? (pIni.endereco || pIni.local || '') : (i === 0 ? this.endereco : '');
-            let plqIni = pIni ? (pIni.plaqueta || pIni.plaqueta_inicial || '') : (i === 0 ? this.plaquetaInicial : '');
-            let coordIni = pIni ? (pIni.coordenada || pIni.coordenada_inicial || (pIni.lat && pIni.lng ? `${pIni.lat}, ${pIni.lng}` : '')) : (i === 0 ? this.coordenadaInicial : '');
-            let probIni = pIni ? (pIni.problema || pIni.problema_inicial || '') : (i === 0 ? this.problemaInicial : '');
+            let endIni = pIni ? (pIni.endereco || pIni.local || '') : '';
+            let plqIni = pIni ? (pIni.plaqueta || pIni.plaqueta_inicial || '') : '';
+            let coordIni = pIni ? (pIni.coordenada || pIni.coordenada_inicial || (pIni.lat && pIni.lng ? `${pIni.lat}, ${pIni.lng}` : '')) : '';
+            let probIni = pIni ? (pIni.problema || pIni.problema_inicial || '') : '';
 
-            let endFin = pFin ? (pFin.endereco || pFin.local || '') : (i === 0 ? (this.coordenadaReparo || this.plaquetaFinal || this.dataConclusao ? (this.endereco || '') : '') : '');
-            let plqFin = pFin ? (pFin.plaqueta || pFin.plaqueta_final || '') : (i === 0 ? (this.plaquetaFinal || '') : '');
-            let coordFin = pFin ? (pFin.coordenada_reparo || (pFin.lat && pFin.lng ? `${pFin.lat}, ${pFin.lng}` : '')) : (i === 0 ? (this.coordenadaReparo || '') : '');
-            let probFin = pFin ? (pFin.problema_encontrado || pFin.problema || '') : (i === 0 ? (this.problemaEncontrado || '') : '');
-            let matFin = pFin ? ChamadoModel.parseMaterialsList(pFin.materiais || pFin.material_utilizado) : (i === 0 ? ChamadoModel.parseMaterialsList(this.materialUtilizado) : []);
+            let endFin = pFin ? (pFin.endereco || pFin.local || '') : '';
+            let plqFin = pFin ? (pFin.plaqueta || pFin.plaqueta_final || '') : '';
+            let coordFin = pFin ? (pFin.coordenada_reparo || pFin.coordenada || (pFin.lat && pFin.lng ? `${pFin.lat}, ${pFin.lng}` : '')) : '';
+            let probFin = pFin ? (pFin.problema_encontrado || pFin.problema || '') : '';
+            let matFin = pFin ? ChamadoModel.parseMaterialsList(pFin.materiais || pFin.material_utilizado) : [];
+
+            if (i === 0 && !plqIni && this.plaquetaInicial) plqIni = this.plaquetaInicial;
+            if (i === 0 && !coordIni && this.coordenadaInicial) coordIni = this.coordenadaInicial;
+            if (i === 0 && !probIni && this.problemaInicial) probIni = this.problemaInicial;
+            if (i === 0 && !endIni && this.endereco) endIni = this.endereco;
+
+            if (i === 0 && !plqFin && this.plaquetaFinal) plqFin = this.plaquetaFinal;
+            if (i === 0 && !coordFin && this.coordenadaReparo) coordFin = this.coordenadaReparo;
+            if (i === 0 && !probFin && this.problemaEncontrado) probFin = this.problemaEncontrado;
+            if (i === 0 && (!matFin || matFin.length === 0) && this.materialUtilizado) matFin = ChamadoModel.parseMaterialsList(this.materialUtilizado);
 
             const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
             const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado') || (matFin && matFin.length > 0)) || isConcluida;
@@ -599,7 +655,7 @@ class ChamadoModel {
                 materiais: matFin,
                 hasFinalData: hasFinalData
             });
-        }
+        });
 
         return result;
     }
@@ -698,13 +754,28 @@ class ChamadoModel {
      */
     get isProblemaDivergente() {
         if (this.isDireto) return false;
+
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            let hasCheckedAny = false;
+            for (const p of pts) {
+                if (p.problemaInicial && p.problemaEncontrado && p.hasFinalData) {
+                    hasCheckedAny = true;
+                    const catIni = ChamadoModel.obterCategoriaProblema(p.problemaInicial);
+                    const catFin = ChamadoModel.obterCategoriaProblema(p.problemaEncontrado);
+
+                    if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
+                    if (catIni && catFin && catIni !== catFin) return true;
+                }
+            }
+            if (hasCheckedAny) return false;
+        }
+
         if (this.problemaInicial && this.problemaEncontrado) {
             const catIni = ChamadoModel.obterCategoriaProblema(this.problemaInicial);
             const catFin = ChamadoModel.obterCategoriaProblema(this.problemaEncontrado);
 
-            // Regra: se o problema de abertura ou de finalização for 'OUTROS', sempre dispara auditoria (divergente)
             if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
-
             if (catIni && catFin && catIni !== catFin) return true;
             if (catIni && catFin && catIni === catFin) return false;
         }
@@ -716,6 +787,27 @@ class ChamadoModel {
 
     get isPlaquetaDivergente() {
         if (this.isDireto) return false;
+
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            let hasCheckedAny = false;
+            for (const p of pts) {
+                const pIni = ChamadoModel.formatLocationText(p.plaquetaInicial).trim().toUpperCase();
+                const pFin = ChamadoModel.formatLocationText(p.plaquetaFinal).trim().toUpperCase();
+                const isValidIni = pIni && pIni !== 'NÃO INFORMADA' && pIni !== 'NAO INFORMADA' && pIni !== '---' && pIni !== 'NULL';
+                const isValidFin = pFin && pFin !== 'NÃO INFORMADA' && pFin !== 'NAO INFORMADA' && pFin !== '---' && pFin !== 'NULL';
+
+                if (isValidIni && isValidFin) {
+                    hasCheckedAny = true;
+                    if (pIni !== pFin) return true;
+                } else if (isValidIni && !isValidFin && p.hasFinalData) {
+                    hasCheckedAny = true;
+                    return true;
+                }
+            }
+            if (hasCheckedAny) return false;
+        }
+
         if (this.plaquetaInicial && this.plaquetaFinal) {
             const pIni = ChamadoModel.formatLocationText(this.plaquetaInicial).trim().toUpperCase();
             const pFin = ChamadoModel.formatLocationText(this.plaquetaFinal).trim().toUpperCase();
@@ -729,6 +821,26 @@ class ChamadoModel {
 
     get isQuantidadeDivergente() {
         if (this.isDireto) return false;
+
+        const parseArrayJson = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                try {
+                    const parsed = JSON.parse(val);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch(e) {}
+            }
+            return [];
+        };
+
+        const ptsIni = parseArrayJson(this.rawPontosInicial);
+        const ptsFin = parseArrayJson(this.rawPontosFinal);
+
+        if (ptsIni.length > 0 && ptsFin.length > 0 && ptsIni.length !== ptsFin.length) {
+            return true;
+        }
+
         if (this.qtdInicial && this.qtdFinal && this.qtdInicial !== this.qtdFinal) {
             return true;
         }
@@ -740,6 +852,21 @@ class ChamadoModel {
 
     get distanciaCalculadaMetros() {
         if (this.isDireto) return null;
+
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            let maxDist = null;
+            for (const p of pts) {
+                if (p.coordenadaInicial && p.coordenadaFinal && p.coordenadaFinal !== 'Sem coordenadas' && p.coordenadaFinal !== 'Não informada') {
+                    const dist = ChamadoModel.calcularDistanciaMetros(p.coordenadaInicial, p.coordenadaFinal);
+                    if (dist !== null && !isNaN(dist)) {
+                        if (maxDist === null || dist > maxDist) maxDist = dist;
+                    }
+                }
+            }
+            if (maxDist !== null) return maxDist;
+        }
+
         if (this.coordenadaInicial && this.coordenadaReparo) {
             return ChamadoModel.calcularDistanciaMetros(this.coordenadaInicial, this.coordenadaReparo);
         }
@@ -761,10 +888,12 @@ class ChamadoModel {
 
     get isDistanciaAcima100m() {
         if (this.isDireto) return false;
-        if (this.coordenadaInicial && this.coordenadaReparo) {
-            const dist = ChamadoModel.calcularDistanciaMetros(this.coordenadaInicial, this.coordenadaReparo);
-            if (dist !== null && dist > 100) return true;
+
+        const d = this.distanciaCalculadaMetros;
+        if (d !== null && !isNaN(d)) {
+            return d > 100;
         }
+
         if (this.audit && this.audit.distancia_acima_100m !== undefined && this.audit.distancia_acima_100m !== null) {
             return Boolean(this.audit.distancia_acima_100m);
         }
@@ -927,18 +1056,24 @@ class ChamadoModel {
         let list = [];
 
         if (Array.isArray(raw)) {
-            list = raw.map(item => {
-                if (!item) return '';
-                if (typeof item === 'string') return item.trim();
+            list = raw.flatMap(item => {
+                if (!item) return [];
+                if (typeof item === 'string') {
+                    const t = item.trim();
+                    if (t.includes('\n') || t.includes('\r') || t.includes(';') || t.includes('|')) {
+                        return t.split(/[\n;\r|]+/).map(s => s.trim()).filter(Boolean);
+                    }
+                    return [t];
+                }
                 if (typeof item === 'object') {
                     const qtd = item.qtd || item.quantidade || item.qtd_final || item.qtd_inicial;
                     const nome = item.nome || item.material || item.item || item.descricao;
                     if (nome) {
-                        return (qtd && parseInt(qtd, 10) > 1) ? `${nome.trim()} (x${qtd})` : nome.trim();
+                        return [(qtd && parseInt(qtd, 10) > 1) ? `${nome.trim()} (x${qtd})` : nome.trim()];
                     }
-                    return JSON.stringify(item);
+                    return [JSON.stringify(item)];
                 }
-                return String(item).trim();
+                return [String(item).trim()];
             }).filter(Boolean);
         } else if (typeof raw === 'object' && raw !== null) {
             const values = Object.values(raw);
@@ -956,8 +1091,13 @@ class ChamadoModel {
                 return String(item).trim();
             }).filter(Boolean);
         } else if (typeof raw === 'string') {
-            // String com divisores (vírgula, ponto e vírgula, quebra de linha)
-            list = raw.split(/[\n,;\r]+/).map(s => s.trim()).filter(Boolean);
+            const trimmed = raw.trim();
+            // Preservar vírgulas em descrições oficiais de contrato, separando apenas por quebras de linha, ponto-e-vírgula ou pipe
+            if (trimmed.includes('\n') || trimmed.includes('\r') || trimmed.includes(';') || trimmed.includes('|')) {
+                list = trimmed.split(/[\n;\r|]+/).map(s => s.trim()).filter(Boolean);
+            } else if (trimmed) {
+                list = [trimmed];
+            }
         }
 
         return list;
@@ -1205,6 +1345,125 @@ class ChamadoModel {
             }
         }
         return String(val).replace(/^"|"$/g, '').trim();
+    }
+
+    /**
+     * Algoritmo de emparelhamento inteligente de pontos entre abertura (iniList) e finalização (finList).
+     * Associa pontos por Plaqueta (identificador único), Coordenadas/Proximidade Geográfica, Endereço ou Fallback de Posição.
+     */
+    static alignPoints(iniList = [], finList = []) {
+        const paired = [];
+        const usedFinIndices = new Set();
+
+        const getPlq = (p) => {
+            if (!p) return '';
+            const raw = ChamadoModel.formatLocationText(p.plaqueta || p.plaqueta_inicial || p.plaqueta_final || '').trim().toUpperCase();
+            if (!raw || raw === 'NÃO INFORMADA' || raw === 'NAO INFORMADA' || raw === '---' || raw === 'NULL') return '';
+            return raw;
+        };
+
+        const getCoord = (p) => {
+            if (!p) return null;
+            const cStr = p.coordenada || p.coordenada_inicial || p.coordenada_reparo || (p.lat && p.lng ? `${p.lat}, ${p.lng}` : '');
+            return ChamadoModel.parseLatLng(cStr);
+        };
+
+        const getAddr = (p) => {
+            if (!p) return '';
+            const raw = ChamadoModel.formatLocationText(p.endereco || p.local || '').trim().toLowerCase();
+            return ChamadoModel.isRealAddress(raw) ? raw : '';
+        };
+
+        // Passo 1: Emparelhamento por Plaqueta (correspondência exata)
+        for (let i = 0; i < iniList.length; i++) {
+            const pIni = iniList[i];
+            const plqIni = getPlq(pIni);
+
+            let bestFinIdx = -1;
+            if (plqIni) {
+                for (let j = 0; j < finList.length; j++) {
+                    if (usedFinIndices.has(j)) continue;
+                    if (getPlq(finList[j]) === plqIni) {
+                        bestFinIdx = j;
+                        break;
+                    }
+                }
+            }
+
+            if (bestFinIdx !== -1) {
+                usedFinIndices.add(bestFinIdx);
+                paired.push({ ini: pIni, fin: finList[bestFinIdx], iniIdx: i, finIdx: bestFinIdx });
+            } else {
+                paired.push({ ini: pIni, fin: null, iniIdx: i, finIdx: -1 });
+            }
+        }
+
+        // Passo 2: Emparelhamento por Proximidade Geográfica (Coordenadas) para pontos não pareados
+        for (let k = 0; k < paired.length; k++) {
+            if (paired[k].fin !== null) continue;
+            const cIni = getCoord(paired[k].ini);
+            if (!cIni) continue;
+
+            let minDist = Infinity;
+            let bestFinIdx = -1;
+            for (let j = 0; j < finList.length; j++) {
+                if (usedFinIndices.has(j)) continue;
+                const cFin = getCoord(finList[j]);
+                if (!cFin) continue;
+                const dist = ChamadoModel.calcularDistanciaMetros(`${cIni.lat},${cIni.lng}`, `${cFin.lat},${cFin.lng}`);
+                if (dist !== null && !isNaN(dist) && dist < minDist) {
+                    minDist = dist;
+                    bestFinIdx = j;
+                }
+            }
+
+            if (bestFinIdx !== -1) {
+                usedFinIndices.add(bestFinIdx);
+                paired[k].fin = finList[bestFinIdx];
+                paired[k].finIdx = bestFinIdx;
+            }
+        }
+
+        // Passo 3: Emparelhamento por Similaridade de Endereço
+        for (let k = 0; k < paired.length; k++) {
+            if (paired[k].fin !== null) continue;
+            const addrIni = getAddr(paired[k].ini);
+            if (!addrIni) continue;
+
+            for (let j = 0; j < finList.length; j++) {
+                if (usedFinIndices.has(j)) continue;
+                const addrFin = getAddr(finList[j]);
+                if (addrFin && (addrIni.includes(addrFin) || addrFin.includes(addrIni))) {
+                    usedFinIndices.add(j);
+                    paired[k].fin = finList[j];
+                    paired[k].finIdx = j;
+                    break;
+                }
+            }
+        }
+
+        // Passo 4: Fallback de Posição para pontos iniciais remanescentes
+        for (let k = 0; k < paired.length; k++) {
+            if (paired[k].fin !== null) continue;
+            for (let j = 0; j < finList.length; j++) {
+                if (!usedFinIndices.has(j)) {
+                    usedFinIndices.add(j);
+                    paired[k].fin = finList[j];
+                    paired[k].finIdx = j;
+                    break;
+                }
+            }
+        }
+
+        // Passo 5: Anexar quaisquer pontos finais extras que não tinham correspondência inicial
+        for (let j = 0; j < finList.length; j++) {
+            if (!usedFinIndices.has(j)) {
+                usedFinIndices.add(j);
+                paired.push({ ini: null, fin: finList[j], iniIdx: -1, finIdx: j });
+            }
+        }
+
+        return paired;
     }
 
     /**

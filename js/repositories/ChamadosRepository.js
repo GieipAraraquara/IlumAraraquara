@@ -53,18 +53,50 @@ class ChamadosRepository {
                 }
             }
 
+            // Se a view unificada não projetar a coluna operador_finalizacao (undefined),
+            // consulta a tabela ordens_servico diretamente para enriquecer os registros.
+            if (data && data.length > 0 && data[0].operador_finalizacao === undefined) {
+                console.warn('⚠️ [ChamadosRepository] A view vw_todas_ordens_servico não possui a coluna operador_finalizacao. Consultando ordens_servico para enriquecer...');
+                try {
+                    const resDirect = await client
+                        .from(this.primaryTable)
+                        .select('protocolo, id, operador_finalizacao');
+                    
+                    if (resDirect.data && resDirect.data.length > 0) {
+                        const mapByProt = new Map();
+                        const mapById = new Map();
+                        resDirect.data.forEach(r => {
+                            if (r.protocolo) mapByProt.set(String(r.protocolo).toUpperCase().trim(), r.operador_finalizacao);
+                            if (r.id) mapById.set(String(r.id), r.operador_finalizacao);
+                        });
+
+                        data.forEach(row => {
+                            const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
+                            const idKey = row.id ? String(row.id) : null;
+                            const opFin = (protKey && mapByProt.has(protKey)) ? mapByProt.get(protKey) : (idKey ? mapById.get(idKey) : null);
+                            row.operador_finalizacao = opFin || null;
+                        });
+                    }
+                } catch(eMerge) {
+                    console.error('⚠️ Erro ao mesclar operador_finalizacao:', eMerge);
+                }
+            }
+
             console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
             
             // Log detalhado de todos os registros para diagnóstico
             if (data && data.length > 0) {
                 console.group('🔎 [ChamadosRepository] Diagnóstico Detalhado por OS');
                 data.forEach((row, i) => {
-                    console.log(`OS #${i+1} [${row.protocolo || row.id}] | Tipo: ${row.tipo_os || 'N/A'}:`, {
-                        endereco_raw: row.endereco,
-                        pontos_raw_str: JSON.stringify(row.pontos_inicial || row.pontos),
-                        plaqueta_raw: row.plaqueta_inicial,
-                        coordenada_raw: row.coordenada,
-                        praca_nome_raw: row.praca_nome
+                    console.log(`OS #${i+1} [${row.protocolo || row.id}] Status: ${row.status}:`, {
+                        operador_finalizacao: row.operador_finalizacao,
+                        finalizado_por: row.finalizado_por,
+                        usuario_finalizacao: row.usuario_finalizacao,
+                        operador_fechamento: row.operador_fechamento,
+                        fechado_por: row.fechado_por,
+                        usuario_conclusao: row.usuario_conclusao,
+                        operador_abertura: row.operador,
+                        pontos_final: row.pontos_final
                     });
                 });
                 console.groupEnd();
@@ -221,6 +253,18 @@ class ChamadosRepository {
                     console.warn(`⚠️ [ChamadosRepository] Nenhum registro encontrado para atualizar com ID/Protocolo = "${idOrProtocol}".`);
                     throw new Error(`Nenhum registro encontrado no banco de dados para a OS (${idOrProtocol}).`);
                 }
+            } else if (window.LogsRepository) {
+                const rec = updatedData[0];
+                const prot = rec.protocolo || strVal;
+                const actualTable = isPraca ? this.pracasTable : this.primaryTable;
+                window.LogsRepository.registrarLog({
+                    protocolo: prot,
+                    tabelaOrigem: actualTable,
+                    tipoAcao: newStatus === 'Concluída' || newStatus === 'Concluida' ? 'FINALIZACAO' : (newStatus === 'Cancelada' ? 'CANCELAMENTO' : 'ALTERACAO_STATUS'),
+                    descricao: `Status alterado para "${newStatus}"${justification ? ' (Justificativa: ' + justification + ')' : ''}`,
+                    dadosNovos: { status: newStatus, observacao_final: justification },
+                    origemTela: 'Painel'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de status:', err));
             }
 
             return updatedData;
@@ -278,6 +322,17 @@ class ChamadosRepository {
             if (!updatedData || updatedData.length === 0) {
                 if (lastError) throw lastError;
                 throw new Error(`Nenhum registro encontrado no banco de dados para a OS (${idOrProtocol}).`);
+            } else if (window.LogsRepository) {
+                const rec = updatedData[0];
+                const prot = rec.protocolo || strVal;
+                window.LogsRepository.registrarLog({
+                    protocolo: prot,
+                    tabelaOrigem: isPraca ? this.pracasTable : this.primaryTable,
+                    tipoAcao: 'ALTERACAO_PRIORIDADE',
+                    descricao: `Prioridade alterada para "${newPriority}"`,
+                    dadosNovos: { prioridade: newPriority },
+                    origemTela: 'Painel'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de prioridade:', err));
             }
 
             console.log(`✅ [ChamadosRepository] Prioridade da OS ${idOrProtocol} atualizada para "${newPriority}".`);
@@ -357,6 +412,19 @@ class ChamadosRepository {
                         }
                     } catch (fallbackErr) {}
                 }
+            }
+
+            if (updatedData && updatedData.length > 0 && window.LogsRepository) {
+                const rec = updatedData[0];
+                const prot = rec.protocolo || id;
+                window.LogsRepository.registrarLog({
+                    protocolo: prot,
+                    tabelaOrigem: rec.praca_nome ? this.pracasTable : this.primaryTable,
+                    tipoAcao: 'AUDITORIA',
+                    descricao: `Status da Auditoria alterado para "${newStatusAuditoria}"`,
+                    dadosNovos: { status_auditoria: newStatusAuditoria },
+                    origemTela: 'Auditoria'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de auditoria:', err));
             }
 
             console.log(`✅ [ChamadosRepository] Status de Auditoria da OS ${id} atualizado para "${newStatusAuditoria}".`);

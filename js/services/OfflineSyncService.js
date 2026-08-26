@@ -427,6 +427,17 @@ class OfflineSyncService {
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
       }
 
+      if (window.LogsRepository) {
+        window.LogsRepository.registrarLog({
+          protocolo: item.protocolo,
+          tabelaOrigem: 'ordens_servico',
+          tipoAcao: 'FINALIZACAO',
+          descricao: 'Ordem de Serviço finalizada com evidências (Sincronizado)',
+          dadosNovos: payloadAtualViaria,
+          origemTela: 'OfflineSync'
+        });
+      }
+
       return { success: true };
 
     } else if (item.tipo === 'praca') {
@@ -468,6 +479,17 @@ class OfflineSyncService {
 
       if (updateRes.error) return { success: false, error: updateRes.error.message };
 
+      if (window.LogsRepository) {
+        window.LogsRepository.registrarLog({
+          protocolo: item.protocolo,
+          tabelaOrigem: 'ordens_servico_pracas',
+          tipoAcao: 'FINALIZACAO',
+          descricao: 'Manutenção em Praça concluída com evidências (Sincronizado)',
+          dadosNovos: payloadAtual,
+          origemTela: 'OfflineSync'
+        });
+      }
+
       return { success: true };
 
     } else if (item.tipo === 'abertura_viaria') {
@@ -493,6 +515,18 @@ class OfflineSyncService {
         let fallbackRes = await supabaseClient.from('chamados').insert([payloadAtualAbertura]);
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
       }
+
+      if (window.LogsRepository) {
+        window.LogsRepository.registrarLog({
+          protocolo: item.protocolo,
+          tabelaOrigem: 'ordens_servico',
+          tipoAcao: 'CRIACAO',
+          descricao: 'Ordem de Serviço criada (Sincronizado)',
+          dadosNovos: payloadAtualAbertura,
+          origemTela: 'OfflineSync'
+        });
+      }
+
       return { success: true };
 
     } else if (item.tipo === 'abertura_praca') {
@@ -500,6 +534,18 @@ class OfflineSyncService {
       let insertRes = await supabaseClient.from('ordens_servico_pracas').insert([payload]);
       console.log('📊 [ProcessItem Abertura Praça Response]:', insertRes);
       if (insertRes.error) return { success: false, error: insertRes.error.message };
+
+      if (window.LogsRepository) {
+        window.LogsRepository.registrarLog({
+          protocolo: item.protocolo,
+          tabelaOrigem: 'ordens_servico_pracas',
+          tipoAcao: 'CRIACAO',
+          descricao: 'Ordem de Serviço em praça criada (Sincronizado)',
+          dadosNovos: payload,
+          origemTela: 'OfflineSync'
+        });
+      }
+
       return { success: true };
     }
 

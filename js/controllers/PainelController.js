@@ -222,7 +222,7 @@ class PainelController {
         const tdProtocolo = document.createElement('td');
         tdProtocolo.className = 'py-3 px-5 font-medium whitespace-nowrap truncate align-middle';
         if (item.isDireto) {
-            const tecNome = item.operadorFinalizacao || item.operador || 'Técnico';
+            const tecNome = item.operadorFinalizacao || item.operador || 'Não informado';
             tdProtocolo.innerHTML = `
                 <div class="flex flex-col gap-0.5 max-w-full overflow-hidden">
                     <span class="font-mono font-bold text-amber-900 truncate" title="${item.protocolo}">${item.protocolo}</span>
@@ -618,6 +618,7 @@ class PainelController {
             iconBgClass: iconBgClass,
             confirmBtnClass: confirmBtnClass,
             confirmText: confirmText,
+            requireJustification: (targetUIStatus === 'rejeitada' || targetUIStatus === 'cancelada' || targetUIStatus === 'aberto'),
             onConfirm: async (justification) => {
                 try {
                     const targetId = (item && item.protocolo) ? item.protocolo : id;
@@ -805,6 +806,7 @@ class PainelController {
         const container = document.getElementById('detalheModalConteudo');
         if (container) {
             container.innerHTML = this.buildDetalhesOSModalHtml(item);
+            this.carregarLogsNoModal(item.protocolo);
         }
 
         const modal = document.getElementById('modalDetalhesOSAuditoria');
@@ -815,6 +817,70 @@ class PainelController {
                 box.classList.remove('scale-95', 'opacity-0');
                 box.classList.add('scale-100', 'opacity-100');
             }, 10);
+        }
+    }
+
+    /**
+     * Carrega e renderiza o histórico de auditoria (logs_protocolos) no modal de detalhes da OS
+     */
+    async carregarLogsNoModal(protocolo) {
+        const listEl = document.getElementById('detalheModalLogsList');
+        if (!listEl) return;
+
+        if (!window.LogsRepository) {
+            listEl.innerHTML = `<span class="text-on-surface-variant italic text-[11px]">Repositório de logs indisponível.</span>`;
+            return;
+        }
+
+        try {
+            const logs = await window.LogsRepository.buscarLogsPorProtocolo(protocolo);
+            if (!logs || logs.length === 0) {
+                listEl.innerHTML = `
+                    <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface-variant italic text-[11px] flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-slate-400">info</span>
+                        <span>Nenhum evento de alteração registrado no histórico para este protocolo.</span>
+                    </div>
+                `;
+                return;
+            }
+
+            const mapAcaoBadge = {
+                'CRIACAO': 'bg-blue-100 text-blue-800 border-blue-300',
+                'ALTERACAO_STATUS': 'bg-purple-100 text-purple-800 border-purple-300',
+                'ALTERACAO_PRIORIDADE': 'bg-amber-100 text-amber-800 border-amber-300',
+                'FINALIZACAO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+                'CANCELAMENTO': 'bg-rose-100 text-rose-800 border-rose-300',
+                'REABERTURA': 'bg-cyan-100 text-cyan-800 border-cyan-300',
+                'AUDITORIA': 'bg-indigo-100 text-indigo-800 border-indigo-300'
+            };
+
+            listEl.innerHTML = logs.map(log => {
+                const dataStr = log.created_at ? new Date(log.created_at).toLocaleString('pt-BR') : 'Data n/d';
+                const badgeCls = mapAcaoBadge[log.tipo_acao] || 'bg-slate-100 text-slate-800 border-slate-300';
+                const userStr = log.usuario_nome || log.usuario_email || 'Sistema / Anônimo';
+                const origStr = log.origem_tela ? ` • Tela: ${log.origem_tela}` : '';
+
+                return `
+                    <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 space-y-1 shadow-2xs text-[11px]">
+                        <div class="flex items-center justify-between gap-2 border-b border-outline-variant/20 pb-1">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeCls}">
+                                ${log.tipo_acao || 'LOG'}
+                            </span>
+                            <span class="font-mono text-on-surface-variant text-[10px] flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">schedule</span>
+                                ${dataStr}
+                            </span>
+                        </div>
+                        <div class="text-on-surface font-medium leading-relaxed">${log.descricao || 'Alteração realizada'}</div>
+                        <div class="flex items-center justify-between text-[10px] text-on-surface-variant/80 pt-0.5 border-t border-slate-100">
+                            <span>👤 <b>Usuário:</b> ${userStr}${origStr}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (err) {
+            console.warn('⚠️ Erro ao carregar logs no modal:', err);
+            listEl.innerHTML = `<span class="text-error italic text-[11px]">Erro ao buscar histórico: ${err.message}</span>`;
         }
     }
 
@@ -1204,6 +1270,23 @@ class PainelController {
             </div>`;
         })()}
 
+        <!-- Seção 3.5: Linha do Tempo de Auditoria & Logs -->
+        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
+            <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                <span class="flex items-center gap-1.5 text-indigo-700 font-bold">
+                    <span class="material-symbols-outlined text-[18px]">history</span>
+                    <span>Trilha de Auditoria (Histórico de Alterações)</span>
+                </span>
+                <span class="text-[10px] text-on-surface-variant font-mono">protocolo #${item.protocolo}</span>
+            </div>
+            <div id="detalheModalLogsList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                <div class="flex items-center gap-2 py-3 text-on-surface-variant text-[11px] italic">
+                    <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                    <span>Buscando histórico de alterações do protocolo...</span>
+                </div>
+            </div>
+        </div>
+
         <!-- Seção 4: Ações Administrativas -->
         ${(() => {
             let isAdminUser = false;
@@ -1542,13 +1625,16 @@ window.rejeitarOSManutentor = function(osId) {
             iconBgClass: 'bg-rose-100 text-rose-700',
             confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
             confirmText: 'Rejeitar OS',
+            requireJustification: true,
             onConfirm: doReject
         });
     } else {
-        const just = prompt(`Deseja rejeitar a OS #${protocol}? Digite o motivo:`);
-        if (just !== null) {
-            doReject(just);
+        let just = null;
+        while (just === null || just.trim() === '') {
+            just = prompt(`Justificativa obrigatória para rejeitar a OS #${protocol}:`);
+            if (just === null) return; // User cancelled prompt
         }
+        doReject(just.trim());
     }
 };
 
@@ -1585,13 +1671,16 @@ window.cancelarOSAdmin = function(osId) {
             iconBgClass: 'bg-rose-100 text-rose-700',
             confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
             confirmText: 'Cancelar OS',
+            requireJustification: true,
             onConfirm: doCancel
         });
     } else {
-        const just = prompt(`Deseja cancelar a OS #${protocol}? Digite o motivo (opcional):`);
-        if (just !== null) {
-            doCancel(just);
+        let just = null;
+        while (just === null || just.trim() === '') {
+            just = prompt(`Justificativa obrigatória para cancelar a OS #${protocol}:`);
+            if (just === null) return; // User cancelled prompt
         }
+        doCancel(just.trim());
     }
 };
 

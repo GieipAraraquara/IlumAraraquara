@@ -79,28 +79,20 @@
     </main>
 
     <script>
-        const CLIENT_ID = 'h-iluminacaoararaquara.netlify.app';
-        const CLIENT_SECRET = '51XS5NyjnroVlBEjEVgtsXoVEbVOqDAohd6VHQGGs0J_bi3ciqkNEeFxsF1p8PUtPlZIBUT6lhfSWfGC21klLg';
-        const TOKEN_URL = 'https://sso.staging.acesso.gov.br/token';
         const USERINFO_URL = 'https://sso.staging.acesso.gov.br/userinfo';
 
         async function obterDadosUsuarioGovBr(code, redirectUri) {
             try {
-                const bodyParams = new URLSearchParams({
-                    grant_type: 'authorization_code',
-                    code: code,
-                    redirect_uri: redirectUri
-                });
-
-                const credentials = btoa(`${CLIENT_ID}:${CLIENT_SECRET}`);
-
-                const response = await fetch(TOKEN_URL, {
+                // Chamada segura para a Vercel Serverless Function (sem expor o CLIENT_SECRET no navegador)
+                const response = await fetch('/api/govbr-token', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                        'Authorization': `Basic ${credentials}`
+                        'Content-Type': 'application/json'
                     },
-                    body: bodyParams.toString()
+                    body: JSON.stringify({
+                        code: code,
+                        redirectUri: redirectUri
+                    })
                 });
 
                 if (response.ok) {

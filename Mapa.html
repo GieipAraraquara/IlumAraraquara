@@ -15,6 +15,7 @@
     <script src="js/guards/authGuard.js?v=30"></script>
     <script src="js/domain/ChamadoModel.js?v=43"></script>
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
+    <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/controllers/PainelController.js?v=33"></script>
@@ -581,38 +582,36 @@
 
             <!-- Filtros de Operador, Data e Botões (TODOS NA MESMA LINHA) -->
             <div class="mt-3 bg-surface-container-lowest/80 p-3 rounded-lg border border-outline-variant/50 flex-none space-y-2.5">
-                <div class="grid grid-cols-12 gap-2 items-end">
-                    <!-- Seleção de Operador (5 cols) -->
-                    <div class="col-span-5">
+                <div class="grid grid-cols-12 gap-1.5 items-end">
+                    <!-- Seleção de Operador (7 cols) -->
+                    <div class="col-span-7">
                         <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate" title="Operador de Finalização">Operador:</label>
                         <select id="selectOperadorRota" onchange="aoMudarOperadorRota()" class="w-full text-xs font-medium border border-outline-variant rounded-lg p-1.5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer truncate h-[32px]">
                             <option value="">Carregando...</option>
                         </select>
                     </div>
 
-                    <!-- Seleção de Data (3 cols) -->
+                    <!-- Seleção de Data (3 cols - Curto apenas para DD/MM/YY + Ícone) -->
                     <div class="col-span-3">
-                        <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate" title="Data de Conclusão">Data:</label>
-                        <div class="relative">
-                            <input type="text" id="inputDataRotaOperadorDisplay" readonly class="w-full text-xs font-medium border border-outline-variant rounded-lg p-1.5 pr-6 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer text-center h-[32px]" placeholder="DD/MM/YYYY" />
-                            <span class="material-symbols-outlined absolute right-1.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[15px] pointer-events-none">calendar_today</span>
+                        <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate cursor-pointer" title="Data de Conclusão">Data:</label>
+                        <div class="relative w-full cursor-pointer" onclick="abrirCalendarioRotaOperador()">
+                            <input type="text" id="inputDataRotaOperadorDisplay" readonly onclick="abrirCalendarioRotaOperador()" class="w-full text-[11px] font-bold border border-outline-variant rounded-lg py-1 px-1 pr-5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer text-center h-[32px]" placeholder="DD/MM/YY" />
+                            <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant text-[14px] pointer-events-none">calendar_today</span>
                             <input type="date" id="inputDataRotaOperador" onchange="aoAtualizarDataBRInput(); aoMudarOperadorRota()" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" />
                         </div>
                     </div>
 
-                    <!-- Botão Exibir (2 cols) -->
-                    <div class="col-span-2">
-                        <button type="button" onclick="calcularERenderizarRotaOperador()" class="w-full py-1.5 px-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer h-[32px]" title="Exibir Rota Concluída">
-                            <span class="material-symbols-outlined text-[16px]">map</span>
-                            <span>Exibir</span>
+                    <!-- Botão Exibir (1 col - Somente Ícone) -->
+                    <div class="col-span-1">
+                        <button type="button" onclick="calcularERenderizarRotaOperador()" class="w-full py-1.5 px-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center cursor-pointer h-[32px]" title="Exibir Rota Concluída">
+                            <span class="material-symbols-outlined text-[18px]">map</span>
                         </button>
                     </div>
 
-                    <!-- Botão Limpar (2 cols) -->
-                    <div class="col-span-2">
-                        <button type="button" onclick="limparRotaOperadorAtual()" class="w-full py-1.5 px-1.5 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-1 h-[32px]" title="Limpar Rota">
-                            <span class="material-symbols-outlined text-[16px]">cleaning_services</span>
-                            <span>Limpar</span>
+                    <!-- Botão Limpar (1 col - Somente Ícone) -->
+                    <div class="col-span-1">
+                        <button type="button" onclick="limparRotaOperadorAtual()" class="w-full py-1.5 px-0 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center h-[32px]" title="Limpar Rota">
+                            <span class="material-symbols-outlined text-[18px]">cleaning_services</span>
                         </button>
                     </div>
                 </div>
@@ -993,21 +992,26 @@
         }
     });
 
-    function alterarFiltroStatus(status) {
-        window.filtroStatusAtual = status;
-        if (typeof filtroStatusAtual !== 'undefined') filtroStatusAtual = status;
+    function atualizarBotoesFiltroStatusUI(status) {
+        const st = status || (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
         const statusList = ['abertas', 'resolvidas', 'canceladas', 'todas'];
         statusList.forEach(s => {
             const btnId = 'chipStatus' + s.charAt(0).toUpperCase() + s.slice(1);
             const btn = document.getElementById(btnId);
             if (btn) {
-                if (s === status) {
+                if (s === st) {
                     btn.className = "px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-secondary bg-secondary/10 text-secondary";
                 } else {
                     btn.className = "px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary";
                 }
             }
         });
+    }
+
+    function alterarFiltroStatus(status) {
+        window.filtroStatusAtual = status;
+        if (typeof filtroStatusAtual !== 'undefined') filtroStatusAtual = status;
+        atualizarBotoesFiltroStatusUI(status);
 
         const state = getFiltroDataMapaState();
         if (status !== 'abertas' && state.tipo === 'ativas') {
@@ -1019,6 +1023,8 @@
 
     function aplicarFiltrosMapa() {
         const stAtual = (typeof getFiltroStatusAtual === 'function' ? getFiltroStatusAtual() : window.filtroStatusAtual) || 'abertas';
+        atualizarBotoesFiltroStatusUI(stAtual);
+        atualizarUIFiltroDataMapa();
 
         const btnRotasOp = document.getElementById('btnModoRotasOperador');
         if (btnRotasOp) {
@@ -1036,8 +1042,9 @@
         }
 
         const osCache = window.dadosOSsAbertasCache || (typeof dadosOSsAbertasCache !== 'undefined' ? dadosOSsAbertasCache : []);
-
         if (osCache && osCache.length > 0) {
+            dadosOSsAbertasCache = osCache;
+            window.dadosOSsAbertasCache = osCache;
             const filtradas = obterListaFiltradaPorStatus(osCache, stAtual);
             const globalInput = document.getElementById('global-search-input');
             const termo = globalInput ? globalInput.value.toLowerCase().trim() : '';
@@ -1166,6 +1173,12 @@
         if (stat) stat.innerHTML = "Carregando OSs do Supabase...";
         if (painelDetalhes) painelDetalhes.style.display = 'none';
 
+        // Se já houver cache na memória global, renderiza os dados filtrados imediatamente enquanto atualiza do Supabase
+        if (window.dadosOSsAbertasCache && window.dadosOSsAbertasCache.length > 0) {
+            dadosOSsAbertasCache = window.dadosOSsAbertasCache;
+            aplicarFiltrosMapa();
+        }
+
         try {
             let service = (typeof getChamadosService === 'function' ? getChamadosService() : null) || window.chamadosService;
             if (!service && typeof window.ChamadosService === 'function') {
@@ -1185,6 +1198,7 @@
             
             // Converte as entidades ChamadoModel para a estrutura de renderização do mapa
             dadosOSsAbertasCache = converterChamadosModelParaMapa(chamadosList || []);
+            window.dadosOSsAbertasCache = dadosOSsAbertasCache;
 
             aplicarFiltrosMapa();
 
@@ -1308,12 +1322,14 @@
                 data: formattedDate,
                 dataObjeto: c.dataAbertura,
                 prioridade: c.prioridade || 'Normal',
-                status: c.rawStatus || 'Aberta',
+                status: c.rawStatus || c.status || (c.normalizedStatus === 'concluida' ? 'Concluída' : (c.normalizedStatus === 'cancelada' ? 'Cancelada' : 'Aberta')),
                 normalizedStatus: c.normalizedStatus,
                 municipe: c.municipeNome || '',
                 telefoneCelular: '',
                 telefoneFixo: '',
                 operador: c.operador || '',
+                operadorAbertura: c.displayOperadorAbertura || c.operadorAbertura || c.rawRow?.operador || '',
+                operadorFinalizacao: c.operadorFinalizacao || c.rawRow?.operador_finalizacao || c.rawRow?.finalizado_por || c.rawRow?.usuario_finalizacao || '',
                 descricao: c.problemaInicial || '',
                 logs: c.observacaoFinal || '',
                 fotos: c.fotosEvidencias || [],
@@ -1324,8 +1340,21 @@
     }
 
     function obterDataObjetoOS(os) {
+        const m = os._originalModel || os;
+        const dtConcl = m.dataConclusao || m.dataFechamento || os.dataConclusao || os.dataFechamento;
+        const stNorm = m.normalizedStatus || os.normalizedStatus || (os.status || '').toLowerCase();
+        const isResolv = stNorm.includes('conclu') || stNorm.includes('resolv') || stNorm.includes('fechad');
+
+        if (isResolv && dtConcl) {
+            const dObj = new Date(dtConcl);
+            if (!isNaN(dObj.getTime())) return dObj;
+        }
+
         if (os.dataObjeto && os.dataObjeto instanceof Date && !isNaN(os.dataObjeto.getTime())) {
             return os.dataObjeto;
+        }
+        if (m.dataAbertura && m.dataAbertura instanceof Date && !isNaN(m.dataAbertura.getTime())) {
+            return m.dataAbertura;
         }
         if (os.data) {
             const partes = os.data.toString().trim().split('/');
@@ -1352,8 +1381,10 @@
         return lista.filter(os => {
             // 1. Filtro de Status
             const st = (os.status || "Aberta").toLowerCase();
-            const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad");
-            const isCanc = st.includes("cancel");
+            const normSt = (os.normalizedStatus || "").toLowerCase();
+            const origSt = (os._originalModel && os._originalModel.normalizedStatus ? os._originalModel.normalizedStatus : "").toLowerCase();
+            const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || normSt === "concluida" || origSt === "concluida" || Boolean(os._originalModel && (os._originalModel.dataConclusao || os._originalModel.dataFechamento));
+            const isCanc = st.includes("cancel") || normSt === "cancelada" || origSt === "cancelada";
             const isAberta = !isResolv && !isCanc;
 
             if (currentUserRole === 'manutentor' && isCanc) {
@@ -2322,6 +2353,25 @@
     let osReversaoPendente = null;
 
     function solicitarReversaoOS(protocolo) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: 'Reabrir / Reverter OS',
+                message: `Deseja realmente reabrir a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocolo}</strong>?<br>Seu status voltará para <strong class="text-error font-bold">Em aberto</strong>.`,
+                icon: 'undo',
+                iconBgClass: 'bg-blue-100 text-blue-700',
+                confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+                confirmText: 'Reabrir OS',
+                requireJustification: true,
+                onConfirm: async (justification) => {
+                    osReversaoPendente = protocolo;
+                    const obsEl = document.getElementById('obsModalReversao');
+                    if (obsEl) obsEl.value = justification;
+                    await executarReversaoOSConfirmado();
+                }
+            });
+            return;
+        }
+
         osReversaoPendente = protocolo;
         const elProt = document.getElementById('protModalReversao');
         if (elProt) elProt.innerText = '#' + protocolo;
@@ -2343,7 +2393,11 @@
             return;
         }
         const prot = osReversaoPendente;
-        const obs = document.getElementById('obsModalReversao').value.trim();
+        const obs = document.getElementById('obsModalReversao') ? document.getElementById('obsModalReversao').value.trim() : '';
+        if (!obs) {
+            alert("Por favor, informe a justificativa para reverter a Ordem de Serviço.");
+            return;
+        }
         fecharModalReversao();
 
         const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
@@ -2385,7 +2439,7 @@
 
     var pendingActionCallback = null;
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -2394,7 +2448,7 @@
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalJustificationInput = document.getElementById('modal-justification-input');
-        const justificationContainer = document.getElementById('modal-justification-container');
+        const justificationContainer = document.getElementById('modal-justification-container') || (modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null);
 
         if (!modal || !modalBox) return;
 
@@ -2413,15 +2467,52 @@
             } else {
                 justificationContainer.classList.remove('hidden');
             }
+
+            const labelBadge = justificationContainer.querySelector('label span');
+            if (labelBadge) {
+                if (requireJustification) {
+                    labelBadge.textContent = '(Obrigatório)';
+                    labelBadge.className = 'text-xs text-rose-600 font-bold ml-1';
+                } else {
+                    labelBadge.textContent = '(Opcional)';
+                    labelBadge.className = 'text-xs opacity-60 font-normal ml-1';
+                }
+            }
+
+            let errorMsg = justificationContainer.querySelector('.modal-justification-error');
+            if (!errorMsg) {
+                errorMsg = document.createElement('p');
+                errorMsg.className = 'modal-justification-error text-[11px] text-rose-600 font-semibold mt-1 hidden flex items-center gap-1';
+                errorMsg.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span><span>Por favor, informe a justificativa para prosseguir.</span>';
+                justificationContainer.appendChild(errorMsg);
+            }
+            errorMsg.classList.add('hidden');
         }
 
         if (modalJustificationInput) {
             modalJustificationInput.value = '';
+            modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            modalJustificationInput.oninput = () => {
+                const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                if (err) err.classList.add('hidden');
+                modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            };
         }
 
         if (modalConfirmBtn) {
             modalConfirmBtn.onclick = () => {
                 const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
+
+                if (requireJustification && showJustification !== false && !justification) {
+                    if (modalJustificationInput) {
+                        modalJustificationInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-300');
+                        modalJustificationInput.focus();
+                    }
+                    const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                    if (err) err.classList.remove('hidden');
+                    return;
+                }
+
                 if (typeof pendingActionCallback === 'function') {
                     pendingActionCallback(justification);
                 }
@@ -2579,6 +2670,25 @@
     let osCancelamentoPendente = null;
 
     function solicitarCancelamentoOS(protocolo) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: 'Cancelar Ordem de Serviço',
+                message: `Deseja realmente cancelar a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocolo}</strong>?<br>Esta ação alterará o status da OS para <strong class="text-slate-700 font-bold">Cancelada</strong>.`,
+                icon: 'close',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+                confirmText: 'Cancelar OS',
+                requireJustification: true,
+                onConfirm: async (justification) => {
+                    osCancelamentoPendente = protocolo;
+                    const obsEl = document.getElementById('obsModalCancelamento');
+                    if (obsEl) obsEl.value = justification;
+                    await executarCancelamentoOSConfirmado();
+                }
+            });
+            return;
+        }
+
         osCancelamentoPendente = protocolo;
         const elProt = document.getElementById('protModalCancelamento');
         if (elProt) elProt.innerText = '#' + protocolo;
@@ -2600,7 +2710,11 @@
             return;
         }
         const prot = osCancelamentoPendente;
-        const obs = document.getElementById('obsModalCancelamento').value.trim();
+        const obs = document.getElementById('obsModalCancelamento') ? document.getElementById('obsModalCancelamento').value.trim() : '';
+        if (!obs) {
+            alert("Por favor, informe a justificativa para cancelar a Ordem de Serviço.");
+            return;
+        }
         fecharModalCancelamento();
 
         const osEncontrada = dadosOSsAbertasCache ? dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase()) : null;
@@ -3127,18 +3241,12 @@
 
         let routeGeometry = null;
 
-        // Busca o traçado real pelas vias e ruas da cidade via Mapbox Directions API
         try {
-            const coordsString = sequenciaRota.map(p => `${p.lng},${p.lat}`).join(';');
-            const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
-            const resp = await fetch(directionsUrl);
-            const data = await resp.json();
-
-            if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                const route = data.routes[0];
-                routeGeometry = route.geometry;
-                if (route.distance) {
-                    distanciaTotalKm = route.distance / 1000;
+            const routeResult = await obterGeometriaMapboxSegmento(sequenciaRota);
+            if (routeResult) {
+                routeGeometry = routeResult.geometry;
+                if (routeResult.distance) {
+                    distanciaTotalKm = routeResult.distance / 1000;
                 }
             }
         } catch (err) {
@@ -3158,18 +3266,104 @@
         exibirPainelResultadosRota(rotaViariaAtual);
     }
 
+    async function obterGeometriaMapboxSegmento(coordsFiltradas) {
+        if (!coordsFiltradas || coordsFiltradas.length < 2) return null;
+
+        const MAX_MAPBOX_POINTS = 25; // Limite da API do Mapbox por requisição
+
+        // Se couber em um único lote (<= 25 pontos)
+        if (coordsFiltradas.length <= MAX_MAPBOX_POINTS) {
+            try {
+                const coordsString = coordsFiltradas.map(p => `${p.lng},${p.lat}`).join(';');
+                const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+                const resp = await fetch(directionsUrl);
+                const data = await resp.json();
+
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    return data.routes[0];
+                }
+            } catch (e) {
+                console.warn("⚠️ Erro na consulta Mapbox Directions:", e);
+            }
+            return null;
+        }
+
+        // Se houver mais de 25 pontos, consulta em lotes concatenados para contornar o limite de 25 pontos do Mapbox
+        const combinedCoordinates = [];
+        const combinedLegs = [];
+        let combinedDistance = 0;
+        let combinedDuration = 0;
+
+        let idx = 0;
+        while (idx < coordsFiltradas.length - 1) {
+            const chunk = coordsFiltradas.slice(idx, idx + MAX_MAPBOX_POINTS);
+            if (chunk.length < 2) break;
+
+            try {
+                const coordsString = chunk.map(p => `${p.lng},${p.lat}`).join(';');
+                const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+                const resp = await fetch(directionsUrl);
+                const data = await resp.json();
+
+                if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                    const route = data.routes[0];
+                    if (route.geometry && route.geometry.coordinates) {
+                        if (combinedCoordinates.length > 0) {
+                            // Evita duplicar o ponto de conexão entre lotes
+                            combinedCoordinates.push(...route.geometry.coordinates.slice(1));
+                        } else {
+                            combinedCoordinates.push(...route.geometry.coordinates);
+                        }
+                    }
+                    if (route.distance) combinedDistance += route.distance;
+                    if (route.duration) combinedDuration += route.duration;
+                    if (route.legs && Array.isArray(route.legs)) {
+                        combinedLegs.push(...route.legs);
+                    }
+                }
+            } catch (e) {
+                console.warn("⚠️ Erro no lote Mapbox Directions:", e);
+            }
+
+            idx += (chunk.length - 1);
+        }
+
+        if (combinedCoordinates.length > 0) {
+            return {
+                geometry: {
+                    type: 'LineString',
+                    coordinates: combinedCoordinates
+                },
+                distance: combinedDistance,
+                duration: combinedDuration,
+                legs: combinedLegs
+            };
+        }
+
+        return null;
+    }
+
     function construirUrlGoogleMapsRota(sequencia) {
         if (!sequencia || sequencia.length === 0) return '#';
         
-        const p1 = sequencia[0];
+        // Deduplica coordenadas idênticas consecutivas para evitar poluição da URL do Google Maps
+        const seqUnica = [];
+        sequencia.forEach(p => {
+            const ult = seqUnica[seqUnica.length - 1];
+            if (!ult || Math.abs(ult.lat - p.lat) > 0.00001 || Math.abs(ult.lng - p.lng) > 0.00001) {
+                seqUnica.push(p);
+            }
+        });
+
+        const p1 = seqUnica[0];
         const origin = `${p1.lat},${p1.lng}`;
 
-        const pN = sequencia[sequencia.length - 1];
+        const pN = seqUnica[seqUnica.length - 1];
         const destination = `${pN.lat},${pN.lng}`;
 
         let waypointsStr = '';
-        if (sequencia.length > 2) {
-            const intermediarios = sequencia.slice(1, sequencia.length - 1);
+        if (seqUnica.length > 2) {
+            const intermediarios = seqUnica.slice(1, seqUnica.length - 1);
             waypointsStr = intermediarios.map(p => `${p.lat},${p.lng}`).join('|');
         }
 
@@ -3378,27 +3572,46 @@
     var markersArrowsOperador = [];
     var animAnimationFrameId = null;
 
-    function formatarDataBR(val) {
+    function formatarDataBR(val, shortYear = false) {
         if (!val) return '';
         if (typeof val === 'string' && val.includes('-')) {
             const parts = val.split('T')[0].split('-');
             if (parts.length === 3 && parts[0].length === 4) {
-                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+                const yearStr = shortYear ? parts[0].slice(-2) : parts[0];
+                return `${parts[2]}/${parts[1]}/${yearStr}`;
             }
         }
         const d = new Date(val);
         if (isNaN(d.getTime())) return String(val);
         const dd = String(d.getDate()).padStart(2, '0');
         const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const yyyy = d.getFullYear();
-        return `${dd}/${mm}/${yyyy}`;
+        const yyyy = String(d.getFullYear());
+        const yearStr = shortYear ? yyyy.slice(-2) : yyyy;
+        return `${dd}/${mm}/${yearStr}`;
     }
 
     function aoAtualizarDataBRInput() {
         const inpDate = document.getElementById('inputDataRotaOperador');
         const inpDisp = document.getElementById('inputDataRotaOperadorDisplay');
         if (inpDate && inpDisp) {
-            inpDisp.value = inpDate.value ? formatarDataBR(inpDate.value) : '';
+            inpDisp.value = inpDate.value ? formatarDataBR(inpDate.value, true) : '';
+        }
+    }
+
+    function abrirCalendarioRotaOperador() {
+        const inpDate = document.getElementById('inputDataRotaOperador');
+        if (inpDate) {
+            if (typeof inpDate.showPicker === 'function') {
+                try {
+                    inpDate.showPicker();
+                } catch(e) {
+                    inpDate.focus();
+                    inpDate.click();
+                }
+            } else {
+                inpDate.focus();
+                inpDate.click();
+            }
         }
     }
 
@@ -3412,51 +3625,58 @@
     }
 
     function obterNomeOperadorOS(os, m) {
-        // 1. Prioridade absoluta: Quem FINALIZOU / CONCLUIU a OS
+        const cleanVal = (v) => {
+            const s = String(v || '').trim();
+            if (!s) return '';
+            const lower = s.toLowerCase();
+            const invalidos = [
+                'null', 'undefined', '---', 'técnico responsável', 'tecnico responsavel', 
+                'técnico', 'tecnico', 'não informado', 'nao informado', 'pendente finalização', 
+                'sistema', 'aprovada', 'reprovada', 'pendente', 'em análise', 'em analise', 
+                'divergente', 'sem alteração', 'sem alteracao', 'ok'
+            ];
+            if (invalidos.includes(lower)) return '';
+            return s;
+        };
+
+        // Prioridade absoluta: Operador que FINALIZOU / CONCLUIU a OS (operador_finalizacao / usuario_finalizacao)
         const finalizacaoCandidatos = [
             m?.operadorFinalizacao,
-            m?.audit?.usuario_finalizacao,
-            (m?.sessoesList && m.sessoesList.length > 0) ? m.sessoesList[m.sessoesList.length - 1].tecnico : null,
+            m?.rawRow?.operador_finalizacao,
+            m?.rawRow?.finalizado_por,
+            m?.rawRow?.usuario_finalizacao,
+            m?.rawRow?.operador_fechamento,
+            m?.rawRow?.fechado_por,
+            m?.rawRow?.usuario_conclusao,
+            os?.operadorFinalizacao,
             os?.operador_finalizacao,
             os?.finalizado_por,
             os?.usuario_finalizacao,
-            os?.fechado_por,
-            os?.usuario_conclusao,
-            os?.tecnico,
-            extrairOperadorDeTexto(m?.observacaoFinal || os?.observacao_final || os?.descricao || os?.observacao)
+            os?.operador_fechamento,
+            m?.audit?.usuario_finalizacao,
+            (m?.sessoesList && m.sessoesList.length > 0) ? m.sessoesList[m.sessoesList.length - 1].tecnico : null,
+            extrairOperadorDeTexto(m?.observacaoFinal || os?.observacao_final || os?.logs || os?.descricao || os?.observacao)
         ];
 
         for (let c of finalizacaoCandidatos) {
-            const s = String(c || '').trim();
-            if (s && s !== 'null' && s !== 'undefined' && s !== 'Técnico Responsável' && s !== 'Técnico' && s !== 'Não informado' && s !== 'Pendente finalização' && s !== 'Sistema') {
-                return s;
+            const s = cleanVal(c);
+            if (s) return s;
+        }
+
+        // Tenta buscar no array de pontos final
+        let ptsFin = m?.rawPontosFinal || os?.pontos_final;
+        if (typeof ptsFin === 'string') {
+            try { ptsFin = JSON.parse(ptsFin); } catch(e) {}
+        }
+        if (Array.isArray(ptsFin) && ptsFin.length > 0) {
+            for (let p of ptsFin) {
+                const ptOp = cleanVal(p?.operador_finalizacao || p?.finalizado_por || p?.usuario_finalizacao || p?.tecnico || p?.operador || p?.usuario);
+                if (ptOp) return ptOp;
             }
         }
 
-        // 2. Se a propriedade displayOperadorFinalizacao do modelo não for genérica
-        if (m && m.displayOperadorFinalizacao) {
-            const disp = String(m.displayOperadorFinalizacao).trim();
-            if (disp && disp !== 'null' && disp !== 'undefined' && disp !== 'Técnico Responsável' && disp !== 'Pendente finalização') {
-                return disp;
-            }
-        }
-
-        // 3. Fallback apenas se nenhuma finalização for encontrada
-        const fallbackCandidatos = [
-            os?.operador,
-            m?.operador,
-            m?.operadorAbertura,
-            os?.usuario_cadastro,
-            os?.user_email
-        ];
-        for (let c of fallbackCandidatos) {
-            const s = String(c || '').trim();
-            if (s && s !== 'null' && s !== 'undefined' && s !== 'Técnico Responsável' && s !== 'Técnico' && s !== 'Não informado' && s !== 'Pendente finalização' && s !== 'Sistema') {
-                return s;
-            }
-        }
-
-        return 'Técnico Responsável';
+        // NÃO considera operador de abertura nem operador de cadastro!
+        return '';
     }
 
     function togglePainelRotasOperador() {
@@ -3474,9 +3694,9 @@
 
             carregarOpcoesOperadoresRota();
 
-            // Configura a data atual como default se estiver vazio
+            // Configura a data padrão como HOJE
             const inpData = document.getElementById('inputDataRotaOperador');
-            if (inpData && !inpData.value) {
+            if (inpData) {
                 const hoje = new Date().toISOString().split('T')[0];
                 inpData.value = hoje;
             }
@@ -3500,15 +3720,35 @@
         const lista = dadosOSsAbertasCache || window.chamadosListCache || [];
         const operadoresSet = new Set();
 
-        lista.forEach(os => {
+        console.group('🔎 [Mapa.html] Diagnóstico do Seletor de Operadores de Rota');
+        console.log(`Analisando ${lista.length} registros no cache do mapa...`);
+
+        lista.forEach((os, idx) => {
             const m = os._originalModel || os;
+            const stNorm = m.normalizedStatus || (os.status || '').toLowerCase();
+            const isResolv = stNorm.includes('conclu') || stNorm.includes('resolv') || stNorm.includes('fechad');
+            
             const cleanOp = obterNomeOperadorOS(os, m);
-            if (cleanOp && cleanOp !== 'Técnico Responsável' && cleanOp !== 'Não informado' && cleanOp !== 'Pendente finalização' && cleanOp !== 'Técnico') {
-                operadoresSet.add(cleanOp);
+            
+            if (isResolv) {
+                console.log(`OS #${idx+1} [${os.protocolo || m.protocolo}] Status: ${os.status || m.rawStatus} | Operador Encontrado: "${cleanOp || 'Nenhum'}"`, {
+                    operadorFinalizacao_model: m.operadorFinalizacao,
+                    rawRow_operador_finalizacao: m.rawRow?.operador_finalizacao,
+                    rawRow_finalizado_por: m.rawRow?.finalizado_por,
+                    rawRow_usuario_finalizacao: m.rawRow?.usuario_finalizacao,
+                    os_operadorFinalizacao: os.operadorFinalizacao,
+                    rawRow_completo: m.rawRow
+                });
+                if (cleanOp) {
+                    operadoresSet.add(cleanOp);
+                }
             }
         });
 
         const operadoresArr = Array.from(operadoresSet).sort();
+        console.log('✅ Operadores únicos identificados para a lista:', operadoresArr);
+        console.groupEnd();
+
         const valorAtual = select.value;
 
         select.innerHTML = '<option value="ALL">Todos</option>';
@@ -3556,6 +3796,81 @@
         { name: 'Vermelho Rosado', line: '#f43f5e', casing: '#881337', dash: '#fecdd3', badgeBg: 'bg-rose-500/20', badgeText: 'text-rose-900', border: 'border-rose-500/40', hex: '#f43f5e' }
     ];
 
+    function extrairPontosCompletosOperadorOS(os, m) {
+        const pontosColetados = [];
+
+        // 1. Tenta extrair de m.pontosDetalhados (melhor fonte de informação detalhada por ponto)
+        const ptsDet = m?.pontosDetalhados;
+        if (ptsDet && Array.isArray(ptsDet) && ptsDet.length > 0) {
+            ptsDet.forEach((p, idx) => {
+                const coordStr = p.coordenadaFinal || p.coordenadaInicial;
+                const parsed = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordStr) : null;
+                let lat = parsed ? parsed.lat : null;
+                let lng = parsed ? parsed.lng : null;
+
+                // Fallback se este ponto específico estiver geocodificado em os.pontos
+                if ((lat === null || lng === null) && os.pontos && os.pontos[idx]) {
+                    lat = parseFloat(os.pontos[idx].lat);
+                    lng = parseFloat(os.pontos[idx].lng);
+                }
+
+                if (!isNaN(lat) && !isNaN(lng) && lat !== null && lng !== null) {
+                    const endText = p.enderecoFinal || p.enderecoInicial || (os.pontos && os.pontos[idx]?.endereco) || os.endereco || m.endereco || 'Araraquara, SP';
+                    const plqText = p.plaquetaFinal || p.plaquetaInicial || (os.pontos && os.pontos[idx]?.plaqueta) || '[---]';
+                    const probText = p.problemaEncontrado || p.problemaInicial || (os.pontos && os.pontos[idx]?.problema) || 'Outro';
+
+                    pontosColetados.push({
+                        pontoNumero: p.numero || (idx + 1),
+                        totalPontosOS: ptsDet.length,
+                        lat: lat,
+                        lng: lng,
+                        endereco: endText,
+                        plaqueta: plqText,
+                        problema: probText
+                    });
+                }
+            });
+        }
+
+        // 2. Se pontosDetalhados não gerou pontos válidos com lat/lng, usa a lista os.pontos
+        if (pontosColetados.length === 0 && os.pontos && Array.isArray(os.pontos) && os.pontos.length > 0) {
+            os.pontos.forEach((pt, idx) => {
+                const lat = parseFloat(pt.lat);
+                const lng = parseFloat(pt.lng);
+                if (!isNaN(lat) && !isNaN(lng) && lat !== null && lng !== null) {
+                    pontosColetados.push({
+                        pontoNumero: idx + 1,
+                        totalPontosOS: os.pontos.length,
+                        lat: lat,
+                        lng: lng,
+                        endereco: pt.endereco || os.endereco || 'Araraquara, SP',
+                        plaqueta: pt.plaqueta || '[---]',
+                        problema: pt.problema || 'Outro'
+                    });
+                }
+            });
+        }
+
+        // 3. Fallback final para dados gerais da OS
+        if (pontosColetados.length === 0) {
+            const coordRaw = m?.coordenadaReparo || m?.coordenadaInicial || os.coordenada;
+            const parsed = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordRaw) : null;
+            if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+                pontosColetados.push({
+                    pontoNumero: 1,
+                    totalPontosOS: 1,
+                    lat: parsed.lat,
+                    lng: parsed.lng,
+                    endereco: os.endereco || m?.endereco || 'Araraquara, SP',
+                    plaqueta: m?.plaquetaInicial || '[---]',
+                    problema: m?.problemaInicial || 'Outro'
+                });
+            }
+        }
+
+        return pontosColetados;
+    }
+
     async function calcularERenderizarRotaOperador() {
         const lista = dadosOSsAbertasCache || window.chamadosListCache || [];
         if (!lista || lista.length === 0) {
@@ -3581,7 +3896,12 @@
 
             const cleanOp = obterNomeOperadorOS(os, m);
 
-            if (opSelecionado !== 'ALL' && cleanOp !== opSelecionado) return;
+            // Se um operador específico foi selecionado (ex: "IGOR"),
+            // exige que a OS tenha sido finalizada por esse operador.
+            // Se "ALL" (Todos) estiver selecionado, inclui todas as OSs concluídas.
+            if (opSelecionado !== 'ALL') {
+                if (!cleanOp || cleanOp.toLowerCase() !== opSelecionado.toLowerCase()) return;
+            }
 
             const dataConc = m.dataConclusao || m.dataFechamento || m.dataAbertura || os.dataObjeto;
             if (dataSelecionadaStr && dataConc) {
@@ -3595,28 +3915,29 @@
                 }
             }
 
-            // Extrai coordenadas do ponto de finalização/reparo ou da OS principal
-            let lat = null, lng = null;
-            if (m.coordenadasReparoList && m.coordenadasReparoList.length > 0) {
-                lat = parseFloat(m.coordenadasReparoList[0].lat);
-                lng = parseFloat(m.coordenadasReparoList[0].lng);
-            } else if (os.pontos && os.pontos.length > 0) {
-                lat = parseFloat(os.pontos[0].lat);
-                lng = parseFloat(os.pontos[0].lng);
-            }
-
-            if (!isNaN(lat) && !isNaN(lng) && lat !== null && lng !== null) {
+            // Extrai TODOS os pontos da OS (suporte a protocolos multi-ponto com endereços diferentes)
+            const pontosOS = extrairPontosCompletosOperadorOS(os, m);
+            pontosOS.forEach(pt => {
                 concluidasDoOperador.push({
                     os: os,
                     model: m,
-                    lat: lat,
-                    lng: lng,
+                    lat: pt.lat,
+                    lng: pt.lng,
                     dataConclusao: dataConc ? new Date(dataConc) : new Date(0),
-                    operador: cleanOp || 'Técnico',
-                    endereco: os.pontos && os.pontos[0]?.endereco ? os.pontos[0].endereco : (os.endereco || m.endereco || 'Araraquara, SP')
+                    operador: cleanOp || '',
+                    pontoNumero: pt.pontoNumero,
+                    totalPontosOS: pt.totalPontosOS,
+                    endereco: pt.endereco,
+                    plaqueta: pt.plaqueta,
+                    problema: pt.problema
                 });
-            }
+            });
         });
+
+        console.group(`🚗 [Mapa.html] Diagnóstico de Renderização de Rota`);
+        console.log(`Filtro Selecionado: Operador="${opSelecionado}", Data="${dataSelecionadaStr}"`);
+        console.log(`Pontos de OSs Concluídas Filtados: ${concluidasDoOperador.length}`);
+        console.groupEnd();
 
         if (concluidasDoOperador.length === 0) {
             const dtBR = formatarDataBR(dataSelecionadaStr);
@@ -3625,20 +3946,33 @@
             return;
         }
 
-        // 2. Ordena cronologicamente por horário de conclusão
-        concluidasDoOperador.sort((a, b) => a.dataConclusao.getTime() - b.dataConclusao.getTime());
+        // 2. Ordena cronologicamente por horário de conclusão e sequência do ponto
+        concluidasDoOperador.sort((a, b) => {
+            const timeDiff = a.dataConclusao.getTime() - b.dataConclusao.getTime();
+            if (timeDiff !== 0) return timeDiff;
+            if (a.os.protocolo === b.os.protocolo) {
+                return (a.pontoNumero || 1) - (b.pontoNumero || 1);
+            }
+            return 0;
+        });
 
         // 2.1 Análise do tempo entre um ponto e outro (> 1 hora e meia = 90 min) para divisão de rotas
         const THRESHOLD_PAUSA_MS = 90 * 60 * 1000; // 1.5 horas (90 min)
         const segmentos = [];
         let segAtual = [];
 
+        let currentOSProtocol = null;
+        let osCounter = 0;
+
         concluidasDoOperador.forEach((pt, idx) => {
             pt.globalIdx = idx;
+
             if (idx === 0) {
                 pt.tempoIntervaloMs = 0;
                 pt.isNovoSegmento = true;
                 segAtual.push(pt);
+                currentOSProtocol = null;
+                osCounter = 0;
             } else {
                 const ptAnterior = concluidasDoOperador[idx - 1];
                 const diffMs = pt.dataConclusao.getTime() - ptAnterior.dataConclusao.getTime();
@@ -3648,11 +3982,21 @@
                     segmentos.push(segAtual);
                     segAtual = [pt];
                     pt.isNovoSegmento = true;
+                    // Reseta a contagem de OSs para o novo segmento (Rota X)
+                    currentOSProtocol = null;
+                    osCounter = 0;
                 } else {
                     pt.isNovoSegmento = false;
                     segAtual.push(pt);
                 }
             }
+
+            const protKey = String(pt.os?.protocolo || pt.os?.id || idx);
+            if (protKey !== currentOSProtocol) {
+                currentOSProtocol = protKey;
+                osCounter++;
+            }
+            pt.osStepNum = osCounter;
         });
         if (segAtual.length > 0) {
             segmentos.push(segAtual);
@@ -3682,31 +4026,37 @@
             const seg = segmentos[sIdx];
             if (seg.length >= 2) {
                 try {
-                    const coordsString = seg.map(p => `${p.lng},${p.lat}`).join(';');
-                    const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
-                    const resp = await fetch(directionsUrl);
-                    const data = await resp.json();
+                    // Filtra coordenadas idênticas consecutivas para evitar erros na Mapbox API (ex: múltiplos pontos no mesmo poste)
+                    const coordsFiltradas = [];
+                    seg.forEach(p => {
+                        const ult = coordsFiltradas[coordsFiltradas.length - 1];
+                        if (!ult || Math.abs(ult.lat - p.lat) > 0.00001 || Math.abs(ult.lng - p.lng) > 0.00001) {
+                            coordsFiltradas.push(p);
+                        }
+                    });
 
-                    if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
-                        const route = data.routes[0];
-                        seg.geometry = route.geometry;
-                        if (route.distance) {
-                            seg.distanciaKm = route.distance / 1000;
-                            distanciaTotalKm += seg.distanciaKm;
-                        }
-                        if (route.duration) {
-                            seg.duracaoMin = Math.round(route.duration / 60);
-                            duracaoEstimadaMin += seg.duracaoMin;
-                        }
-                        if (route.legs && Array.isArray(route.legs)) {
-                            route.legs.forEach((leg, legIdx) => {
-                                if (seg[legIdx + 1]) {
-                                    seg[legIdx + 1].trechoLeg = {
-                                        duracaoMin: leg.duration ? Math.round(leg.duration / 60) : 0,
-                                        distanciaKm: leg.distance ? parseFloat((leg.distance / 1000).toFixed(1)) : 0
-                                    };
-                                }
-                            });
+                    if (coordsFiltradas.length >= 2) {
+                        const routeResult = await obterGeometriaMapboxSegmento(coordsFiltradas);
+                        if (routeResult) {
+                            seg.geometry = routeResult.geometry;
+                            if (routeResult.distance) {
+                                seg.distanciaKm = routeResult.distance / 1000;
+                                distanciaTotalKm += seg.distanciaKm;
+                            }
+                            if (routeResult.duration) {
+                                seg.duracaoMin = Math.round(routeResult.duration / 60);
+                                duracaoEstimadaMin += seg.duracaoMin;
+                            }
+                            if (routeResult.legs && Array.isArray(routeResult.legs)) {
+                                routeResult.legs.forEach((leg, legIdx) => {
+                                    if (seg[legIdx + 1]) {
+                                        seg[legIdx + 1].trechoLeg = {
+                                            duracaoMin: leg.duration ? Math.round(leg.duration / 60) : 0,
+                                            distanciaKm: leg.distance ? parseFloat((leg.distance / 1000).toFixed(1)) : 0
+                                        };
+                                    }
+                                });
+                            }
                         }
                     }
                 } catch (err) {
@@ -3840,9 +4190,10 @@
         // Marcadores de Passos Numerados de Conclusão (①, ②, ③...) com cor do segmento
         const bounds = new mapboxgl.LngLatBounds();
         rota.sequencia.forEach((pt, idx) => {
-            const stepNum = (pt.globalIdx !== undefined) ? pt.globalIdx + 1 : idx + 1;
+            const stepNum = (pt.osStepNum !== undefined) ? pt.osStepNum : ((pt.globalIdx !== undefined) ? pt.globalIdx + 1 : idx + 1);
             const dataHoraStr = pt.dataConclusao ? pt.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '';
             const cor = pt.corSegmento || CORES_ROTAS_OPERADOR[0];
+            const pontoTag = (pt.totalPontosOS && pt.totalPontosOS > 1) ? ` (Pt #${pt.pontoNumero}/${pt.totalPontosOS})` : '';
 
             let tempoDecorridoTooltip = '';
             if (pt.isNovoSegmento && pt.globalIdx > 0 && pt.tempoIntervaloMs > 0) {
@@ -3867,7 +4218,7 @@
             el.innerHTML = stepNum;
             el.style.background = `linear-gradient(135deg, ${cor.casing} 0%, ${cor.line} 100%)`;
             el.style.boxShadow = `0 4px 14px ${cor.line}88`;
-            el.title = `[Rota ${pt.segmentoIndex + 1}] Conclusão #${stepNum}: OS #${pt.os.protocolo} (${dataHoraStr}${tempoDecorridoTooltip}) - ${pt.operador}`;
+            el.title = `[Rota ${pt.segmentoIndex + 1}] OS #${stepNum}${pontoTag}: Protocolo #${pt.os.protocolo} (${dataHoraStr}${tempoDecorridoTooltip})${pt.operador ? ' - ' + pt.operador : ''}`;
 
             el.onclick = (e) => {
                 e.stopPropagation();
@@ -3905,8 +4256,13 @@
         if (!container) return;
 
         const numRotas = rota.segmentos ? rota.segmentos.length : 1;
+        const totalOSsUnicas = (new Set(rota.sequencia.map(p => String(p.os?.protocolo || p.os?.id || '')))).size;
         if (elQtde) {
-            elQtde.innerText = `${rota.sequencia.length} OSs (${numRotas} Rota${numRotas > 1 ? 's' : ''})`;
+            if (rota.sequencia.length > totalOSsUnicas) {
+                elQtde.innerText = `${totalOSsUnicas} OSs (${rota.sequencia.length} Pontos • ${numRotas} Rota${numRotas > 1 ? 's' : ''})`;
+            } else {
+                elQtde.innerText = `${rota.sequencia.length} OSs (${numRotas} Rota${numRotas > 1 ? 's' : ''})`;
+            }
         }
         
         if (elDist) {
@@ -3938,7 +4294,7 @@
             listContainer.innerHTML = '';
             
             rota.sequencia.forEach((p, idx) => {
-                const stepNum = (p.globalIdx !== undefined) ? p.globalIdx + 1 : idx + 1;
+                const stepNum = (p.osStepNum !== undefined) ? p.osStepNum : ((p.globalIdx !== undefined) ? p.globalIdx + 1 : idx + 1);
                 const horaStr = p.dataConclusao ? p.dataConclusao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '--:--';
                 const cor = p.corSegmento || CORES_ROTAS_OPERADOR[0];
 
@@ -4026,15 +4382,16 @@
                         </span>
                         <div class="truncate w-full">
                             <div class="flex items-center justify-between gap-1 mb-0.5">
-                                <div class="flex items-center gap-1.5">
+                                <div class="flex items-center gap-1.5 flex-wrap">
                                     <span class="font-bold text-on-surface text-xs">#${p.os.protocolo}</span>
+                                    ${p.totalPontosOS && p.totalPontosOS > 1 ? `<span class="text-[9px] px-1.5 py-0.2 rounded bg-secondary/15 text-secondary font-bold" title="Ponto #${p.pontoNumero} de ${p.totalPontosOS} da OS">Pt #${p.pontoNumero}/${p.totalPontosOS}</span>` : ''}
                                     <span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-800 font-bold">⏰ ${horaStr}</span>
                                     <span class="text-[9px] px-1.5 py-0.2 rounded font-bold text-white" style="background-color: ${cor.line}">Rota ${p.segmentoIndex + 1}</span>
                                 </div>
                                 ${tempoDecorridoBadge}
                             </div>
                             <div class="flex items-center justify-between text-[10px] text-on-surface-variant">
-                                <p class="truncate text-on-surface-variant font-medium pr-1">${p.endereco}</p>
+                                <p class="truncate text-on-surface-variant font-medium pr-1">${p.endereco}${p.plaqueta && p.plaqueta !== '[---]' ? ' | Plq: ' + p.plaqueta : ''}</p>
                                 ${p.operador ? `<span class="font-bold flex-shrink-0" style="color: ${cor.line}">${p.operador}</span>` : ''}
                             </div>
                         </div>

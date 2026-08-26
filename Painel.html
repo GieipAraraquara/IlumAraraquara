@@ -18,6 +18,7 @@
     <script src="js/guards/authGuard.js?v=30"></script>
     <script src="js/domain/ChamadoModel.js?v=43"></script>
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
+    <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/controllers/PainelController.js?v=33"></script>
@@ -557,7 +558,7 @@
                                         <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
                                             <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Status</span>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
-                                                <input type="checkbox" id="status-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <input type="checkbox" id="status-filter-all" value="all" class="rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Todos os status</span>
                                             </label>
                                             <div class="border-t border-outline-variant/40 my-0.5"></div>
@@ -570,7 +571,7 @@
                                                 <span>Em andamento</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
-                                                <input type="checkbox" name="status-filter" value="concluida" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <input type="checkbox" name="status-filter" value="concluida" class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Concluída</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
@@ -1040,7 +1041,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1049,36 +1050,77 @@
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalJustificationInput = document.getElementById('modal-justification-input');
+        const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
 
         if (!modal || !modalBox) return;
 
-        modalTitle.textContent = title || 'Confirmar Ação';
-        modalMessage.innerHTML = message || 'Deseja prosseguir?';
-        modalIcon.textContent = icon || 'help';
-        modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
-        modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
-        modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        if (modalTitle) modalTitle.textContent = title || 'Confirmar Ação';
+        if (modalMessage) modalMessage.innerHTML = message || 'Deseja prosseguir?';
+        if (modalIcon) modalIcon.textContent = icon || 'help';
+        if (modalIconBg) modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
+        if (modalConfirmBtn) {
+            modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+            modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        }
 
-        const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
         if (justificationContainer) {
             if (showJustification === false) {
                 justificationContainer.classList.add('hidden');
             } else {
                 justificationContainer.classList.remove('hidden');
             }
+
+            const labelBadge = justificationContainer.querySelector('label span');
+            if (labelBadge) {
+                if (requireJustification) {
+                    labelBadge.textContent = '(Obrigatório)';
+                    labelBadge.className = 'text-xs text-rose-600 font-bold ml-1';
+                } else {
+                    labelBadge.textContent = '(Opcional)';
+                    labelBadge.className = 'text-xs opacity-60 font-normal ml-1';
+                }
+            }
+
+            let errorMsg = justificationContainer.querySelector('.modal-justification-error');
+            if (!errorMsg) {
+                errorMsg = document.createElement('p');
+                errorMsg.className = 'modal-justification-error text-[11px] text-rose-600 font-semibold mt-1 hidden flex items-center gap-1';
+                errorMsg.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span><span>Por favor, informe a justificativa para prosseguir.</span>';
+                justificationContainer.appendChild(errorMsg);
+            }
+            errorMsg.classList.add('hidden');
         }
 
         if (modalJustificationInput) {
             modalJustificationInput.value = '';
+            modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            modalJustificationInput.oninput = () => {
+                const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                if (err) err.classList.add('hidden');
+                modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            };
         }
 
-        modalConfirmBtn.onclick = () => {
-            const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
-            if (typeof pendingActionCallback === 'function') {
-                pendingActionCallback(justification);
-            }
-            closeConfirmModal();
-        };
+        if (modalConfirmBtn) {
+            modalConfirmBtn.onclick = () => {
+                const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
+
+                if (requireJustification && showJustification !== false && !justification) {
+                    if (modalJustificationInput) {
+                        modalJustificationInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-300');
+                        modalJustificationInput.focus();
+                    }
+                    const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                    if (err) err.classList.remove('hidden');
+                    return;
+                }
+
+                if (typeof pendingActionCallback === 'function') {
+                    pendingActionCallback(justification);
+                }
+                closeConfirmModal();
+            };
+        }
 
         pendingActionCallback = onConfirm;
 
@@ -1105,14 +1147,6 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('modal-confirm-btn')?.addEventListener('click', () => {
-            const justification = document.getElementById('modal-justification-input')?.value.trim() || '';
-            if (typeof pendingActionCallback === 'function') {
-                pendingActionCallback(justification);
-            }
-            closeConfirmModal();
-        });
-
         // Initialize row lock state for rows loaded with Concluída
         document.querySelectorAll('#os-table tbody tr').forEach(row => {
             const badge = row.querySelector('.status-badge');
@@ -1197,7 +1231,8 @@
             iconBgClass: 'bg-rose-100 text-rose-700',
             confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
             confirmText: 'Cancelar OS',
-            onConfirm: async () => {
+            requireJustification: true,
+            onConfirm: async (justification) => {
                 try {
                     const repo = new window.ChamadosRepository();
                     await repo.updateStatus(protocol || osId, 'Cancelada');
@@ -1247,10 +1282,11 @@
             iconBgClass: 'bg-blue-100 text-blue-700',
             confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
             confirmText: 'Reverter',
-            onConfirm: async () => {
+            requireJustification: true,
+            onConfirm: async (justification) => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(protocol || osId, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta', justification);
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -1504,7 +1540,7 @@
     // Unified Filtering Logic (Date, Protocol, Status, Problema, and Search)
     (function() {
         let activeDatePredicate = null;
-        let activeStatusFilter = ['all'];
+        let activeStatusFilter = ['aberto', 'em_andamento', 'pendente', 'cancelada', 'rejeitada'];
         let activeProblemFilter = ['all'];
         let protocolSearchQuery = '';
         let searchQuery = '';
@@ -1845,7 +1881,7 @@
             // Indicators update
             [dateIndicator, pendentesDateIndicator].forEach(ind => ind?.classList.toggle('hidden', !activeDatePredicate));
             [protocolIndicator, pendentesProtocolIndicator].forEach(ind => ind?.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !currentPrefix));
-            [statusIndicator, pendentesStatusIndicator].forEach(ind => ind?.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 4));
+            [statusIndicator, pendentesStatusIndicator].forEach(ind => ind?.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 6));
             [problemIndicator, pendentesProblemIndicator].forEach(ind => ind?.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4));
         }
 

@@ -18,6 +18,7 @@
     <script src="js/guards/authGuard.js?v=30"></script>
     <script src="js/domain/ChamadoModel.js?v=43"></script>
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
+    <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script>window.isManutentorView = true;</script>
     <script src="js/services/ChamadosService.js?v=30"></script>
     <script src="js/services/MapService.js?v=73"></script>
@@ -869,7 +870,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -878,27 +879,77 @@
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalJustificationInput = document.getElementById('modal-justification-input');
+        const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
 
         if (!modal || !modalBox) return;
 
-        modalTitle.textContent = title || 'Confirmar Ação';
-        modalMessage.innerHTML = message || 'Deseja prosseguir?';
-        modalIcon.textContent = icon || 'help';
-        modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
-        modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
-        modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        if (modalTitle) modalTitle.textContent = title || 'Confirmar Ação';
+        if (modalMessage) modalMessage.innerHTML = message || 'Deseja prosseguir?';
+        if (modalIcon) modalIcon.textContent = icon || 'help';
+        if (modalIconBg) modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-primary/10 text-primary'}`;
+        if (modalConfirmBtn) {
+            modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+            modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        }
+
+        if (justificationContainer) {
+            if (showJustification === false) {
+                justificationContainer.classList.add('hidden');
+            } else {
+                justificationContainer.classList.remove('hidden');
+            }
+
+            const labelBadge = justificationContainer.querySelector('label span');
+            if (labelBadge) {
+                if (requireJustification) {
+                    labelBadge.textContent = '(Obrigatório)';
+                    labelBadge.className = 'text-xs text-rose-600 font-bold ml-1';
+                } else {
+                    labelBadge.textContent = '(Opcional)';
+                    labelBadge.className = 'text-xs opacity-60 font-normal ml-1';
+                }
+            }
+
+            let errorMsg = justificationContainer.querySelector('.modal-justification-error');
+            if (!errorMsg) {
+                errorMsg = document.createElement('p');
+                errorMsg.className = 'modal-justification-error text-[11px] text-rose-600 font-semibold mt-1 hidden flex items-center gap-1';
+                errorMsg.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span><span>Por favor, informe a justificativa para prosseguir.</span>';
+                justificationContainer.appendChild(errorMsg);
+            }
+            errorMsg.classList.add('hidden');
+        }
 
         if (modalJustificationInput) {
             modalJustificationInput.value = '';
+            modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            modalJustificationInput.oninput = () => {
+                const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                if (err) err.classList.add('hidden');
+                modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+            };
         }
 
-        modalConfirmBtn.onclick = () => {
-            const justification = modalJustificationInput ? modalJustificationInput.value.trim() : '';
-            if (typeof pendingActionCallback === 'function') {
-                pendingActionCallback(justification);
-            }
-            closeConfirmModal();
-        };
+        if (modalConfirmBtn) {
+            modalConfirmBtn.onclick = () => {
+                const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
+
+                if (requireJustification && showJustification !== false && !justification) {
+                    if (modalJustificationInput) {
+                        modalJustificationInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-300');
+                        modalJustificationInput.focus();
+                    }
+                    const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                    if (err) err.classList.remove('hidden');
+                    return;
+                }
+
+                if (typeof pendingActionCallback === 'function') {
+                    pendingActionCallback(justification);
+                }
+                closeConfirmModal();
+            };
+        }
 
         pendingActionCallback = onConfirm;
 
@@ -906,7 +957,7 @@
         setTimeout(() => {
             modalBox.classList.remove('scale-95', 'opacity-0');
             modalBox.classList.add('scale-100', 'opacity-100');
-            if (modalJustificationInput) modalJustificationInput.focus();
+            if (showJustification !== false && modalJustificationInput) modalJustificationInput.focus();
         }, 10);
     };
 
@@ -925,14 +976,6 @@
     };
 
     document.addEventListener('DOMContentLoaded', () => {
-        document.getElementById('modal-confirm-btn')?.addEventListener('click', () => {
-            const justification = document.getElementById('modal-justification-input')?.value.trim() || '';
-            if (typeof pendingActionCallback === 'function') {
-                pendingActionCallback(justification);
-            }
-            closeConfirmModal();
-        });
-
         // Initialize row lock state for rows loaded with Concluída
         document.querySelectorAll('#os-table tbody tr').forEach(row => {
             const badge = row.querySelector('.status-badge');
@@ -1009,6 +1052,7 @@
             iconBgClass: 'bg-rose-100 text-rose-700',
             confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
             confirmText: 'Rejeitar OS',
+            requireJustification: true,
             onConfirm: async (justification) => {
                 try {
                     const repo = new window.ChamadosRepository();
@@ -1059,10 +1103,11 @@
             iconBgClass: 'bg-blue-100 text-blue-700',
             confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
             confirmText: 'Reverter',
-            onConfirm: async () => {
+            requireJustification: true,
+            onConfirm: async (justification) => {
                 try {
                     const repo = new window.ChamadosRepository();
-                    await repo.updateStatus(protocol || osId, 'Aberta');
+                    await repo.updateStatus(protocol || osId, 'Aberta', justification);
                     if (window.painelController && typeof window.painelController.loadData === 'function') {
                         window.painelController.loadData();
                     } else {
@@ -1866,72 +1911,7 @@
     })();
 </script>
 
-<!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->
-<div id="confirm-modal" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
-    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
-        <div class="flex items-start gap-4">
-            <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700">
-                <span id="modal-icon" class="material-symbols-outlined text-[24px]">check</span>
-            </div>
-            <div class="flex-1">
-                <h3 id="modal-title" class="text-title-md font-title-md font-bold text-on-surface mb-1">Confirmar Ação</h3>
-                <p id="modal-message" class="text-body-md text-on-surface-variant leading-relaxed">Deseja prosseguir com essa alteração de status?</p>
-            </div>
-        </div>
-        
-        <!-- Campo de Justificativa / Observação -->
-        <div class="mt-4">
-            <label for="modal-justification-input" class="block text-label-sm font-medium text-on-surface-variant mb-1.5">
-                Justificativa / Observação <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
-            </label>
 
-            <textarea id="modal-justification-input" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors text-xs" placeholder="Informe o motivo ou observação sobre esta alteração..."></textarea>
-
-            <!-- Botões de Mensagens Padrão (Quick Presets) -->
-            <div class="mt-2.5">
-                <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
-                    <span class="material-symbols-outlined text-[14px] text-primary">chat_bubble_outline</span>
-                    <span>Mensagens Padrão:</span>
-                </div>
-                <div class="flex flex-wrap gap-1.5">
-                    <button type="button" 
-                            onclick="setModalJustification('Identificada duplicidade de protocolo.')" 
-                            title="Identificada duplicidade de protocolo."
-                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
-                        <span>Identificada duplicidade</span>
-                    </button>
-                    <button type="button" 
-                            onclick="setModalJustification('Resolvido em outro protocolo.')" 
-                            title="Resolvido em outro protocolo."
-                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
-                        <span>Resolvido em outro protocolo</span>
-                    </button>
-                    <button type="button" 
-                            onclick="setModalJustification('Atendimento cancelado pela equipe.')" 
-                            title="Atendimento cancelado pela equipe."
-                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
-                        <span>Cancelado pela equipe</span>
-                    </button>
-                    <button type="button" 
-                            onclick="setModalJustification('Endereço não localizado.')" 
-                            title="Endereço não localizado."
-                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
-                        <span>Endereço não localizado</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-6 flex items-center justify-end gap-3">
-            <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
-                Cancelar
-            </button>
-            <button id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer">
-                Confirmar
-            </button>
-        </div>
-    </div>
-</div>
 
 <!-- Modal de Abertura de Nova Ordem de Serviço -->
 <div id="modal-abertura-os" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
