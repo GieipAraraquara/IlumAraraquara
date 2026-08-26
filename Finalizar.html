@@ -466,8 +466,9 @@
                                id="inputMaterial" 
                                placeholder="Digite para buscar material..." 
                                autocomplete="off" 
-                               oninput="filtrarMateriais()" 
+                               oninput="filtrarMateriais(); removerErroInputMaterial('inputMaterial');" 
                                onclick="mostrarTodosMateriais()"
+                               onfocus="mostrarTodosMateriais()"
                                class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-900 transition-all" />
                         <div id="dropdownMateriais" class="dropdown-lista"></div>
                     </div>
@@ -671,8 +672,9 @@
                                    id="inputMaterialPraca" 
                                    placeholder="Digite para buscar material..." 
                                    autocomplete="off" 
-                                   oninput="filtrarMateriaisPraca()" 
+                                   oninput="filtrarMateriaisPraca(); removerErroInputMaterial('inputMaterialPraca');" 
                                    onclick="mostrarTodosMateriaisPraca()"
+                                   onfocus="mostrarTodosMateriaisPraca()"
                                    class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-900 transition-all" />
                             <div id="dropdownMateriaisPraca" class="dropdown-lista"></div>
                         </div>
@@ -805,6 +807,36 @@
             <button type="button" onclick="fecharModalAlertaValidacao()" class="w-full py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-sm rounded-xl transition-all shadow-sm">
                 Entendido
             </button>
+        </div>
+    </div>
+
+    <!-- MODAL ALERTA MATERIAL DIGITADO NÃO ADICIONADO -->
+    <div id="modalMaterialPendente" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[99999] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl p-6 shadow-2xl max-w-md w-full text-center space-y-4 border border-slate-100">
+            <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                <span class="material-symbols-outlined text-3xl">inventory_2</span>
+            </div>
+            <h3 class="text-base font-bold text-slate-900">Item Não Adicionado</h3>
+            <div class="text-xs text-slate-600 leading-relaxed text-left bg-amber-50/80 p-3.5 rounded-xl border border-amber-200 space-y-2">
+                <p>
+                    Você digitou <strong id="txtNomeMaterialPendente" class="text-amber-900 font-bold">"XXX"</strong> no campo de material, mas <strong class="text-slate-900">não clicou em "Adicionar"</strong> para incluí-lo na lista.
+                </p>
+                <p class="text-slate-500">
+                    Deseja voltar para adicionar o item ou prosseguir com a finalização sem ele?
+                </p>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-end gap-2.5 pt-1">
+                <button type="button" 
+                        onclick="fecharModalMaterialPendente(false)" 
+                        class="w-full sm:w-auto px-4 py-2.5 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer">
+                    Voltar e Adicionar
+                </button>
+                <button type="button" 
+                        onclick="fecharModalMaterialPendente(true)" 
+                        class="w-full sm:w-auto px-5 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer">
+                    Prosseguir Sem Adicionar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -1639,7 +1671,14 @@
         });
       }
 
-      function mostrarTodosMateriais() { renderListaMateriais(opcoesMateriais, 'dropdownMateriais', 'inputMaterial'); }
+      function mostrarTodosMateriais() {
+        var val = document.getElementById('inputMaterial')?.value.toLowerCase().trim();
+        if (val) {
+          filtrarMateriais();
+        } else {
+          renderListaMateriais(opcoesMateriais, 'dropdownMateriais', 'inputMaterial');
+        }
+      }
       function filtrarMateriais() {
         var val = document.getElementById('inputMaterial').value.toLowerCase().trim();
         var list = opcoesMateriais.filter(function(i) {
@@ -1649,7 +1688,14 @@
         renderListaMateriais(list, 'dropdownMateriais', 'inputMaterial');
       }
 
-      function mostrarTodosMateriaisPraca() { renderListaMateriais(opcoesMateriais, 'dropdownMateriaisPraca', 'inputMaterialPraca'); }
+      function mostrarTodosMateriaisPraca() {
+        var val = document.getElementById('inputMaterialPraca')?.value.toLowerCase().trim();
+        if (val) {
+          filtrarMateriaisPraca();
+        } else {
+          renderListaMateriais(opcoesMateriais, 'dropdownMateriaisPraca', 'inputMaterialPraca');
+        }
+      }
       function filtrarMateriaisPraca() {
         var val = document.getElementById('inputMaterialPraca').value.toLowerCase().trim();
         var list = opcoesMateriais.filter(function(i) {
@@ -1657,6 +1703,82 @@
           return texto.toLowerCase().includes(val);
         });
         renderListaMateriais(list, 'dropdownMateriaisPraca', 'inputMaterialPraca');
+      }
+
+      // -------------------------------------------------------------------------
+      // HELPER DE VALIDAÇÃO E ERRO DE MATERIAIS
+      // -------------------------------------------------------------------------
+      function eMaterialValido(nome) {
+        if (!nome || !opcoesMateriais || opcoesMateriais.length === 0) return false;
+        var nomeNorm = nome.trim().toLowerCase();
+        return opcoesMateriais.some(function(item) {
+          var valStr = (typeof item === 'object') ? (item.valor || item.nome || item.material || '') : String(item);
+          return valStr.trim().toLowerCase() === nomeNorm;
+        });
+      }
+
+      function aplicarErroInputMaterial(inputId) {
+        var el = document.getElementById(inputId);
+        if (!el) return;
+        el.classList.add('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-500', 'text-red-900');
+        el.classList.remove('border-slate-300', 'bg-slate-50', 'focus:ring-blue-600', 'focus:ring-emerald-600');
+      }
+
+      function removerErroInputMaterial(inputId) {
+        var el = document.getElementById(inputId);
+        if (!el) return;
+        el.classList.remove('border-red-500', 'bg-red-50', 'ring-2', 'ring-red-500', 'text-red-900');
+        el.classList.add('border-slate-300', 'bg-slate-50');
+      }
+
+      var callbackProsseguirSemMaterialPendente = null;
+      var inputIdMaterialPendenteFocus = null;
+      var submeterSemMaterialPendenteViaria = false;
+      var submeterSemMaterialPendentePraca = false;
+
+      function checarEMostrarMaterialPendente(inputId, callbackProsseguir) {
+        var el = document.getElementById(inputId);
+        var val = el ? el.value.trim() : '';
+        if (val !== '') {
+          document.getElementById('txtNomeMaterialPendente').innerText = '"' + val + '"';
+          callbackProsseguirSemMaterialPendente = callbackProsseguir;
+          inputIdMaterialPendenteFocus = inputId;
+          document.getElementById('modalMaterialPendente').classList.remove('hidden');
+          return true;
+        }
+        return false;
+      }
+
+      function fecharModalMaterialPendente(prosseguir) {
+        document.getElementById('modalMaterialPendente').classList.add('hidden');
+        if (prosseguir) {
+          if (inputIdMaterialPendenteFocus) {
+            var el = document.getElementById(inputIdMaterialPendenteFocus);
+            if (el) el.value = '';
+          }
+          if (typeof callbackProsseguirSemMaterialPendente === 'function') {
+            var cb = callbackProsseguirSemMaterialPendente;
+            callbackProsseguirSemMaterialPendente = null;
+            cb();
+          }
+        } else {
+          // Voltar e Adicionar
+          if (inputIdMaterialPendenteFocus) {
+            var el = document.getElementById(inputIdMaterialPendenteFocus);
+            if (el) {
+              el.focus();
+              if (inputIdMaterialPendenteFocus === 'inputMaterial') {
+                mostrarTodosMateriais();
+              } else {
+                mostrarTodosMateriaisPraca();
+              }
+              if (!eMaterialValido(el.value.trim())) {
+                aplicarErroInputMaterial(inputIdMaterialPendenteFocus);
+              }
+            }
+          }
+          callbackProsseguirSemMaterialPendente = null;
+        }
       }
 
       function renderListaMateriais(lista, dropdownId, inputId) {
@@ -1673,6 +1795,7 @@
           d.onclick = function(e) {
             e.stopPropagation();
             document.getElementById(inputId).value = valStr;
+            removerErroInputMaterial(inputId);
             drop.style.display = 'none';
           };
           drop.appendChild(d);
@@ -1687,10 +1810,21 @@
         var qtd = parseFloat(inputQtd.value);
 
         if (!nome || isNaN(qtd) || qtd <= 0) {
-          alert('Por favor, informe um material e quantidade válida.');
+          aplicarErroInputMaterial('inputMaterial');
+          exibirModalAlertaValidacao('Material Obrigatório', 'Por favor, informe um material e quantidade válida.');
           return;
         }
 
+        if (!eMaterialValido(nome)) {
+          aplicarErroInputMaterial('inputMaterial');
+          exibirModalAlertaValidacao(
+            'Material Não Encontrado na Lista',
+            'O item "' + nome + '" não consta na lista oficial de materiais.\n\nPor favor, escolha uma das opções sugeridas ao digitar no campo.'
+          );
+          return;
+        }
+
+        removerErroInputMaterial('inputMaterial');
         carrinhoMateriais.push({ nome: nome, qtd: qtd });
         inputMat.value = '';
         inputQtd.value = '1';
@@ -1728,10 +1862,21 @@
         var qtd = parseFloat(inputQtd.value);
 
         if (!nome || isNaN(qtd) || qtd <= 0) {
-          alert('Por favor, informe um material e quantidade válida.');
+          aplicarErroInputMaterial('inputMaterialPraca');
+          exibirModalAlertaValidacao('Material Obrigatório', 'Por favor, informe um material e quantidade válida.');
           return;
         }
 
+        if (!eMaterialValido(nome)) {
+          aplicarErroInputMaterial('inputMaterialPraca');
+          exibirModalAlertaValidacao(
+            'Material Não Encontrado na Lista',
+            'O item "' + nome + '" não consta na lista oficial de materiais.\n\nPor favor, escolha uma das opções sugeridas ao digitar no campo.'
+          );
+          return;
+        }
+
+        removerErroInputMaterial('inputMaterialPraca');
         carrinhoMateriaisPraca.push({ nome: nome, qtd: qtd });
         inputMat.value = '';
         inputQtd.value = '1';
@@ -1777,6 +1922,16 @@
       // ENVIO E FINALIZAÇÃO DE OS VIÁRIA NO SUPABASE
       // =========================================================================
       async function validarEEnviar() {
+        if (!submeterSemMaterialPendenteViaria) {
+          if (checarEMostrarMaterialPendente('inputMaterial', function() {
+            submeterSemMaterialPendenteViaria = true;
+            validarEEnviar();
+            submeterSemMaterialPendenteViaria = false;
+          })) {
+            return;
+          }
+        }
+
         var protInput = document.getElementById('protocolo');
         var prot = protInput ? protInput.value.trim().toUpperCase() : '';
         var dataReparo = document.getElementById('dataReparo').value.trim();
@@ -2502,6 +2657,16 @@
       }
 
       function executarAcaoSessaoPraca() {
+        if (!submeterSemMaterialPendentePraca) {
+          if (checarEMostrarMaterialPendente('inputMaterialPraca', function() {
+            submeterSemMaterialPendentePraca = true;
+            executarAcaoSessaoPraca();
+            submeterSemMaterialPendentePraca = false;
+          })) {
+            return;
+          }
+        }
+
         if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
           exibirModalAlertaValidacao("Protocolo Não Validado", "Busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
           return;
@@ -2530,6 +2695,16 @@
       }
 
       function executarConcluirPraca() {
+        if (!submeterSemMaterialPendentePraca) {
+          if (checarEMostrarMaterialPendente('inputMaterialPraca', function() {
+            submeterSemMaterialPendentePraca = true;
+            executarConcluirPraca();
+            submeterSemMaterialPendentePraca = false;
+          })) {
+            return;
+          }
+        }
+
         if (!dadosPracaAtual || !dadosPracaAtual.protocolo) {
           exibirModalAlertaValidacao("Protocolo Não Validado", "Busque e valide primeiro o protocolo da Ordem de Serviço da Praça.");
           return;
