@@ -75,23 +75,33 @@ window.PushNotificationService = {
             let userId = null;
             let role = 'admin';
 
-            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
-                const authData = window.AuthGuard._cachedAuthData;
-                userEmail = authData.user?.email || authData.profile?.email || userEmail;
-                userId = authData.user?.id || null;
-                role = window.AuthGuard.getUserRole(authData.user, authData.profile) || 'admin';
-            } else if (window.supabaseClient) {
-                const { data: { session } } = await window.supabaseClient.auth.getSession();
-                if (session && session.user) {
-                    userEmail = session.user.email;
-                    userId = session.user.id;
+            if (window.AuthGuard) {
+                if (!window.AuthGuard._cachedAuthData && typeof window.AuthGuard.requireAuth === 'function') {
+                    try { await window.AuthGuard.requireAuth(); } catch(e) {}
+                }
+                if (window.AuthGuard._cachedAuthData) {
+                    const authData = window.AuthGuard._cachedAuthData;
+                    userEmail = authData.user?.email || authData.profile?.email || userEmail;
+                    userId = authData.user?.id || null;
+                    role = window.AuthGuard.getUserRole(authData.user, authData.profile) || 'admin';
                 }
             }
-
-            // Se for explicitamente salvo em localStorage, usa de fallback
-            const localRole = localStorage.getItem('user_role');
-            if (localRole && (localRole.includes('admin') || localRole.includes('gestor'))) {
-                role = 'admin';
+            
+            if ((!role || role === 'operador') && window.supabaseClient) {
+                try {
+                    const { data: { session } } = await window.supabaseClient.auth.getSession();
+                    if (session && session.user) {
+                        userEmail = session.user.email || userEmail;
+                        userId = session.user.id;
+                        const { data: prof } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                        if (prof) {
+                            const candidateRole = prof.role || prof.cargo || prof.categoria || prof.tipo;
+                            if (candidateRole && candidateRole.toLowerCase().includes('admin')) {
+                                role = 'admin';
+                            }
+                        }
+                    }
+                } catch(e) {}
             }
 
             // Extract p256dh e auth keys
