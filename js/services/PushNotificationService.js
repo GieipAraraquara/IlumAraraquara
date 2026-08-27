@@ -156,6 +156,40 @@ window.PushNotificationService = {
     },
 
     /**
+     * Resolve a role/categoria do usuário autenticado no sistema
+     */
+    async getUserRole() {
+        let role = null;
+        if (window.AuthGuard) {
+            if (!window.AuthGuard._cachedAuthData && typeof window.AuthGuard.requireAuth === 'function') {
+                try { await window.AuthGuard.requireAuth(); } catch(e) {}
+            }
+            if (window.AuthGuard._cachedAuthData) {
+                const authData = window.AuthGuard._cachedAuthData;
+                role = window.AuthGuard.getUserRole(authData.user, authData.profile);
+            }
+        }
+        
+        if (!role && window.supabaseClient) {
+            try {
+                const { data: { session } } = await window.supabaseClient.auth.getSession();
+                if (session && session.user) {
+                    const { data: prof } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                    if (prof) {
+                        role = prof.role || prof.cargo || prof.categoria || prof.tipo;
+                    }
+                }
+            } catch(e) {}
+        }
+
+        const normalizedRole = (role || 'operador').toLowerCase();
+        if (normalizedRole.includes('admin') || normalizedRole === 'gestor') {
+            return 'admin';
+        }
+        return normalizedRole;
+    },
+
+    /**
      * Utilitário para adicionar o botão de notificação no painel do administrador
      */
     async initAdminNotificationButton(containerId = 'pushNotificationAdminBox') {
@@ -169,10 +203,22 @@ window.PushNotificationService = {
     }
 };
 
-// Auto-inicialização quando a autenticação estiver pronta
+// Auto-inicialização em qualquer página HTML do sistema (Apenas para Administradores)
 if (typeof window !== 'undefined') {
     const autoCheck = async () => {
-        if (window.PushNotificationService && window.PushNotificationService.getPermissionStatus() === 'granted') {
+        if (!window.PushNotificationService) return;
+
+        // Verifica se o usuário logado pertence à categoria admin
+        const role = await window.PushNotificationService.getUserRole();
+        if (role !== 'admin') {
+            console.log('ℹ️ [PushNotification] Usuário com role "' + role + '". Auto-prompt de notificação reservado para admins.');
+            return;
+        }
+
+        const status = window.PushNotificationService.getPermissionStatus();
+        
+        // Se a permissão for 'granted' ou 'default' (ainda não solicitada), solicita/renova automaticamente apenas para administradores
+        if (status === 'granted' || status === 'default') {
             await window.PushNotificationService.subscribeUser();
         }
     };
@@ -182,10 +228,10 @@ if (typeof window !== 'undefined') {
     });
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(autoCheck, 1500);
+        setTimeout(autoCheck, 1200);
     } else {
         document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(autoCheck, 1500);
+            setTimeout(autoCheck, 1200);
         });
     }
 }

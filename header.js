@@ -97,19 +97,13 @@ customElements.define('app-header', AppHeader);
 window.solicitarNotificacoesPush = async function(event) {
     if (event) event.stopPropagation();
     if (!window.PushNotificationService) {
-        alert('⚠️ Serviço de Notificações em carregamento. Por favor, tente novamente em instantes.');
         return;
     }
 
     const res = await window.PushNotificationService.subscribeUser();
     if (res.success) {
         alert(`🔔 Notificações Ativadas com Sucesso!\n\nEste dispositivo está registrado para receber notificações da categoria: ${(res.role || 'admin').toUpperCase()}`);
-    } else if (res.reason === 'permission_denied') {
-        alert('⚠️ A permissão para enviar notificações foi negada/bloqueada no seu navegador.\n\nPara receber notificações do sistema, clique no ícone de cadeado/configurações na barra de endereço do navegador e ative a permissão de "Notificações".');
-    } else if (res.reason === 'unsupported') {
-        alert('⚠️ Seu navegador ou dispositivo não possui suporte a Notificações Web Push.');
-    } else {
-        alert('⚠️ Não foi possível registrar este dispositivo para notificações.');
     }
+    // Caso o usuário recuse ou cancele, o processo é encerrado silenciosamente sem exibir alertas incômodos.
 };
 
