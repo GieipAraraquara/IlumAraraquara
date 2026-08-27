@@ -642,6 +642,34 @@
                     </button>
                 </div>
 
+                <!-- FOTOS DO ANDAMENTO DA PRAÇA (REGISTRO EM CAMPO / PROGRESSO) -->
+                <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-blue-600 text-[18px]">collections</span>
+                            <span>Fotos do Andamento / Evidências</span>
+                        </label>
+                        <span id="badgeCountFotosAndamentoPraca" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                            0 anexadas
+                        </span>
+                    </div>
+
+                    <div id="boxFotoAndamentoPraca">
+                        <input type="file" id="fotoAndamentoPraca" accept="image/*" capture="environment" multiple class="hidden" onchange="adicionarFotoAndamentoPraca(event)">
+                        <button type="button" 
+                                id="btnAnexarFotoAndamentoPraca"
+                                onclick="document.getElementById('fotoAndamentoPraca').click()"
+                                class="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-300 border-dashed rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                            <span class="material-symbols-outlined text-[20px] text-blue-600">add_a_photo</span>
+                            <span>Anexar Fotos do Andamento (Progresso em Campo)</span>
+                        </button>
+                    </div>
+
+                    <!-- PREVIEWS DAS FOTOS DO ANDAMENTO -->
+                    <div id="containerPreviewsAndamentoPraca" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                    </div>
+                </div>
+
                 <!-- GPS E MAPA DE LOCALIZAÇÃO DO TÉCNICO NA PRAÇA -->
                 <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
@@ -863,6 +891,63 @@
         return window.supabaseClient;
       }
 
+      async function carregarHistoricoFechamentosAnteriores(prot) {
+        var boxHist = document.getElementById('historicoFechamentosAnteriores');
+        var container = document.getElementById('listaFechamentosAnterioresContainer');
+        if (!boxHist || !container) return;
+
+        if (!prot || String(prot).trim() === '') {
+          boxHist.classList.add('hidden');
+          container.innerHTML = '';
+          return;
+        }
+
+        try {
+          var client = obterSupabaseClient();
+          if (!client) return;
+
+          const { data, error } = await client
+            .from('fechamentos_os')
+            .select('*')
+            .eq('protocolo', String(prot).toUpperCase().trim())
+            .order('numero_fechamento', { ascending: true });
+
+          if (error || !data || data.length === 0) {
+            boxHist.classList.add('hidden');
+            container.innerHTML = '';
+            return;
+          }
+
+          boxHist.classList.remove('hidden');
+          container.innerHTML = '';
+
+          data.forEach(function(f, idx) {
+            var dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : 'Data não registrada';
+            var numFech = f.numero_fechamento || f.numero || (idx + 1);
+            var matParsed = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : [];
+            var matStr = matParsed.length > 0 ? matParsed.join(', ') : 'Nenhum material informado';
+
+            var card = document.createElement('div');
+            card.className = "bg-white border border-amber-200 rounded-xl p-3 text-xs space-y-1.5 shadow-sm";
+            card.innerHTML = 
+              '<div class="flex items-center justify-between font-bold text-amber-900">' +
+                '<span>Fechamento #' + numFech + ' (' + (f.ponto_referencia || 'Original') + ')</span>' +
+                '<span class="text-[11px] font-normal text-slate-500">📅 ' + dataStr + ' | 👤 ' + (f.operador || 'Técnico') + '</span>' +
+              '</div>' +
+              '<div class="text-slate-700"><strong>Materiais Utilizados:</strong> ' + matStr + '</div>' +
+              (f.relatorio_tecnico ? '<div class="text-slate-600 italic">" ' + f.relatorio_tecnico + ' "</div>' : '');
+            
+            container.appendChild(card);
+          });
+
+        } catch(err) {
+          console.warn('⚠️ Erro ao carregar histórico de fechamentos:', err);
+        }
+      }
+
+      var debounceTimerProtocoloViaria = null;
+      // A função verificarEValidarProtocoloViaria principal é definida na seção de validações assíncronas do sistema
+
       // Lista Dinâmica de Materiais
       var opcoesMateriais = [];
       try {
@@ -883,6 +968,7 @@
       var dadosPracaAtual = null;
       var fotoEntradaPracaBase64 = null;
       var fotoEntradaPracaNome = "";
+      var fotosAndamentoPracaBase64Arr = [];
       var carrinhoMateriaisPraca = [];
       var mapPraca = null;
       var markerPraca = null;
@@ -932,6 +1018,7 @@
           dadosPracaAtual: dadosPracaAtual,
           fotoEntradaPracaBase64: fotoEntradaPracaBase64,
           fotoEntradaPracaNome: fotoEntradaPracaNome,
+          fotosAndamentoPracaBase64Arr: fotosAndamentoPracaBase64Arr,
           qtdEletricistaPraca: document.getElementById('qtdEletricistaPraca')?.value || 1,
           coordsGpsPracaAtual: coordsGpsPracaAtual,
           carrinhoMateriaisPraca: carrinhoMateriaisPraca
@@ -939,7 +1026,7 @@
 
         var temFotosViaria = Object.values(pontosData).some(p => p && p.fotosEstagios && Object.values(p.fotosEstagios).some(f => !!f));
         var temDadosViaria = draft.protocolo.trim() !== '' || draft.descricao.trim() !== '' || draft.carrinhoMateriais.length > 0 || temFotosViaria;
-        var temDadosPraca = draft.protocoloPraca.trim() !== '' || !!draft.fotoEntradaPracaBase64 || draft.carrinhoMateriaisPraca.length > 0;
+        var temDadosPraca = draft.protocoloPraca.trim() !== '' || !!draft.fotoEntradaPracaBase64 || (draft.fotosAndamentoPracaBase64Arr && draft.fotosAndamentoPracaBase64Arr.length > 0) || draft.carrinhoMateriaisPraca.length > 0;
 
         if (temDadosViaria || temDadosPraca) {
           await window.offlineSyncService.saveDraft('finalizar_draft', draft);
@@ -1066,6 +1153,11 @@
               fotoEntradaPracaNome = draft.fotoEntradaPracaNome || "foto_entrada.jpg";
               document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
               document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
+              restaurouAlgo = true;
+            }
+            if (draft.fotosAndamentoPracaBase64Arr && Array.isArray(draft.fotosAndamentoPracaBase64Arr) && draft.fotosAndamentoPracaBase64Arr.length > 0) {
+              fotosAndamentoPracaBase64Arr = draft.fotosAndamentoPracaBase64Arr;
+              renderizarPreviewsAndamentoPraca();
               restaurouAlgo = true;
             }
             if (draft.qtdEletricistaPraca && document.getElementById('qtdEletricistaPraca')) {
@@ -1390,6 +1482,15 @@
         if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0 && Math.abs(latVal) <= 90 && Math.abs(lngVal) <= 180) {
           container.classList.remove('hidden');
           if (typeof L !== 'undefined') {
+            if (mapsPontos[idx]) {
+              var domNode = mapsPontos[idx].getContainer ? mapsPontos[idx].getContainer() : null;
+              if (!domNode || domNode !== container || !document.body.contains(domNode)) {
+                try { mapsPontos[idx].remove(); } catch(e) {}
+                delete mapsPontos[idx];
+                delete markersPontos[idx];
+              }
+            }
+
             if (!mapsPontos[idx]) {
               mapsPontos[idx] = L.map('mapaCanvasPonto_' + idx).setView([latVal, lngVal], 17);
               L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -1399,7 +1500,9 @@
               markersPontos[idx] = L.marker([latVal, lngVal]).addTo(mapsPontos[idx]);
             } else {
               mapsPontos[idx].setView([latVal, lngVal], 17);
-              markersPontos[idx].setLatLng([latVal, lngVal]);
+              if (markersPontos[idx]) {
+                markersPontos[idx].setLatLng([latVal, lngVal]);
+              }
             }
             setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 100);
             setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 400);
@@ -1945,6 +2048,14 @@
           return;
         }
 
+        if (!dataReparo || dataReparo.trim().length < 10) {
+          exibirModalAlertaValidacao("Data do Reparo Obrigatória", "Para finalizar a Ordem de Serviço, é obrigatório preencher a Data do Reparo no formato DD/MM/AAAA.");
+          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ É obrigatório preencher a Data do Reparo.</span>';
+          var dtElem = document.getElementById('dataReparo');
+          if (dtElem) dtElem.focus();
+          return;
+        }
+
         // Validação obrigatória por ponto: Plaqueta (texto), Coordenadas GPS e 3 fotos de evidência
         var estagiosObrigatorios = ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'];
         var pontosComPendencia = [];
@@ -2108,7 +2219,22 @@
             protFinal = gerarNovoProtocoloEmergencial(prot); // ex: IP93T1Y200826-IGOR
           }
 
-          // Build pontos payload with Cloudinary upload for evidences
+          // 1. Obter contagem de fechamentos anteriores para taguamento de fotos e histórico acumulativo
+          var proximoNum = 1;
+          try {
+            const { data: existFech } = await client
+              .from('fechamentos_os')
+              .select('numero_fechamento')
+              .eq('protocolo', protFinal);
+
+            if (existFech && existFech.length > 0) {
+              proximoNum = Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1;
+            }
+          } catch(eFechCount) {
+            console.warn('⚠️ Não foi possível consultar fechamentos anteriores:', eFechCount);
+          }
+
+          // Build pontos payload com upload para Cloudinary com TAG de fechamento
           var arrPontosPayload = [];
           for (var i = 0; i < qtdAtual; i++) {
             var plaq = document.getElementById('plaqueta_' + i) ? document.getElementById('plaqueta_' + i).value.toUpperCase().trim() : '';
@@ -2125,18 +2251,21 @@
                 if (rawFoto) {
                   if (rawFoto.startsWith('http://') || rawFoto.startsWith('https://')) {
                     evidenciasUrls[estagio] = rawFoto;
-                  } else if (window.cloudinaryService) {
-                    btnTexto.innerText = `☁️ Enviando foto Ponto #${i + 1} (${estagio})...`;
-                    try {
-                      var nomeFoto = window.cloudinaryService.gerarNomePadraoFoto(protFinal, plaq, estagio);
-                      var cdnUrl = await window.cloudinaryService.uploadImage(rawFoto, 'viaria_fotos', nomeFoto);
-                      evidenciasUrls[estagio] = cdnUrl;
-                    } catch (uploadErr) {
-                      console.warn(`⚠️ Erro ao enviar foto do Ponto ${i + 1} para Cloudinary:`, uploadErr);
+                  } else {
+                    var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+                    if (cdnService) {
+                      btnTexto.innerText = `☁️ Enviando foto Ponto #${i + 1} (${estagio})...`;
+                      try {
+                        var nomeFoto = cdnService.gerarNomePadraoFoto(protFinal, plaq, estagio, proximoNum);
+                        var cdnUrl = await cdnService.uploadImage(rawFoto, 'viaria_fotos', nomeFoto);
+                        evidenciasUrls[estagio] = cdnUrl;
+                      } catch (uploadErr) {
+                        console.warn(`⚠️ Erro ao enviar foto do Ponto ${i + 1} para Cloudinary:`, uploadErr);
+                        evidenciasUrls[estagio] = rawFoto;
+                      }
+                    } else {
                       evidenciasUrls[estagio] = rawFoto;
                     }
-                  } else {
-                    evidenciasUrls[estagio] = rawFoto;
                   }
                 }
               }
@@ -2145,6 +2274,7 @@
             var ocrTexto = stObj.textoAuditoriaOCR || null;
 
             arrPontosPayload.push({
+              fechamento: proximoNum,
               ponto: i + 1,
               plaqueta: plaq,
               problema: prob,
@@ -2158,31 +2288,33 @@
           }
 
           var firstPoint = arrPontosPayload[0] || {};
-
           var nomeOperadorFinalizacao = obterNomeOperadorLogado();
-
           var ocrGeral = arrPontosPayload.map(p => p.texto_auditoria_ocr).filter(t => t && t !== "Nenhuma leitura realizada").join(' | ') || (firstPoint.texto_auditoria_ocr || null);
+
+          // Mesclar com pontos acumulados dos fechamentos anteriores (se existirem na OS)
+          var pontosFinalAcumulados = [...arrPontosPayload];
+          if (osAtual && osAtual.pontos_final) {
+            var existentes = [];
+            if (typeof osAtual.pontos_final === 'string') {
+              try { existentes = JSON.parse(osAtual.pontos_final); } catch(e) { existentes = []; }
+            } else if (Array.isArray(osAtual.pontos_final)) {
+              existentes = osAtual.pontos_final;
+            }
+            if (existentes.length > 0) {
+              pontosFinalAcumulados = [...existentes, ...arrPontosPayload];
+            }
+          }
 
           var payloadUpdate = {
             status: "Concluída",
             data_fechamento: new Date().toISOString(),
             operador_finalizacao: nomeOperadorFinalizacao,
-            usuario_finalizacao: nomeOperadorFinalizacao,
-            finalizado_por: nomeOperadorFinalizacao,
-            tecnico: nomeOperadorFinalizacao,
             materiais: carrinhoMateriais,
             descricao: document.getElementById('descricao').value.trim() || null,
-            pontos_final: arrPontosPayload,
+            pontos_final: pontosFinalAcumulados,
             status_auditoria: "Pendente",
             texto_auditoria_ocr: ocrGeral
           };
-
-          if (firstPoint.plaqueta) {
-            payloadUpdate.plaqueta_final = firstPoint.plaqueta;
-          }
-          if (firstPoint.coordenada || (firstPoint.lat && firstPoint.lng)) {
-            payloadUpdate.coordenada_reparo = firstPoint.coordenada || (firstPoint.lat + ', ' + firstPoint.lng);
-          }
 
           if (isDireto) {
             var dataAgora = new Date();
@@ -2263,6 +2395,26 @@
             }
           }
 
+          // Registo complementar na tabela fechamentos_os (para histórico sem sobrescrita)
+          try {
+            await client.from('fechamentos_os').insert([{
+              protocolo: protFinal,
+              os_id: osAtual ? String(osAtual.id) : null,
+              numero_fechamento: proximoNum,
+              ponto_referencia: arrPontosPayload.length > 1 ? (arrPontosPayload.length + ' Pontos') : (firstPoint.plaqueta ? ('Plaqueta ' + firstPoint.plaqueta) : 'Ponto 1'),
+              operador: nomeOperadorFinalizacao,
+              data_fechamento: new Date().toISOString(),
+              relatorio_tecnico: document.getElementById('descricao').value.trim() || null,
+              observacoes: document.getElementById('descricao').value.trim() || null,
+              texto_auditoria_ocr: ocrGeral,
+              materiais: carrinhoMateriais,
+              fotos: arrPontosPayload
+            }]);
+            console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
+          } catch(errFechInsert) {
+            console.warn('⚠️ Não foi possível salvar em fechamentos_os:', errFechInsert);
+          }
+
           if (window.offlineSyncService) {
             window.offlineSyncService.cacheOSRecord(protFinal, osAtual || payloadUpdate);
           }
@@ -2310,10 +2462,25 @@
         carrinhoMateriais = [];
         renderizarTabelaMateriais();
 
+        for (var k in mapsPontos) {
+          if (mapsPontos[k]) {
+            try { mapsPontos[k].remove(); } catch(e) {}
+          }
+        }
+        mapsPontos = {};
+        markersPontos = {};
+
+        if (mapPraca) {
+          try { mapPraca.remove(); } catch(e) {}
+          mapPraca = null;
+          markerPraca = null;
+        }
+
         qtdAtual = 0;
         pontosData = {};
         document.getElementById('pontosContainer').innerHTML = '';
         ajustarPontos();
+        limparFotosAndamentoPraca();
 
         if (window.offlineSyncService) {
           window.offlineSyncService.clearDraft('finalizar_draft');
@@ -2505,6 +2672,100 @@
         salvarRascunhoFinalizar();
       }
 
+      function adicionarFotoAndamentoPraca(event) {
+        var files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+        var pendingCount = files.length;
+
+        Array.from(files).forEach(function(file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var rawBase64 = e.target.result;
+            
+            if (cdnService && typeof cdnService.compressImage === 'function') {
+              cdnService.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
+                fotosAndamentoPracaBase64Arr.push(compressedBase64 || rawBase64);
+                pendingCount--;
+                if (pendingCount === 0) {
+                  renderizarPreviewsAndamentoPraca();
+                  salvarRascunhoFinalizar();
+                }
+              }).catch(function(err) {
+                console.warn('⚠️ Compressão de foto do andamento falhou:', err);
+                fotosAndamentoPracaBase64Arr.push(rawBase64);
+                pendingCount--;
+                if (pendingCount === 0) {
+                  renderizarPreviewsAndamentoPraca();
+                  salvarRascunhoFinalizar();
+                }
+              });
+            } else {
+              fotosAndamentoPracaBase64Arr.push(rawBase64);
+              pendingCount--;
+              if (pendingCount === 0) {
+                renderizarPreviewsAndamentoPraca();
+                salvarRascunhoFinalizar();
+              }
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+
+        event.target.value = "";
+      }
+
+      function removerFotoAndamentoPraca(index) {
+        if (index >= 0 && index < fotosAndamentoPracaBase64Arr.length) {
+          fotosAndamentoPracaBase64Arr.splice(index, 1);
+          renderizarPreviewsAndamentoPraca();
+          salvarRascunhoFinalizar();
+        }
+      }
+
+      function limparFotosAndamentoPraca() {
+        fotosAndamentoPracaBase64Arr = [];
+        var fileEl = document.getElementById('fotoAndamentoPraca');
+        if (fileEl) fileEl.value = "";
+        renderizarPreviewsAndamentoPraca();
+      }
+
+      function renderizarPreviewsAndamentoPraca() {
+        var container = document.getElementById('containerPreviewsAndamentoPraca');
+        var badge = document.getElementById('badgeCountFotosAndamentoPraca');
+        if (!container) return;
+
+        var count = fotosAndamentoPracaBase64Arr.length;
+        if (badge) {
+          badge.innerText = count === 1 ? '1 anexada' : count + ' anexadas';
+          badge.className = count > 0 
+            ? 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200'
+            : 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600';
+        }
+
+        if (count === 0) {
+          container.innerHTML = '';
+          container.classList.add('hidden');
+          return;
+        }
+
+        container.classList.remove('hidden');
+        container.innerHTML = fotosAndamentoPracaBase64Arr.map(function(b64, idx) {
+          return `
+            <div class="relative group bg-slate-900 border border-slate-200 rounded-xl overflow-hidden shadow-2xs aspect-video">
+              <img src="${b64}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
+              <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-1.5">
+                <span class="text-[10px] font-bold text-white">#${idx + 1}</span>
+                <button type="button" onclick="removerFotoAndamentoPraca(${idx})" class="p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md shadow-xs transition-colors flex items-center justify-center">
+                  <span class="material-symbols-outlined text-[14px]">delete</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
       function travarControleQtdEletricista(travar) {
         var el = document.getElementById('qtdEletricistaPraca');
         var btnMinus = document.getElementById('btnQtdMinusPraca');
@@ -2557,6 +2818,16 @@
           if (typeof L !== 'undefined') {
             var latNum = parseFloat(lat);
             var lngNum = parseFloat(lng);
+            var containerPraca = document.getElementById('mapaCanvasPraca');
+            if (mapPraca) {
+              var pracaDomNode = mapPraca.getContainer ? mapPraca.getContainer() : null;
+              if (!pracaDomNode || pracaDomNode !== containerPraca || !document.body.contains(pracaDomNode)) {
+                try { mapPraca.remove(); } catch(e) {}
+                mapPraca = null;
+                markerPraca = null;
+              }
+            }
+
             if (!mapPraca) {
               mapPraca = L.map('mapaCanvasPraca').setView([latNum, lngNum], 17);
               L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -2566,7 +2837,7 @@
               markerPraca = L.marker([latNum, lngNum]).addTo(mapPraca);
             } else {
               mapPraca.setView([latNum, lngNum], 17);
-              markerPraca.setLatLng([latNum, lngNum]);
+              if (markerPraca) markerPraca.setLatLng([latNum, lngNum]);
             }
             setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 100);
             setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
@@ -2762,22 +3033,48 @@
         try {
           var statusFinal = (novoStatus === "Concluído" || novoStatus === "Concluida" || novoStatus === "Resolvida") ? "Concluída" : novoStatus;
 
-          // Upload da foto capturada para Cloudinary
+          // Upload da foto capturada (Entrada / Saída) para Cloudinary
           var fotoEntradaUrl = null;
           if (fotoEntradaPracaBase64) {
             if (fotoEntradaPracaBase64.startsWith('http://') || fotoEntradaPracaBase64.startsWith('https://')) {
               fotoEntradaUrl = fotoEntradaPracaBase64;
-            } else if (window.cloudinaryService) {
-              try {
-                var tipoFotoTag = (novoStatus === 'Em Andamento') ? 'FOTO ENTRADA' : 'FOTO SAIDA';
-                var nomeFotoPraca = window.cloudinaryService.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', tipoFotoTag);
-                fotoEntradaUrl = await window.cloudinaryService.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
-              } catch (uploadErr) {
-                console.warn('⚠️ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
+            } else {
+              var cdnServicePraca = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+              if (cdnServicePraca) {
+                try {
+                  var tipoFotoTag = (novoStatus === 'Em Andamento') ? 'FOTO ENTRADA' : 'FOTO SAIDA';
+                  var nomeFotoPraca = cdnServicePraca.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', tipoFotoTag);
+                  fotoEntradaUrl = await cdnServicePraca.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
+                } catch (uploadErr) {
+                  console.warn('⚠️ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
+                  fotoEntradaUrl = fotoEntradaPracaBase64;
+                }
+              } else {
                 fotoEntradaUrl = fotoEntradaPracaBase64;
               }
-            } else {
-              fotoEntradaUrl = fotoEntradaPracaBase64;
+            }
+          }
+
+          // Upload das Fotos do Andamento para Cloudinary (Múltiplas)
+          var urlsAndamento = [];
+          if (fotosAndamentoPracaBase64Arr && fotosAndamentoPracaBase64Arr.length > 0) {
+            var cdnServicePracaAnd = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+            for (var iAnd = 0; iAnd < fotosAndamentoPracaBase64Arr.length; iAnd++) {
+              var fBase64 = fotosAndamentoPracaBase64Arr[iAnd];
+              if (fBase64.startsWith('http://') || fBase64.startsWith('https://')) {
+                urlsAndamento.push(fBase64);
+              } else if (cdnServicePracaAnd) {
+                try {
+                  var nomeFotoAndamento = cdnServicePracaAnd.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', 'ANDAMENTO_' + (iAnd + 1));
+                  var urlUp = await cdnServicePracaAnd.uploadImage(fBase64, 'praca_fotos', nomeFotoAndamento);
+                  urlsAndamento.push(urlUp || fBase64);
+                } catch (uploadErrAnd) {
+                  console.warn('⚠️ Erro ao enviar foto do andamento para Cloudinary:', uploadErrAnd);
+                  urlsAndamento.push(fBase64);
+                }
+              } else {
+                urlsAndamento.push(fBase64);
+              }
             }
           }
 
@@ -2811,6 +3108,7 @@
               qtd_eletricistas: qtdElet,
               tecnico: usuarioAtual,
               foto_entrada: fotoEntradaUrl || dadosPracaAtual.foto_entrada || null,
+              fotos_andamento: urlsAndamento,
               foto_saida: null,
               coordenada_inicio: coordsGpsPracaAtual || null,
               coordenada_fim: null,
@@ -2824,6 +3122,9 @@
               sessaoAberta.coordenada_fim = coordsGpsPracaAtual || null;
               if (fotoEntradaUrl) {
                 sessaoAberta.foto_saida = fotoEntradaUrl;
+              }
+              if (urlsAndamento.length > 0) {
+                sessaoAberta.fotos_andamento = (sessaoAberta.fotos_andamento || []).concat(urlsAndamento);
               }
               var dtInc = new Date(sessaoAberta.inicio);
               var dtFm = new Date(agoraIso);
@@ -2875,11 +3176,6 @@
           if (statusFinal === "Concluída") {
             payload.data_fechamento = new Date().toISOString();
             payload.operador_finalizacao = usuarioAtual;
-            payload.usuario_finalizacao = usuarioAtual;
-            payload.finalizado_por = usuarioAtual;
-            if (coordsGpsPracaAtual) {
-              payload.coordenada_reparo = coordsGpsPracaAtual;
-            }
           }
 
           // Se estiver OFFLINE, salva atualização da praça localmente
@@ -2892,6 +3188,7 @@
             document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: A Ordem de Serviço da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> foi <strong class='text-amber-600 font-bold'>SALVA LOCALMENTE</strong>!<br><br>Ela será enviada ao servidor automaticamente assim que a conexão retornar.";
             document.getElementById('modalSucesso').classList.remove('hidden');
             removerFotoEntradaPraca();
+            limparFotosAndamentoPraca();
             carrinhoMateriaisPraca = [];
             renderizarTabelaMateriaisPraca();
             return;
@@ -2922,6 +3219,46 @@
           dadosPracaAtual.status = novoStatus;
           document.getElementById('badgeStatusPraca').innerText = novoStatus;
 
+          if (statusFinal === 'Concluída') {
+            try {
+              const { data: existFech } = await client
+                .from('fechamentos_os')
+                .select('numero_fechamento')
+                .eq('protocolo', dadosPracaAtual.protocolo);
+
+              const proximoNum = (existFech && existFech.length > 0)
+                ? Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1
+                : 1;
+
+              var fotosFechamento = [];
+              if (fotoEntradaUrl) {
+                fotosFechamento.push({ url: fotoEntradaUrl, titulo: 'Foto de Entrada/Conclusão Praça' });
+              }
+              if (urlsAndamento && urlsAndamento.length > 0) {
+                urlsAndamento.forEach(function(uAnd, uIdx) {
+                  fotosFechamento.push({ url: uAnd, titulo: 'Foto do Andamento #' + (uIdx + 1) });
+                });
+              }
+
+              await client.from('fechamentos_os').insert([{
+                protocolo: dadosPracaAtual.protocolo,
+                os_id: dadosPracaAtual.id ? String(dadosPracaAtual.id) : null,
+                numero_fechamento: proximoNum,
+                ponto_referencia: dadosPracaAtual.praca_nome || 'Praça Pública',
+                operador: usuarioAtual,
+                data_fechamento: new Date().toISOString(),
+                relatorio_tecnico: obsAdicionalModal || 'Conclusão de Serviço em Praça Pública',
+                observacoes: obsAdicionalModal || '',
+                texto_auditoria_ocr: null,
+                materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
+                fotos: fotosFechamento
+              }]);
+              console.log('✅ Fechamento Praça #' + proximoNum + ' gravado na tabela fechamentos_os!');
+            } catch(eFechPraca) {
+              console.warn('⚠️ Não foi possível salvar fechamento de praça em fechamentos_os:', eFechPraca);
+            }
+          }
+
           var htmlSucesso = "";
           if (novoStatus === 'Em Andamento') {
             htmlSucesso = "▶️ Sessão de trabalho iniciada para a Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> com sucesso!";
@@ -2942,6 +3279,7 @@
 
           atualizarBotoesSessaoPraca(novoStatus);
           removerFotoEntradaPraca();
+          limparFotosAndamentoPraca();
           carrinhoMateriaisPraca = [];
           renderizarTabelaMateriaisPraca();
 
@@ -2952,6 +3290,7 @@
               document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: Atualização da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> salva localmente para envio automático.";
               document.getElementById('modalSucesso').classList.remove('hidden');
               removerFotoEntradaPraca();
+              limparFotosAndamentoPraca();
               carrinhoMateriaisPraca = [];
               renderizarTabelaMateriaisPraca();
               return;
@@ -3000,7 +3339,13 @@
         if (!prot) {
           window.dadosViariaValidos = null;
           atualizarEstadoBotaoMapa('btnVerMapaProtocolo', false, "Digite o protocolo da OS");
+          var boxHist = document.getElementById('historicoFechamentosAnteriores');
+          if (boxHist) boxHist.classList.add('hidden');
           return;
+        }
+
+        if (typeof carregarHistoricoFechamentosAnteriores === 'function') {
+          carregarHistoricoFechamentosAnteriores(prot);
         }
 
         if (window.dadosViariaValidos && window.dadosViariaValidos.protocolo === prot) {

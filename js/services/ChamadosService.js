@@ -205,7 +205,12 @@ class ChamadosService {
             { id: '5', protocolo: 'OS-2023-001', data_abertura: '2026-08-05', status: 'Cancelada', prioridade: 'Normal', operador: 'Flavia', municipe_nome: 'Genesio Luiz', plaqueta_inicial: 'F6433', problema_inicial: 'Lâmpada quebrada', qtd_inicial: 1, endereco: 'Rua São José, 45' }
         ];
 
-        return mockRows.map(row => window.ChamadoModel.fromRow(row));
+        return mockRows.map(row => {
+            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+            if (ModelClass && typeof ModelClass.fromRow === 'function') return ModelClass.fromRow(row);
+            if (ModelClass && typeof ModelClass === 'function') return new ModelClass(row);
+            return row;
+        });
     }
 
     /**
@@ -263,7 +268,12 @@ class ChamadosService {
             }
         ];
 
-        return mockRows.map(row => window.ChamadoModel.fromRow(row));
+        return mockRows.map(row => {
+            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+            if (ModelClass && typeof ModelClass.fromRow === 'function') return ModelClass.fromRow(row);
+            if (ModelClass && typeof ModelClass === 'function') return new ModelClass(row);
+            return row;
+        });
     }
 }
 

@@ -120,6 +120,21 @@ class CloudinaryService {
     }
 
     /**
+     * Sanitiza a string de public_id para garantir que ela contenha apenas caracteres permitidos pela API do Cloudinary.
+     * Remove acentos, colchetes, cerquilhas, espaços e símbolos especiais.
+     * @param {string} str - String original do identificador público
+     * @returns {string|null} String limpa contendo apenas [a-zA-Z0-9_\-\/]
+     */
+    static sanitizePublicId(str) {
+        if (!str) return null;
+        return str
+            .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // Remove acentuação
+            .replace(/[^a-zA-Z0-9_\-\/]/g, "_") // Substitui caracteres inválidos (colchetes, espaços, #, etc) por _
+            .replace(/__+/g, "_") // Remove underscores duplicados
+            .replace(/^_+|_+$/g, ""); // Trim de underscores nas pontas
+    }
+
+    /**
      * Generates a standardized OS photo filename matching the system pattern
      * Pattern: [PROTOCOLO] [PLAQUETA] [ESTAGIO] [MES] [ANO] DD-MM-YYYY_HH-mm-ss
      * @param {string} protocolo - OS Protocol
@@ -127,7 +142,7 @@ class CloudinaryService {
      * @param {string} estagio - Stage name (e.g. PROBLEMA ENCONTRADO, REPARO EFETUADO, PLAQUETA, FOTO ENTRADA)
      * @returns {string} Standardized public_id string
      */
-    gerarNomePadraoFoto(protocolo, plaqueta, estagio) {
+    gerarNomePadraoFoto(protocolo, plaqueta, estagio, numeroFechamento = null) {
         const dataAtual = new Date();
         const meses = ["JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO", "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO"];
         const mesEscrito = meses[dataAtual.getMonth()];
@@ -144,8 +159,9 @@ class CloudinaryService {
         const prot = (protocolo || "SEM_PROTOCOLO").toUpperCase().trim();
         const plaq = (plaqueta || "S_P").toUpperCase().trim();
         const est = (estagio || "EVIDENCIA").toUpperCase().trim();
+        const tagFech = (numeroFechamento !== null && numeroFechamento !== undefined) ? ` [FECHAMENTO_#${numeroFechamento}]` : '';
 
-        return `[${prot}] [${plaq}] [${est}] [${mesEscrito}] [${ano4Digitos}] ${dataHoraFormatada}`;
+        return `[${prot}] [${plaq}]${tagFech} [${est}] [${mesEscrito}] [${ano4Digitos}] ${dataHoraFormatada}`;
     }
 
     /**
@@ -190,7 +206,10 @@ class CloudinaryService {
             formData.append('folder', folder);
         }
         if (customPublicId) {
-            formData.append('public_id', customPublicId);
+            const cleanPublicId = CloudinaryService.sanitizePublicId(customPublicId);
+            if (cleanPublicId) {
+                formData.append('public_id', cleanPublicId);
+            }
         }
 
         const uploadUrl = `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`;

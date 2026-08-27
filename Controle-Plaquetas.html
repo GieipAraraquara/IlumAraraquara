@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Controle de Plaquetas - Luz Araraquara</title>
+    
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="manifest" href="manifest.json?v=2" />
+    <meta name="theme-color" content="#1a73e8" />
+    <meta name="apple-mobile-web-app-title" content="Luz Araraquara" />
+    
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=30"></script>
+    <script src="js/services/MapService.js?v=73"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        .material-symbols-outlined {
+            font-family: 'Material Symbols Outlined' !important;
+            font-weight: normal;
+            font-style: normal;
+            font-size: 24px;
+            line-height: 1;
+            letter-spacing: normal;
+            text-transform: none;
+            display: inline-block;
+            white-space: nowrap;
+            word-wrap: normal;
+            direction: ltr;
+            -webkit-font-feature-settings: 'liga' 1;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-feature-settings: 'liga' 1;
+            text-rendering: optimizeLegibility;
+        }
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+        }
+        #main-content {
+            overflow-x: hidden !important;
+        }
+        /* Sidebar collapse mechanics */
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { width: calc(100% - 80px); left: 80px; margin-left: 0; }
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+        
+        /* Fixed Resizer CSS */
+        .resizer {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 12px;
+            cursor: col-resize;
+            user-select: none;
+            height: 100%;
+            z-index: 10;
+            transform: translateX(50%);
+            display: flex;
+            justify-content: center;
+        }
+        .resizer::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            width: 2px;
+            height: 100%;
+            background-color: transparent;
+            transition: background-color 0.2s ease;
+        }
+        .resizer:hover::after,
+        .resizer.resizing::after {
+            background-color: #0051d5;
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
+
+<!-- WebGL Background Canvas -->
+<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
+<script>
+    const canvas = document.getElementById('bg-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    const vertexShader = `
+        varying vec2 v_texCoord;
+        void main() {
+            v_texCoord = uv;
+            gl_Position = vec4(position, 1.0);
+        }
+    `;
+    
+    const fragmentShader = `
+        precision highp float;
+        uniform float u_time;
+        uniform vec2 u_resolution;
+        varying vec2 v_texCoord;
+
+        void main() {
+            vec2 uv = v_texCoord;
+            float t = u_time * 0.2;
+            vec3 color1 = vec3(0.988, 0.973, 0.98); 
+            vec3 color2 = vec3(0.957, 0.941, 0.953);
+            vec3 accent = vec3(0.059, 0.09, 0.165); 
+            
+            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
+            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
+            vec3 base = mix(color1, color2, w1 * w2);
+            
+            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
+            vec3 finalColor = mix(base, accent, edge * 0.02);
+            gl_FragColor = vec4(finalColor, 1.0);
+        }
+    `;
+    
+    const uniforms = {
+        u_time: { value: 0 },
+        u_resolution: { value: new THREE.Vector2() }
+    };
+    
+    const material = new THREE.ShaderMaterial({
+        vertexShader,
+        fragmentShader,
+        uniforms
+    });
+    
+    const mesh = new THREE.Mesh(geometry, material);
+    scene.add(mesh);
+    
+    function resize() {
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener('resize', resize);
+    resize();
+    
+    function animate(time) {
+        uniforms.u_time.value = time * 0.001;
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+</script>
+
+<app-sidebar active="plaquetas"></app-sidebar>
+
+<app-header placeholder="Buscar plaqueta por código, empresa ou observação..." search-id="header-search-plaqueta"></app-header>
+
+<main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
+
+    <!-- Header da Página -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="material-symbols-outlined text-secondary text-[28px]">pin_drop</span>
+                <h2 class="font-headline-md text-headline-md text-on-surface">Controle de Plaquetas</h2>
+            </div>
+            <p class="font-body-md text-body-md text-on-surface-variant">Gestão da tabela <code class="bg-surface-container-high px-1.5 py-0.5 rounded text-secondary font-mono text-xs">localizacao_plaquetas</code> do Supabase — consulta, visualização geográfica e alteração de coordenadas.</p>
+        </div>
+        
+        <div class="flex items-center gap-2 flex-wrap">
+            <button onclick="window.abrirModalEditarPlaqueta()" class="bg-secondary text-white px-4 py-2.5 rounded-xl font-label-md text-label-md font-semibold flex items-center gap-2 hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm active:scale-95 cursor-pointer">
+                <span class="material-symbols-outlined text-[20px]">add_location_alt</span>
+                <span>Nova Plaqueta</span>
+            </button>
+            <button onclick="window.recarregarTabelaPlaquetas()" class="bg-surface-container-lowest border border-outline-variant text-on-surface hover:bg-surface-container-high px-3.5 py-2.5 rounded-xl font-label-md text-label-md font-semibold flex items-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer" title="Atualizar dados do Supabase">
+                <span class="material-symbols-outlined text-[20px] text-secondary">refresh</span>
+                <span class="hidden sm:inline">Atualizar</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- KPI Grid (Total de Plaquetas) -->
+    <div class="grid grid-cols-12 gap-card-gap mb-4 max-w-max-width-content mx-auto">
+        <!-- Card 1: Total de Plaquetas -->
+        <div class="col-span-12 md:col-span-6 lg:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+            <div class="flex items-center justify-between mb-1">
+                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Plaquetas Cadastradas</span>
+                <div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[20px]">tag</span>
+                </div>
+            </div>
+            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible font-bold" id="kpi-total-plaquetas">
+                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+            </div>
+            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                <span class="material-symbols-outlined text-[15px] text-secondary">database</span>
+                <span>Registros ativos na tabela Supabase (localizacao_plaquetas)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barra de Filtros e Busca -->
+    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-4 opacity-0 animate-fade-in-up [animation-delay:550ms]">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            
+            <!-- Campo de Busca em Tempo Real (Suporta múltiplas plaquetas: C0012 C0013) -->
+            <div class="relative flex-1 min-w-[280px]">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">search</span>
+                <input type="text" id="input-busca-plaqueta" placeholder="Buscar identificações (ex: C0012 C0013) ou empresa/observação..." class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl pl-10 pr-9 py-2 text-xs font-medium text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all placeholder:text-on-surface-variant/50" />
+                <button type="button" id="btn-limpar-busca" onclick="window.limparBuscaPlaqueta()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5 rounded-full transition-colors cursor-pointer">
+                    <span class="material-symbols-outlined text-[18px]">cancel</span>
+                </button>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <!-- Filtro por Empresa -->
+                <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
+                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant">domain</span>
+                    <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Empresa:</label>
+                    <select id="select-filtro-empresa" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 p-0 pr-4">
+                        <option value="all">Todas as Empresas</option>
+                        <option value="FORTNORT">FORTNORT</option>
+                        <option value="ILUMITERRA">ILUMITERRA</option>
+                        <option value="OUTRA">Outras</option>
+                    </select>
+                </div>
+
+                <!-- Quantidade por Página -->
+                <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
+                    <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Exibir:</label>
+                    <select id="select-itens-por-pagina" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 p-0 pr-2">
+                        <option value="25" selected>25 por pág.</option>
+                        <option value="50">50 por pág.</option>
+                        <option value="100">100 por pág.</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela Principal de Plaquetas -->
+    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
+            <div class="px-5 py-3.5 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-secondary text-[20px]">table_chart</span>
+                    <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Plaquetas de Iluminação Cadastradas</h3>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <button type="button" id="btn-ver-mapa-multi" onclick="window.abrirMapaMultiPlaquetasModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs active:scale-95 cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">map</span>
+                        <span id="label-btn-mapa-multi">Ver 0 no Mapa</span>
+                    </button>
+                    <span class="text-xs text-on-surface-variant font-medium" id="info-contagem-tabela">Carregando registros...</span>
+                </div>
+            </div>
+            
+            <div class="w-full min-h-[360px] overflow-x-auto">
+                <table class="w-full text-left border-collapse table-fixed max-w-full" id="plaquetas-table">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative select-none">
+                            <!-- Coluna 1: Identificação -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 170px; min-width: 170px;" data-col="0">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Identificação</span>
+                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">tag</span>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Coluna 2: Localização (Latitude e Longitude) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 280px; min-width: 280px;" data-col="1">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Localização (Lat, Lng)</span>
+                                    <span class="material-symbols-outlined text-[16px] text-emerald-600">location_on</span>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Coluna 3: Qtd. Luminárias -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative text-center" style="width: 140px; min-width: 140px;" data-col="2">
+                                <div class="flex items-center justify-center gap-1.5">
+                                    <span>Qtd. Lum.</span>
+                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">lightbulb</span>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Coluna 4: Empresa -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 180px; min-width: 180px;" data-col="3">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Empresa</span>
+                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">domain</span>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Coluna 5: Observação -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" data-col="4">
+                                <div class="flex items-center gap-1.5">
+                                    <span>Observação</span>
+                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">notes</span>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+                            
+                            <!-- Coluna 6: Ações -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 180px; min-width: 180px;" data-col="5">
+                                Ações
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="font-data-tabular text-data-tabular text-on-surface" id="tbody-plaquetas">
+                        <!-- Skeleton Loading Rows -->
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5"><div class="h-6 w-24 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-6 w-44 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5 text-center"><div class="h-5 w-8 bg-surface-container-high animate-pulse rounded mx-auto"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-36 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-7 w-16 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                    <div class="h-7 w-14 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5"><div class="h-6 w-20 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-6 w-48 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5 text-center"><div class="h-5 w-8 bg-surface-container-high animate-pulse rounded mx-auto"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-24 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-28 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-7 w-16 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                    <div class="h-7 w-14 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr class="skeleton-row border-b border-outline-variant bg-surface-container-lowest align-middle">
+                            <td class="py-3.5 px-5"><div class="h-6 w-24 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-6 w-40 bg-surface-container-high animate-pulse rounded-lg"></div></td>
+                            <td class="py-3.5 px-5 text-center"><div class="h-5 w-8 bg-surface-container-high animate-pulse rounded mx-auto"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-32 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5"><div class="h-5 w-40 bg-surface-container-high animate-pulse rounded"></div></td>
+                            <td class="py-3.5 px-5 text-center">
+                                <div class="flex items-center justify-center gap-2">
+                                    <div class="h-7 w-16 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                    <div class="h-7 w-14 bg-surface-container-high animate-pulse rounded-lg"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer com Paginação -->
+            <div class="px-5 py-3.5 border-t border-outline-variant bg-[#F8FAFC]/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <div class="text-on-surface-variant font-medium" id="pagination-info">
+                    Exibindo 0 - 0 de 0 registros
+                </div>
+                <div class="flex items-center gap-2" id="pagination-controls">
+                    <button type="button" id="btn-pagina-anterior" onclick="window.mudarPaginaPlaqueta(-1)" disabled class="px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-high text-on-surface disabled:opacity-40 disabled:pointer-events-none transition-all font-semibold flex items-center gap-1 cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                        <span>Anterior</span>
+                    </button>
+                    
+                    <span class="px-3 py-1 bg-surface-container-high rounded-md font-bold text-secondary" id="label-pagina-atual">1</span>
+                    
+                    <button type="button" id="btn-pagina-proxima" onclick="window.mudarPaginaPlaqueta(1)" disabled class="px-3 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-high text-on-surface disabled:opacity-40 disabled:pointer-events-none transition-all font-semibold flex items-center gap-1 cursor-pointer">
+                        <span>Próxima</span>
+                        <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- MODAL 1: Visualização do Mapa e Edição Direta de Coordenadas -->
+<div id="modal-mapa-plaqueta" onclick="if (event.target === this) window.fecharMapaPlaquetaModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-5xl w-full h-[92vh] max-h-[820px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Modal Header -->
+        <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">location_on</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900" id="mapa-modal-titulo">Plaqueta #---</h3>
+                        <span id="mapa-modal-badge-status" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Localização Definida</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium truncate max-w-md mt-0.5" id="mapa-modal-endereco-str">Arraste o marcador ou clique no mapa para alterar as coordenadas de latitude e longitude.</p>
+                </div>
+            </div>
+
+            <!-- External Navigation Buttons & Close -->
+            <div class="flex items-center gap-2">
+                <a id="btn-gmaps-plaqueta" href="#" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]">map</span>
+                    <span class="hidden sm:inline">Google Maps</span>
+                </a>
+                <a id="btn-waze-plaqueta" href="#" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]">navigation</span>
+                    <span class="hidden sm:inline">Waze</span>
+                </a>
+                <button type="button" onclick="window.fecharMapaPlaquetaModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-1">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas do Mapa & Painel Lateral Flutuante -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden flex flex-col md:flex-row">
+            <!-- Mapbox Canvas Container -->
+            <div id="mapa-plaqueta-canvas" class="w-full h-full min-h-[300px]"></div>
+
+            <!-- Painel Informativo e de Edição (Glassmorphism Overlay) -->
+            <div class="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-auto sm:w-96 bg-white/95 backdrop-blur-md border border-slate-200 p-4 rounded-2xl shadow-xl text-xs space-y-3 z-10 text-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+                        <span class="material-symbols-outlined text-[18px] text-blue-600">edit_location</span>
+                        <span>Atualizar Coordenadas</span>
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200" id="mapa-card-empresa">---</span>
+                </div>
+
+                <div class="space-y-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Latitude:</label>
+                            <input type="number" step="any" id="input-mapa-lat" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600" />
+                        </div>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-500 uppercase mb-1">Longitude:</label>
+                            <input type="number" step="any" id="input-mapa-lng" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600" />
+                        </div>
+                    </div>
+
+                    <div class="text-[11px] text-slate-600 leading-snug bg-slate-50 p-2.5 rounded-lg border border-slate-200" id="box-mapa-endereco-reverso">
+                        <span class="font-semibold text-slate-700">📍 Endereço estimado:</span>
+                        <p id="label-endereco-geocodificado" class="text-slate-600 mt-0.5 font-normal">Arraste o pino para atualizar o endereço.</p>
+                    </div>
+                </div>
+
+                <div class="pt-1 flex items-center gap-2">
+                    <button type="button" onclick="window.salvarCoordenadasDoMapaModal()" id="btn-salvar-coords-mapa" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-3 rounded-xl transition-all shadow-sm active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">save</span>
+                        <span>Salvar Nova Localização</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL 2: Formulário Completo Editar / Criar Plaqueta -->
+<div id="modal-form-plaqueta" onclick="if (event.target === this) window.fecharFormPlaquetaModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-form-plaqueta-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-lg w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <div class="flex items-center justify-between border-b border-outline-variant/60 pb-4 mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]" id="form-plaqueta-icon">edit_square</span>
+                </div>
+                <div>
+                    <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="form-plaqueta-titulo">Editar Plaqueta</h3>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant">Preencha os campos da tabela localizacao_plaquetas</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.fecharFormPlaquetaModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1 rounded-full transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <form id="form-cadastro-plaqueta" onsubmit="window.submitFormPlaqueta(event)" class="space-y-4">
+            <input type="hidden" id="form-plaqueta-id-original" value="" />
+
+            <!-- Identificação -->
+            <div>
+                <label for="form-input-identificacao" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Identificação / Código da Plaqueta *</label>
+                <input type="text" id="form-input-identificacao" required uppercase placeholder="Ex: C0002 ou U8162" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-bold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary uppercase" />
+            </div>
+
+            <!-- Latitude & Longitude -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="form-input-latitude" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Latitude</label>
+                    <input type="number" step="any" id="form-input-latitude" placeholder="-21.75478" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                </div>
+                <div>
+                    <label for="form-input-longitude" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Longitude</label>
+                    <input type="number" step="any" id="form-input-longitude" placeholder="-48.17188" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                </div>
+            </div>
+
+            <!-- Qtd. Luminárias & Empresa -->
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="form-input-qtd-lum" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Qtd. Luminárias</label>
+                    <input type="number" id="form-input-qtd-lum" min="1" max="10" value="1" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-semibold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                </div>
+                <div>
+                    <label for="form-input-empresa" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
+                    <input type="text" id="form-input-empresa" placeholder="Ex: FORTNORT" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-semibold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                </div>
+            </div>
+
+            <!-- Observação -->
+            <div>
+                <label for="form-input-observacao" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Observação</label>
+                <textarea id="form-input-observacao" rows="2" placeholder="Observações como DUPLICADO, PONTO ESPECIAL, etc..." class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-normal text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary resize-none"></textarea>
+            </div>
+
+            <!-- Botões de Ação -->
+            <div class="pt-3 flex items-center justify-end gap-3 border-t border-outline-variant/60">
+                <button type="button" onclick="window.fecharFormPlaquetaModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="submit" id="btn-submit-form-plaqueta" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-secondary hover:bg-secondary-container hover:text-on-secondary-container active:scale-95 transition-all shadow-sm cursor-pointer flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[18px]">check</span>
+                    <span>Salvar Plaqueta</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- MODAL MULTI-MAPA: Visualização Geral de Múltiplas Plaquetas no Mapa -->
+<div id="modal-mapa-multi-plaquetas" onclick="if (event.target === this) window.fecharMapaMultiPlaquetasModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-multi-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-6xl w-full h-[92vh] max-h-[850px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">pin_drop</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900" id="multi-mapa-modal-titulo">Mapa de Plaquetas Filtradas</h3>
+                        <span id="multi-mapa-badge-count" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">0 no mapa</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium truncate max-w-xl mt-0.5">Exibindo a localização no mapa de todas as plaquetas resultantes da busca.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="window.centralizarMultiMapa()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]">center_focus_strong</span>
+                    <span>Centralizar Todas</span>
+                </button>
+                <button type="button" onclick="window.fecharMapaMultiPlaquetasModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-1">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-multi-canvas" class="w-full h-full min-h-[400px]"></div>
+
+            <!-- Legend Overlay -->
+            <div class="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md border border-slate-200 p-3 rounded-xl shadow-lg text-xs space-y-1 z-10 text-slate-800 max-w-xs">
+                <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-emerald-600">info</span>
+                    <span>Dica de Uso</span>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-tight">Clique nos marcadores azuis para ver detalhes e editar a localização exata de cada plaqueta individualmente.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CONTROLLER E LÓGICA DE GERENCIAMENTO DE PLAQUETAS -->
+<script>
+    (function() {
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+        
+        let plaquetasCache = [];
+        let totalCountPlaquetas = 0;
+        let paginaAtual = 1;
+        let tamanhoPagina = 25;
+        
+        let buscaTexto = '';
+        let filtroEmpresa = 'all';
+        
+        let plaquetaEmVisualizacaoMap = null;
+        let mapboxInstance = null;
+        let mapboxMarkerInstance = null;
+        let timeoutDebounceBusca = null;
+
+        // Executar inicialização quando DOM e Supabase estiverem prontos
+        document.addEventListener('DOMContentLoaded', () => {
+            initEvents();
+            carregarPlaquetas(1);
+        });
+
+        function initEvents() {
+            const inputBusca = document.getElementById('input-busca-plaqueta');
+            const selectEmpresa = document.getElementById('select-filtro-empresa');
+            const selectPaginacao = document.getElementById('select-itens-por-pagina');
+            const headerSearch = document.getElementById('header-search-plaqueta');
+
+            if (inputBusca) {
+                inputBusca.addEventListener('input', (e) => {
+                    buscaTexto = e.target.value;
+                    document.getElementById('btn-limpar-busca')?.classList.toggle('hidden', !buscaTexto);
+                    if (timeoutDebounceBusca) clearTimeout(timeoutDebounceBusca);
+                    timeoutDebounceBusca = setTimeout(() => {
+                        carregarPlaquetas(1);
+                    }, 350);
+                });
+            }
+
+            if (headerSearch) {
+                headerSearch.addEventListener('input', (e) => {
+                    if (inputBusca) inputBusca.value = e.target.value;
+                    buscaTexto = e.target.value;
+                    document.getElementById('btn-limpar-busca')?.classList.toggle('hidden', !buscaTexto);
+                    if (timeoutDebounceBusca) clearTimeout(timeoutDebounceBusca);
+                    timeoutDebounceBusca = setTimeout(() => {
+                        carregarPlaquetas(1);
+                    }, 350);
+                });
+            }
+
+            if (selectEmpresa) {
+                selectEmpresa.addEventListener('change', (e) => {
+                    filtroEmpresa = e.target.value;
+                    carregarPlaquetas(1);
+                });
+            }
+
+            if (selectPaginacao) {
+                selectPaginacao.addEventListener('change', (e) => {
+                    tamanhoPagina = parseInt(e.target.value, 10) || 25;
+                    carregarPlaquetas(1);
+                });
+            }
+
+            const btnMultiMapa = document.getElementById('btn-ver-mapa-multi');
+            if (btnMultiMapa) {
+                btnMultiMapa.addEventListener('click', (e) => {
+                    console.log("🗺️ [MultiMapa] EventListener de clique acionado no botão!");
+                    window.abrirMapaMultiPlaquetasModal();
+                });
+            }
+
+            // Sync resizers
+            initResizers();
+        }
+
+        window.limparBuscaPlaqueta = function() {
+            const inputBusca = document.getElementById('input-busca-plaqueta');
+            const headerSearch = document.getElementById('header-search-plaqueta');
+            if (inputBusca) inputBusca.value = '';
+            if (headerSearch) headerSearch.value = '';
+            buscaTexto = '';
+            document.getElementById('btn-limpar-busca')?.classList.add('hidden');
+            carregarPlaquetas(1);
+        };
+
+        window.recarregarTabelaPlaquetas = function() {
+            carregarPlaquetas(paginaAtual);
+        };
+
+        async function carregarPlaquetas(page = 1) {
+            paginaAtual = page;
+            exibirSkeletonRows(true);
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : (window.supabaseClient || null);
+            if (!client) {
+                console.warn('⚠️ Cliente Supabase ainda não pronto. Tentando novamente...');
+                setTimeout(() => carregarPlaquetas(page), 500);
+                return;
+            }
+
+            try {
+                let query = client.from('localizacao_plaquetas').select('*', { count: 'exact' });
+
+                // Filtro de busca textual (suporta busca por múltiplas plaquetas ex: C0012 C0013)
+                if (buscaTexto.trim()) {
+                    const rawTokens = buscaTexto
+                        .trim()
+                        .split(/[\s,;\n\r]+/)
+                        .map(t => t.trim())
+                        .filter(t => t.length > 0);
+
+                    if (rawTokens.length > 1) {
+                        const orConditions = rawTokens.map(token => `identificacao.ilike.%${token}%`);
+                        query = query.or(orConditions.join(','));
+                    } else if (rawTokens.length === 1) {
+                        const q = rawTokens[0];
+                        query = query.or(`identificacao.ilike.%${q}%,Empresa.ilike.%${q}%`);
+                    }
+                }
+
+                // Filtro de empresa
+                if (filtroEmpresa !== 'all') {
+                    if (filtroEmpresa === 'OUTRA') {
+                        query = query.not('Empresa', 'ilike', '%FORTNORT%').not('Empresa', 'ilike', '%ILUMITERRA%');
+                    } else {
+                        query = query.ilike('Empresa', `%${filtroEmpresa}%`);
+                    }
+                }
+
+                // Paginacao
+                const inicio = (paginaAtual - 1) * tamanhoPagina;
+                const fim = inicio + tamanhoPagina - 1;
+                query = query.order('identificacao', { ascending: true }).range(inicio, fim);
+
+                let { data, count, error } = await query;
+
+                if (error && buscaTexto.trim()) {
+                    console.warn('⚠️ Erro na consulta combinada. Tentando fallback por identificacao:', error);
+                    let fallbackQuery = client.from('localizacao_plaquetas')
+                        .select('*', { count: 'exact' })
+                        .ilike('identificacao', `%${buscaTexto.trim()}%`)
+                        .order('identificacao', { ascending: true })
+                        .range(inicio, fim);
+                    const resFB = await fallbackQuery;
+                    if (!resFB.error) {
+                        data = resFB.data;
+                        count = resFB.count;
+                        error = null;
+                    }
+                }
+
+                if (error) {
+                    console.error('❌ Erro Supabase ao buscar plaquetas:', error);
+                    renderizarErroTabela(error.message);
+                    return;
+                }
+
+                totalCountPlaquetas = count || (data ? data.length : 0);
+                plaquetasCache = (data || []).map(parseRowData);
+
+                renderizarTabela();
+                atualizarPaginacaoUI();
+                carregarKPIsTotais(client);
+
+            } catch (err) {
+                console.error('❌ Exceção ao consultar localizacao_plaquetas:', err);
+                renderizarErroTabela(err.message);
+            } finally {
+                exibirSkeletonRows(false);
+            }
+        }
+
+        function parseCoordinate(val) {
+            if (val === null || val === undefined || val === '') return null;
+            if (typeof val === 'number') return isNaN(val) ? null : val;
+            const str = String(val).replace(',', '.').trim();
+            const num = parseFloat(str);
+            return isNaN(num) ? null : num;
+        }
+
+        function parseRowData(row) {
+            const identificacao = row.identificacao || row.Identificacao || row.plaqueta || '---';
+            const latRaw = row.Latitude ?? row.latitude ?? row.lat;
+            const lngRaw = row.Longitude ?? row.longitude ?? row.lng;
+            
+            const lat = parseCoordinate(latRaw);
+            const lng = parseCoordinate(lngRaw);
+
+            const hasCoords = lat !== null && lng !== null && lat !== 0 && lng !== 0;
+
+            const qtd_lum = row['QTD. Lum.'] ?? row.qtd_lum ?? row.qtd_luminarias ?? 1;
+            const observacao = row['Observação'] ?? row.observacao ?? '';
+            const empresa = row['Empresa'] ?? row.empresa ?? '';
+            const quando = row['Quando foi colocado?'] ?? row.quando_colocado ?? '';
+
+            return {
+                id: row.id || identificacao,
+                identificacao,
+                latitude: hasCoords ? lat : null,
+                longitude: hasCoords ? lng : null,
+                hasCoords,
+                qtd_lum,
+                observacao,
+                empresa,
+                quando,
+                raw: row
+            };
+        }
+
+        function renderizarTabela() {
+            const tbody = document.getElementById('tbody-plaquetas');
+            const labelCount = document.getElementById('info-contagem-tabela');
+            const labelBtnMapaMulti = document.getElementById('label-btn-mapa-multi');
+            if (!tbody) return;
+
+            tbody.innerHTML = '';
+
+            if (labelBtnMapaMulti) {
+                labelBtnMapaMulti.innerText = `Ver ${plaquetasCache ? plaquetasCache.length : 0} no Mapa`;
+            }
+
+            if (labelCount) {
+                labelCount.innerText = `Total de ${totalCountPlaquetas.toLocaleString('pt-BR')} plaquetas encontradas`;
+            }
+
+            if (!plaquetasCache || plaquetasCache.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-12 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                            <div class="flex flex-col items-center justify-center gap-2">
+                                <span class="material-symbols-outlined text-[36px] text-on-surface-variant/40">location_off</span>
+                                <span class="text-sm font-semibold">Nenhuma plaqueta encontrada</span>
+                                <span class="text-xs text-on-surface-variant/60">Tente ajustar a busca ou os filtros acima.</span>
+                            </div>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            plaquetasCache.forEach((plq) => {
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-outline-variant/60 hover:bg-surface-container-low/60 transition-colors align-middle';
+
+                // 1. Identificação
+                const tdIdent = `
+                    <td class="py-3 px-5 font-bold">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
+                            <span class="material-symbols-outlined text-[15px]">tag</span>
+                            <span>${plq.identificacao}</span>
+                        </span>
+                    </td>`;
+
+                // 2. Localização (Lat / Lng)
+                let tdLoc = '';
+                if (plq.hasCoords) {
+                    tdLoc = `
+                    <td class="py-3 px-5">
+                        <button type="button" onclick="window.abrirMapaPlaquetaModal('${plq.identificacao}')" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-semibold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200 transition-colors cursor-pointer group" title="Visualizar e Editar no Mapa">
+                            <span class="material-symbols-outlined text-[16px] text-emerald-600 flex-shrink-0">location_on</span>
+                            <span>${plq.latitude.toFixed(5)}, ${plq.longitude.toFixed(5)}</span>
+                            <span class="material-symbols-outlined text-[14px] text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity ml-0.5">open_in_new</span>
+                        </button>
+                    </td>`;
+                } else {
+                    tdLoc = `
+                    <td class="py-3 px-5">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span class="material-symbols-outlined text-[15px]">warning</span>
+                            <span>Sem Coordenadas</span>
+                        </span>
+                    </td>`;
+                }
+
+                // 3. Qtd Luminárias
+                const tdQtd = `
+                    <td class="py-3 px-5 text-center font-semibold text-on-surface">
+                        <span class="inline-block px-2 py-0.5 rounded bg-surface-container-high text-xs font-bold">${plq.qtd_lum}</span>
+                    </td>`;
+
+                // 4. Empresa
+                const tdEmpresa = `
+                    <td class="py-3 px-5 font-medium text-xs text-on-surface-variant">
+                        ${plq.empresa ? `<span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-semibold text-slate-700">${plq.empresa}</span>` : '<span class="text-slate-400">---</span>'}
+                    </td>`;
+
+                // 5. Observação
+                let tdObs = '';
+                if (plq.observacao) {
+                    const isDuplicado = plq.observacao.toUpperCase().includes('DUPLICADO');
+                    const badgeClass = isDuplicado ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-blue-50 text-blue-700 border-blue-200';
+                    tdObs = `
+                    <td class="py-3 px-5">
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold border ${badgeClass}">
+                            <span class="material-symbols-outlined text-[14px]">info</span>
+                            <span>${plq.observacao}</span>
+                        </span>
+                    </td>`;
+                } else {
+                    tdObs = `<td class="py-3 px-5 text-slate-400 text-xs">---</td>`;
+                }
+
+                // 6. Ações
+                const tdAcoes = `
+                    <td class="py-3 px-5 text-center">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <button type="button" onclick="window.abrirMapaPlaquetaModal('${plq.identificacao}')" class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all cursor-pointer active:scale-95" title="Ver / Editar no Mapa">
+                                <span class="material-symbols-outlined text-[18px]">map</span>
+                            </button>
+                            <button type="button" onclick="window.abrirModalEditarPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-all cursor-pointer active:scale-95" title="Editar dados da Plaqueta">
+                                <span class="material-symbols-outlined text-[18px]">edit</span>
+                            </button>
+                            <button type="button" onclick="window.confirmarExcluirPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer active:scale-95" title="Excluir Plaqueta">
+                                <span class="material-symbols-outlined text-[18px]">delete</span>
+                            </button>
+                        </div>
+                    </td>`;
+
+                tr.innerHTML = tdIdent + tdLoc + tdQtd + tdEmpresa + tdObs + tdAcoes;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function carregarKPIsTotais(client) {
+            try {
+                const resTotal = await client.from('localizacao_plaquetas').select('identificacao', { count: 'exact', head: true });
+                const countTotal = resTotal.count || 0;
+                const elTotal = document.getElementById('kpi-total-plaquetas');
+                if (elTotal) elTotal.innerText = countTotal.toLocaleString('pt-BR');
+            } catch(e) {
+                console.warn("⚠️ Aviso ao carregar total de plaquetas:", e);
+            }
+        }
+
+        function atualizarPaginacaoUI() {
+            const inicio = (paginaAtual - 1) * tamanhoPagina + 1;
+            const fim = Math.min(paginaAtual * tamanhoPagina, totalCountPlaquetas);
+            const totalPaginas = Math.ceil(totalCountPlaquetas / tamanhoPagina) || 1;
+
+            const labelInfo = document.getElementById('pagination-info');
+            if (labelInfo) {
+                labelInfo.innerText = `Exibindo ${totalCountPlaquetas > 0 ? inicio : 0} - ${fim} de ${totalCountPlaquetas.toLocaleString('pt-BR')} registros`;
+            }
+
+            const labelPagina = document.getElementById('label-pagina-atual');
+            if (labelPagina) labelPagina.innerText = `Página ${paginaAtual} de ${totalPaginas}`;
+
+            const btnAnt = document.getElementById('btn-pagina-anterior');
+            const btnProx = document.getElementById('btn-pagina-proxima');
+
+            if (btnAnt) btnAnt.disabled = (paginaAtual <= 1);
+            if (btnProx) btnProx.disabled = (paginaAtual >= totalPaginas);
+        }
+
+        window.mudarPaginaPlaqueta = function(delta) {
+            const novaPagina = paginaAtual + delta;
+            if (novaPagina < 1) return;
+            carregarPlaquetas(novaPagina);
+        };
+
+        function exibirSkeletonRows(exibir) {
+            const tbody = document.getElementById('tbody-plaquetas');
+            if (!tbody || !exibir) return;
+            // Rows maintain loading animation during query
+        }
+
+        function renderizarErroTabela(msg) {
+            const tbody = document.getElementById('tbody-plaquetas');
+            if (!tbody) return;
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="6" class="py-8 text-center text-rose-600 bg-rose-50/50">
+                        <div class="flex flex-col items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[28px]">error</span>
+                            <span class="text-xs font-bold">Erro ao consultar Supabase: ${msg}</span>
+                            <button onclick="window.recarregarTabelaPlaquetas()" class="mt-2 text-xs bg-rose-600 text-white px-3 py-1 rounded-lg font-semibold cursor-pointer">Tentar Novamente</button>
+                        </div>
+                    </td>
+                </tr>`;
+        }
+
+        // =========================================================================
+        // LÓGICA DO MODAL 1: VISUALIZAR E EDITAR NO MAPA (MAPBOX GL JS)
+        // =========================================================================
+        window.abrirMapaPlaquetaModal = function(identificacao) {
+            const item = plaquetasCache.find(p => p.identificacao.toUpperCase() === identificacao.toUpperCase());
+            if (!item) return;
+
+            plaquetaEmVisualizacaoMap = item;
+
+            const modal = document.getElementById('modal-mapa-plaqueta');
+            const modalBox = document.getElementById('modal-mapa-plaqueta-box');
+            if (!modal || !modalBox) return;
+
+            document.getElementById('mapa-modal-titulo').innerText = `Plaqueta #${item.identificacao}`;
+            document.getElementById('mapa-card-empresa').innerText = item.empresa || 'Sem Empresa';
+
+            const defaultLat = item.hasCoords ? item.latitude : -21.75478;
+            const defaultLng = item.hasCoords ? item.longitude : -48.17188;
+
+            document.getElementById('input-mapa-lat').value = defaultLat.toFixed(6);
+            document.getElementById('input-mapa-lng').value = defaultLng.toFixed(6);
+
+            // Links de Navegação Externa
+            const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${defaultLat},${defaultLng}`;
+            const wazeUrl = `https://waze.com/ul?ll=${defaultLat},${defaultLng}&navigate=yes`;
+            document.getElementById('btn-gmaps-plaqueta').href = gmapsUrl;
+            document.getElementById('btn-waze-plaqueta').href = wazeUrl;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+
+                inicializarMapboxModal(defaultLat, defaultLng);
+            }, 50);
+        };
+
+        function inicializarMapboxModal(lat, lng) {
+            const container = document.getElementById('mapa-plaqueta-canvas');
+            if (!container) return;
+
+            if (!mapboxInstance) {
+                mapboxgl.accessToken = MAPBOX_TOKEN;
+                mapboxInstance = new mapboxgl.Map({
+                    container: 'mapa-plaqueta-canvas',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: [lng, lat],
+                    zoom: 16
+                });
+
+                mapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+                mapboxInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+                // Criar Marcador Arrastável (Draggable Marker)
+                mapboxMarkerInstance = new mapboxgl.Marker({
+                    color: '#0051d5',
+                    draggable: true
+                })
+                .setLngLat([lng, lat])
+                .addTo(mapboxInstance);
+
+                // Evento ao arrastar o marcador
+                mapboxMarkerInstance.on('dragend', () => {
+                    const lngLat = mapboxMarkerInstance.getLngLat();
+                    document.getElementById('input-mapa-lat').value = lngLat.lat.toFixed(6);
+                    document.getElementById('input-mapa-lng').value = lngLat.lng.toFixed(6);
+                    buscarEnderecoGeocodificado(lngLat.lat, lngLat.lng);
+                });
+
+                // Evento ao clicar no mapa para mover o marcador
+                mapboxInstance.on('click', (e) => {
+                    mapboxMarkerInstance.setLngLat(e.lngLat);
+                    document.getElementById('input-mapa-lat').value = e.lngLat.lat.toFixed(6);
+                    document.getElementById('input-mapa-lng').value = e.lngLat.lng.toFixed(6);
+                    buscarEnderecoGeocodificado(e.lngLat.lat, e.lngLat.lng);
+                });
+
+            } else {
+                mapboxInstance.setCenter([lng, lat]);
+                mapboxInstance.setZoom(16);
+                if (mapboxMarkerInstance) {
+                    mapboxMarkerInstance.setLngLat([lng, lat]);
+                }
+            }
+
+            setTimeout(() => {
+                if (mapboxInstance) mapboxInstance.resize();
+            }, 200);
+
+            buscarEnderecoGeocodificado(lat, lng);
+        }
+
+        function buscarEnderecoGeocodificado(lat, lng) {
+            const urlRev = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${MAPBOX_TOKEN}&country=br&language=pt`;
+            fetch(urlRev)
+                .then(r => r.json())
+                .then(data => {
+                    const label = document.getElementById('label-endereco-geocodificado');
+                    if (label) {
+                        if (data && data.features && data.features.length > 0) {
+                            label.innerHTML = `<b>${data.features[0].place_name}</b>`;
+                        } else {
+                            label.innerText = `Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                        }
+                    }
+                })
+                .catch(() => {
+                    const label = document.getElementById('label-endereco-geocodificado');
+                    if (label) label.innerText = `Coordenadas: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+                });
+        }
+
+        window.salvarCoordenadasDoMapaModal = async function() {
+            if (!plaquetaEmVisualizacaoMap) return;
+
+            const newLat = parseFloat(document.getElementById('input-mapa-lat').value);
+            const newLng = parseFloat(document.getElementById('input-mapa-lng').value);
+
+            if (isNaN(newLat) || isNaN(newLng)) {
+                alert("Por favor, informe coordenadas numéricas válidas para Latitude e Longitude.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-salvar-coords-mapa');
+            if (btn) { btn.disabled = true; btn.innerText = "Salvando no Supabase..."; }
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                alert("Erro: Cliente Supabase não encontrado.");
+                if (btn) { btn.disabled = false; btn.innerText = "Salvar Nova Localização"; }
+                return;
+            }
+
+            try {
+                // Atualizar tanto nome em minúsculo quanto maiúsculo para compatibilidade com o esquema
+                const updatePayload = {
+                    Latitude: newLat,
+                    Longitude: newLng,
+                    latitude: newLat,
+                    longitude: newLng
+                };
+
+                const { error } = await client.from('localizacao_plaquetas')
+                    .update(updatePayload)
+                    .eq('identificacao', plaquetaEmVisualizacaoMap.identificacao);
+
+                if (error) {
+                    alert("Erro ao atualizar coordenadas no Supabase: " + error.message);
+                } else {
+                    alert(`✅ Localização da plaqueta #${plaquetaEmVisualizacaoMap.identificacao} atualizada com sucesso!`);
+                    window.fecharMapaPlaquetaModal();
+                    carregarPlaquetas(paginaAtual);
+                }
+            } catch (err) {
+                alert("Erro inesperado: " + err.message);
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = "Salvar Nova Localização"; }
+            }
+        };
+
+        window.fecharMapaPlaquetaModal = function() {
+            const modal = document.getElementById('modal-mapa-plaqueta');
+            const modalBox = document.getElementById('modal-mapa-plaqueta-box');
+            if (!modal || !modalBox) return;
+
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                plaquetaEmVisualizacaoMap = null;
+            }, 200);
+        };
+
+        // =========================================================================
+        // LÓGICA DO MODAL 2: FORMULÁRIO COMPLETO CRIAR / EDITAR PLAQUETA
+        // =========================================================================
+        window.abrirModalEditarPlaqueta = function(identificacao = null) {
+            const modal = document.getElementById('modal-form-plaqueta');
+            const modalBox = document.getElementById('modal-form-plaqueta-box');
+            const titulo = document.getElementById('form-plaqueta-titulo');
+            const icon = document.getElementById('form-plaqueta-icon');
+            if (!modal || !modalBox) return;
+
+            if (identificacao) {
+                const item = plaquetasCache.find(p => p.identificacao.toUpperCase() === identificacao.toUpperCase());
+                if (!item) return;
+
+                if (titulo) titulo.innerText = `Editar Plaqueta #${item.identificacao}`;
+                if (icon) icon.innerText = 'edit_square';
+
+                document.getElementById('form-plaqueta-id-original').value = item.identificacao;
+                document.getElementById('form-input-identificacao').value = item.identificacao;
+                document.getElementById('form-input-identificacao').readOnly = true; // Chave primária não editável
+                document.getElementById('form-input-latitude').value = item.latitude !== null ? item.latitude : '';
+                document.getElementById('form-input-longitude').value = item.longitude !== null ? item.longitude : '';
+                document.getElementById('form-input-qtd-lum').value = item.qtd_lum || 1;
+                document.getElementById('form-input-empresa').value = item.empresa || '';
+                document.getElementById('form-input-observacao').value = item.observacao || '';
+            } else {
+                if (titulo) titulo.innerText = 'Cadastrar Nova Plaqueta';
+                if (icon) icon.innerText = 'add_location_alt';
+
+                document.getElementById('form-plaqueta-id-original').value = '';
+                document.getElementById('form-input-identificacao').value = '';
+                document.getElementById('form-input-identificacao').readOnly = false;
+                document.getElementById('form-input-latitude').value = '';
+                document.getElementById('form-input-longitude').value = '';
+                document.getElementById('form-input-qtd-lum').value = 1;
+                document.getElementById('form-input-empresa').value = 'FORTNORT';
+                document.getElementById('form-input-observacao').value = '';
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 50);
+        };
+
+        window.submitFormPlaqueta = async function(e) {
+            e.preventDefault();
+
+            const idOriginal = document.getElementById('form-plaqueta-id-original').value.trim();
+            const identificacao = document.getElementById('form-input-identificacao').value.trim().toUpperCase();
+            const latVal = parseFloat(document.getElementById('form-input-latitude').value);
+            const lngVal = parseFloat(document.getElementById('form-input-longitude').value);
+            const qtdLum = parseInt(document.getElementById('form-input-qtd-lum').value, 10) || 1;
+            const empresa = document.getElementById('form-input-empresa').value.trim();
+            const observacao = document.getElementById('form-input-observacao').value.trim();
+
+            if (!identificacao) {
+                alert("A identificação da plaqueta é obrigatória.");
+                return;
+            }
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                alert("Erro: Conexão Supabase indisponível.");
+                return;
+            }
+
+            const btnSubmit = document.getElementById('btn-submit-form-plaqueta');
+            if (btnSubmit) { btnSubmit.disabled = true; btnSubmit.innerText = "Salvando..."; }
+
+            try {
+                const payload = {
+                    identificacao: identificacao,
+                    Latitude: !isNaN(latVal) ? latVal : null,
+                    Longitude: !isNaN(lngVal) ? lngVal : null,
+                    latitude: !isNaN(latVal) ? latVal : null,
+                    longitude: !isNaN(lngVal) ? lngVal : null,
+                    "QTD. Lum.": qtdLum,
+                    Empresa: empresa,
+                    empresa: empresa,
+                    Observação: observacao,
+                    observacao: observacao
+                };
+
+                let res;
+                if (idOriginal) {
+                    // Update
+                    res = await client.from('localizacao_plaquetas')
+                        .update(payload)
+                        .eq('identificacao', idOriginal);
+                } else {
+                    // Insert
+                    res = await client.from('localizacao_plaquetas')
+                        .insert([payload]);
+                }
+
+                if (res.error) {
+                    alert("Erro ao salvar plaqueta no Supabase: " + res.error.message);
+                } else {
+                    alert(`✅ Plaqueta ${identificacao} salva com sucesso!`);
+                    window.fecharFormPlaquetaModal();
+                    carregarPlaquetas(paginaAtual);
+                }
+
+            } catch(err) {
+                alert("Erro inesperado: " + err.message);
+            } finally {
+                if (btnSubmit) { btnSubmit.disabled = false; btnSubmit.innerText = "Salvar Plaqueta"; }
+            }
+        };
+
+        window.fecharFormPlaquetaModal = function() {
+            const modal = document.getElementById('modal-form-plaqueta');
+            const modalBox = document.getElementById('modal-form-plaqueta-box');
+            if (!modal || !modalBox) return;
+
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        };
+
+        // =========================================================================
+        // EXCLUSÃO DE PLAQUETA
+        // =========================================================================
+        window.confirmarExcluirPlaqueta = async function(identificacao) {
+            if (!confirm(`Deseja realmente excluir o registro da plaqueta #${identificacao} da tabela localizacao_plaquetas?`)) {
+                return;
+            }
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) return;
+
+            try {
+                const { error } = await client.from('localizacao_plaquetas')
+                    .delete()
+                    .eq('identificacao', identificacao);
+
+                if (error) {
+                    alert("Erro ao excluir plaqueta: " + error.message);
+                } else {
+                    alert(`✅ Plaqueta #${identificacao} removida com sucesso.`);
+                    carregarPlaquetas(paginaAtual);
+                }
+            } catch(e) {
+                alert("Erro: " + e.message);
+            }
+        };
+
+        // Resizers para ajustar largura de colunas da tabela
+        function initResizers() {
+            const table = document.getElementById('plaquetas-table');
+            if (!table) return;
+
+            const resizers = table.querySelectorAll('.resizer');
+            resizers.forEach((resizer) => {
+                resizer.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    const th = resizer.parentElement;
+                    const startX = e.clientX;
+                    const startWidth = th.offsetWidth;
+
+                    const mouseMoveHandler = (eMove) => {
+                        const dx = eMove.clientX - startX;
+                        const newWidth = Math.max(90, startWidth + dx);
+                        th.style.width = `${newWidth}px`;
+                        th.style.minWidth = `${newWidth}px`;
+                    };
+
+                    const mouseUpHandler = () => {
+                        document.removeEventListener('mousemove', mouseMoveHandler);
+                        document.removeEventListener('mouseup', mouseUpHandler);
+                    };
+
+                    document.addEventListener('mousemove', mouseMoveHandler);
+                    document.addEventListener('mouseup', mouseUpHandler);
+                });
+            });
+        }
+
+        // =========================================================================
+        // LÓGICA DO MODAL 3: MAPA GERAL / MULTI-PLAQUETAS
+        // =========================================================================
+        let multiMapboxInstance = null;
+        let multiMapboxMarkers = [];
+
+        window.abrirMapaMultiPlaquetasModal = function() {
+            console.log("🗺️ [MultiMapa] Função abrirMapaMultiPlaquetasModal acionada!");
+            const plaquetasParaExibir = plaquetasCache || [];
+            console.log("🗺️ [MultiMapa] plaquetasCache total:", plaquetasParaExibir.length);
+
+            if (plaquetasParaExibir.length === 0) {
+                console.warn("⚠️ [MultiMapa] Nenhum registro em plaquetasCache.");
+                alert("Nenhuma plaqueta carregada para exibição no mapa.");
+                return;
+            }
+
+            const modal = document.getElementById('modal-mapa-multi-plaquetas');
+            const modalBox = document.getElementById('modal-mapa-multi-box');
+            console.log("🗺️ [MultiMapa] Elementos DOM:", { modal, modalBox });
+
+            if (!modal || !modalBox) {
+                console.error("❌ Elementos do modal #modal-mapa-multi-plaquetas não encontrados no DOM.");
+                alert("O elemento do mapa não foi localizado na página.");
+                return;
+            }
+
+            const badgeCount = document.getElementById('multi-mapa-badge-count');
+            if (badgeCount) badgeCount.innerText = `${plaquetasParaExibir.length} plaqueta(s) na página`;
+
+            modal.style.display = 'flex';
+            modal.classList.remove('hidden');
+            console.log("🗺️ [MultiMapa] Modal tornado visível via display:flex e remoção de .hidden");
+
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+
+                inicializarMultiMapbox(plaquetasParaExibir);
+            }, 50);
+        };
+
+        function inicializarMultiMapbox(plaquetas) {
+            const container = document.getElementById('mapa-multi-canvas');
+            if (!container) return;
+
+            if (!multiMapboxInstance) {
+                mapboxgl.accessToken = MAPBOX_TOKEN;
+                multiMapboxInstance = new mapboxgl.Map({
+                    container: 'mapa-multi-canvas',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: [-48.17188, -21.75478],
+                    zoom: 13
+                });
+
+                multiMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+                multiMapboxInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+            }
+
+            // Limpar marcadores anteriores
+            multiMapboxMarkers.forEach(m => m.remove());
+            multiMapboxMarkers = [];
+
+            const bounds = new mapboxgl.LngLatBounds();
+
+            plaquetas.forEach((plq, idx) => {
+                let lat = plq.latitude;
+                let lng = plq.longitude;
+                let isFallback = false;
+
+                if (!plq.hasCoords || lat === null || lng === null) {
+                    isFallback = true;
+                    // Distribuir pontos sem coordenadas próximas ao centro de Araraquara
+                    const offsetLat = ((idx % 5) - 2) * 0.003;
+                    const offsetLng = (Math.floor(idx / 5) - 2) * 0.003;
+                    lat = -21.75478 + offsetLat;
+                    lng = -48.17188 + offsetLng;
+                }
+
+                bounds.extend([lng, lat]);
+
+                // Criar Marcador Personalizado
+                const el = document.createElement('div');
+                el.className = 'custom-multi-marker flex flex-col items-center cursor-pointer group select-none';
+                el.innerHTML = `
+                    <div class="px-2 py-0.5 rounded-md text-[11px] font-bold ${isFallback ? 'bg-amber-800 text-amber-100' : 'bg-slate-900 text-white'} shadow-md border border-white/40 whitespace-nowrap transition-transform group-hover:scale-110">
+                        #${plq.identificacao} ${isFallback ? '(sem coord)' : ''}
+                    </div>
+                    <div class="w-3.5 h-3.5 ${isFallback ? 'bg-amber-500' : 'bg-blue-600'} rounded-full border-2 border-white shadow-md -mt-1"></div>
+                `;
+
+                const popupContent = `
+                    <div class="p-2 text-xs text-slate-800 space-y-1.5 min-w-[200px]">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-1 font-bold text-slate-900">
+                            <span class="text-secondary font-mono">Plaqueta #${plq.identificacao}</span>
+                            <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">${plq.empresa || 'Sem empresa'}</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-600">
+                            📍 ${plq.hasCoords ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Sem coordenadas cadastradas'}
+                        </div>
+                        ${plq.observacao ? `<div class="text-[11px] bg-rose-50 text-rose-700 p-1 rounded font-semibold border border-rose-200">${plq.observacao}</div>` : ''}
+                        <button type="button" onclick="window.fecharMapaMultiPlaquetasModal(); window.abrirMapaPlaquetaModal('${plq.identificacao}')" class="w-full mt-1.5 bg-secondary text-white text-[11px] font-bold py-1.5 px-2 rounded-lg hover:bg-secondary-container transition-colors cursor-pointer text-center flex items-center justify-center gap-1">
+                            <span class="material-symbols-outlined text-[14px]">edit_location</span>
+                            <span>Editar Localização Desta Plaqueta</span>
+                        </button>
+                    </div>
+                `;
+
+                const popup = new mapboxgl.Popup({ offset: 25, closeButton: false }).setHTML(popupContent);
+
+                const marker = new mapboxgl.Marker({ element: el })
+                    .setLngLat([lng, lat])
+                    .setPopup(popup)
+                    .addTo(multiMapboxInstance);
+
+                multiMapboxMarkers.push(marker);
+            });
+
+            if (plaquetas.length > 0) {
+                multiMapboxInstance.fitBounds(bounds, { padding: 80, maxZoom: 17 });
+            }
+
+            setTimeout(() => {
+                if (multiMapboxInstance) multiMapboxInstance.resize();
+            }, 200);
+        }
+
+        window.centralizarMultiMapa = function() {
+            const plaquetasParaExibir = plaquetasCache || [];
+            if (plaquetasParaExibir.length === 0 || !multiMapboxInstance) return;
+
+            const bounds = new mapboxgl.LngLatBounds();
+            plaquetasParaExibir.forEach((p, idx) => {
+                let lat = p.latitude;
+                let lng = p.longitude;
+                if (!p.hasCoords || lat === null || lng === null) {
+                    const offsetLat = ((idx % 5) - 2) * 0.003;
+                    const offsetLng = (Math.floor(idx / 5) - 2) * 0.003;
+                    lat = -21.75478 + offsetLat;
+                    lng = -48.17188 + offsetLng;
+                }
+                bounds.extend([lng, lat]);
+            });
+            multiMapboxInstance.fitBounds(bounds, { padding: 80, maxZoom: 17 });
+        };
+
+        window.fecharMapaMultiPlaquetasModal = function() {
+            const modal = document.getElementById('modal-mapa-multi-plaquetas');
+            const modalBox = document.getElementById('modal-mapa-multi-box');
+            if (!modal || !modalBox) return;
+
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                modal.style.display = 'none';
+            }, 200);
+        };
+
+    })();
+</script>
+</body>
+</html>

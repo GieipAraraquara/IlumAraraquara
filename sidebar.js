@@ -88,6 +88,7 @@ class AppSidebar extends HTMLElement {
             { id: 'auditoria', label: 'Auditoria', icon: 'fact_check', href: 'Auditoria.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
             { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
+            { id: 'plaquetas', label: 'Plaquetas', icon: 'pin_drop', href: 'Controle-Plaquetas.html' },
             { id: 'configuracoes', label: 'Configurações', icon: 'settings', href: '#', mtAuto: true },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";' }
         ];
@@ -376,6 +377,16 @@ customElements.define('app-sidebar', AppSidebar);
 function loadScriptIfNeeded(src) {
     if (!src) return Promise.resolve();
     const cleanSrc = src.replace(/^\.\//, '').split('?')[0];
+
+    let expectedGlobal = null;
+    if (cleanSrc.includes('ChamadoModel')) expectedGlobal = 'ChamadoModel';
+    else if (cleanSrc.includes('ChamadosRepository')) expectedGlobal = 'ChamadosRepository';
+    else if (cleanSrc.includes('ChamadosService')) expectedGlobal = 'ChamadosService';
+    else if (cleanSrc.includes('LogsRepository')) expectedGlobal = 'LogsRepository';
+    else if (cleanSrc.includes('AuditoriaController')) expectedGlobal = 'AuditoriaController';
+    else if (cleanSrc.includes('PainelController')) expectedGlobal = 'PainelController';
+    else if (cleanSrc.includes('RelatorioController')) expectedGlobal = 'RelatorioController';
+
     const existingScript = Array.from(document.querySelectorAll('script')).find(s => {
         const sSrc = s.getAttribute('src');
         if (!sSrc) return false;
@@ -384,7 +395,9 @@ function loadScriptIfNeeded(src) {
     });
 
     if (existingScript) {
-        return Promise.resolve();
+        if (!expectedGlobal || (typeof window !== 'undefined' && window[expectedGlobal])) {
+            return Promise.resolve();
+        }
     }
 
     return new Promise((resolve) => {
@@ -404,6 +417,7 @@ function updateSidebarActiveState(targetUrl) {
     let activeId = 'painel';
     if (lower.includes('manutentor')) activeId = 'painel-manutentor';
     else if (lower.includes('auditoria')) activeId = 'auditoria';
+    else if (lower.includes('plaqueta')) activeId = 'plaquetas';
     else if (lower.includes('mapa')) activeId = 'mapa';
     else if (lower.includes('relat')) activeId = 'relatorios';
     else if (lower.includes('config')) activeId = 'configuracoes';

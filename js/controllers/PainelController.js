@@ -244,7 +244,7 @@ class PainelController {
         // Endereço / Pontos
         const tdEndereco = document.createElement('td');
         tdEndereco.className = 'py-3 px-5 align-middle';
-        const points = item.addressPoints;
+        const points = item.addressPointsIniciais;
         console.log(`📌 [PainelController] Renderizando OS ${item.protocolo}:`, {
             endereco: item.endereco,
             plaquetaInicial: item.plaquetaInicial,
@@ -888,6 +888,10 @@ class PainelController {
      * Constrói o HTML dinâmico das informações detalhadas da OS para o modal no Painel
      */
     buildDetalhesOSModalHtml(item) {
+        const isPracaOS = Boolean(
+            item.isPraca ||
+            (item.protocolo && String(item.protocolo).trim().toUpperCase().startsWith('P'))
+        );
         const coordIni = window.ChamadoModel.formatCoordPair(item.coordenadaInicial);
         const coordFin = window.ChamadoModel.formatCoordPair(item.coordenadaReparo);
         const linkMaps = (coordFin.lat !== '--') ? `https://www.google.com/maps/search/?api=1&query=${coordFin.lat},${coordFin.lng}` : (coordIni.lat !== '--' ? `https://www.google.com/maps/search/?api=1&query=${coordIni.lat},${coordIni.lng}` : '#');
@@ -926,6 +930,39 @@ class PainelController {
             distFormatted = '> 100 metros (Divergente)';
         }
 
+        let isAdminUser = false;
+        let isManutentorUser = false;
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (r === 'admin') isAdminUser = true;
+                if (r === 'manutentor') isManutentorUser = true;
+            }
+            if (!isAdminUser && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
+            }
+            if (!isManutentorUser && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isManutentorUser = true;
+            }
+            if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                isAdminUser = true;
+            }
+            if (!isManutentorUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('manutentor')) {
+                isManutentorUser = true;
+            }
+            if (!isManutentorUser && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
+                isManutentorUser = true;
+            }
+        } catch(e) {}
+
+        const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
+        const isJaCancelada = (item.normalizedStatus === 'cancelada');
+        const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
+        const isConcluida = (item.normalizedStatus === 'concluida');
+        const isPendente = (item.normalizedStatus === 'pendente');
+
         const getCleanOp = (v) => {
             if (!v) return '';
             const s = String(v).trim();
@@ -945,7 +982,7 @@ class PainelController {
         const opFinalizacao = getCleanOp(item.displayOperadorFinalizacao) || getCleanOp(item.operadorFinalizacao) || 'Pendente finalização';
 
         return `
-        <!-- Seção 1: Dados do Solicitante & Operação -->
+        <!-- Seção 1: Solicitante & Ações Administrativas no Topo -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-1">
                 <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 mb-1.5 flex items-center gap-1">
@@ -960,42 +997,104 @@ class PainelController {
                 ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">${item.motivoAprovacao}</span></div>` : ''}
             </div>
 
-            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2">
-                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center gap-1">
-                    <span class="material-symbols-outlined text-[16px]">inventory_2</span>
-                    <span>Materiais Utilizados</span>
-                </div>
-
-                <!-- Seção Estruturada de Materiais Utilizados -->
+            <!-- Bloco 2: Ações Administrativas -->
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2 flex flex-col justify-between">
                 <div>
-                    ${(() => {
-                        const rawMatModal = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado;
-                        const modalMats = (item.materialsList && Array.isArray(item.materialsList) && item.materialsList.length > 0)
-                            ? item.materialsList
-                            : (window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(rawMatModal) : (rawMatModal ? [String(rawMatModal)] : []));
-                        if (modalMats.length === 0) {
-                            return `
-                                <div class="flex items-center gap-1.5 py-1">
-                                    <span class="text-on-surface-variant italic text-xs">Nenhum material registrado</span>
-                                </div>
-                            `;
-                        }
-                        return `
-                            <div class="flex flex-wrap gap-1.5 pt-0.5">
-                                ${modalMats.map(mat => `
-                                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-surface-container-lowest text-on-surface border border-outline-variant/60 shadow-2xs">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-secondary flex-shrink-0"></span>
-                                        <span>${mat}</span>
-                                    </span>
-                                `).join('')}
-                            </div>
-                        `;
-                    })()}
+                    <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
+                            <span>Ações Administrativas</span>
+                        </span>
+                        ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel Admin</span>` : ''}
+                    </div>
+                    
+                    <div class="flex flex-wrap items-center gap-2 pt-2">
+                        ${isManutentorUser ? `
+                            ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
+                            <button type="button" onclick="window.rejeitarOSManutentor('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">thumb_down</span>
+                                <span>Rejeitar OS</span>
+                            </button>` : (isJaRejeitada ? `
+                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 opacity-70 cursor-not-allowed">
+                                <span class="material-symbols-outlined text-[15px]">thumb_down</span>
+                                <span>OS Rejeitada</span>
+                            </button>` : '')}
+                        ` : ''}
+
+                        ${isAdminUser ? `
+                            ${isPendente ? `
+                            <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">check</span>
+                                <span>Aprovar OS</span>
+                            </button>` : ''}
+
+                            ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
+                                !isJaUrgente ? `
+                                <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Urgente')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">priority_high</span>
+                                    <span>Priorizar para Urgente</span>
+                                </button>` : `
+                                <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Normal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">restart_alt</span>
+                                    <span>Retornar para Normal</span>
+                                </button>`
+                            ) : ''}
+
+                            ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
+                            <button type="button" onclick="window.reabrirOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">undo</span>
+                                <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
+                            </button>` : ''}
+
+                            ${!isConcluida ? (
+                                !isJaCancelada ? `
+                                <button type="button" onclick="window.cancelarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[16px]">block</span>
+                                    <span>Cancelar OS</span>
+                                </button>` : `
+                                <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
+                                    <span class="material-symbols-outlined text-[15px]">block</span>
+                                    <span>OS Cancelada</span>
+                                </button>`
+                            ) : ''}
+                        ` : ''}
+
+                        ${(!isAdminUser && !isManutentorUser) ? `
+                            <div class="text-slate-500 italic text-xs py-1">Atendimento registrado no sistema. Sem ações pendentes.</div>
+                        ` : ''}
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Seção 2: Pontos de Manutenção, Plaqueta & Coordenadas -->
+        <!-- Seção 2: Observações de Abertura (Munícipe / Solicitante) -->
+        ${(() => {
+            const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();
+            const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
+
+            if (!obsIni && !obsFin) return '';
+
+            let bodyObs = '';
+            if (obsIni && obsFin && obsIni !== obsFin) {
+                bodyObs = `<div><b class="text-slate-700 font-semibold">📌 Abertura / Solicitante:</b> ${obsIni.replace(/\n/g, '<br/>')}</div><div class="mt-2 pt-2 border-t border-slate-200/60"><b class="text-slate-700 font-semibold">📝 Observação Complementar:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
+            } else {
+                bodyObs = `<div>${(obsIni || obsFin).replace(/\n/g, '<br/>')}</div>`;
+            }
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1.5">
+                <strong class="text-secondary font-bold flex items-center gap-1.5 mb-1">
+                    <span class="material-symbols-outlined text-[16px]">chat</span>
+                    <span>Observações de Abertura (Munícipe / Solicitante)</span>
+                </strong>
+                <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 text-[11.5px] text-on-surface leading-relaxed italic">
+                    ${bodyObs}
+                </div>
+            </div>`;
+        })()}
+
+        <!-- Seção 3: Pontos de Manutenção (Exclusivo para Protocolos Viários 'I') -->
+        ${!isPracaOS ? `
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
                 <span class="flex items-center gap-1.5">
@@ -1004,15 +1103,9 @@ class PainelController {
                 </span>
             </div>
 
-            <!-- Resumo Rápido -->
-            <div class="p-2 rounded-lg bg-surface-container-lowest border border-outline-variant/50 grid grid-cols-1 md:grid-cols-2 gap-2 text-[11.5px]">
-                <div><b class="text-on-surface-variant font-medium">Plaqueta(s) Registrada(s):</b> <span class="font-semibold text-primary">${(item.plaquetasFinalList || []).join(', ') || 'Não informada'}</span></div>
-                ${!item.isDireto ? `<div><b class="text-on-surface-variant font-medium">Distância Abertura ➔ Reparo:</b> <span class="font-medium ${distM > 100 ? 'text-rose-700 font-bold' : 'text-emerald-700'}">${distFormatted}</span></div>` : '<div><b class="text-on-surface-variant font-medium">Tipo:</b> <span class="font-semibold text-amber-700">Demanda Emergencial (Atendimento Direto)</span></div>'}
-            </div>
-
             <!-- Lista Estruturada dos Pontos -->
             <div class="space-y-2">
-                ${(item.pontosDetalhados || []).map(p => {
+                ${(item.pontosDetalhados || []).map((p, pIdx) => {
                     const isRealAddr = (val) => window.ChamadoModel ? window.ChamadoModel.isRealAddress(val) : (val && !String(val).toLowerCase().includes('coord'));
 
                     const buildNavLinks = (coordVal, enderecoVal) => {
@@ -1041,11 +1134,12 @@ class PainelController {
                             gmaps = `https://www.google.com/maps/search/?api=1&query=${queryEnc}`;
                             waze = `https://waze.com/ul?q=${queryEnc}&navigate=yes`;
                         }
-                        return { gmaps, waze, hasNav: gmaps !== '#' };
+                        return { hasNav: (lat !== null || isRealAddr(enderecoVal)), gmaps, waze };
                     };
 
-                    const navIni = buildNavLinks(p.coordenadaInicial, p.enderecoInicial);
-                    const navFin = buildNavLinks(p.coordenadaFinal, p.enderecoFinal || p.enderecoInicial);
+                    const hasIni = p.hasInicialData || (pIdx === 0 && Boolean(p.plaquetaInicial || item.plaquetaInicial || item.plaqueta));
+                    const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, p.enderecoInicial) : { hasNav: false };
+                    const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, p.enderecoFinal) : { hasNav: false };
 
                     return `
                     <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
@@ -1056,58 +1150,27 @@ class PainelController {
                             </div>
                             ${p.hasFinalData ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Concluído</span>` : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Abertura / Pendente</span>`}
                         </div>
-
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                            <!-- Coluna Abertura (Inicial) -->
-                            <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1.5 text-xs flex flex-col justify-between">
-                                <div class="space-y-1.5">
-                                    <div class="font-bold text-slate-700 text-xs border-b border-slate-200/60 pb-1">📌 Abertura (Inicial)</div>
-                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta:</b> <span class="font-semibold text-slate-800">${p.plaquetaInicial || 'Não informada'}</span></div>
-                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada:</b> <span class="font-medium text-slate-800">${p.coordenadaInicial || 'Não informada'}</span></div>
-                                    <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema:</b> <span class="font-medium text-slate-800">${p.problemaInicial || 'Não informado'}</span></div>
-                                    ${isRealAddr(p.enderecoInicial) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço:</b> <span class="font-medium text-slate-800">${p.enderecoInicial}</span></div>` : ''}
-                                </div>
-                                ${navIni.hasNav ? `
-                                <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1.5">
-                                    <span class="text-[10.5px] font-semibold text-slate-500 flex items-center gap-0.5">
-                                        <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
-                                    </span>
-                                    <a href="${navIni.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                                        <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
-                                        <span>Maps</span>
-                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
-                                    </a>
-                                    <a href="${navIni.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
-                                        <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
-                                        <span>Waze</span>
-                                        <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
-                                    </a>
-                                </div>
-                                ` : ''}
-                            </div>
-
-                            <!-- Coluna Conclusão (Final / Reparo) -->
-                            ${p.hasFinalData ? `
-                                <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1.5 text-xs flex flex-col justify-between">
-                                    <div class="space-y-1.5">
-                                        <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Conclusão (Reparo)</div>
-                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Plaqueta Final:</b> <span class="font-semibold text-slate-800">${p.plaquetaFinal || 'Não informada'}</span></div>
-                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Coordenada Reparo:</b> <span class="font-medium text-slate-800">${p.coordenadaFinal || 'Não informada'}</span></div>
-                                        <div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Problema Encontrado:</b> <span class="font-medium text-slate-800">${p.problemaEncontrado || 'Não informado'}</span></div>
-                                        ${isRealAddr(p.enderecoFinal) ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Endereço Reparo:</b> <span class="font-medium text-slate-800">${p.enderecoFinal}</span></div>` : ''}
-                                        ${p.materiais && p.materiais.length > 0 ? `<div class="text-xs leading-relaxed"><b class="text-slate-600 font-semibold">Materiais:</b> <span class="font-medium text-slate-800">${p.materiais.join(', ')}</span></div>` : ''}
+                            ${hasIni ? `
+                                <div class="p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1 text-xs flex flex-col justify-between h-full">
+                                    <div class="space-y-1">
+                                        <div class="font-bold text-slate-700 text-xs border-b border-slate-200/60 pb-1">📌 Abertura (Inicial)</div>
+                                        <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-slate-800">${(p.plaquetaInicial && p.plaquetaInicial !== 'Não informada') ? p.plaquetaInicial : (pIdx === 0 ? (item.plaquetaInicial || item.plaqueta || 'Não informada') : 'Não informada')}</span></div>
+                                        <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-slate-800">${(p.coordenadaInicial && p.coordenadaInicial !== 'Não informada') ? p.coordenadaInicial : (pIdx === 0 ? (item.coordenadaInicial || item.coordenada || 'Não informada') : 'Não informada')}</span></div>
+                                        <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-slate-800">${(p.problemaInicial && p.problemaInicial !== 'Não informado') ? p.problemaInicial : (pIdx === 0 ? (item.problemaInicial || item.problema || 'Não informado') : 'Não informado')}</span></div>
+                                        ${isRealAddr(p.enderecoInicial || (pIdx === 0 ? item.endereco : '')) ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-800">${p.enderecoInicial || item.endereco}</span></div>` : ''}
                                     </div>
-                                    ${navFin.hasNav ? `
-                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
-                                        <span class="text-[10.5px] font-semibold text-emerald-700 flex items-center gap-0.5">
+                                    ${navIni.hasNav ? `
+                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1.5">
+                                        <span class="text-[10.5px] font-semibold text-slate-500 flex items-center gap-0.5">
                                             <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
                                         </span>
-                                        <a href="${navFin.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <a href="${navIni.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-blue-100/80 text-blue-700 hover:bg-blue-200 border border-blue-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
                                             <span class="material-symbols-outlined text-[12px] text-blue-600">map</span>
                                             <span>Maps</span>
                                             <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
                                         </a>
-                                        <a href="${navFin.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                        <a href="${navIni.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100/80 text-cyan-800 hover:bg-cyan-200 border border-cyan-200/80 active:scale-95 transition-all cursor-pointer shadow-2xs">
                                             <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
                                             <span>Waze</span>
                                             <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
@@ -1116,12 +1179,44 @@ class PainelController {
                                     ` : ''}
                                 </div>
                             ` : `
-                                <div class="p-2.5 rounded-lg bg-amber-50/40 border border-amber-200/60 space-y-1.5 flex flex-col justify-center items-center text-center min-h-[90px] text-xs">
-                                    <div class="font-bold text-amber-800 text-xs flex items-center gap-1">
-                                        <span class="material-symbols-outlined text-[14px]">hourglass_empty</span>
-                                        <span>Conclusão (Reparo)</span>
+                                <div class="p-2.5 rounded-lg bg-slate-100/60 border border-dashed border-slate-300 text-xs flex flex-col items-center justify-center text-center space-y-1 text-slate-500 italic h-full py-4">
+                                    <span class="material-symbols-outlined text-[22px] text-slate-400">playlist_add</span>
+                                    <span class="font-semibold text-slate-600 text-xs">Sem Registro de Abertura</span>
+                                    <span class="text-[10.5px] text-slate-500">Ponto adicional registrado durante o fechamento em campo.</span>
+                                </div>
+                            `}
+                            ${p.hasFinalData ? `
+                                 <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1 text-xs flex flex-col justify-between h-full">
+                                    <div class="space-y-1">
+                                        <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Fechamento #${p.fechamento || p.numeroFechamento || 1}</div>
+                                        <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (item.plaquetaFinal || 'Não informada')}</span></div>
+                                        <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (item.coordenadaReparo || 'Não informada')}</span></div>
+                                        <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (item.problemaEncontrado || 'Não informado')}</span></div>
+                                        ${isRealAddr(p.enderecoFinal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${p.enderecoFinal}</span></div>` : ''}
                                     </div>
-                                    <span class="text-xs text-amber-700 font-medium pt-0.5">Aguardando execução / conclusão</span>
+                                    ${navFin.hasNav ? `
+                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
+                                        <span class="text-[10.5px] font-semibold text-emerald-700 flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[13px]">explore</span> Navegar:
+                                        </span>
+                                        <a href="${navFin.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-emerald-700">map</span>
+                                            <span>Maps</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                        <a href="${navFin.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-semibold bg-cyan-100 text-cyan-800 hover:bg-cyan-200 border border-cyan-300 active:scale-95 transition-all cursor-pointer shadow-2xs">
+                                            <span class="material-symbols-outlined text-[12px] text-cyan-600">navigation</span>
+                                            <span>Waze</span>
+                                            <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                        </a>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            ` : `
+                                <div class="p-2.5 rounded-lg bg-amber-50/50 border border-dashed border-amber-300 text-xs flex flex-col items-center justify-center text-center space-y-1 text-amber-700 italic h-full py-4">
+                                    <span class="material-symbols-outlined text-[22px] text-amber-500">pending_actions</span>
+                                    <span class="font-semibold text-amber-800 text-xs">Aguardando Conclusão</span>
+                                    <span class="text-[10.5px] text-amber-600">Ponto pendente de reparo/fechamento em campo.</span>
                                 </div>
                             `}
                         </div>
@@ -1130,12 +1225,13 @@ class PainelController {
                 }).join('')}
             </div>
         </div>
+        ` : ''}
 
         <!-- Seção: Gestão de Sessões de Trabalho & Equipe (Praça Pública / Manutenção) -->
-        ${(item.sessoesList && item.sessoesList.length > 0) ? `
+        ${(isPracaOS || (item.sessoesList && item.sessoesList.length > 0)) ? `
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
-                <span class="flex items-center gap-1.5 text-blue-700">
+                <span class="flex items-center gap-1.5 text-blue-700 font-bold">
                     <span class="material-symbols-outlined text-[18px]">groups</span>
                     <span>Gestão de Sessões & Equipe</span>
                 </span>
@@ -1146,6 +1242,7 @@ class PainelController {
                 ` : ''}
             </div>
             
+            ${(item.sessoesList && item.sessoesList.length > 0) ? `
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                 ${item.sessoesList.map(s => {
                     const st = (s.status || '').toUpperCase();
@@ -1155,6 +1252,11 @@ class PainelController {
                     const dataInc = s.inicioStr || 'Início registrado';
                     const dataFim = s.fimStr || (isEmAndamento ? 'Em andamento...' : 'Concluída');
                     const durStr = s.duracao_minutos ? (s.duracao_minutos >= 60 ? `${Math.floor(s.duracao_minutos/60)}h ${s.duracao_minutos%60}min (${s.duracao_minutos} min)` : `${s.duracao_minutos} min`) : '';
+
+                    const fotoEnt = s.foto_entrada || s.foto;
+                    const fotoSai = s.foto_saida;
+                    const fEntIdx = fotoEnt && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoEnt) : -1;
+                    const fSaiIdx = fotoSai && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoSai) : -1;
 
                     return `
                     <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 flex flex-col justify-between space-y-2 shadow-2xs">
@@ -1176,222 +1278,199 @@ class PainelController {
                                 <div><b class="text-slate-500 font-medium">Fim:</b> ${dataFim}</div>
                             </div>
                             ${durStr ? `<div class="text-blue-700 font-bold text-[11px] pt-0.5">⏱️ Duração: ${durStr}</div>` : ''}
+                            ${(s.coordenada_inicio || s.coordenada_fim) ? `
+                            <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
+                                ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
+                                ${s.coordenada_fim ? `<div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>` : ''}
+                            </div>
+                            ` : ''}
+                            ${(s.materiais && s.materiais.length > 0) ? `
+                            <div class="pt-1.5 border-t border-slate-100/80 text-[10px]">
+                                <b class="text-slate-600 flex items-center gap-1 font-semibold mb-1">
+                                    <span class="material-symbols-outlined text-[13px] text-slate-500">inventory_2</span>
+                                    Materiais da Sessão:
+                                </b>
+                                <div class="flex flex-wrap gap-1">
+                                    ${(window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(s.materiais) : (Array.isArray(s.materiais) ? s.materiais : [s.materiais])).map(mat => `<span class="px-1.5 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[9.5px] font-medium">${mat}</span>`).join('')}
+                                </div>
+                            </div>
+                            ` : ''}
                         </div>
+
+                        ${(fotoEnt || fotoSai || (s.fotos_andamento && s.fotos_andamento.length > 0)) ? `
+                        <div class="pt-1.5 border-t border-slate-100 space-y-1.5">
+                            ${fotoEnt ? `
+                            <div class="flex items-center gap-2 cursor-pointer group p-1 rounded-lg hover:bg-slate-100/80 transition-colors" onclick="${fEntIdx >= 0 ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fEntIdx})` : `window.open('${fotoEnt}', '_blank')`}">
+                                <div class="w-10 h-8 rounded-md overflow-hidden border border-slate-200 bg-slate-900 flex-shrink-0 relative">
+                                    <img src="${fotoEnt}" alt="Foto Entrada Sessão #${s.numero}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10.5px] font-semibold text-blue-700 group-hover:underline flex items-center gap-0.5">
+                                        📷 Foto de Entrada
+                                    </span>
+                                </div>
+                            </div>
+                            ` : ''}
+
+                            ${(s.fotos_andamento && Array.isArray(s.fotos_andamento)) ? s.fotos_andamento.map((fAnd, faIdx) => {
+                                const fAndIdx = item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fAnd) : -1;
+                                return `
+                                <div class="flex items-center gap-2 cursor-pointer group p-1 rounded-lg hover:bg-slate-100/80 transition-colors" onclick="${fAndIdx >= 0 ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fAndIdx})` : `window.open('${fAnd}', '_blank')`}">
+                                    <div class="w-10 h-8 rounded-md overflow-hidden border border-slate-200 bg-slate-900 flex-shrink-0 relative">
+                                        <img src="${fAnd}" alt="Foto Andamento #${faIdx + 1} Sessão #${s.numero}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[10.5px] font-semibold text-blue-700 group-hover:underline flex items-center gap-0.5">
+                                            📷 Foto do Andamento #${faIdx + 1}
+                                        </span>
+                                    </div>
+                                </div>
+                                `;
+                            }).join('') : ''}
+
+                            ${fotoSai ? `
+                            <div class="flex items-center gap-2 cursor-pointer group p-1 rounded-lg hover:bg-slate-100/80 transition-colors" onclick="${fSaiIdx >= 0 ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fSaiIdx})` : `window.open('${fotoSai}', '_blank')`}">
+                                <div class="w-10 h-8 rounded-md overflow-hidden border border-slate-200 bg-slate-900 flex-shrink-0 relative">
+                                    <img src="${fotoSai}" alt="Foto Encerramento Sessão #${s.numero}" class="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10.5px] font-semibold text-blue-700 group-hover:underline flex items-center gap-0.5">
+                                        📷 Foto de Saída
+                                    </span>
+                                </div>
+                            </div>
+                            ` : ''}
+                        </div>
+                        ` : ''}
                     </div>
                     `;
                 }).join('')}
             </div>
+            ` : `
+            <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface-variant italic text-[11px]">
+                Nenhuma sessão individual registrada para esta praça.
+            </div>
+            `}
         </div>
-        ` : (item.tempoTotalFormatado ? `
-        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs flex items-center justify-between">
-            <span class="font-bold text-secondary flex items-center gap-1.5">
-                <span class="material-symbols-outlined text-[16px] text-blue-600">timer</span>
-                <span>Tempo Total de Trabalho:</span>
-            </span>
-            <span class="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-                ${item.tempoTotalFormatado}
-            </span>
-        </div>
-        ` : '')}
+        ` : ''}
 
-        <!-- Seção: Fotos & Evidências -->
+
+
+        <!-- Seção 3: Histórico de Fechamentos (Com Subseções de Materiais & Fotos para Cada Fechamento) -->
         ${(() => {
-            const fotosList = (item.fotosEvidencias && item.fotosEvidencias.length > 0)
-                ? item.fotosEvidencias
-                : (window.Mapa && typeof window.Mapa.obterFotosEvidenciasOS === 'function' ? window.Mapa.obterFotosEvidenciasOS(item) : ((item.fotos && Array.isArray(item.fotos)) ? item.fotos : []));
-
-            if (!fotosList || fotosList.length === 0) {
-                return `
-                <div class="p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-center text-on-surface-variant text-xs italic">
-                    <span class="material-symbols-outlined text-[20px] align-middle text-outline mr-1">no_photography</span>
-                    <span>Nenhuma foto de evidência anexada para este protocolo.</span>
-                </div>`;
-            }
-
-            let cardsHtml = '';
-            fotosList.forEach((foto, fIdx) => {
-                const fotoUrl = typeof foto === 'string' ? foto : (foto.url || foto.link || foto.foto || '#');
-                const fotoTitulo = typeof foto === 'string' ? `Evidência #${fIdx + 1}` : (foto.titulo || foto.estagio || `Evidência #${fIdx + 1}`);
-                cardsHtml += `
-                <div class="relative group rounded-lg overflow-hidden border border-outline-variant/60 cursor-pointer shadow-2xs hover:shadow-md transition-all aspect-video bg-slate-900" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', ${fIdx})">
-                    <img src="${fotoUrl}" alt="${fotoTitulo}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
-                        <span class="text-[9.5px] font-semibold text-white truncate drop-shadow">${fotoTitulo}</span>
-                    </div>
-                    <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
-                        <span class="material-symbols-outlined text-[14px]">zoom_in</span>
-                    </div>
-                </div>`;
-            });
+            const fechList = item.fechamentosList || [];
+            if (!fechList || fechList.length === 0) return '';
 
             return `
-            <div class="p-3 bg-surface-container-low border border-outline-variant/60 rounded-xl shadow-2xs space-y-2">
-                <div class="flex items-center justify-between">
-                    <strong class="text-xs font-bold text-secondary flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px] text-amber-500">photo_library</span>
-                        <span>Fotos & Evidências (${fotosList.length})</span>
-                    </strong>
+            <div class="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl space-y-3 text-xs">
+                <div class="font-bold text-amber-900 text-xs border-b border-amber-200/60 pb-1.5 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] text-amber-600">history</span>
+                        <span>Histórico de Fechamentos (${fechList.length} registro${fechList.length > 1 ? 's' : ''})</span>
+                    </span>
+                    <span class="text-[10px] font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                        Histórico Auditável
+                    </span>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5">
-                    ${cardsHtml}
+                
+                <div class="space-y-3 pt-1">
+                    ${fechList.map((f, fIdx) => {
+                        const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || 'Data não informada');
+                        const numFech = f.numero || f.numero_fechamento || (fIdx + 1);
+
+                        const matsParsed = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : [];
+                        const fotosParsed = window.ChamadoModel ? window.ChamadoModel.parseClosurePhotos(f) : [];
+
+                        return `
+                        <div class="p-3 rounded-xl bg-white border border-amber-200/90 shadow-2xs space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-1.5 font-bold text-amber-950 border-b border-amber-100 pb-1.5">
+                                <span class="flex items-center gap-1.5 text-[12.5px]">
+                                    <span class="material-symbols-outlined text-[16px] text-amber-600">task_alt</span>
+                                    <span>Fechamento #${numFech}</span>
+                                </span>
+                                <span class="text-[10.5px] font-medium text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                                    📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
+                                </span>
+                            </div>
+
+                            ${(f.relatorioTecnico || f.relatorio_tecnico || f.observacoes) ? `
+                            <div class="text-[11px] text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200/60 italic leading-relaxed">
+                                "${f.relatorioTecnico || f.relatorio_tecnico || f.observacoes}"
+                            </div>` : ''}
+
+                            <div class="p-2 rounded-lg bg-amber-50/40 border border-amber-200/50 space-y-1 text-xs">
+                                <div class="font-bold text-amber-900 text-[11px] flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px] text-amber-700">inventory_2</span>
+                                    <span>Materiais Utilizados neste Fechamento (${matsParsed.length}):</span>
+                                </div>
+                                ${matsParsed.length > 0 ? `
+                                    <div class="flex flex-wrap gap-1.5 pt-1">
+                                        ${matsParsed.map(mat => `
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-amber-950 border border-amber-200 shadow-2xs">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-600 flex-shrink-0"></span>
+                                                <span>${mat}</span>
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhum material cadastrado para este fechamento.</div>
+                                `}
+                            </div>
+
+                            <div class="p-2 rounded-lg bg-slate-50 border border-slate-200/60 space-y-1 text-xs">
+                                <div class="font-bold text-slate-700 text-[11px] flex items-center justify-between">
+                                    <span class="flex items-center gap-1">
+                                        <span class="material-symbols-outlined text-[14px] text-slate-600">photo_camera</span>
+                                        <span>Fotos & Evidências (${fotosParsed.length}):</span>
+                                    </span>
+                                </div>
+                                ${fotosParsed.length > 0 ? `
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 pt-1">
+                                        ${fotosParsed.map(fotoObj => {
+                                            const fIdx = (item.fotosEvidencias || []).findIndex(f => f.urlOriginal === fotoObj.url || f.url === fotoObj.url);
+                                            const clickAction = fIdx >= 0
+                                                ? `window.abrirGaleriaFotosModal('${item.protocolo}', ${fIdx})`
+                                                : `window.abrirGaleriaFotosModal ? window.abrirGaleriaFotosModal([{url:'${fotoObj.url}', titulo:'${fotoObj.titulo}'}], 0) : window.open('${fotoObj.url}', '_blank')`;
+                                            return `
+                                            <div class="relative group rounded-lg overflow-hidden border border-slate-200 cursor-pointer shadow-2xs hover:shadow-md transition-all aspect-video bg-slate-900" onclick="${clickAction}">
+                                                <img src="${fotoObj.url}" alt="${fotoObj.titulo}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
+                                                    <span class="text-[9.5px] font-semibold text-white truncate drop-shadow">${fotoObj.titulo}</span>
+                                                </div>
+                                                <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
+                                                    <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+                                                </div>
+                                            </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhuma foto anexada a este fechamento.</div>
+                                `}
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
                 </div>
-            </div>`;
+            </div>
+            `;
         })()}
 
-        <!-- Seção 3: Observações & Histórico -->
-        ${(() => {
-            const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();
-            const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
-
-            if (!obsIni && !obsFin) {
-                return `
-                <div class="p-3 bg-surface-container-low border border-outline-variant/40 rounded-xl text-xs flex items-center gap-2 text-on-surface-variant italic">
-                    <span class="material-symbols-outlined text-[18px] text-outline">notes</span>
-                    <span>Nenhuma observação ou texto de histórico registrado.</span>
-                </div>`;
-            }
-
-            let bodyObs = '';
-            if (obsIni && obsFin && obsIni !== obsFin) {
-                bodyObs = `<div><b class="text-secondary font-semibold">📌 Abertura / Solicitante:</b> ${obsIni.replace(/\n/g, '<br/>')}</div><div class="mt-2 pt-2 border-t border-outline-variant/30"><b class="text-secondary font-semibold">📝 Conclusão / Histórico:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
-            } else {
-                bodyObs = `<div>${(obsFin || obsIni).replace(/\n/g, '<br/>')}</div>`;
-            }
-
-            return `
-            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1.5">
-                <strong class="text-secondary font-bold flex items-center gap-1.5 mb-1">
-                    <span class="material-symbols-outlined text-[16px]">notes</span>
-                    <span>Observações & Histórico</span>
-                </strong>
-                <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 font-mono text-[11px] text-on-surface max-h-32 overflow-y-auto leading-relaxed">
-                    ${bodyObs}
-                </div>
-            </div>`;
-        })()}
-
-        <!-- Seção 3.5: Linha do Tempo de Auditoria & Logs -->
+        <!-- Seção 5: Linha do Tempo de Auditoria & Logs -->
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
                 <span class="flex items-center gap-1.5 text-indigo-700 font-bold">
                     <span class="material-symbols-outlined text-[18px]">history</span>
-                    <span>Trilha de Auditoria (Histórico de Alterações)</span>
+                    <span>Histórico do protocolo</span>
                 </span>
-                <span class="text-[10px] text-on-surface-variant font-mono">protocolo #${item.protocolo}</span>
             </div>
-            <div id="detalheModalLogsList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div id="detalheModalLogsList" class="space-y-2">
                 <div class="flex items-center gap-2 py-3 text-on-surface-variant text-[11px] italic">
                     <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
                     <span>Buscando histórico de alterações do protocolo...</span>
                 </div>
             </div>
         </div>
-
-        <!-- Seção 4: Ações Administrativas -->
-        ${(() => {
-            let isAdminUser = false;
-            let isManutentorUser = false;
-            try {
-                if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
-                    const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
-                    if (r === 'admin') isAdminUser = true;
-                    if (r === 'manutentor') isManutentorUser = true;
-                }
-                if (!isAdminUser && window.usuarioLogadoSupabase) {
-                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                    if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
-                }
-                if (!isManutentorUser && window.usuarioLogadoSupabase) {
-                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                    if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isManutentorUser = true;
-                }
-                if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
-                    isAdminUser = true;
-                }
-                if (!isManutentorUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('manutentor')) {
-                    isManutentorUser = true;
-                }
-                if (!isManutentorUser && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
-                    isManutentorUser = true;
-                }
-            } catch(e) {}
-
-            const isJaUrgente = (String(item.prioridade || '').trim().toLowerCase() === 'urgente');
-            const isJaCancelada = (item.normalizedStatus === 'cancelada');
-            const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
-            const isConcluida = (item.normalizedStatus === 'concluida');
-            const isPendente = (item.normalizedStatus === 'pendente');
-
-            if (!isAdminUser && !isManutentorUser) return '';
-
-            return `
-            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2 pt-3">
-                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
-                    <span class="flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[18px]">admin_panel_settings</span>
-                        <span>Ações Administrativas</span>
-                    </span>
-                    ${isAdminUser ? `<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">Painel do Administrador</span>` : ''}
-                </div>
-                
-                <div class="flex flex-wrap items-center gap-2 pt-1">
-                    <!-- Botões de Ações (Manutentor & Admin) -->
-                    ${isManutentorUser ? `
-                        ${!isJaRejeitada && !isConcluida && !isJaCancelada ? `
-                        <button type="button" onclick="window.rejeitarOSManutentor('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                            <span class="material-symbols-outlined text-[16px]">thumb_down</span>
-                            <span>Rejeitar OS</span>
-                        </button>` : (isJaRejeitada ? `
-                        <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-100 text-rose-800 border border-rose-300 opacity-70 cursor-not-allowed">
-                            <span class="material-symbols-outlined text-[15px]">thumb_down</span>
-                            <span>OS Rejeitada</span>
-                        </button>` : '')}
-                    ` : ''}
-
-                    ${isAdminUser ? `
-                        <!-- Aprovar (se Pendente) -->
-                        ${isPendente ? `
-                        <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                            <span class="material-symbols-outlined text-[16px]">check</span>
-                            <span>Aprovar OS</span>
-                        </button>` : ''}
-
-                        <!-- Priorizar para Urgente / Retornar para Normal (NÃO exibido se Concluída, Cancelada ou Rejeitada) -->
-                        ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
-                            !isJaUrgente ? `
-                            <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Urgente')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">priority_high</span>
-                                <span>Priorizar para Urgente</span>
-                            </button>` : `
-                            <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Normal')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">restart_alt</span>
-                                <span>Retornar para Normal</span>
-                            </button>`
-                        ) : ''}
-
-                        <!-- Reabrir OS (exibido se Concluída, Cancelada ou Rejeitada) -->
-                        ${(isConcluida || isJaCancelada || isJaRejeitada) ? `
-                        <button type="button" onclick="window.reabrirOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                            <span class="material-symbols-outlined text-[16px]">undo</span>
-                            <span>${isJaCancelada ? 'Reabrir OS Cancelada' : (isConcluida ? 'Reabrir OS Concluída' : 'Reabrir OS Rejeitada')}</span>
-                        </button>` : ''}
-
-                        <!-- Cancelar OS (NÃO exibido se Concluída) -->
-                        ${!isConcluida ? (
-                            !isJaCancelada ? `
-                            <button type="button" onclick="window.cancelarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-rose-600 text-white hover:bg-rose-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
-                                <span class="material-symbols-outlined text-[16px]">block</span>
-                                <span>Cancelar OS</span>
-                            </button>` : `
-                            <button type="button" disabled class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-300 opacity-70 cursor-not-allowed">
-                                <span class="material-symbols-outlined text-[15px]">block</span>
-                                <span>OS Cancelada</span>
-                            </button>`
-                        ) : ''}
-                    ` : ''}
-                </div>
-            </div>`;
-        })()}
         `;
     }
 }
@@ -1402,6 +1481,8 @@ window.abrirDetalhesOSModal = function(id) {
         window.painelController.abrirDetalhesOSModal(id);
     } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
         window.auditoriaController.abrirDetalhesOSModal(id);
+    } else if (typeof window.abrirModalDetalhesPrincipal === 'function') {
+        window.abrirModalDetalhesPrincipal(id);
     } else {
         console.warn('Controller não encontrado para a OS:', id);
     }

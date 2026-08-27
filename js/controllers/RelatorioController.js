@@ -844,8 +844,10 @@ class RelatorioController {
         listToMeasure.forEach(item => {
             const prot = item.protocolo || 'OS-SEM-PROT';
 
-            // A) MATERIAIS FÍSICOS UTILIZADOS NA OS (VIÁRIA E PRAÇA)
-            const rawMats = item.materialsList || [];
+            // A) MATERIAIS FÍSICOS UTILIZADOS NA OS (VIÁRIA E PRAÇA CONSOLIDADOS DE TODOS OS FECHAMENTOS)
+            const rawMats = (item.materiaisConsolidados && Array.isArray(item.materiaisConsolidados) && item.materiaisConsolidados.length > 0)
+                ? item.materiaisConsolidados
+                : (item.materialsList || []);
             rawMats.forEach(matStr => {
                 let qty = 1;
                 const matchX = matStr.match(/\(x(\d+)\)/i);

@@ -863,7 +863,6 @@
 
         <!-- Footer -->
         <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
-            <span class="text-[11px] text-on-surface-variant/70 font-medium hidden sm:inline">Clique em qualquer foto para visualizar em tela cheia na galeria</span>
             <button type="button" onclick="fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
                 Fechar
             </button>
@@ -927,22 +926,35 @@
     };
 
     window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
-        const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []));
-        const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
-        
-        if (!osObj || !osObj.fotosEvidencias || osObj.fotosEvidencias.length === 0) {
+        let listFotos = [];
+        let titleProt = 'Fotos da OS';
+
+        if (Array.isArray(protocolo)) {
+            listFotos = protocolo;
+            titleProt = 'Evidência Fotográfica';
+        } else {
+            const list = (window.chamadosListCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : [])) || [];
+            const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+            
+            if (osObj && osObj.fotosEvidencias && osObj.fotosEvidencias.length > 0) {
+                listFotos = osObj.fotosEvidencias;
+                titleProt = `Fotos da OS #${osObj.protocolo}`;
+            }
+        }
+
+        if (!listFotos || listFotos.length === 0) {
             alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
             return;
         }
 
-        galeriaFotosAtualList = osObj.fotosEvidencias;
-        galeriaFotosIndexAtual = indexInicial || 0;
+        galeriaFotosAtualList = listFotos;
+        galeriaFotosIndexAtual = (typeof indexInicial === 'number' && indexInicial >= 0) ? indexInicial : 0;
 
         const elModal = document.getElementById('modalGaleriaFotosCloudinary');
         if (!elModal) return;
 
         const elProt = document.getElementById('galeriaModalProtocolo');
-        if (elProt) elProt.innerText = `Fotos da OS #${osObj.protocolo}`;
+        if (elProt) elProt.innerText = titleProt;
 
         window.renderizarFotoModalAtual();
 

@@ -133,6 +133,7 @@ class ChamadoModel {
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
         this.textoAuditoriaOCR = data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
+        this.fechamentosRaw = data.fechamentos_os || data.fechamentos || [];
     }
 
     /**
@@ -257,6 +258,7 @@ class ChamadoModel {
                     qtd_eletricistas: parseInt(s.qtd_eletricistas, 10) || this.qtdEletricistas || 1,
                     tecnico: s.tecnico || this.operadorFinalizacao || this.operador || '',
                     foto_entrada: s.foto_entrada || s.foto || (idx === 0 ? this.fotoEntrada : null),
+                    fotos_andamento: Array.isArray(s.fotos_andamento) ? s.fotos_andamento : (s.fotos_andamento ? [s.fotos_andamento] : []),
                     foto_saida: s.foto_saida || null,
                     coordenada_inicio: s.coordenada_inicio || s.coordenada || null,
                     coordenada_fim: s.coordenada_fim || null,
@@ -458,6 +460,13 @@ class ChamadoModel {
                 if (fotoEnt) {
                     pushItem(fotoEnt, `Foto de Entrada (Sessão #${s.numero || (sIdx + 1)})`, { origem: 'Sessão de Praça' });
                 }
+                if (s.fotos_andamento && Array.isArray(s.fotos_andamento)) {
+                    s.fotos_andamento.forEach((fAnd, faIdx) => {
+                        if (fAnd) {
+                            pushItem(fAnd, `Foto do Andamento #${faIdx + 1} (Sessão #${s.numero || (sIdx + 1)})`, { origem: 'Sessão de Praça' });
+                        }
+                    });
+                }
                 const fotoSai = s.foto_saida;
                 if (fotoSai) {
                     pushItem(fotoSai, `Foto de Encerramento (Sessão #${s.numero || (sIdx + 1)})`, { origem: 'Sessão de Praça' });
@@ -476,16 +485,123 @@ class ChamadoModel {
                 arr.forEach((f, idx) => {
                     const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
                     const t = typeof f === 'object' && f ? (f.titulo || f.estagio || f.tipo || `Foto #${idx + 1}`) : `Foto #${idx + 1}`;
-                    if (u) {
-                        pushItem(u, t, { origem: 'Fotos OS' });
-                    }
+                    if (u) pushItem(u, t, { origem: 'Fotos Anexadas' });
                 });
-            } else if (typeof arr === 'string') {
-                pushItem(arr, 'Foto OS', { origem: 'Fotos OS' });
             }
         }
 
+        // 6. Fotos registradas na nova tabela fechamentos_os
+        if (this.fechamentosList && this.fechamentosList.length > 0) {
+            this.fechamentosList.forEach(f => {
+                const closurePhotos = ChamadoModel.parseClosurePhotos(f);
+                closurePhotos.forEach(cp => {
+                    pushItem(cp.url, cp.titulo, { origem: `Fechamento #${f.numero || 1}` });
+                });
+            });
+        }
+
         return list;
+    }
+
+    /**
+     * Retorna a lista tratada e ordenada de fechamentos da OS (tabela fechamentos_os)
+     */
+    get fechamentosList() {
+        let list = [...(Array.isArray(this.fechamentosRaw) ? this.fechamentosRaw : (typeof this.fechamentosRaw === 'string' ? (JSON.parse(this.fechamentosRaw || '[]')) : []))];
+
+        // Ordena cronologicamente por data_fechamento / id
+        list.sort((a, b) => {
+            const dtA = a.data_fechamento ? new Date(a.data_fechamento).getTime() : 0;
+            const dtB = b.data_fechamento ? new Date(b.data_fechamento).getTime() : 0;
+            if (dtA !== dtB) return dtA - dtB;
+            return (a.id || 0) - (b.id || 0);
+        });
+
+        const tryParseJson = (val) => {
+            if (!val) return [];
+            if (Array.isArray(val)) return val;
+            if (typeof val === 'string') {
+                try {
+                    const p = JSON.parse(val);
+                    return Array.isArray(p) ? p : [p];
+                } catch(e) {}
+            }
+            return [];
+        };
+        
+        const seenNumbers = new Set();
+
+        return list.map((f, idx) => {
+            let numFech = parseInt(f.numero_fechamento || f.numero, 10);
+            if (!numFech || seenNumbers.has(numFech)) {
+                numFech = idx + 1;
+            }
+            seenNumbers.add(numFech);
+
+            const matParsed = tryParseJson(f.materiais);
+            const fotosParsed = tryParseJson(f.fotos);
+            const pontosParsed = tryParseJson(f.pontos || f.fotos);
+
+            return {
+                id: f.id || null,
+                numero: numFech,
+                pontoReferencia: f.ponto_referencia || `Fechamento #${numFech}`,
+                operador: f.operador || f.tecnico || 'Técnico Responsável',
+                dataFechamento: f.data_fechamento ? new Date(f.data_fechamento) : null,
+                dataFechamentoStr: f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : '',
+                relatorioTecnico: f.relatorio_tecnico || f.observacoes || '',
+                textoAuditoriaOCR: f.texto_auditoria_ocr || '',
+                materiais: matParsed,
+                fotos: fotosParsed,
+                pontos: pontosParsed
+            };
+        });
+    }
+
+    /**
+     * Retorna o acumulado consolidado de materiais de TODOS os fechamentos
+     */
+    get materiaisConsolidados() {
+        const map = new Map();
+
+        const addMat = (item) => {
+            if (!item) return;
+            let nome = '';
+            let qtd = 1;
+
+            if (typeof item === 'string') {
+                nome = item.trim();
+            } else if (typeof item === 'object') {
+                nome = (item.nome || item.descricao || item.material || '').trim();
+                qtd = parseInt(item.qtd || item.quantidade, 10) || 1;
+            }
+
+            if (!nome) return;
+            const key = nome.toUpperCase();
+            if (map.has(key)) {
+                const existing = map.get(key);
+                existing.qtd += qtd;
+            } else {
+                map.set(key, { nome: nome, qtd: qtd });
+            }
+        };
+
+        // 1. Prioriza materiais dos fechamentos complementares
+        if (this.fechamentosList && this.fechamentosList.length > 0) {
+            this.fechamentosList.forEach(f => {
+                if (f.materiais && Array.isArray(f.materiais)) {
+                    f.materiais.forEach(addMat);
+                }
+            });
+        }
+
+        // 2. Fallback para materias gravados diretamente na tabela ordens_servico
+        if (map.size === 0 && this.materialUtilizado) {
+            const legacyList = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+            legacyList.forEach(addMat);
+        }
+
+        return Array.from(map.values());
     }
 
     /**
@@ -581,8 +697,23 @@ class ChamadoModel {
         };
 
         const ptsIni = parseArrayJson(this.rawPontosInicial);
-        const ptsFin = parseArrayJson(this.rawPontosFinal);
+        let ptsFin = parseArrayJson(this.rawPontosFinal);
         const ptsLegacy = parseArrayJson(this.rawPontos);
+
+        // Agrega pontos de reparo registrados em fechamentos_os se ptsFin estiver vazio ou parcial
+        if (this.fechamentosList && this.fechamentosList.length > 0) {
+            this.fechamentosList.forEach(f => {
+                const ptsFech = f.pontos || f.fotos;
+                if (Array.isArray(ptsFech)) {
+                    ptsFech.forEach(pt => {
+                        if (pt && typeof pt === 'object') {
+                            const jaExiste = ptsFin.some(exist => exist.ponto === pt.ponto && exist.plaqueta === pt.plaqueta);
+                            if (!jaExiste) ptsFin.push(pt);
+                        }
+                    });
+                }
+            });
+        }
 
         const iniList = ptsIni.length > 0 ? ptsIni : (ptsLegacy.length > 0 && !this.rawPontosFinal ? ptsLegacy : []);
         const finList = ptsFin.length > 0 ? ptsFin : (ptsLegacy.length > 0 && String(this.rawStatus || '').toLowerCase().includes('conclu') ? ptsLegacy : []);
@@ -593,8 +724,7 @@ class ChamadoModel {
             const plqFin = this.plaquetaFinal || '';
             const coordFin = this.coordenadaReparo || '';
             const probFin = this.problemaEncontrado || '';
-            const matFin = ChamadoModel.parseMaterialsList(this.materialUtilizado);
-            const hasFinalData = Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado') || (matFin && matFin.length > 0)) || isConcluida;
+            const hasFinalData = Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado')) || isConcluida;
 
             return [{
                 numero: 1,
@@ -606,7 +736,6 @@ class ChamadoModel {
                 plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
                 coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
                 problemaEncontrado: ChamadoModel.formatLocationText(probFin),
-                materiais: matFin,
                 hasFinalData: hasFinalData
             }];
         }
@@ -627,7 +756,6 @@ class ChamadoModel {
             let plqFin = pFin ? (pFin.plaqueta || pFin.plaqueta_final || '') : '';
             let coordFin = pFin ? (pFin.coordenada_reparo || pFin.coordenada || (pFin.lat && pFin.lng ? `${pFin.lat}, ${pFin.lng}` : '')) : '';
             let probFin = pFin ? (pFin.problema_encontrado || pFin.problema || '') : '';
-            let matFin = pFin ? ChamadoModel.parseMaterialsList(pFin.materiais || pFin.material_utilizado) : [];
 
             if (i === 0 && !plqIni && this.plaquetaInicial) plqIni = this.plaquetaInicial;
             if (i === 0 && !coordIni && this.coordenadaInicial) coordIni = this.coordenadaInicial;
@@ -637,13 +765,19 @@ class ChamadoModel {
             if (i === 0 && !plqFin && this.plaquetaFinal) plqFin = this.plaquetaFinal;
             if (i === 0 && !coordFin && this.coordenadaReparo) coordFin = this.coordenadaReparo;
             if (i === 0 && !probFin && this.problemaEncontrado) probFin = this.problemaEncontrado;
-            if (i === 0 && (!matFin || matFin.length === 0) && this.materialUtilizado) matFin = ChamadoModel.parseMaterialsList(this.materialUtilizado);
 
             const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
-            const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado') || (matFin && matFin.length > 0)) || isConcluida;
+            const hasInicialData = !!pIni || (i === 0 && Boolean(plqIni || coordIni || probIni || this.plaquetaInicial || this.coordenadaInicial || this.problemaInicial));
+            const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado')) || isConcluida;
+
+            let numFech = pFin ? (pFin.fechamento || pFin.numero_fechamento || pFin.numero || null) : null;
+            if (!numFech && hasFinalData) numFech = 1;
 
             result.push({
                 numero: i + 1,
+                fechamento: numFech,
+                numeroFechamento: numFech,
+                hasInicialData: hasInicialData,
                 enderecoInicial: ChamadoModel.isRealAddress(endIni) ? ChamadoModel.formatLocationText(endIni) : '',
                 plaquetaInicial: ChamadoModel.formatLocationText(plqIni),
                 coordenadaInicial: ChamadoModel.formatLocationText(coordIni),
@@ -652,7 +786,6 @@ class ChamadoModel {
                 plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
                 coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
                 problemaEncontrado: ChamadoModel.formatLocationText(probFin),
-                materiais: matFin,
                 hasFinalData: hasFinalData
             });
         });
@@ -755,29 +888,38 @@ class ChamadoModel {
     get isProblemaDivergente() {
         if (this.isDireto) return false;
 
+        const isDivergentePair = (ini, fin) => {
+            const catIni = ChamadoModel.obterCategoriaProblema(ini);
+            const catFin = ChamadoModel.obterCategoriaProblema(fin);
+
+            if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
+            if (!catIni || !catFin) return false;
+
+            // Se forem da mesma categoria, não é divergente
+            if (catIni === catFin) return false;
+
+            // Regra de Negócio: 'Acesa Dia' e 'Lâmpada Apagada/Queimada' não são considerados divergentes entre si
+            if ((catIni === 'ACESA_DIA' && catFin === 'LAMPADA_APAGADA') || (catIni === 'LAMPADA_APAGADA' && catFin === 'ACESA_DIA')) {
+                return false;
+            }
+
+            return true;
+        };
+
         const pts = this.pontosDetalhados;
         if (pts && pts.length > 0) {
             let hasCheckedAny = false;
             for (const p of pts) {
                 if (p.problemaInicial && p.problemaEncontrado && p.hasFinalData) {
                     hasCheckedAny = true;
-                    const catIni = ChamadoModel.obterCategoriaProblema(p.problemaInicial);
-                    const catFin = ChamadoModel.obterCategoriaProblema(p.problemaEncontrado);
-
-                    if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
-                    if (catIni && catFin && catIni !== catFin) return true;
+                    if (isDivergentePair(p.problemaInicial, p.problemaEncontrado)) return true;
                 }
             }
             if (hasCheckedAny) return false;
         }
 
         if (this.problemaInicial && this.problemaEncontrado) {
-            const catIni = ChamadoModel.obterCategoriaProblema(this.problemaInicial);
-            const catFin = ChamadoModel.obterCategoriaProblema(this.problemaEncontrado);
-
-            if (catIni === 'OUTROS' || catFin === 'OUTROS') return true;
-            if (catIni && catFin && catIni !== catFin) return true;
-            if (catIni && catFin && catIni === catFin) return false;
+            return isDivergentePair(this.problemaInicial, this.problemaEncontrado);
         }
         if (this.audit && this.audit.problema_divergente !== undefined && this.audit.problema_divergente !== null) {
             return Boolean(this.audit.problema_divergente);
@@ -790,7 +932,7 @@ class ChamadoModel {
 
         const pts = this.pontosDetalhados;
         if (pts && pts.length > 0) {
-            let hasCheckedAny = false;
+            let checkedAnyValidIni = false;
             for (const p of pts) {
                 const pIni = ChamadoModel.formatLocationText(p.plaquetaInicial).trim().toUpperCase();
                 const pFin = ChamadoModel.formatLocationText(p.plaquetaFinal).trim().toUpperCase();
@@ -798,21 +940,29 @@ class ChamadoModel {
                 const isValidFin = pFin && pFin !== 'NÃO INFORMADA' && pFin !== 'NAO INFORMADA' && pFin !== '---' && pFin !== 'NULL';
 
                 if (isValidIni && isValidFin) {
-                    hasCheckedAny = true;
+                    checkedAnyValidIni = true;
                     if (pIni !== pFin) return true;
                 } else if (isValidIni && !isValidFin && p.hasFinalData) {
-                    hasCheckedAny = true;
+                    checkedAnyValidIni = true;
                     return true;
                 }
             }
-            if (hasCheckedAny) return false;
+            if (checkedAnyValidIni) return false;
         }
 
-        if (this.plaquetaInicial && this.plaquetaFinal) {
-            const pIni = ChamadoModel.formatLocationText(this.plaquetaInicial).trim().toUpperCase();
-            const pFin = ChamadoModel.formatLocationText(this.plaquetaFinal).trim().toUpperCase();
-            if (pIni && pFin && pIni !== pFin) return true;
+        const pIni = ChamadoModel.formatLocationText(this.plaquetaInicial).trim().toUpperCase();
+        const pFin = ChamadoModel.formatLocationText(this.plaquetaFinal).trim().toUpperCase();
+        const isValidIni = pIni && pIni !== 'NÃO INFORMADA' && pIni !== 'NAO INFORMADA' && pIni !== '---' && pIni !== 'NULL';
+        const isValidFin = pFin && pFin !== 'NÃO INFORMADA' && pFin !== 'NAO INFORMADA' && pFin !== '---' && pFin !== 'NULL';
+
+        if (isValidIni && isValidFin) {
+            if (pIni !== pFin) return true;
+        } else if (isValidIni && !isValidFin && (this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao))) {
+            return true;
         }
+
+        if (!isValidIni) return false;
+
         if (this.audit && this.audit.plaqueta_divergente !== undefined && this.audit.plaqueta_divergente !== null) {
             return Boolean(this.audit.plaqueta_divergente);
         }
@@ -1060,43 +1210,57 @@ class ChamadoModel {
                 if (!item) return [];
                 if (typeof item === 'string') {
                     const t = item.trim();
+                    if (t === '[object Object]' || t.startsWith('[object Object]')) return [];
+                    if (t.startsWith('{') || t.startsWith('[')) {
+                        try { return ChamadoModel.parseMaterialsList(JSON.parse(t)); } catch(e) {}
+                    }
                     if (t.includes('\n') || t.includes('\r') || t.includes(';') || t.includes('|')) {
-                        return t.split(/[\n;\r|]+/).map(s => s.trim()).filter(Boolean);
+                        return t.split(/[\n;\r|]+/).map(s => s.trim()).filter(s => s && s !== '[object Object]');
                     }
                     return [t];
                 }
                 if (typeof item === 'object') {
                     const qtd = item.qtd || item.quantidade || item.qtd_final || item.qtd_inicial;
-                    const nome = item.nome || item.material || item.item || item.descricao;
-                    if (nome) {
-                        return [(qtd && parseInt(qtd, 10) > 1) ? `${nome.trim()} (x${qtd})` : nome.trim()];
+                    const nome = item.nome || item.material || item.item || item.descricao || item.nome_material || item.material_nome;
+                    if (nome && typeof nome === 'string' && nome.trim() && nome.trim() !== '[object Object]') {
+                        return (qtd && parseInt(qtd, 10) > 1) ? [`${nome.trim()} (x${qtd})`] : [nome.trim()];
                     }
-                    return [JSON.stringify(item)];
+                    if (nome && typeof nome === 'object') {
+                        const subNome = item.nome ? (item.nome.nome || item.nome.material || item.nome.descricao) : null;
+                        if (subNome && typeof subNome === 'string') {
+                            return (qtd && parseInt(qtd, 10) > 1) ? [`${subNome.trim()} (x${qtd})`] : [subNome.trim()];
+                        }
+                    }
+                    return [];
                 }
                 return [String(item).trim()];
-            }).filter(Boolean);
+            }).filter(s => s && s !== '[object Object]');
         } else if (typeof raw === 'object' && raw !== null) {
             const values = Object.values(raw);
-            list = values.map(item => {
-                if (!item) return '';
-                if (typeof item === 'string') return item.trim();
+            list = values.flatMap(item => {
+                if (!item) return [];
+                if (typeof item === 'string') {
+                    const t = item.trim();
+                    return (t && t !== '[object Object]') ? [t] : [];
+                }
                 if (typeof item === 'object') {
                     const qtd = item.qtd || item.quantidade;
-                    const nome = item.nome || item.material || item.item;
-                    if (nome) {
-                        return (qtd && parseInt(qtd, 10) > 1) ? `${nome.trim()} (x${qtd})` : nome.trim();
+                    const nome = item.nome || item.material || item.item || item.descricao;
+                    if (nome && typeof nome === 'string' && nome.trim() && nome.trim() !== '[object Object]') {
+                        return (qtd && parseInt(qtd, 10) > 1) ? [`${nome.trim()} (x${qtd})`] : [nome.trim()];
                     }
-                    return JSON.stringify(item);
+                    return [];
                 }
-                return String(item).trim();
-            }).filter(Boolean);
+                return [String(item).trim()];
+            }).filter(s => s && s !== '[object Object]');
         } else if (typeof raw === 'string') {
             const trimmed = raw.trim();
-            // Preservar vírgulas em descrições oficiais de contrato, separando apenas por quebras de linha, ponto-e-vírgula ou pipe
-            if (trimmed.includes('\n') || trimmed.includes('\r') || trimmed.includes(';') || trimmed.includes('|')) {
-                list = trimmed.split(/[\n;\r|]+/).map(s => s.trim()).filter(Boolean);
-            } else if (trimmed) {
-                list = [trimmed];
+            if (trimmed && trimmed !== '[object Object]') {
+                if (trimmed.includes('\n') || trimmed.includes('\r') || trimmed.includes(';') || trimmed.includes('|')) {
+                    list = trimmed.split(/[\n;\r|]+/).map(s => s.trim()).filter(s => s && s !== '[object Object]');
+                } else {
+                    list = [trimmed];
+                }
             }
         }
 
@@ -1104,21 +1268,122 @@ class ChamadoModel {
     }
 
     /**
-     * Retorna a lista parseada de materiais utilizados acumulada do campo principal, dos pontos individuais (pontos_inicial/pontos_final/pontos) e das sessões
+     * Extrai e descompacta todas as fotos/evidências de um fechamento (f)
+     * Trata arrays de strings, JSON stringificado e objetos estruturados (ex: evidencias {foto_antes, foto_durante, foto_depois})
+     */
+    static parseClosurePhotos(f) {
+        if (!f) return [];
+        const result = [];
+        const seenUrls = new Set();
+
+        const addPhoto = (rawUrl, defaultTitle) => {
+            if (!rawUrl) return;
+            const url = String(rawUrl).trim();
+            if (!url || url === '#' || !url.startsWith('http')) return;
+            if (seenUrls.has(url)) return;
+            seenUrls.add(url);
+            result.push({
+                url: url,
+                titulo: defaultTitle || 'Evidência de Fechamento'
+            });
+        };
+
+        const numFech = f.numero || f.numero_fechamento || '';
+        const prefix = numFech ? `Fechamento #${numFech}` : 'Fechamento';
+
+        // 1. Inspeciona f.fotos, f.fotosEvidencias, f.evidencias
+        let rawFotos = f.fotos || f.fotosEvidencias || f.evidencias || f.fotos_evidencias;
+        if (typeof rawFotos === 'string') {
+            try { rawFotos = JSON.parse(rawFotos); } catch(e) { rawFotos = [rawFotos]; }
+        }
+
+        if (Array.isArray(rawFotos)) {
+            rawFotos.forEach((item, idx) => {
+                if (typeof item === 'string') {
+                    addPhoto(item, `${prefix} - Foto ${idx + 1}`);
+                } else if (item && typeof item === 'object') {
+                    // Trata objeto de evidências por estágios (foto_antes, foto_durante, foto_depois)
+                    const evs = item.evidencias || item.fotosEstagios || item.estagios;
+                    if (evs && typeof evs === 'object') {
+                        const pNum = item.ponto || item.pontoIndex || (idx + 1);
+                        const estagioMap = {
+                            foto_antes: 'Antes',
+                            foto_durante: 'Durante',
+                            foto_depois: 'Depois',
+                            antes: 'Antes',
+                            durante: 'Durante',
+                            depois: 'Depois'
+                        };
+                        for (let key in evs) {
+                            const u = evs[key];
+                            if (u) {
+                                const lblEst = estagioMap[key.toLowerCase()] || (key.replace(/foto_/gi, '').replace(/_/g, ' '));
+                                addPhoto(u, `Ponto #${pNum} — ${lblEst}`);
+                            }
+                        }
+                    }
+
+                    // Trata foto individual (url, link, foto, foto_url)
+                    const directUrl = item.url || item.link || item.foto || item.foto_url;
+                    if (directUrl) {
+                        const tit = item.titulo || item.estagio || (item.ponto ? `Foto Ponto #${item.ponto}` : `${prefix} - Foto ${idx + 1}`);
+                        addPhoto(directUrl, tit);
+                    }
+                }
+            });
+        }
+
+        // 2. Inspeciona f.pontos se ainda não encontrou fotos suficientes ou complementares
+        if (f.pontos && Array.isArray(f.pontos)) {
+            f.pontos.forEach((p, idx) => {
+                if (!p) return;
+                const pNum = p.ponto || p.numero || (idx + 1);
+                const evs = p.evidencias || p.fotosEstagios || p.estagios;
+                if (evs && typeof evs === 'object') {
+                    const estagioMap = {
+                        foto_antes: 'Antes',
+                        foto_durante: 'Durante',
+                        foto_depois: 'Depois',
+                        antes: 'Antes',
+                        durante: 'Durante',
+                        depois: 'Depois'
+                    };
+                    for (let key in evs) {
+                        const u = evs[key];
+                        if (u) {
+                            const lblEst = estagioMap[key.toLowerCase()] || (key.replace(/foto_/gi, '').replace(/_/g, ' '));
+                            addPhoto(u, `Ponto #${pNum} — ${lblEst}`);
+                        }
+                    }
+                }
+                const pUrl = p.url || p.foto || p.foto_url;
+                if (pUrl) {
+                    addPhoto(pUrl, `Foto Ponto #${pNum}`);
+                }
+            });
+        }
+
+        return result;
+    }
+
+    /**
+     * Retorna a lista parseada de materiais utilizados acumulada do campo principal, dos pontos individuais (pontos_inicial/pontos_final/pontos), dos fechamentos_os e das sessões
      */
     get materialsList() {
+        const consol = this.materiaisConsolidados;
+        if (consol && Array.isArray(consol) && consol.length > 0) {
+            return consol.map(m => (m.qtd && parseInt(m.qtd, 10) > 1 ? `${m.nome} (x${m.qtd})` : m.nome));
+        }
+
         let list = ChamadoModel.parseMaterialsList(this.materialUtilizado);
 
-        // Agrega materiais de cada ponto em pontosDetalhados (pontos_inicial / pontos_final / pontos)
-        if (this.pontosDetalhados && this.pontosDetalhados.length > 0) {
-            this.pontosDetalhados.forEach(p => {
-                if (p.materiais && Array.isArray(p.materiais)) {
-                    p.materiais.forEach(m => {
-                        if (!m) return;
-                        const parsed = ChamadoModel.parseMaterialsList(m);
-                        parsed.forEach(pMat => {
-                            if (pMat && !list.includes(pMat)) list.push(pMat);
-                        });
+        // Agrega materiais da nova tabela fechamentos_os (fechamentosList)
+        if (this.fechamentosList && this.fechamentosList.length > 0) {
+            this.fechamentosList.forEach(f => {
+                if (f.materiais) {
+                    const parsed = ChamadoModel.parseMaterialsList(f.materiais);
+                    parsed.forEach(pMat => {
+                        if (pMat && !list.includes(pMat)) list.push(pMat);
                     });
                 }
             });
@@ -1489,6 +1754,40 @@ class ChamadoModel {
     }
 
     /**
+     * Returns location points using strictly opening/initial data (Endereço Abertura -> Plaqueta Inicial -> Coordenada Inicial)
+     */
+    get addressPointsIniciais() {
+        try {
+            const list = this.pontosDetalhados;
+            if (list && list.length > 0) {
+                const formatted = list.map(p => {
+                    const parts = [];
+                    const end = p.enderecoInicial || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
+                    const plq = p.plaquetaInicial;
+                    const coord = p.coordenadaInicial;
+                    if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
+                    if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') parts.push(`Plaqueta: ${plq}`);
+                    if (coord && coord !== 'Sem coordenadas') parts.push(`Coord: ${coord}`);
+                    return parts.length > 0 ? parts.join(' | ') : null;
+                }).filter(Boolean);
+
+                if (formatted.length > 0) return formatted;
+            }
+
+            if (ChamadoModel.isValidLocationText(this.endereco)) {
+                const cleanAddress = ChamadoModel.formatLocationText(this.endereco);
+                const lines = cleanAddress.split(/\r?\n/).map(l => l.trim()).filter(l => ChamadoModel.isValidLocationText(l));
+                if (lines.length > 0) return lines;
+            }
+
+            return ['Ponto não informado'];
+        } catch (err) {
+            console.error('Erro ao processar addressPointsIniciais:', err);
+            return ['Ponto não informado'];
+        }
+    }
+
+    /**
      * Returns location points with fallback hierarchy: Endereço -> Coordenada -> Plaqueta
      */
     get addressPoints() {
@@ -1651,6 +1950,175 @@ class ChamadoModel {
             lng: lngStr,
             formatted: `${latStr}, ${lngStr}`
         };
+    }
+
+    /**
+     * Extrai e formata a lista de materiais em formato limpo
+     * @param {Array|string|Object} val - Dados brutos de materiais
+     * @returns {Array<string>} Lista de nomes/quantidades de materiais formatados
+     */
+    static parseMaterialsList(val) {
+        if (!val) return [];
+        let list = [];
+
+        if (typeof val === 'string') {
+            try {
+                const parsed = JSON.parse(val);
+                list = Array.isArray(parsed) ? parsed : [parsed];
+            } catch(e) {
+                if (val.includes(',') || val.includes(';')) {
+                    list = val.split(/[,;]/).map(s => s.trim()).filter(Boolean);
+                } else if (val.trim()) {
+                    list = [val.trim()];
+                }
+            }
+        } else if (Array.isArray(val)) {
+            list = val;
+        } else if (typeof val === 'object') {
+            list = [val];
+        }
+
+        return list.map(item => {
+            if (typeof item === 'string') return item.trim();
+            if (item && typeof item === 'object') {
+                const nome = item.nome || item.material || item.descricao || item.item || item.label || 'Material';
+                const qtd = item.qtd || item.quantidade || item.qtd_utilizada || item.quantidade_utilizada;
+                const un = item.unidade || item.un;
+                if (qtd) {
+                    return `${nome} (${qtd}${un ? ' ' + un : 'x'})`;
+                }
+                return nome;
+            }
+            return String(item);
+        }).filter(Boolean);
+    }
+
+    /**
+     * Extrai e sanitiza a lista de fotos/evidências para um fechamento específico
+     * @param {Object} f - Objeto do fechamento (de fechamentosList)
+     * @returns {Array<{url: string, titulo: string}>} Lista de objetos com url e titulo
+     */
+    static parseClosurePhotos(f) {
+        if (!f) return [];
+        const fechNum = f.numero || f.numero_fechamento || 1;
+        const list = [];
+        const seenUrls = new Set();
+
+        const addPhoto = (rawUrl, defaultTitle) => {
+            if (!rawUrl || typeof rawUrl !== 'string') return;
+            const url = rawUrl.trim();
+            if (!url || url.length < 5) return;
+            const key = `${defaultTitle || 'Evidencia'}::${url}`;
+            if (seenUrls.has(key)) return;
+            seenUrls.add(key);
+            list.push({
+                url: url,
+                titulo: defaultTitle || `Foto Fechamento #${fechNum}`
+            });
+        };
+
+        const processItem = (item, defaultPtIdx) => {
+            if (!item) return;
+
+            if (typeof item === 'string') {
+                const trimmed = item.trim();
+                if (trimmed.startsWith('http') || trimmed.startsWith('data:')) {
+                    addPhoto(trimmed, `Fechamento #${fechNum} (Foto ${defaultPtIdx + 1})`);
+                } else {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        processItem(parsed, defaultPtIdx);
+                    } catch(e) {
+                        if (trimmed.includes(',') || trimmed.includes(';') || trimmed.includes('\n')) {
+                            trimmed.split(/[,;\n]/).forEach((subUrl, subIdx) => {
+                                if (subUrl.trim()) addPhoto(subUrl.trim(), `Fechamento #${fechNum} (Foto ${subIdx + 1})`);
+                            });
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (Array.isArray(item)) {
+                item.forEach((sub, subIdx) => processItem(sub, subIdx));
+                return;
+            }
+
+            if (typeof item === 'object' && item !== null) {
+                const ptNum = item.ponto || item.pontoIndex || (defaultPtIdx + 1);
+
+                // 1. Dicionário evidencias / fotosEstagios (pode ser objeto ou JSON string)
+                let ev = item.evidencias || item.fotosEstagios || item.estagios;
+                if (typeof ev === 'string') {
+                    try { ev = JSON.parse(ev); } catch(e) {}
+                }
+                if (typeof ev === 'object' && ev !== null) {
+                    for (const estagio in ev) {
+                        const urlEv = typeof ev[estagio] === 'string' ? ev[estagio] : (ev[estagio]?.url || ev[estagio]?.link || ev[estagio]?.foto);
+                        if (urlEv) {
+                            addPhoto(urlEv, `Ponto #${ptNum} (${estagio})`);
+                        }
+                    }
+                }
+
+                // 2. Propriedades diretas de foto / url / link / foto_url / foto_entrada / foto_saida
+                ['foto', 'url', 'link', 'foto_url', 'url_foto', 'imagem', 'foto_entrada', 'foto_saida'].forEach(prop => {
+                    if (item[prop] && typeof item[prop] === 'string') {
+                        const title = item.titulo || item.estagio || (prop === 'foto_entrada' ? `Ponto #${ptNum} (Foto Entrada)` : prop === 'foto_saida' ? `Ponto #${ptNum} (Foto Saída)` : `Ponto #${ptNum} (Evidência)`);
+                        addPhoto(item[prop], title);
+                    }
+                });
+
+                // 3. Sub-arrays de fotos dentro do item
+                ['fotos', 'evidencias_lista', 'fotosList'].forEach(prop => {
+                    if (item[prop]) {
+                        processItem(item[prop], defaultPtIdx);
+                    }
+                });
+            }
+        };
+
+        // Coleta de todas as fontes possíveis no objeto do fechamento f
+        const sources = [
+            f.fotos,
+            f.pontos,
+            f.evidencias,
+            f.fotos_evidencias,
+            f.foto,
+            f.foto_url,
+            f.url_foto,
+            f.foto_entrada,
+            f.foto_saida,
+            f.rawRow?.fotos,
+            f.rawRow?.pontos,
+            f.rawRow?.evidencias
+        ];
+
+        sources.forEach(src => {
+            if (!src) return;
+            let data = src;
+            if (typeof data === 'string') {
+                const trimmed = data.trim();
+                if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try { data = JSON.parse(trimmed); } catch(e) {}
+                }
+                if (typeof data === 'string') {
+                    if (trimmed.includes(',') || trimmed.includes(';') || trimmed.includes('\n')) {
+                        data = trimmed.split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+                    } else {
+                        data = [trimmed];
+                    }
+                }
+            }
+
+            if (Array.isArray(data)) {
+                data.forEach((item, idx) => processItem(item, idx));
+            } else if (data && typeof data === 'object') {
+                processItem(data, 0);
+            }
+        });
+
+        return list;
     }
 
     /**

@@ -82,27 +82,47 @@ class ChamadosRepository {
                 }
             }
 
-            console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
-            
-            // Log detalhado de todos os registros para diagnóstico
+            // Carrega todos os fechamentos complementares para associar às OSs
             if (data && data.length > 0) {
-                console.group('🔎 [ChamadosRepository] Diagnóstico Detalhado por OS');
-                data.forEach((row, i) => {
-                    console.log(`OS #${i+1} [${row.protocolo || row.id}] Status: ${row.status}:`, {
-                        operador_finalizacao: row.operador_finalizacao,
-                        finalizado_por: row.finalizado_por,
-                        usuario_finalizacao: row.usuario_finalizacao,
-                        operador_fechamento: row.operador_fechamento,
-                        fechado_por: row.fechado_por,
-                        usuario_conclusao: row.usuario_conclusao,
-                        operador_abertura: row.operador,
-                        pontos_final: row.pontos_final
-                    });
-                });
-                console.groupEnd();
+                try {
+                    const { data: fechamentosData, error: fechErr } = await client
+                        .from('fechamentos_os')
+                        .select('*')
+                        .order('numero_fechamento', { ascending: true });
+
+                    if (!fechErr && fechamentosData && fechamentosData.length > 0) {
+                        const fechMap = new Map();
+                        fechamentosData.forEach(f => {
+                            const protKey = f.protocolo ? String(f.protocolo).toUpperCase().trim() : null;
+                            if (protKey) {
+                                if (!fechMap.has(protKey)) fechMap.set(protKey, []);
+                                fechMap.get(protKey).push(f);
+                            }
+                        });
+
+                        data.forEach(row => {
+                            const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
+                            row.fechamentos_os = (protKey && fechMap.has(protKey)) ? fechMap.get(protKey) : [];
+                        });
+                    }
+                } catch(eFech) {
+                    console.warn('⚠️ [ChamadosRepository] Não foi possível carregar fechamentos_os:', eFech);
+                }
             }
 
-            return (data || []).map((row) => window.ChamadoModel.fromRow(row));
+            console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
+            
+            return (data || []).map((row) => {
+                const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+                if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                    return ModelClass.fromRow(row);
+                }
+                if (ModelClass && typeof ModelClass === 'function') {
+                    return new ModelClass(row);
+                }
+                console.error('❌ [ChamadosRepository] ChamadoModel indisponível ao mapear linha:', row);
+                return row;
+            });
         } catch (err) {
             console.warn('⚠️ [ChamadosRepository] Falha ao consultar Supabase, utilizando dados de contingência local.', err);
             return null;
@@ -146,8 +166,18 @@ class ChamadosRepository {
             } catch (vErr) {}
 
             return (data || []).map(row => {
-                const model = window.ChamadoModel.fromRow(row);
-                if (auditMap[String(row.id)]) {
+                const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+                let model = null;
+                if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                    model = ModelClass.fromRow(row);
+                } else if (ModelClass && typeof ModelClass === 'function') {
+                    model = new ModelClass(row);
+                } else {
+                    console.error('❌ [ChamadosRepository] ChamadoModel indisponível ao mapear linha de auditoria:', row);
+                    model = row;
+                }
+
+                if (model && auditMap[String(row.id)]) {
                     model.audit = auditMap[String(row.id)];
                 }
                 return model;
@@ -432,6 +462,59 @@ class ChamadosRepository {
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateStatusAuditoria:', err);
             return null;
+        }
+    }
+
+    /**
+     * Insere um novo fechamento na tabela fechamentos_os e atualiza o status da OS para Concluída
+     */
+    async salvarNovoFechamento(protocolo, dadosFechamento) {
+        try {
+            const client = this.getClient();
+            const protUpper = String(protocolo || '').trim().toUpperCase();
+
+            // 1. Busca fechamentos existentes para determinar o próximo número
+            const { data: existFech } = await client
+                .from('fechamentos_os')
+                .select('numero_fechamento')
+                .eq('protocolo', protUpper);
+
+            const proximoNumero = (existFech && existFech.length > 0) 
+                ? Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1 
+                : 1;
+
+            const payloadFechamento = {
+                protocolo: protUpper,
+                os_id: dadosFechamento.os_id || null,
+                numero_fechamento: proximoNumero,
+                ponto_referencia: dadosFechamento.ponto_referencia || `Fechamento #${proximoNumero}`,
+                operador: dadosFechamento.operador || 'Técnico Responsável',
+                data_fechamento: dadosFechamento.data_fechamento || new Date().toISOString(),
+                relatorio_tecnico: dadosFechamento.relatorio_tecnico || dadosFechamento.descricao || '',
+                observacoes: dadosFechamento.observacoes || dadosFechamento.descricao || '',
+                texto_auditoria_ocr: dadosFechamento.texto_auditoria_ocr || null,
+                materiais: dadosFechamento.materiais || [],
+                fotos: dadosFechamento.fotos || []
+            };
+
+            const { data: fechInserido, error: errFech } = await client
+                .from('fechamentos_os')
+                .insert([payloadFechamento])
+                .select();
+
+            if (errFech) {
+                console.error('❌ Erro ao inserir em fechamentos_os:', errFech);
+                throw errFech;
+            }
+
+            // 2. Atualiza o status da OS principal para Concluída
+            await this.updateStatus(protUpper, 'Concluída', `Concluído via Fechamento #${proximoNumero}`);
+
+            console.log(`✅ Novo fechamento #${proximoNumero} registrado no Supabase para a OS ${protUpper}:`, fechInserido);
+            return fechInserido;
+        } catch (err) {
+            console.error('❌ Exceção em salvarNovoFechamento:', err);
+            throw err;
         }
     }
 }
