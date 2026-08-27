@@ -13,8 +13,9 @@ class AppHeader extends HTMLElement {
         </div>
     </div>
     <div class="flex items-center gap-4">
-        <button class="text-on-surface-variant hover:bg-surface-container-highest transition-all duration-200 p-2 rounded-full flex items-center justify-center active:scale-90 hover:text-secondary cursor-pointer" title="Notificações">
+        <button onclick="window.solicitarNotificacoesPush(event)" class="text-on-surface-variant hover:bg-surface-container-highest transition-all duration-200 p-2 rounded-full flex items-center justify-center active:scale-90 hover:text-secondary cursor-pointer relative" title="Ativar/Gerenciar Notificações Push">
             <span class="material-symbols-outlined">notifications</span>
+            <span id="push-status-dot" class="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 border-2 border-white hidden" title="Notificações Pendentes"></span>
         </button>
         <button class="text-on-surface-variant hover:bg-surface-container-highest transition-all duration-200 p-2 rounded-full flex items-center justify-center active:scale-90 hover:text-secondary cursor-pointer" title="Ajuda">
             <span class="material-symbols-outlined">help</span>
@@ -91,3 +92,24 @@ if (!window._userDropdownClickListenerBound) {
 }
 
 customElements.define('app-header', AppHeader);
+
+// Global helper para solicitar/gerenciar notificações Web Push
+window.solicitarNotificacoesPush = async function(event) {
+    if (event) event.stopPropagation();
+    if (!window.PushNotificationService) {
+        alert('⚠️ Serviço de Notificações em carregamento. Por favor, tente novamente em instantes.');
+        return;
+    }
+
+    const res = await window.PushNotificationService.subscribeUser();
+    if (res.success) {
+        alert(`🔔 Notificações Ativadas com Sucesso!\n\nEste dispositivo está registrado para receber notificações da categoria: ${(res.role || 'admin').toUpperCase()}`);
+    } else if (res.reason === 'permission_denied') {
+        alert('⚠️ A permissão para enviar notificações foi negada/bloqueada no seu navegador.\n\nPara receber notificações do sistema, clique no ícone de cadeado/configurações na barra de endereço do navegador e ative a permissão de "Notificações".');
+    } else if (res.reason === 'unsupported') {
+        alert('⚠️ Seu navegador ou dispositivo não possui suporte a Notificações Web Push.');
+    } else {
+        alert('⚠️ Não foi possível registrar este dispositivo para notificações.');
+    }
+};
+

@@ -67,3 +67,51 @@ self.addEventListener('fetch', (event) => {
       })
   );
 });
+
+// ==========================================
+// WEB PUSH NOTIFICATIONS EVENT LISTENERS
+// ==========================================
+self.addEventListener('push', (event) => {
+  let data = { title: 'Sistema OS', body: 'Nova notificação recebida' };
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data.body = event.data.text();
+    }
+  }
+
+  const title = data.title || 'Sistema OS';
+  const options = {
+    body: data.body || 'Você possui uma nova notificação.',
+    icon: data.icon || './icons/icon-192.png',
+    badge: data.badge || './icons/icon-192.png',
+    data: { url: data.url || './Painel.html' },
+    vibrate: [200, 100, 200, 100, 200],
+    tag: data.tag || 'os-push-notification',
+    renotify: true
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const targetUrl = event.notification.data?.url || './Painel.html';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

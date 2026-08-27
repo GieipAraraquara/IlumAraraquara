@@ -25,6 +25,35 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+    // Rota API para registrar assinaturas de Web Push localmente
+    if (req.method === 'POST' && req.url.startsWith('/api/register-push')) {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            try {
+                const subscriptionData = JSON.parse(body);
+                const localFile = path.join(__dirname, 'push_subscriptions.json');
+                let existing = [];
+                if (fs.existsSync(localFile)) {
+                    try { existing = JSON.parse(fs.readFileSync(localFile, 'utf-8')) || []; } catch(e) {}
+                }
+                // Evita duplicatas pelo endpoint
+                existing = existing.filter(item => item.endpoint !== subscriptionData.endpoint);
+                existing.push(subscriptionData);
+
+                fs.writeFileSync(localFile, JSON.stringify(existing, null, 2));
+                console.log(`✅ [Servidor Local] Assinatura Push salva localmente para a categoria: ${subscriptionData.role}`);
+
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ success: true, message: 'Assinatura registrada localmente!' }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: err.message }));
+            }
+        });
+        return;
+    }
+
     // Decodifica a URL para lidar com espaços e caracteres especiais (ex: "Abrir.html")
     let reqUrl = decodeURIComponent(req.url.split('?')[0]);
     if (reqUrl === '/' || reqUrl === '') {

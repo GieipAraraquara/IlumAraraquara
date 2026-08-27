@@ -647,10 +647,10 @@
                     <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                         <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
                             <span class="material-symbols-outlined text-blue-600 text-[18px]">collections</span>
-                            <span>Fotos do Andamento / Evidências</span>
+                            <span>Fotos do Andamento</span>
                         </label>
                         <span id="badgeCountFotosAndamentoPraca" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
-                            0 anexadas
+                            0
                         </span>
                     </div>
 
@@ -661,7 +661,7 @@
                                 onclick="document.getElementById('fotoAndamentoPraca').click()"
                                 class="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-300 border-dashed rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
                             <span class="material-symbols-outlined text-[20px] text-blue-600">add_a_photo</span>
-                            <span>Anexar Fotos do Andamento (Progresso em Campo)</span>
+                            <span>Anexar Fotos do Andamento</span>
                         </button>
                     </div>
 
@@ -2738,7 +2738,7 @@
 
         var count = fotosAndamentoPracaBase64Arr.length;
         if (badge) {
-          badge.innerText = count === 1 ? '1 anexada' : count + ' anexadas';
+          badge.innerText = count.toString();
           badge.className = count > 0 
             ? 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200'
             : 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600';
@@ -2753,14 +2753,17 @@
         container.classList.remove('hidden');
         container.innerHTML = fotosAndamentoPracaBase64Arr.map(function(b64, idx) {
           return `
-            <div class="relative group bg-slate-900 border border-slate-200 rounded-xl overflow-hidden shadow-2xs aspect-video">
-              <img src="${b64}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-              <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-1.5">
-                <span class="text-[10px] font-bold text-white">#${idx + 1}</span>
-                <button type="button" onclick="removerFotoAndamentoPraca(${idx})" class="p-1 bg-rose-600 hover:bg-rose-700 text-white rounded-md shadow-xs transition-colors flex items-center justify-center">
-                  <span class="material-symbols-outlined text-[14px]">delete</span>
-                </button>
-              </div>
+            <div class="relative bg-slate-900 border border-slate-200 rounded-xl overflow-hidden shadow-2xs aspect-video">
+              <img src="${b64}" class="w-full h-full object-cover" />
+              <span class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/60 text-white font-bold text-[10px] backdrop-blur-xs">
+                #${idx + 1}
+              </span>
+              <button type="button" 
+                      onclick="removerFotoAndamentoPraca(${idx})" 
+                      title="Remover foto"
+                      class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-md flex items-center justify-center transition-all cursor-pointer z-10">
+                <span class="material-symbols-outlined text-[14px] font-bold">close</span>
+              </button>
             </div>
           `;
         }).join('');
