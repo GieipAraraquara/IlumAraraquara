@@ -848,10 +848,49 @@ class PainelController {
                 'CRIACAO': 'bg-blue-100 text-blue-800 border-blue-300',
                 'ALTERACAO_STATUS': 'bg-purple-100 text-purple-800 border-purple-300',
                 'ALTERACAO_PRIORIDADE': 'bg-amber-100 text-amber-800 border-amber-300',
+                'ALTERACAO_MATERIAL': 'bg-indigo-100 text-indigo-800 border-indigo-300',
                 'FINALIZACAO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
                 'CANCELAMENTO': 'bg-rose-100 text-rose-800 border-rose-300',
                 'REABERTURA': 'bg-cyan-100 text-cyan-800 border-cyan-300',
                 'AUDITORIA': 'bg-indigo-100 text-indigo-800 border-indigo-300'
+            };
+
+            const parseAndFormatMaterialsLog = (dataVal) => {
+                if (!dataVal) return [];
+                let mat = dataVal;
+                if (typeof dataVal === 'object' && dataVal !== null) {
+                    if (dataVal.materiais !== undefined && dataVal.materiais !== null) {
+                        mat = dataVal.materiais;
+                    } else if (dataVal.material_utilizado !== undefined && dataVal.material_utilizado !== null) {
+                        mat = dataVal.material_utilizado;
+                    }
+                }
+                if (window.ChamadoModel && typeof window.ChamadoModel.parseMaterialsList === 'function') {
+                    return window.ChamadoModel.parseMaterialsList(mat);
+                }
+                if (typeof mat === 'string') {
+                    const trimmed = mat.trim();
+                    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                        try { mat = JSON.parse(trimmed); } catch(e) { mat = [trimmed]; }
+                    } else if (trimmed) {
+                        mat = [trimmed];
+                    } else {
+                        mat = [];
+                    }
+                }
+                if (!Array.isArray(mat)) {
+                    mat = mat ? [mat] : [];
+                }
+                return mat.map(item => {
+                    if (!item) return '';
+                    if (typeof item === 'string') return item;
+                    if (typeof item === 'object') {
+                        const name = item.nome || item.material || item.descricao || item.item || JSON.stringify(item);
+                        const qtd = item.qtd || item.quantidade || item.qtd_utilizada || item.qtdUtilizada;
+                        return (qtd && parseInt(qtd, 10) > 1) ? `${name} (x${qtd})` : name;
+                    }
+                    return String(item);
+                }).filter(Boolean);
             };
 
             listEl.innerHTML = logs.map(log => {
@@ -859,6 +898,74 @@ class PainelController {
                 const badgeCls = mapAcaoBadge[log.tipo_acao] || 'bg-slate-100 text-slate-800 border-slate-300';
                 const userStr = log.usuario_nome || log.usuario_email || 'Sistema / Anônimo';
                 const origStr = log.origem_tela ? ` • Tela: ${log.origem_tela}` : '';
+
+                let diffHtml = '';
+                const hasAnteriores = log.dados_anteriores !== null && log.dados_anteriores !== undefined;
+                const hasNovos = log.dados_novos !== null && log.dados_novos !== undefined;
+
+                if (log.tipo_acao === 'ALTERACAO_MATERIAL' || (hasAnteriores && (log.dados_anteriores?.materiais !== undefined || log.dados_anteriores?.material_utilizado !== undefined)) || (hasNovos && (log.dados_novos?.materiais !== undefined || log.dados_novos?.material_utilizado !== undefined))) {
+                    const listAnt = parseAndFormatMaterialsLog(log.dados_anteriores);
+                    const listNova = parseAndFormatMaterialsLog(log.dados_novos);
+
+                    diffHtml = `
+                        <div class="mt-2.5 space-y-2 text-xs">
+                            <div class="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/80 space-y-1.5">
+                                <div class="font-bold text-rose-950 text-[11px] flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-rose-600">history</span>
+                                        <span>Lista Anterior (${listAnt.length}):</span>
+                                    </span>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-rose-100/80 text-rose-800 border border-rose-200/60">Antes da edição</span>
+                                </div>
+                                ${listAnt.length > 0 ? `
+                                    <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                        ${listAnt.map(mat => `
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-rose-950 border border-rose-200 shadow-2xs">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                                                <span>${mat}</span>
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhum material cadastrado anteriormente.</div>
+                                `}
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-1.5">
+                                <div class="font-bold text-emerald-950 text-[11px] flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                                        <span>Nova Lista Atualizada (${listNova.length}):</span>
+                                    </span>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100/80 text-emerald-800 border border-emerald-200/60">Após a edição</span>
+                                </div>
+                                ${listNova.length > 0 ? `
+                                    <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                        ${listNova.map(mat => `
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-emerald-950 border border-emerald-200 shadow-2xs">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 flex-shrink-0"></span>
+                                                <span>${mat}</span>
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhum material cadastrado.</div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                } else if (hasAnteriores || hasNovos) {
+                    const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
+                    const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
+                    if (antStr || novStr) {
+                        diffHtml = `
+                            <div class="mt-2 pt-2 border-t border-outline-variant/30 text-[10.5px] text-slate-600 space-y-1">
+                                ${antStr ? `<div><b class="text-rose-700">Anterior:</b> <span class="font-mono">${antStr}</span></div>` : ''}
+                                ${novStr ? `<div><b class="text-emerald-700">Novo:</b> <span class="font-mono">${novStr}</span></div>` : ''}
+                            </div>
+                        `;
+                    }
+                }
 
                 return `
                     <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 space-y-1 shadow-2xs text-[11px]">
@@ -872,7 +979,8 @@ class PainelController {
                             </span>
                         </div>
                         <div class="text-on-surface font-medium leading-relaxed">${log.descricao || 'Alteração realizada'}</div>
-                        <div class="flex items-center justify-between text-[10px] text-on-surface-variant/80 pt-0.5 border-t border-slate-100">
+                        ${diffHtml}
+                        <div class="flex items-center justify-between text-[10px] text-on-surface-variant/80 pt-1 border-t border-slate-100 mt-1">
                             <span>👤 <b>Usuário:</b> ${userStr}${origStr}</span>
                         </div>
                     </div>
@@ -1027,6 +1135,11 @@ class PainelController {
                                 <span class="material-symbols-outlined text-[16px]">check</span>
                                 <span>Aprovar OS</span>
                             </button>` : ''}
+
+                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                                <span>Editar Materiais</span>
+                            </button>
 
                             ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                                 !isJaUrgente ? `
@@ -1473,15 +1586,55 @@ class PainelController {
         </div>
         `;
     }
+
+    async abrirModalEdicaoMateriais(protocoloOrId) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+            return await window.auditoriaController.abrirModalEdicaoMateriais(protocoloOrId);
+        }
+        const item = (this.chamadosList || window.chamadosListCache || []).find(o => 
+            String(o.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
+            String(o.id || '') === String(protocoloOrId)
+        );
+        if (!item) {
+            alert('Ordem de serviço não encontrada para edição de materiais.');
+            return;
+        }
+        const repo = new window.ChamadosRepository();
+        const matTextoAtual = typeof item.materialUtilizado === 'string' ? item.materialUtilizado : JSON.stringify(item.materialUtilizado || '');
+        const novoMat = prompt('Editar Lista de Materiais da OS #' + (item.protocolo || item.id) + ':', matTextoAtual);
+        if (novoMat !== null) {
+            await repo.updateMaterial(item.protocolo || item.id, novoMat);
+            item.materialUtilizado = novoMat;
+            this.abrirDetalhesOSModal(item.protocolo || item.id);
+            if (typeof this.loadData === 'function') this.loadData();
+        }
+    }
 }
 
 // Global helpers for row click details modal
 window.abrirDetalhesOSModal = function(id) {
-    if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
-        window.painelController.abrirDetalhesOSModal(id);
-    } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
-        window.auditoriaController.abrirDetalhesOSModal(id);
-    } else if (typeof window.abrirModalDetalhesPrincipal === 'function') {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+            return window.auditoriaController.abrirDetalhesOSModal(id);
+        }
+        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+            return window.painelController.abrirDetalhesOSModal(id);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+            return window.painelController.abrirDetalhesOSModal(id);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+            return window.auditoriaController.abrirDetalhesOSModal(id);
+        }
+    }
+
+    if (typeof window.abrirModalDetalhesPrincipal === 'function') {
         window.abrirModalDetalhesPrincipal(id);
     } else {
         console.warn('Controller não encontrado para a OS:', id);

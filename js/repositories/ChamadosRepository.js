@@ -165,6 +165,34 @@ class ChamadosRepository {
                 }
             } catch (vErr) {}
 
+            // Carrega todos os fechamentos complementares para associar às OSs de Auditoria (fotos, relatórios e materiais)
+            if (data && data.length > 0) {
+                try {
+                    const { data: fechamentosData, error: fechErr } = await client
+                        .from('fechamentos_os')
+                        .select('*')
+                        .order('numero_fechamento', { ascending: true });
+
+                    if (!fechErr && fechamentosData && fechamentosData.length > 0) {
+                        const fechMap = new Map();
+                        fechamentosData.forEach(f => {
+                            const protKey = f.protocolo ? String(f.protocolo).toUpperCase().trim() : null;
+                            if (protKey) {
+                                if (!fechMap.has(protKey)) fechMap.set(protKey, []);
+                                fechMap.get(protKey).push(f);
+                            }
+                        });
+
+                        data.forEach(row => {
+                            const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
+                            row.fechamentos_os = (protKey && fechMap.has(protKey)) ? fechMap.get(protKey) : [];
+                        });
+                    }
+                } catch(eFech) {
+                    console.warn('⚠️ [ChamadosRepository] Não foi possível carregar fechamentos_os para Auditoria:', eFech);
+                }
+            }
+
             return (data || []).map(row => {
                 const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
                 let model = null;
@@ -514,6 +542,205 @@ class ChamadosRepository {
             return fechInserido;
         } catch (err) {
             console.error('❌ Exceção em salvarNovoFechamento:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Updates materials for an OS by protocol or ID (updates ordens_servico / ordens_servico_pracas and fechamentos_os)
+     * @param {string} protocoloOrId
+     * @param {string|Array} novosMateriais
+     * @param {string|number|null} [fechamentoId=null]
+     * @param {number|null} [numFechamento=null]
+     */
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null) {
+        try {
+            const client = this.getClient();
+            const protStr = String(protocoloOrId || '').trim();
+
+            let matPayload = novosMateriais;
+            let matStr = novosMateriais;
+
+            if (Array.isArray(novosMateriais) || typeof novosMateriais === 'object') {
+                matStr = JSON.stringify(novosMateriais);
+                matPayload = novosMateriais;
+            } else if (typeof novosMateriais === 'string') {
+                const trimmed = novosMateriais.trim();
+                if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try {
+                        matPayload = JSON.parse(trimmed);
+                        matStr = trimmed;
+                    } catch(e) {
+                        matPayload = [trimmed];
+                        matStr = JSON.stringify(matPayload);
+                    }
+                } else if (trimmed) {
+                    matPayload = [trimmed];
+                    matStr = JSON.stringify(matPayload);
+                } else {
+                    matPayload = [];
+                    matStr = '[]';
+                }
+            }
+
+            const isNumeric = /^\d+$/.test(protStr);
+
+            // Fetch previous material list for audit logging (robust detection & deep clone)
+            let materiaisAnteriores = null;
+            if (fechamentoId) {
+                try {
+                    const { data: currentFech } = await client
+                        .from('fechamentos_os')
+                        .select('materiais')
+                        .eq('id', fechamentoId)
+                        .maybeSingle();
+                    if (currentFech && currentFech.materiais !== undefined && currentFech.materiais !== null) {
+                        materiaisAnteriores = currentFech.materiais;
+                    }
+                } catch (prevErr) {
+                    console.warn('⚠️ [ChamadosRepository] Falha ao consultar materiais anteriores do fechamento:', prevErr);
+                }
+            }
+
+            const isValEmpty = (v) => {
+                if (v === null || v === undefined || v === '') return true;
+                if (Array.isArray(v) && v.length === 0) return true;
+                if (typeof v === 'string' && (v.trim() === '[]' || v.trim() === '{}' || v.trim() === '')) return true;
+                return false;
+            };
+
+            if (isValEmpty(materiaisAnteriores)) {
+                for (const tableName of [this.primaryTable, this.pracasTable]) {
+                    try {
+                        let query = client.from(tableName).select('*');
+                        if (isNumeric) {
+                            query = query.or(`protocolo.eq.${protStr},id.eq.${protStr}`);
+                        } else {
+                            query = query.eq('protocolo', protStr);
+                        }
+                        const { data: currentOS } = await query.limit(1);
+                        if (currentOS && currentOS.length > 0) {
+                            const foundMat = currentOS[0].materiais || currentOS[0].material_utilizado;
+                            if (!isValEmpty(foundMat)) {
+                                materiaisAnteriores = foundMat;
+                                break;
+                            }
+                        }
+                    } catch (prevErr) {
+                        console.warn(`⚠️ [ChamadosRepository] Falha ao consultar materiais anteriores da tabela ${tableName}:`, prevErr);
+                    }
+                }
+            }
+
+            const materiaisAnterioresCloned = materiaisAnteriores 
+                ? (typeof materiaisAnteriores === 'object' ? JSON.parse(JSON.stringify(materiaisAnteriores)) : materiaisAnteriores)
+                : null;
+
+            // 1. Sync/update fechamentos_os
+            if (fechamentoId) {
+                try {
+                    await client
+                        .from('fechamentos_os')
+                        .update({ materiais: matPayload })
+                        .eq('id', fechamentoId);
+                } catch (fechErr) {
+                    console.warn('⚠️ [ChamadosRepository] Erro ao atualizar fechamento específico:', fechErr);
+                }
+            } else {
+                try {
+                    let fechQuery = client.from('fechamentos_os').select('id');
+                    if (isNumeric) {
+                        fechQuery = fechQuery.or(`protocolo.eq.${protStr},os_id.eq.${protStr}`);
+                    } else {
+                        fechQuery = fechQuery.eq('protocolo', protStr);
+                    }
+                    const { data: fechamentos } = await fechQuery
+                        .order('data_fechamento', { ascending: false })
+                        .limit(1);
+
+                    if (fechamentos && fechamentos.length > 0) {
+                        await client
+                            .from('fechamentos_os')
+                            .update({ materiais: matPayload })
+                            .eq('id', fechamentos[0].id);
+                    }
+                } catch (fechErr) {
+                    console.warn('⚠️ [ChamadosRepository] Aviso ao atualizar fechamentos_os:', fechErr);
+                }
+            }
+
+            // 2. Update primary OS table
+            const updatePayloadPrimary = {
+                materiais: matPayload,
+                material_utilizado: matStr
+            };
+
+            const isPraca = protStr.toUpperCase().startsWith('P');
+            const tablesToTry = isPraca
+                ? [this.pracasTable, this.primaryTable]
+                : [this.primaryTable, this.pracasTable];
+
+            let updatedData = null;
+
+            for (const tableName of tablesToTry) {
+                const fieldsToTry = isNumeric ? ['id', 'protocolo'] : ['protocolo'];
+                for (const field of fieldsToTry) {
+                    try {
+                        let currentPayload = { ...updatePayloadPrimary };
+                        let res = await client
+                            .from(tableName)
+                            .update(currentPayload)
+                            .eq(field, protStr)
+                            .select();
+
+                        while (res.error && res.error.message && res.error.message.includes("Could not find the")) {
+                            const match = res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+                            if (match && match[1]) {
+                                const missingCol = match[1];
+                                console.warn(`⚠️ [ChamadosRepository] Coluna '${missingCol}' não existe na tabela '${tableName}'. Removendo do payload e tentando novamente...`);
+                                delete currentPayload[missingCol];
+                                res = await client
+                                    .from(tableName)
+                                    .update(currentPayload)
+                                    .eq(field, protStr)
+                                    .select();
+                            } else {
+                                break;
+                            }
+                        }
+
+                        if (res.data && res.data.length > 0) {
+                            updatedData = res.data;
+                            break;
+                        }
+                    } catch(eUpd) {
+                        console.warn(`⚠️ [ChamadosRepository] Aviso ao atualizar tabela ${tableName} via ${field}:`, eUpd);
+                    }
+                }
+                if (updatedData && updatedData.length > 0) break;
+            }
+
+            // 3. Register log in logs_protocolos table via LogsRepository
+            if (window.LogsRepository) {
+                const descText = numFechamento 
+                    ? `Alteração da lista de materiais do Fechamento #${numFechamento} pelo Administrador`
+                    : `Alteração da lista de materiais da OS pelo Administrador`;
+
+                window.LogsRepository.registrarLog({
+                    protocolo: protStr,
+                    tabelaOrigem: 'ordens_servico',
+                    tipoAcao: 'ALTERACAO_MATERIAL',
+                    descricao: descText,
+                    dadosAnteriores: { fechamento_id: fechamentoId, materiais: materiaisAnterioresCloned },
+                    dadosNovos: { fechamento_id: fechamentoId, materiais: matPayload, material_utilizado: matStr },
+                    origemTela: 'Auditoria'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de materiais:', err));
+            }
+
+            console.log(`✅ [ChamadosRepository] Materiais da OS ${protStr} atualizados com sucesso.`);
+            return updatedData || true;
+        } catch (err) {
+            console.error('❌ [ChamadosRepository] Exceção em updateMaterial:', err);
             throw err;
         }
     }

@@ -850,10 +850,49 @@ class AuditoriaController {
                 'CRIACAO': 'bg-blue-100 text-blue-800 border-blue-300',
                 'ALTERACAO_STATUS': 'bg-purple-100 text-purple-800 border-purple-300',
                 'ALTERACAO_PRIORIDADE': 'bg-amber-100 text-amber-800 border-amber-300',
+                'ALTERACAO_MATERIAL': 'bg-indigo-100 text-indigo-800 border-indigo-300',
                 'FINALIZACAO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
                 'CANCELAMENTO': 'bg-rose-100 text-rose-800 border-rose-300',
                 'REABERTURA': 'bg-cyan-100 text-cyan-800 border-cyan-300',
                 'AUDITORIA': 'bg-indigo-100 text-indigo-800 border-indigo-300'
+            };
+
+            const parseAndFormatMaterialsLog = (dataVal) => {
+                if (!dataVal) return [];
+                let mat = dataVal;
+                if (typeof dataVal === 'object' && dataVal !== null) {
+                    if (dataVal.materiais !== undefined && dataVal.materiais !== null) {
+                        mat = dataVal.materiais;
+                    } else if (dataVal.material_utilizado !== undefined && dataVal.material_utilizado !== null) {
+                        mat = dataVal.material_utilizado;
+                    }
+                }
+                if (window.ChamadoModel && typeof window.ChamadoModel.parseMaterialsList === 'function') {
+                    return window.ChamadoModel.parseMaterialsList(mat);
+                }
+                if (typeof mat === 'string') {
+                    const trimmed = mat.trim();
+                    if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                        try { mat = JSON.parse(trimmed); } catch(e) { mat = [trimmed]; }
+                    } else if (trimmed) {
+                        mat = [trimmed];
+                    } else {
+                        mat = [];
+                    }
+                }
+                if (!Array.isArray(mat)) {
+                    mat = mat ? [mat] : [];
+                }
+                return mat.map(item => {
+                    if (!item) return '';
+                    if (typeof item === 'string') return item;
+                    if (typeof item === 'object') {
+                        const name = item.nome || item.material || item.descricao || item.item || JSON.stringify(item);
+                        const qtd = item.qtd || item.quantidade || item.qtd_utilizada || item.qtdUtilizada;
+                        return (qtd && parseInt(qtd, 10) > 1) ? `${name} (x${qtd})` : name;
+                    }
+                    return String(item);
+                }).filter(Boolean);
             };
 
             listEl.innerHTML = logs.map(log => {
@@ -861,6 +900,74 @@ class AuditoriaController {
                 const badgeCls = mapAcaoBadge[log.tipo_acao] || 'bg-slate-100 text-slate-800 border-slate-300';
                 const userStr = log.usuario_nome || log.usuario_email || 'Sistema / Anônimo';
                 const origStr = log.origem_tela ? ` • Tela: ${log.origem_tela}` : '';
+
+                let diffHtml = '';
+                const hasAnteriores = log.dados_anteriores !== null && log.dados_anteriores !== undefined;
+                const hasNovos = log.dados_novos !== null && log.dados_novos !== undefined;
+
+                if (log.tipo_acao === 'ALTERACAO_MATERIAL' || (hasAnteriores && (log.dados_anteriores?.materiais !== undefined || log.dados_anteriores?.material_utilizado !== undefined)) || (hasNovos && (log.dados_novos?.materiais !== undefined || log.dados_novos?.material_utilizado !== undefined))) {
+                    const listAnt = parseAndFormatMaterialsLog(log.dados_anteriores);
+                    const listNova = parseAndFormatMaterialsLog(log.dados_novos);
+
+                    diffHtml = `
+                        <div class="mt-2.5 space-y-2 text-xs">
+                            <div class="p-2.5 rounded-xl bg-rose-50/60 border border-rose-200/80 space-y-1.5">
+                                <div class="font-bold text-rose-950 text-[11px] flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-rose-600">history</span>
+                                        <span>Lista Anterior (${listAnt.length}):</span>
+                                    </span>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-rose-100/80 text-rose-800 border border-rose-200/60">Antes da edição</span>
+                                </div>
+                                ${listAnt.length > 0 ? `
+                                    <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                        ${listAnt.map(mat => `
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-rose-950 border border-rose-200 shadow-2xs">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 flex-shrink-0"></span>
+                                                <span>${mat}</span>
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhum material cadastrado anteriormente.</div>
+                                `}
+                            </div>
+
+                            <div class="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-200/80 space-y-1.5">
+                                <div class="font-bold text-emerald-950 text-[11px] flex items-center justify-between">
+                                    <span class="flex items-center gap-1.5">
+                                        <span class="material-symbols-outlined text-[15px] text-emerald-600">check_circle</span>
+                                        <span>Nova Lista Atualizada (${listNova.length}):</span>
+                                    </span>
+                                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-emerald-100/80 text-emerald-800 border border-emerald-200/60">Após a edição</span>
+                                </div>
+                                ${listNova.length > 0 ? `
+                                    <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                        ${listNova.map(mat => `
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white text-emerald-950 border border-emerald-200 shadow-2xs">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-600 flex-shrink-0"></span>
+                                                <span>${mat}</span>
+                                            </span>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="text-[11px] text-slate-500 italic pt-0.5">Nenhum material cadastrado.</div>
+                                `}
+                            </div>
+                        </div>
+                    `;
+                } else if (hasAnteriores || hasNovos) {
+                    const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
+                    const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
+                    if (antStr || novStr) {
+                        diffHtml = `
+                            <div class="mt-2 pt-2 border-t border-outline-variant/30 text-[10.5px] text-slate-600 space-y-1">
+                                ${antStr ? `<div><b class="text-rose-700">Anterior:</b> <span class="font-mono">${antStr}</span></div>` : ''}
+                                ${novStr ? `<div><b class="text-emerald-700">Novo:</b> <span class="font-mono">${novStr}</span></div>` : ''}
+                            </div>
+                        `;
+                    }
+                }
 
                 return `
                     <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 space-y-1 shadow-2xs text-[11px]">
@@ -874,7 +981,8 @@ class AuditoriaController {
                             </span>
                         </div>
                         <div class="text-on-surface font-medium leading-relaxed">${log.descricao || 'Alteração realizada'}</div>
-                        <div class="flex items-center justify-between text-[10px] text-on-surface-variant/80 pt-0.5 border-t border-slate-100">
+                        ${diffHtml}
+                        <div class="flex items-center justify-between text-[10px] text-on-surface-variant/80 pt-1 border-t border-slate-100 mt-1">
                             <span>👤 <b>Usuário:</b> ${userStr}${origStr}</span>
                         </div>
                     </div>
@@ -1043,6 +1151,11 @@ class AuditoriaController {
                                 <span class="material-symbols-outlined text-[16px]">check</span>
                                 <span>Aprovar OS</span>
                             </button>` : ''}
+
+                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                                <span>Editar Materiais</span>
+                            </button>
 
                             ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                                 !isJaUrgente ? `
@@ -1507,15 +1620,596 @@ class AuditoriaController {
         </div>
         `;
     }
+
+    /**
+     * Abre o modal interativo para alteração da lista de materiais da OS por Administrador
+     * Organizado por Fechamento, integrado ao catálogo Supabase (materiais_contrato), 
+     * com autocompletar, inclusão dos 5 itens mais frequentes dos últimos 30 dias e trava estrita.
+     */
+    async abrirModalEdicaoMateriais(protocoloOrId) {
+        const item = (this.chamadosList || window.chamadosListCache || []).find(o => 
+            String(o.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
+            String(o.id || '') === String(protocoloOrId)
+        );
+
+        if (!item) {
+            alert('Ordem de serviço não encontrada para edição de materiais.');
+            return;
+        }
+
+        // Validação de Perfil Administrativo
+        let isAdmin = false;
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (r === 'admin') isAdmin = true;
+            }
+            if (!isAdmin && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+            }
+            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                isAdmin = true;
+            }
+        } catch(e) {}
+
+        if (!isAdmin) {
+            alert('Acesso restrito: Apenas usuários com perfil de Administrador podem editar a lista de materiais.');
+            return;
+        }
+
+        // 1. Carrega catálogo oficial de materiais do Supabase (materiais_contrato)
+        const catalogList = await (async () => {
+            if (window.opcoesMateriaisContrato && window.opcoesMateriaisContrato.length > 0) {
+                return window.opcoesMateriaisContrato;
+            }
+            const cache = localStorage.getItem('os_cached_materiais');
+            if (cache) {
+                try {
+                    const parsed = JSON.parse(cache);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        window.opcoesMateriaisContrato = parsed;
+                        return parsed;
+                    }
+                } catch(e) {}
+            }
+            try {
+                const client = window.supabaseClient || (typeof window.obterSupabaseClient === 'function' ? window.obterSupabaseClient() : null);
+                if (client) {
+                    const { data } = await client.from('materiais_contrato').select('*');
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        window.opcoesMateriaisContrato = data.map(row => {
+                            if (typeof row === 'string') return row;
+                            var marca = (row["Marca"] || row.marca || row.fabricante || "").trim();
+                            var desc = (row["Material/Serviço"] || row["Material"] || row.descricao || row.nome || "").trim();
+                            var unidade = (row["Unidade de Medida"] || row["Unidade"] || row.unidade || "").trim();
+                            var valFinal = (marca && desc && !desc.toLowerCase().startsWith(marca.toLowerCase())) ? `${marca} - ${desc}` : (desc || JSON.stringify(row));
+                            if (unidade && !valFinal.includes('(')) valFinal += ` (${unidade})`;
+                            return valFinal.trim();
+                        }).filter(Boolean).sort();
+                        localStorage.setItem('os_cached_materiais', JSON.stringify(window.opcoesMateriaisContrato));
+                        return window.opcoesMateriaisContrato;
+                    }
+                }
+            } catch(e) {
+                console.warn('⚠️ [AuditoriaController] Erro ao carregar materiais_contrato:', e);
+            }
+            return null;
+        })();
+
+        // Se estiver offline ou sem catálogo do Supabase, bloqueia a edição para evitar inconsistências
+        if (!catalogList || !Array.isArray(catalogList) || catalogList.length === 0) {
+            alert('⚠️ Conexão indisponível ou catálogo de materiais do Supabase (materiais_contrato) inacessível.\n\nPor razões de segurança e consistência dos dados, a edição de materiais exige conexão com o banco de dados.');
+            return;
+        }
+
+        // Monta o estado dos Fechamentos (ou Geral se não houver fechamentos)
+        const fechamentosList = item.fechamentosList || [];
+        let fechamentosState = [];
+
+        if (fechamentosList.length > 0) {
+            fechamentosState = fechamentosList.map((f, idx) => {
+                const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : (Array.isArray(f.materiais) ? f.materiais : [f.materiais]);
+                const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || '');
+                return {
+                    id: f.id,
+                    numero: f.numero || f.numero_fechamento || (idx + 1),
+                    operador: f.operador || 'Técnico Responsável',
+                    dataStr: dataStr,
+                    materiais: [...mats]
+                };
+            });
+        } else {
+            const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(item.materialUtilizado) : [];
+            fechamentosState = [{
+                id: null,
+                numero: 1,
+                operador: item.operador || 'Abertura / Geral',
+                dataStr: item.dataConclusaoStr || 'Atendimento Geral',
+                materiais: [...mats]
+            }];
+        }
+
+        // Remove modal existente se houver
+        let modalEl = document.getElementById('modalEditarMateriaisAdmin');
+        if (modalEl) modalEl.remove();
+
+        // Cria o elemento modal com z-index elevado
+        modalEl = document.createElement('div');
+        modalEl.id = 'modalEditarMateriaisAdmin';
+        modalEl.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        modalEl.style.zIndex = '999999';
+
+        // Renderiza o corpo do modal
+        const renderModalContent = () => {
+            modalEl.innerHTML = `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-outline-variant/60 bg-slate-50 flex justify-between items-center flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[22px]">inventory_2</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base text-on-surface">Editar Materiais da OS</h3>
+                            <p class="text-xs text-on-surface-variant font-medium">Protocolo: <span class="text-indigo-600 font-bold">#${item.protocolo || item.id}</span></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('modalEditarMateriaisAdmin').remove()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Body (Scrollable) -->
+                <div class="p-5 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+                    ${fechamentosState.map((fState, fIdx) => `
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div class="flex items-center gap-2 font-bold text-slate-800 text-xs sm:text-sm">
+                                <span class="material-symbols-outlined text-[18px] text-amber-600">task_alt</span>
+                                <span>${fechamentosList.length > 0 ? `Fechamento #${fState.numero}` : 'Materiais Utilizados da OS'}</span>
+                            </div>
+                            <span class="text-[10.5px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                                👤 ${fState.operador} ${fState.dataStr ? `• 📅 ${fState.dataStr}` : ''}
+                            </span>
+                        </div>
+
+                        <!-- Formulário de Adição com Autocompletar (Estilo Finalizar.html) -->
+                        <div class="flex flex-col sm:flex-row gap-2.5 items-end pt-1">
+                            <div class="flex-1 w-full relative custom-combobox">
+                                <label for="inputMat_${fIdx}" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Material do Catálogo Supabase
+                                </label>
+                                <input type="text" 
+                                       id="inputMat_${fIdx}" 
+                                       placeholder="Buscar material no catálogo..." 
+                                       autocomplete="off"
+                                       oninput="window.filtrarMateriaisAdmin(${fIdx})"
+                                       onclick="window.mostrarMateriaisAdmin(${fIdx})"
+                                       onfocus="window.mostrarMateriaisAdmin(${fIdx})"
+                                       class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-lg px-3 py-2 text-xs font-medium text-slate-900 transition-all" />
+                                
+                                <!-- Dropdown Autocompletar -->
+                                <div id="dropdownMat_${fIdx}" class="hidden max-h-48 overflow-y-auto bg-white border border-slate-300 rounded-xl shadow-2xl absolute z-50 left-0 right-0 top-full mt-1 border-t border-indigo-100 divide-y divide-slate-100"></div>
+                            </div>
+
+                            <div class="w-full sm:w-24">
+                                <label for="inputQtd_${fIdx}" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Qtd</label>
+                                <input type="number" 
+                                       id="inputQtd_${fIdx}" 
+                                       min="0.1" 
+                                       step="0.1" 
+                                       value="1" 
+                                       class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-lg px-3 py-2 text-xs font-bold text-slate-900 transition-all text-center" />
+                            </div>
+
+                            <button type="button" 
+                                    onclick="window.adicionarMaterialModalAdmin(${fIdx})" 
+                                    class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">add</span>
+                                <span>Adicionar</span>
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Materiais Adicionados (Estilo Finalizar.html) -->
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl mt-2">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-600 font-semibold uppercase border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-2 px-3 w-16 text-center">Qtd</th>
+                                        <th class="py-2 px-3">Material / Item</th>
+                                        <th class="py-2 px-3 w-16 text-center">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    ${fState.materiais.length > 0 ? fState.materiais.map((matStr, mIdx) => {
+                                        let displayQtd = '1';
+                                        let displayNome = matStr;
+                                        const matchQtd = matStr.match(/\(x?(\d+(\.\d+)?)\)$/i);
+                                        if (matchQtd) {
+                                            displayQtd = matchQtd[1];
+                                            displayNome = matStr.replace(/\(x?\d+(\.\d+)?\)$/i, '').trim();
+                                        }
+
+                                        return `
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-2 px-3 font-bold text-slate-800 text-center">
+                                                <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[11px] font-bold inline-block">${displayQtd}</span>
+                                            </td>
+                                            <td class="py-2 px-3 font-medium text-slate-800 text-[11.5px]">${displayNome}</td>
+                                            <td class="py-2 px-3 text-center">
+                                                <button type="button" 
+                                                        onclick="window.removerMaterialModalAdmin(${fIdx}, ${mIdx})" 
+                                                        class="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" 
+                                                        title="Remover Material">
+                                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        `;
+                                    }).join('') : `
+                                        <tr>
+                                            <td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium italic text-[11px]">
+                                                Nenhum material cadastrado para este fechamento.
+                                            </td>
+                                        </tr>
+                                    `}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    `).join('')}
+
+                </div>
+
+                <!-- Footer -->
+                <div class="px-5 py-3.5 border-t border-outline-variant/60 bg-slate-50 flex justify-end items-center gap-3 flex-shrink-0">
+                    <button type="button" onclick="document.getElementById('modalEditarMateriaisAdmin').remove()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btnSalvarMateriaisAdmin" onclick="window.salvarMateriaisAdmin('${item.protocolo || item.id}')" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">save</span>
+                        <span>Salvar Materiais</span>
+                    </button>
+                </div>
+            </div>
+            `;
+        };
+
+        // Handlers globais dinâmicos para a sessão atual do modal
+        window.mostrarMateriaisAdmin = (fIdx) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const val = inp ? inp.value.trim() : '';
+            window.filtrarMateriaisAdmin(fIdx, val);
+        };
+
+        window.filtrarMateriaisAdmin = (fIdx, forcedVal) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const drop = document.getElementById(`dropdownMat_${fIdx}`);
+            if (!inp || !drop) return;
+
+            inp.classList.remove('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+            inp.classList.add('border-slate-300', 'bg-slate-50');
+
+            const val = (forcedVal !== undefined ? forcedVal : inp.value).trim().toLowerCase();
+            const catalog = window.opcoesMateriaisContrato || [];
+
+            const filtered = val 
+                ? catalog.filter(m => m.toLowerCase().includes(val))
+                : catalog;
+
+            if (filtered.length === 0) {
+                drop.innerHTML = `<div class="p-3 text-xs text-rose-600 font-semibold italic text-center">Nenhum material correspondente no catálogo.</div>`;
+                drop.style.display = 'block';
+                return;
+            }
+
+            drop.innerHTML = filtered.slice(0, 60).map(mat => {
+                let htmlContent = mat;
+                const matchUnidade = mat.match(/\s*\(([^)]+)\)$/);
+                let unidadeHTML = "";
+                let baseStr = mat;
+                if (matchUnidade) {
+                    unidadeHTML = ` <b class="font-bold text-blue-600">(${matchUnidade[1]})</b>`;
+                    baseStr = mat.replace(/\s*\(([^)]+)\)$/, '');
+                }
+                const partes = baseStr.split(" - ");
+                if (partes.length >= 2) {
+                    htmlContent = `<b class="font-bold text-slate-900">${partes[0].trim()}</b> - ${partes.slice(1).join(" - ").trim()}${unidadeHTML}`;
+                } else {
+                    htmlContent = baseStr + unidadeHTML;
+                }
+
+                return `<div class="px-3.5 py-2 text-xs text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors" onclick="window.selecionarMaterialDropdownAdmin(${fIdx}, '${mat.replace(/'/g, "\\'")}')">${htmlContent}</div>`;
+            }).join('');
+
+            drop.style.display = 'block';
+        };
+
+        window.selecionarMaterialDropdownAdmin = (fIdx, matNome) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const drop = document.getElementById(`dropdownMat_${fIdx}`);
+            if (inp) {
+                inp.value = matNome;
+                inp.classList.remove('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inp.classList.add('border-slate-300', 'bg-slate-50');
+            }
+            if (drop) drop.style.display = 'none';
+        };
+
+        window.selecionarPresetModalAdmin = (fIdx, matNome) => {
+            window.selecionarMaterialDropdownAdmin(fIdx, matNome);
+        };
+
+        window.adicionarMaterialModalAdmin = (fIdx) => {
+            const inpMat = document.getElementById(`inputMat_${fIdx}`);
+            const inpQtd = document.getElementById(`inputQtd_${fIdx}`);
+            if (!inpMat) return;
+
+            const rawVal = inpMat.value.trim();
+            const qtd = inpQtd ? parseFloat(inpQtd.value) || 1 : 1;
+
+            if (!rawVal) {
+                inpMat.classList.add('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inpMat.focus();
+                window.mostrarMateriaisAdmin(fIdx);
+                return;
+            }
+
+            // Trava estrita contra o catálogo do Supabase
+            const catalog = window.opcoesMateriaisContrato || [];
+            const matchedCatalogItem = catalog.find(c => c.trim().toLowerCase() === rawVal.toLowerCase());
+
+            if (!matchedCatalogItem) {
+                inpMat.classList.add('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inpMat.focus();
+                window.mostrarMateriaisAdmin(fIdx);
+                return;
+            }
+
+            const itemFormatted = (qtd > 1 || qtd < 1) ? `${matchedCatalogItem} (x${qtd})` : matchedCatalogItem;
+            fechamentosState[fIdx].materiais.push(itemFormatted);
+
+            renderModalContent();
+        };
+
+        window.removerMaterialModalAdmin = (fIdx, mIdx) => {
+            if (fechamentosState[fIdx] && fechamentosState[fIdx].materiais) {
+                fechamentosState[fIdx].materiais.splice(mIdx, 1);
+                renderModalContent();
+            }
+        };
+
+        // Event listener para fechar dropdowns ao clicar fora
+        const fecharDropdownsOnClickOutside = (e) => {
+            if (!e.target.closest('.custom-combobox')) {
+                fechamentosState.forEach((_, fIdx) => {
+                    const drop = document.getElementById(`dropdownMat_${fIdx}`);
+                    if (drop) drop.style.display = 'none';
+                });
+            }
+        };
+        document.removeEventListener('click', fecharDropdownsOnClickOutside);
+        document.addEventListener('click', fecharDropdownsOnClickOutside);
+
+        window.salvarMateriaisAdmin = async (prot) => {
+            const btn = document.getElementById('btnSalvarMateriaisAdmin');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span><span>Salvando no banco...</span>`;
+            }
+
+            try {
+                let todosMateriaisConsolidados = [];
+
+                for (const fState of fechamentosState) {
+                    await this.service.updateMaterial(prot, fState.materiais, fState.id, fState.numero);
+                    todosMateriaisConsolidados = todosMateriaisConsolidados.concat(fState.materiais);
+                }
+
+                // Armazena JSON array para evitar que vírgulas no nome do material quebrem o item
+                const matConsolidadoStr = JSON.stringify(todosMateriaisConsolidados);
+
+                // Função auxiliar para atualizar as referências do item nos objetos em memória
+                const updateItemRef = (targetObj) => {
+                    if (!targetObj) return;
+                    targetObj.materialUtilizado = matConsolidadoStr;
+                    targetObj.material_utilizado = matConsolidadoStr;
+                    if (targetObj.materiais !== undefined) targetObj.materiais = matConsolidadoStr;
+
+                    fechamentosState.forEach((fState, idx) => {
+                        if (targetObj.fechamentosList && targetObj.fechamentosList[idx]) {
+                            targetObj.fechamentosList[idx].materiais = [...fState.materiais];
+                        }
+                        if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
+                            targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
+                        }
+                    });
+                };
+
+                updateItemRef(item);
+
+                // Atualiza o item em todas as listas de cache ativas no controlador
+                [this.chamadosList, this.pracasChamadosList, this.completedChamadosList, window.chamadosListCache].forEach(arr => {
+                    if (Array.isArray(arr)) {
+                        arr.filter(o => o && (String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "") === String(prot)))
+                           .forEach(o => updateItemRef(o));
+                    }
+                });
+
+                document.removeEventListener('click', fecharDropdownsOnClickOutside);
+
+                const mEdit = document.getElementById('modalEditarMateriaisAdmin');
+                if (mEdit) mEdit.remove();
+
+                // Re-renderiza o conteúdo do modal de detalhes da OS em tempo real
+                const container = document.getElementById('detalheModalConteudo');
+                if (container) {
+                    container.innerHTML = this.buildDetalhesOSModalHtml(item);
+                }
+
+                // Recarrega o histórico de logs no modal com um pequeno delay para propagação no banco
+                setTimeout(async () => {
+                    await this.carregarLogsNoModal(prot);
+                }, 200);
+
+                if (typeof this.renderOSTable === 'function') this.renderOSTable();
+                if (typeof this.renderPracaTable === 'function') this.renderPracaTable();
+                if (typeof this.renderCompletedTable === 'function') this.renderCompletedTable();
+
+                this.exibirModalSucessoHTML(
+                    'Materiais Salvos',
+                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados no Supabase com sucesso!`
+                );
+            } catch(err) {
+                console.error('Erro ao salvar materiais:', err);
+                this.exibirModalErroHTML(
+                    'Erro ao Salvar',
+                    'Ocorreu uma falha ao salvar a lista de materiais no Supabase. Tente novamente.'
+                );
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">save</span><span>Salvar Materiais</span>`;
+                }
+            }
+        };
+
+        renderModalContent();
+        document.body.appendChild(modalEl);
+    }
+
+    /**
+     * Exibe modal padrão de confirmação/sucesso em HTML sem utilizar alert nativo do navegador
+     */
+    exibirModalSucessoHTML(titulo, mensagem) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: titulo,
+                message: mensagem,
+                icon: 'check_circle',
+                iconBgClass: 'bg-emerald-100 text-emerald-700',
+                confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold',
+                confirmText: 'Entendido',
+                showJustification: false,
+                onConfirm: () => {}
+            });
+            return;
+        }
+
+        let m = document.getElementById('modalSucessoAdminHTML');
+        if (m) m.remove();
+        m = document.createElement('div');
+        m.id = 'modalSucessoAdminHTML';
+        m.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        m.style.zIndex = '999999';
+        m.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+                <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto flex-shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">check_circle</span>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-base text-slate-900">${titulo}</h3>
+                    <p class="text-xs font-medium text-slate-600 leading-relaxed">${mensagem}</p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" onclick="document.getElementById('modalSucessoAdminHTML').remove()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    }
+
+    exibirModalErroHTML(titulo, mensagem) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: titulo,
+                message: mensagem,
+                icon: 'error',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white font-bold',
+                confirmText: 'Fechar',
+                showJustification: false,
+                onConfirm: () => {}
+            });
+            return;
+        }
+
+        let m = document.getElementById('modalErroAdminHTML');
+        if (m) m.remove();
+        m = document.createElement('div');
+        m.id = 'modalErroAdminHTML';
+        m.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        m.style.zIndex = '999999';
+        m.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+                <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto flex-shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">error</span>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-base text-slate-900">${titulo}</h3>
+                    <p class="text-xs font-medium text-slate-600 leading-relaxed">${mensagem}</p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" onclick="document.getElementById('modalErroAdminHTML').remove()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    }
 }
 
-// Global helpers for row click details modal
+// Global helpers for row click details modal & material editing
+window.editarMateriaisAdmin = function(id) {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+            return window.auditoriaController.abrirModalEdicaoMateriais(id);
+        }
+        if (window.painelController && typeof window.painelController.abrirModalEdicaoMateriais === 'function') {
+            return window.painelController.abrirModalEdicaoMateriais(id);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirModalEdicaoMateriais === 'function') {
+            return window.painelController.abrirModalEdicaoMateriais(id);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+            return window.auditoriaController.abrirModalEdicaoMateriais(id);
+        }
+    }
+    alert('Funcionalidade de edição de materiais indisponível no momento.');
+};
+
 window.abrirDetalhesOSModal = function(id) {
-    if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
-        window.painelController.abrirDetalhesOSModal(id);
-    } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
-        window.auditoriaController.abrirDetalhesOSModal(id);
-    } else if (typeof window.abrirModalDetalhesPrincipal === 'function') {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+            return window.auditoriaController.abrirDetalhesOSModal(id);
+        }
+        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+            return window.painelController.abrirDetalhesOSModal(id);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+            return window.painelController.abrirDetalhesOSModal(id);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+            return window.auditoriaController.abrirDetalhesOSModal(id);
+        }
+    }
+
+    if (typeof window.abrirModalDetalhesPrincipal === 'function') {
         window.abrirModalDetalhesPrincipal(id);
     } else {
         console.warn('Controller não encontrado para abrir detalhes da OS:', id);

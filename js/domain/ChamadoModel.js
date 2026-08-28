@@ -517,6 +517,28 @@ class ChamadoModel {
             return (a.id || 0) - (b.id || 0);
         });
 
+        // Se não houver registros na tabela fechamentos_os (ex: OSs de fechamento único ou legadas),
+        // mas a OS tiver materiais, observação de fechamento ou data de conclusão/status concluído,
+        // sintetiza 1 registro de fechamento para manter consistência nos modais de detalhes e relatórios.
+        if (list.length === 0 && (this.materialUtilizado || this.observacaoFinal || this.dataConclusao || this.normalizedStatus === 'concluida')) {
+            const matsParsed = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+            const fotosParsed = this.evidencias ? (Array.isArray(this.evidencias) ? this.evidencias : []) : [];
+            return [{
+                id: null,
+                numero: 1,
+                pontoReferencia: 'Fechamento #1',
+                operador: this.operador || 'Técnico Responsável',
+                data_fechamento: this.dataConclusao || null,
+                dataFechamento: this.dataConclusao || null,
+                dataFechamentoStr: this.dataConclusao ? this.dataConclusao.toLocaleString('pt-BR') : '',
+                relatorioTecnico: this.observacaoFinal || this.descricao || '',
+                textoAuditoriaOCR: this.textoAuditoriaOCR || '',
+                materiais: matsParsed,
+                fotos: fotosParsed,
+                pontos: []
+            }];
+        }
+
         const tryParseJson = (val) => {
             if (!val) return [];
             if (Array.isArray(val)) return val;

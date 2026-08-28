@@ -4125,13 +4125,27 @@
     var galeriaFotosIndexAtual = 0;
 
     window.abrirDetalhesOSModal = function(id) {
-        if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
-            window.painelController.abrirDetalhesOSModal(id);
-        } else if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
-            window.auditoriaController.abrirDetalhesOSModal(id);
+        const path = (window.location.pathname || '').toLowerCase();
+        const sidebar = document.querySelector('app-sidebar');
+        const activePage = sidebar ? sidebar.getAttribute('active') : '';
+        const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+        if (isAuditoria) {
+            if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+                return window.auditoriaController.abrirDetalhesOSModal(id);
+            }
+            if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+                return window.painelController.abrirDetalhesOSModal(id);
+            }
         } else {
-            console.warn('Controller não encontrado para abrir detalhes da OS:', id);
+            if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+                return window.painelController.abrirDetalhesOSModal(id);
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+                return window.auditoriaController.abrirDetalhesOSModal(id);
+            }
         }
+        console.warn('Controller não encontrado para abrir detalhes da OS:', id);
     };
 
     window.fecharDetalhesOSModal = function() {
@@ -4146,22 +4160,35 @@
     };
 
     window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
-        const list = (window.chamadosListCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []));
-        const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
-        
-        if (!osObj || !osObj.fotosEvidencias || osObj.fotosEvidencias.length === 0) {
+        let listFotos = [];
+        let titleProt = 'Fotos da OS';
+
+        if (Array.isArray(protocolo)) {
+            listFotos = protocolo;
+            titleProt = 'Evidência Fotográfica';
+        } else {
+            const list = (window.chamadosListCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : [])) || [];
+            const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+            
+            if (osObj && osObj.fotosEvidencias && osObj.fotosEvidencias.length > 0) {
+                listFotos = osObj.fotosEvidencias;
+                titleProt = `Fotos da OS #${osObj.protocolo}`;
+            }
+        }
+
+        if (!listFotos || listFotos.length === 0) {
             alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
             return;
         }
 
-        galeriaFotosAtualList = osObj.fotosEvidencias;
-        galeriaFotosIndexAtual = indexInicial || 0;
+        galeriaFotosAtualList = listFotos;
+        galeriaFotosIndexAtual = (typeof indexInicial === 'number' && indexInicial >= 0) ? indexInicial : 0;
 
         const elModal = document.getElementById('modalGaleriaFotosCloudinary');
         if (!elModal) return;
 
         const elProt = document.getElementById('galeriaModalProtocolo');
-        if (elProt) elProt.innerText = `Fotos da OS #${osObj.protocolo}`;
+        if (elProt) elProt.innerText = titleProt;
 
         window.renderizarFotoModalAtual();
 

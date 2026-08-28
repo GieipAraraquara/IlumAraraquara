@@ -155,6 +155,13 @@ class ChamadosService {
     }
 
     /**
+     * Updates materials for an OS protocol or ID (with optional fechamentoId and numFechamento)
+     */
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null) {
+        return await this.repository.updateMaterial(protocoloOrId, novosMateriais, fechamentoId, numFechamento);
+    }
+
+    /**
      * Loads list of Chamados for Auditoria, including vw_auditoria_chamados view metrics
      */
     async getAuditoriaChamadosList() {
