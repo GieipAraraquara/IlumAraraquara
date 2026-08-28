@@ -1654,12 +1654,15 @@ window.aprovarOSAdmin = function(osId) {
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
-            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
-            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+            }
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas(true);
+            }
+            if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
-            } else {
-                window.location.reload();
             }
         } catch(err) {
             alert('Erro ao aprovar a Ordem de Serviço: ' + (err.message || err));
@@ -1713,12 +1716,15 @@ window.reabrirOSAdmin = function(osId) {
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
-            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
-            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+            }
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas(true);
+            }
+            if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
-            } else {
-                window.location.reload();
             }
         } catch(err) {
             alert('Erro ao reabrir a Ordem de Serviço: ' + (err.message || err));
@@ -1783,11 +1789,14 @@ window.alterarPrioridadeOS = function(osId, targetPriority = 'Urgente') {
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
-            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
-            } else if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas();
-            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+            }
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas(true);
+            }
+            if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
             }
         } catch(err) {
@@ -1839,12 +1848,15 @@ window.rejeitarOSManutentor = function(osId) {
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
-            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
-            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+            }
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas(true);
+            }
+            if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
-            } else {
-                window.location.reload();
             }
         } catch(err) {
             alert('Erro ao rejeitar a Ordem de Serviço: ' + (err.message || err));
@@ -1885,12 +1897,15 @@ window.cancelarOSAdmin = function(osId) {
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 await window.painelController.loadData();
-            } else if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            }
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
                 await window.auditoriaController.loadData();
-            } else if (typeof window.carregarDadosMapaOSs === 'function') {
+            }
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                await window.carregarMapaOSsAbertas(true);
+            }
+            if (typeof window.carregarDadosMapaOSs === 'function') {
                 await window.carregarDadosMapaOSs();
-            } else {
-                window.location.reload();
             }
         } catch(err) {
             alert('Erro ao cancelar a Ordem de Serviço: ' + (err.message || err));

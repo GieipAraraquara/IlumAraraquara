@@ -226,7 +226,7 @@ function garantirModalFinalizarOSNoDOM() {
     document.body.appendChild(modalContainer);
 }
 
-window.abrirModalNovaOS = function() {
+window.abrirModalNovaOS = function(dadosLoc) {
     garantirModalNovaOSNoDOM();
     const modal = document.getElementById('modal-abertura-os');
     const modalBox = document.getElementById('modal-abertura-os-box');
@@ -235,9 +235,18 @@ window.abrirModalNovaOS = function() {
 
     try { sessionStorage.removeItem('os_para_edicao'); } catch(e) {}
 
+    if (dadosLoc && (dadosLoc.lat || dadosLoc.lng)) {
+        try { sessionStorage.setItem('os_pre_fill_data', JSON.stringify(dadosLoc)); } catch(e) {}
+    } else {
+        try { sessionStorage.removeItem('os_pre_fill_data'); } catch(e) {}
+    }
+
     if (iframe) {
         if (iframe.contentWindow && typeof iframe.contentWindow.carregarModoEdicaoOuReset === 'function') {
             iframe.contentWindow.carregarModoEdicaoOuReset();
+            if (dadosLoc && (dadosLoc.lat || dadosLoc.lng) && typeof iframe.contentWindow.prePreencherCoordenadas === 'function') {
+                iframe.contentWindow.prePreencherCoordenadas(dadosLoc.lat, dadosLoc.lng, dadosLoc.endereco);
+            }
         } else if (!iframe.src || iframe.src === 'about:blank' || !iframe.src.includes('Abrir.html')) {
             iframe.src = 'Abrir.html';
         }
@@ -342,27 +351,32 @@ window.addEventListener('message', (event) => {
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
         } else if (event.data.action === 'FECHAR_MODAL_FINALIZAR') {
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
-        } else if (event.data.action === 'OS_CRIADA_SUCESSO') {
+        } else if (
+            event.data.action === 'OS_CRIADA_SUCESSO' ||
+            event.data.action === 'OS_CRIADA_SILENCIOSO' ||
+            event.data.action === 'OS_CONCLUIDA_SUCESSO' ||
+            event.data.action === 'OS_EDITADA_SUCESSO' ||
+            event.data.action === 'OS_CANCELADA_SUCESSO'
+        ) {
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
+            if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
+
             if (window.painelController && typeof window.painelController.loadData === 'function') {
                 window.painelController.loadData();
             } else if (typeof window.carregarChamados === 'function') {
                 window.carregarChamados();
             } else if (typeof window.applyCombinedFilters === 'function') {
                 window.applyCombinedFilters();
+            }
+
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                window.auditoriaController.loadData();
             } else if (typeof window.carregarDadosAuditoria === 'function') {
                 window.carregarDadosAuditoria();
             }
-        } else if (event.data.action === 'OS_CONCLUIDA_SUCESSO') {
-            if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                window.painelController.loadData();
-            } else if (typeof window.carregarChamados === 'function') {
-                window.carregarChamados();
-            } else if (typeof window.applyCombinedFilters === 'function') {
-                window.applyCombinedFilters();
-            } else if (typeof window.carregarDadosAuditoria === 'function') {
-                window.carregarDadosAuditoria();
+
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                window.carregarMapaOSsAbertas(true);
             }
         }
     }
@@ -500,7 +514,7 @@ function reinitPageControllers(targetUrl) {
             window.chamadosService = new window.ChamadosService();
         }
         if (typeof window.carregarMapaOSsAbertas === 'function') {
-            window.carregarMapaOSsAbertas();
+            window.carregarMapaOSsAbertas(true);
         }
     } else if (page.includes('relat')) {
         const Controller = window.RelatorioController || (typeof RelatorioController !== 'undefined' ? RelatorioController : null);

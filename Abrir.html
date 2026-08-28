@@ -2018,6 +2018,7 @@
         if (typeof verificarEAplicarModoRapido === 'function') {
           verificarEAplicarModoRapido();
         }
+        conferirEPrePreencherCoordenadas();
       };
 
       function buscarEPreencherOSEdicao(protocolo) {
@@ -3049,7 +3050,86 @@
         ajustarPontos(); // Inicia desenhando o 1º Ponto de Iluminação Viária
         carregarListaPracasServidor(); // Carrega lista de praças dinamicamente da planilha
         verificarEAplicarModoRapido(); // Verifica e aplica o Modo Rápido se em dispositivo mobile
+        conferirEPrePreencherCoordenadas(); // Confere se há coordenadas pré-preenchidas
       };
+
+      // =========================================================================
+      // PRÉ-PREENCHIMENTO AUTOMÁTICO DE COORDENADAS E ENDEREÇO (VIA MAPA OU URL)
+      // =========================================================================
+      function prePreencherCoordenadas(lat, lng, endereco) {
+        if (!lat || !lng) return;
+        var latNum = parseFloat(lat);
+        var lngNum = parseFloat(lng);
+        if (isNaN(latNum) || isNaN(lngNum)) return;
+
+        // Garante que a aba de Iluminação Viária esteja ativa
+        var tabIlum = document.getElementById('tabIluminacao');
+        if (tabIlum) {
+          tabIlum.checked = true;
+          if (typeof alternarTipoOS === 'function') alternarTipoOS();
+        }
+
+        // Garante que o Ponto 1 existe
+        if (qtdAtual < 1) {
+          var inputQtd = document.getElementById('quantidade');
+          if (inputQtd) inputQtd.value = 1;
+          if (typeof ajustarPontos === 'function') ajustarPontos();
+        }
+
+        // Seleciona a aba "Coordenadas" no Ponto 1
+        var radioCoord = document.getElementById('tabCoord_0');
+        if (radioCoord) {
+          radioCoord.checked = true;
+          if (typeof alternarLocal === 'function') alternarLocal(0);
+        }
+
+        var latInput = document.getElementById('lat_0');
+        var lngInput = document.getElementById('lng_0');
+        if (latInput && lngInput) {
+          latInput.value = latNum.toFixed(6);
+          lngInput.value = lngNum.toFixed(6);
+          if (typeof validarCoordsManuais === 'function') {
+            validarCoordsManuais(false, 0);
+          }
+        }
+
+        if (endereco) {
+          var endInput = document.getElementById('endereco_0');
+          if (endInput) endInput.value = endereco;
+        }
+      }
+
+      function conferirEPrePreencherCoordenadas() {
+        try {
+          var urlParams = new URLSearchParams(window.location.search);
+          var pLat = urlParams.get('lat') || urlParams.get('latitude');
+          var pLng = urlParams.get('lng') || urlParams.get('longitude');
+          var pEnd = urlParams.get('endereco') || urlParams.get('address');
+
+          if (pLat && pLng) {
+            prePreencherCoordenadas(pLat, pLng, pEnd);
+            return;
+          }
+
+          var storageData = sessionStorage.getItem('os_pre_fill_data');
+          if (storageData) {
+            var d = JSON.parse(storageData);
+            sessionStorage.removeItem('os_pre_fill_data');
+            if (d && d.lat && d.lng) {
+              prePreencherCoordenadas(d.lat, d.lng, d.endereco);
+            }
+          }
+        } catch(e) {
+          console.warn("⚠️ [Abrir.html] Erro ao conferir pré-preenchimento:", e);
+        }
+      }
+
+      window.addEventListener('message', function(event) {
+        if (event && event.data && (event.data.action === 'PRE_PREENCHER_LOCALIZACAO' || event.data.action === 'PRE_PREENCHER_COORDENADAS')) {
+          var d = event.data;
+          prePreencherCoordenadas(d.lat, d.lng, d.endereco);
+        }
+      });
 
       // =========================================================================
       // CONTROLE DAS ABAS PRINCIPAIS (ILUMINAÇÃO VIÁRIA VS PRAÇA PÚBLICA)

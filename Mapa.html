@@ -355,16 +355,16 @@
         <div id="canvasMapaOSsAbertas" class="absolute inset-0 w-full h-full z-0"></div>
 
         <!-- PAINEL SUPERIOR: FILTROS DE STATUS E PERÍODO (GLASSMORPHISM) -->
-        <div id="topControlsMapaOverlay" class="glass-overlay absolute top-3 left-3 z-10 p-2 rounded-xl transition-all duration-300 shadow-md border border-outline-variant/60 w-fit max-w-[calc(100%-100px)]">
-            <div class="flex flex-wrap gap-2 items-center">
-                <span class="text-xs font-bold text-on-surface mr-1">Status:</span>
-                <button type="button" id="chipStatusAbertas" onclick="alterarFiltroStatus('abertas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-secondary bg-secondary/10 text-secondary">🟢 Abertas</button>
-                <button type="button" id="chipStatusResolvidas" onclick="alterarFiltroStatus('resolvidas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary">✅ Concluídas</button>
-                <button type="button" id="chipStatusCanceladas" onclick="alterarFiltroStatus('canceladas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-error">❌ Canceladas</button>
-                <button type="button" id="chipStatusTodas" onclick="alterarFiltroStatus('todas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary">🌐 Todas</button>
+        <div id="topControlsMapaOverlay" class="glass-overlay absolute top-3 left-3 z-10 p-2 rounded-xl transition-all duration-300 shadow-md border border-outline-variant/60 w-fit max-w-[calc(100%-70px)]">
+            <div class="flex flex-wrap sm:flex-nowrap gap-2 items-center w-full">
+                <span class="text-xs font-bold text-on-surface mr-1 flex-shrink-0">Status:</span>
+                <button type="button" id="chipStatusAbertas" onclick="alterarFiltroStatus('abertas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-secondary bg-secondary/10 text-secondary flex-shrink-0">🟢 Abertas</button>
+                <button type="button" id="chipStatusResolvidas" onclick="alterarFiltroStatus('resolvidas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary flex-shrink-0">✅ Concluídas</button>
+                <button type="button" id="chipStatusCanceladas" onclick="alterarFiltroStatus('canceladas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-error flex-shrink-0">❌ Canceladas</button>
+                <button type="button" id="chipStatusTodas" onclick="alterarFiltroStatus('todas')" class="px-2.5 py-1 rounded-full text-xs font-bold transition-all border border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:text-secondary flex-shrink-0">🌐 Todas</button>
 
                 <!-- FILTRO DE PERÍODO / DATA PERSONALIZADA DA OS -->
-                <div class="relative inline-block text-left group/date-filter border-l border-outline-variant/60 pl-2 ml-1">
+                <div class="relative inline-block text-left group/date-filter border-l border-outline-variant/60 pl-2 ml-1 flex-shrink-0">
                     <button type="button" id="btnFiltroDataMapa" onclick="toggleDropdownFiltroDataMapa(event)" class="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-outline-variant bg-surface-container-lowest text-on-surface hover:border-secondary transition-all cursor-pointer shadow-sm">
                         <span class="material-symbols-outlined text-[15px] text-secondary">calendar_today</span>
                         <span id="labelFiltroDataMapa" class="font-medium">Somente Ativas</span>
@@ -407,6 +407,16 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- BUSCA DE ENDEREÇO PARA NOVA OS (COMPACTO POR PADRÃO, ESTICA AO CLICAR PARA ESCREVER) -->
+                <div id="containerBuscaPingMapa" class="relative transition-all duration-300 border-l border-outline-variant/60 pl-2 ml-1 w-[145px] flex-shrink-0">
+                    <div class="relative flex items-center w-full">
+                        <span class="material-symbols-outlined absolute left-1.5 text-[16px] text-blue-600 dark:text-blue-400 pointer-events-none">add_location_alt</span>
+                        <input type="text" id="buscaEnderecoPingMapa" placeholder="➕ Nova OS..." oninput="buscarEnderecoParaPingNoMapa(this.value)" onkeydown="if(event.key==='Enter'){ event.preventDefault(); selecionarPrimeiraSugestaoPingMapa(); }" onfocus="expandirBuscaPingMapa(this)" onblur="contrairBuscaPingMapa(this)" autocomplete="off" class="w-full pl-6 pr-6 py-1 text-xs font-medium border border-outline-variant bg-surface-container-lowest rounded-lg outline-none focus:ring-2 focus:ring-secondary text-on-surface shadow-xs transition-all duration-300" />
+                        <button type="button" onclick="limparBuscaEnderecoPingMapa()" id="btnLimparPingMapa" class="hidden absolute right-2 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer" title="Limpar">&times;</button>
+                    </div>
+                    <div id="dropdownSuggestionsPingMapa" class="absolute left-0 right-0 mt-1.5 min-w-[280px] sm:min-w-[340px] bg-surface-container-lowest/95 backdrop-blur-md border border-outline-variant/80 rounded-xl shadow-2xl z-50 p-1 hidden max-h-60 overflow-y-auto"></div>
                 </div>
             </div>
         </div>
@@ -691,7 +701,7 @@
         </div>
 
         <div class="mt-6 flex items-center justify-end gap-3">
-            <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+            <button id="modal-cancel-btn" onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
                 Cancelar
             </button>
             <button id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:scale-95 transition-all shadow-sm cursor-pointer">
@@ -1155,7 +1165,7 @@
         }
     }
 
-    async function carregarMapaOSsAbertas() {
+    async function carregarMapaOSsAbertas(forceReload = false) {
         if (window.AuthGuard) {
             const authData = await window.AuthGuard.requireAuth();
             if (!authData) return;
@@ -1174,8 +1184,14 @@
         if (stat) stat.innerHTML = "Carregando OSs do Supabase...";
         if (painelDetalhes) painelDetalhes.style.display = 'none';
 
-        // Se já houver cache na memória global, renderiza os dados filtrados imediatamente enquanto atualiza do Supabase
-        if (window.dadosOSsAbertasCache && window.dadosOSsAbertasCache.length > 0) {
+        if (forceReload) {
+            window.dadosOSsAbertasCache = null;
+            dadosOSsAbertasCache = null;
+            window.chamadosListCache = null;
+        }
+
+        // Se já houver cache na memória global e não for forceReload, renderiza os dados filtrados imediatamente enquanto atualiza do Supabase
+        if (!forceReload && window.dadosOSsAbertasCache && window.dadosOSsAbertasCache.length > 0) {
             dadosOSsAbertasCache = window.dadosOSsAbertasCache;
             aplicarFiltrosMapa();
         }
@@ -1189,7 +1205,7 @@
 
             if (!service) {
                 console.warn("⚠️ [Mapa] chamadosService ainda não está instanciado. Tentando novamente em 150ms...");
-                setTimeout(() => carregarMapaOSsAbertas(), 150);
+                setTimeout(() => carregarMapaOSsAbertas(forceReload), 150);
                 return;
             }
 
@@ -1210,6 +1226,21 @@
             if (stat) stat.innerHTML = '<span class="text-error">Erro ao carregar dados do Supabase.</span>';
         }
     }
+
+    window.addEventListener('message', function(event) {
+        if (event.data && (
+            event.data.action === 'OS_CRIADA_SUCESSO' ||
+            event.data.action === 'OS_CRIADA_SILENCIOSO' ||
+            event.data.action === 'OS_CONCLUIDA_SUCESSO' ||
+            event.data.action === 'OS_EDITADA_SUCESSO' ||
+            event.data.action === 'OS_CANCELADA_SUCESSO' ||
+            event.data.action === 'OS_RELOAD_MAPA'
+        )) {
+            if (typeof carregarMapaOSsAbertas === 'function') {
+                carregarMapaOSsAbertas(true);
+            }
+        }
+    });
 
     function converterChamadosModelParaMapa(chamadosList) {
         return chamadosList.map(c => {
@@ -1538,6 +1569,18 @@
             mapOSsInstance.on('click', () => {
                 const painel = document.getElementById('painelLateralOS');
                 if (painel) painel.style.display = 'none';
+                removerPinMapa();
+            });
+
+            mapOSsInstance.on('contextmenu', (e) => {
+                if (e.originalEvent) {
+                    e.originalEvent.preventDefault();
+                    e.originalEvent.stopPropagation();
+                }
+                const painel = document.getElementById('painelLateralOS');
+                if (painel) painel.style.display = 'none';
+
+                processarCliqueOuContextMenuMapa(e.lngLat.lng, e.lngLat.lat, false);
             });
         }
 
@@ -1783,6 +1826,374 @@
 
     function filtrarOSsMapa(termoManual) {
         aplicarFiltrosMapa();
+    }
+
+    // =========================================================================
+    // VALIDAÇÃO DE NÚMERO DO IMÓVEL (TRAVAMENTO DE OS SEM NÚMERO)
+    // =========================================================================
+    function validarPresencaNumeroEndereco(feature, text) {
+        var str = (text || (feature ? feature.place_name : '')).trim();
+        if (!str) return false;
+
+        if (/\b(s\/n|s\/nº|sem n[uú]mero|sn)\b/i.test(str)) {
+            return false;
+        }
+
+        if (feature && feature.address && !/^\d{5}(-\d{3})?$/.test(feature.address.trim())) {
+            var addr = feature.address.trim();
+            if (str.indexOf(addr) !== -1) {
+                return true;
+            }
+        }
+
+        var strRua = str;
+        var idxCidade = strRua.search(/,\s*(araraquara|s[aã]o paulo|brasil|\d{5}(-\d{3})?)/i);
+        if (idxCidade !== -1) {
+            strRua = strRua.substring(0, idxCidade);
+        } else {
+            var idxCorte = strRua.search(/\b(araraquara|s[aã]o paulo|brasil)\b/i);
+            if (idxCorte !== -1) {
+                strRua = strRua.substring(0, idxCorte).replace(/,\s*$/, '');
+            }
+        }
+
+        var partesComa = strRua.split(',').map(function(s) { return s.trim(); });
+
+        for (var i = 0; i < partesComa.length; i++) {
+            var p = partesComa[i];
+            if (/^\d{5}(-\d{3})?$/.test(p)) continue;
+
+            if (/^(nº?|n°|n\.|no\.|num\.|número|numero)?\s*\d{1,4}\s*[a-z]?$/i.test(p)) {
+                if (i === 0) {
+                    var semPrefixoRua = p.replace(/^(rua|r\.|avenida|av\.|alameda|al\.|praça|praca|pç\.|rodovia|rod\.|via|travessa|tv\.)\s+/i, '');
+                    if (/\D+\s+\d+/i.test(semPrefixoRua) || /^\d+\s+\d+/i.test(semPrefixoRua)) {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
+            }
+        }
+
+        var primeiroBloco = partesComa[0] || '';
+        var semPrefixo = primeiroBloco.replace(/^(rua|r\.|avenida|av\.|alameda|al\.|praça|praca|pç\.|rodovia|rod\.|via|travessa|tv\.)\s+/i, '');
+        if (/\D+\s+\d{1,4}\b/i.test(semPrefixo) || /^\d+\s+\d{1,4}\b/i.test(semPrefixo)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    // =========================================================================
+    // BUSCA E SELEÇÃO DE ENDEREÇO PARA PINGAR E ABRIR OS NO MAPA (EXPANSÃO DINÂMICA)
+    // =========================================================================
+    function expandirBuscaPingMapa(input) {
+        if (input) input.placeholder = '📍 Digite o endereço completo com número...';
+        const container = document.getElementById('containerBuscaPingMapa');
+        if (container) {
+            container.classList.remove('w-[145px]', 'flex-shrink-0');
+            container.classList.add('w-[280px]', 'sm:w-[420px]', 'flex-1');
+        }
+    }
+
+    function contrairBuscaPingMapa(input) {
+        const val = input ? input.value : (document.getElementById('buscaEnderecoPingMapa') ? document.getElementById('buscaEnderecoPingMapa').value : '');
+        if (!val) {
+            if (input) input.placeholder = '➕ Nova OS...';
+            const container = document.getElementById('containerBuscaPingMapa');
+            if (container) {
+                container.classList.remove('w-[280px]', 'sm:w-[420px]', 'flex-1');
+                container.classList.add('w-[145px]', 'flex-shrink-0');
+            }
+        }
+    }
+
+    var timerBuscaPingMapa = null;
+
+    function buscarEnderecoParaPingNoMapa(query) {
+        const q = query.trim();
+        const sugBox = document.getElementById('dropdownSuggestionsPingMapa');
+        const btnLimpar = document.getElementById('btnLimparPingMapa');
+
+        if (q.length > 0) {
+            expandirBuscaPingMapa(document.getElementById('buscaEnderecoPingMapa'));
+        }
+
+        if (btnLimpar) btnLimpar.classList.toggle('hidden', q.length === 0);
+
+        if (timerBuscaPingMapa) clearTimeout(timerBuscaPingMapa);
+
+        if (q.length < 3) {
+            if (sugBox) { sugBox.style.display = 'none'; sugBox.innerHTML = ''; }
+            return;
+        }
+
+        timerBuscaPingMapa = setTimeout(() => {
+            let queryBbox = q;
+            if (q.toLowerCase().indexOf("araraquara") === -1) {
+                queryBbox = q + ", Araraquara";
+            }
+
+            const MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+            const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(queryBbox)}.json?access_token=${MAPBOX_TOKEN}&country=br&language=pt&autocomplete=true&proximity=-48.1766,-21.7946`;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    if (!data || !data.features || data.features.length === 0) {
+                        if (sugBox) { sugBox.style.display = 'none'; sugBox.innerHTML = ''; }
+                        return;
+                    }
+
+                    sugBox.innerHTML = '';
+                    data.features.forEach(feat => {
+                        const temNum = validarPresencaNumeroEndereco(feat, feat.place_name);
+                        const div = document.createElement('div');
+                        div.className = 'px-3 py-2 text-xs text-on-surface hover:bg-secondary/10 hover:text-secondary rounded-lg cursor-pointer transition-colors flex items-center justify-between gap-2 border-b border-outline-variant/30 last:border-0';
+                        div.innerHTML = `
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="material-symbols-outlined text-[16px] text-secondary flex-shrink-0">location_on</span>
+                                <span class="font-medium truncate">${feat.place_name}</span>
+                            </div>
+                            ${!temNum ? '<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-error/10 text-error flex-shrink-0">⚠️ Sem nº</span>' : ''}
+                        `;
+                        div.onclick = () => {
+                            selecionarEnderecoPingMapa(feat);
+                        };
+                        sugBox.appendChild(div);
+                    });
+                    sugBox.style.display = 'block';
+                })
+                .catch(() => {
+                    if (sugBox) { sugBox.style.display = 'none'; }
+                });
+        }, 250);
+    }
+
+    function selecionarEnderecoPingMapa(feature) {
+        const temNum = validarPresencaNumeroEndereco(feature, feature ? feature.place_name : '');
+        if (!temNum) {
+            if (typeof window.showConfirmModal === 'function') {
+                window.showConfirmModal({
+                    title: 'Número do Imóvel Obrigatório',
+                    message: 'É obrigatório informar o <b>número do imóvel</b> para abrir uma Ordem de Serviço.<br><br><div class="text-xs text-on-surface-variant font-medium bg-amber-500/10 text-amber-800 dark:text-amber-300 p-2.5 rounded-xl border border-amber-500/20">💡 Exemplo: <b>Rua Voluntários da Pátria, 1400</b></div>',
+                    icon: 'warning',
+                    iconBgClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30',
+                    confirmBtnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+                    confirmText: 'Entendido',
+                    showJustification: false,
+                    showCancelBtn: false,
+                    onConfirm: () => {
+                        const input = document.getElementById('buscaEnderecoPingMapa');
+                        if (input && feature && feature.place_name) {
+                            const nomeRua = feature.place_name.split(',')[0].trim();
+                            input.value = nomeRua + ', ';
+                            input.focus();
+                            expandirBuscaPingMapa(input);
+                        }
+                    }
+                });
+            } else {
+                alert("⚠️ Atenção: É obrigatório informar o número do imóvel para abrir uma Ordem de Serviço (ex: Rua Voluntários da Pátria, 1400).\n\nPor favor, digite o número no endereço para continuar.");
+            }
+            return;
+        }
+
+        const input = document.getElementById('buscaEnderecoPingMapa');
+        const sugBox = document.getElementById('dropdownSuggestionsPingMapa');
+
+        if (sugBox) { sugBox.style.display = 'none'; sugBox.innerHTML = ''; }
+        if (input) input.value = feature.place_name;
+
+        const lng = feature.center[0];
+        const lat = feature.center[1];
+
+        if (mapOSsInstance) {
+            mapOSsInstance.easeTo({
+                center: [lng, lat],
+                zoom: 16.5,
+                duration: 800
+            });
+        }
+
+        processarCliqueOuContextMenuMapa(lng, lat, false);
+    }
+
+    function selecionarPrimeiraSugestaoPingMapa() {
+        const sugBox = document.getElementById('dropdownSuggestionsPingMapa');
+        if (!sugBox) return;
+        const primeiroItem = sugBox.querySelector('div[onclick]');
+        if (primeiroItem) {
+            primeiroItem.click();
+        }
+    }
+
+    function limparBuscaEnderecoPingMapa() {
+        const input = document.getElementById('buscaEnderecoPingMapa');
+        const sugBox = document.getElementById('dropdownSuggestionsPingMapa');
+        const btnLimpar = document.getElementById('btnLimparPingMapa');
+
+        if (input) {
+            input.value = '';
+            contrairBuscaPingMapa(input);
+        }
+        if (sugBox) { sugBox.style.display = 'none'; sugBox.innerHTML = ''; }
+        if (btnLimpar) btnLimpar.classList.add('hidden');
+        removerPinMapa();
+    }
+
+    document.addEventListener('click', (e) => {
+        const container = document.getElementById('buscaEnderecoPingMapa');
+        const sugBox = document.getElementById('dropdownSuggestionsPingMapa');
+        if (container && sugBox && e.target && !container.contains(e.target) && !sugBox.contains(e.target)) {
+            sugBox.style.display = 'none';
+        }
+    });
+
+    // =========================================================================
+    // SELEÇÃO INTERATIVA DE PONTOS NO MAPA E CRIAÇÃO DE OS (PING & BOTÃO DIREITO)
+    // =========================================================================
+    var markerPinadoMapa = null;
+    var popupPinadoMapa = null;
+
+    function processarCliqueOuContextMenuMapa(lng, lat, abrirModalDireto = false) {
+        if (!mapOSsInstance) return;
+
+        removerPinMapa();
+
+        const pLat = parseFloat(lat);
+        const pLng = parseFloat(lng);
+        if (isNaN(pLat) || isNaN(pLng)) return;
+
+        const elPin = document.createElement('div');
+        elPin.className = 'marker-ponto-pinado-custom';
+        elPin.style.cssText = 'position: relative; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 50;';
+        elPin.innerHTML = `
+            <div class="absolute inset-0 rounded-full bg-blue-500/30 animate-ping"></div>
+            <div style="width: 24px; height: 24px; background: linear-gradient(135deg, #1a73e8 0%, #0051d5 100%); border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 4px 10px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: #ffffff; font-size: 13px; font-weight: bold;">
+                📍
+            </div>
+        `;
+
+        markerPinadoMapa = new mapboxgl.Marker({ element: elPin })
+            .setLngLat([pLng, pLat])
+            .addTo(mapOSsInstance);
+
+        let endFormatado = `Lat: ${pLat.toFixed(5)}, Lng: ${pLng.toFixed(5)}`;
+
+        const popupContent = document.createElement('div');
+        popupContent.className = 'popup-ponto-pinado p-3 font-sans max-w-[280px] bg-slate-900 text-slate-100 rounded-2xl border border-slate-700 shadow-xl';
+        popupContent.innerHTML = `
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-700/80">
+                <span class="flex items-center gap-1 font-bold text-xs text-blue-400">
+                    <span class="material-symbols-outlined text-[16px]">location_on</span> Ponto Selecionado
+                </span>
+                <button type="button" onclick="removerPinMapa()" class="text-slate-400 hover:text-white text-xs font-bold transition-colors cursor-pointer">&times;</button>
+            </div>
+            <div class="text-xs text-slate-200 space-y-1 mb-3">
+                <div id="endTextoPinadoPopup" class="font-medium leading-tight text-slate-100">🔍 Buscando endereço...</div>
+                <div id="alertaSemNumeroPopup" class="hidden text-[10px] font-bold text-amber-400 bg-amber-950/60 p-1.5 rounded-lg border border-amber-600/50 mt-1">⚠️ Informe o número do imóvel no endereço</div>
+                <div class="font-mono text-[10px] text-blue-300">🌐 ${pLat.toFixed(6)}, ${pLng.toFixed(6)}</div>
+            </div>
+            <div class="flex items-center gap-1.5 pt-2 border-t border-slate-800">
+                <button type="button" id="btnAbrirOSPinado" onclick="dispararModalNovaOSComPonto(${pLat}, ${pLng})" class="flex-1 py-2 px-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                    <span>Abrir OS Aqui</span>
+                </button>
+            </div>
+        `;
+
+        popupPinadoMapa = new mapboxgl.Popup({ offset: 25, maxWidth: '300px', closeOnClick: false })
+            .setLngLat([pLng, pLat])
+            .setDOMContent(popupContent)
+            .addTo(mapOSsInstance);
+
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+        const urlRev = `https://api.mapbox.com/geocoding/v5/mapbox.places/${pLng},${pLat}.json?access_token=${MAPBOX_TOKEN}&country=br&language=pt`;
+
+        fetch(urlRev)
+            .then(r => r.json())
+            .then(data => {
+                let firstFeat = null;
+                if (data && data.features && data.features.length > 0) {
+                    firstFeat = data.features[0];
+                    endFormatado = firstFeat.place_name;
+                }
+                const elEnd = document.getElementById('endTextoPinadoPopup');
+                if (elEnd) elEnd.innerText = "📍 " + endFormatado;
+
+                const temNum = validarPresencaNumeroEndereco(firstFeat, endFormatado);
+                const alertaNum = document.getElementById('alertaSemNumeroPopup');
+                if (alertaNum) {
+                    alertaNum.classList.toggle('hidden', temNum);
+                }
+
+                const btn = document.getElementById('btnAbrirOSPinado');
+                if (btn) {
+                    const endEscaped = endFormatado.replace(/'/g, "\\'");
+                    btn.setAttribute('onclick', `dispararModalNovaOSComPonto(${pLat}, ${pLng}, '${endEscaped}')`);
+                }
+
+                if (abrirModalDireto) {
+                    dispararModalNovaOSComPonto(pLat, pLng, endFormatado);
+                }
+            })
+            .catch(err => {
+                const elEnd = document.getElementById('endTextoPinadoPopup');
+                if (elEnd) elEnd.innerText = `📍 ${pLat.toFixed(5)}, ${pLng.toFixed(5)}`;
+                if (abrirModalDireto) {
+                    dispararModalNovaOSComPonto(pLat, pLng, endFormatado);
+                }
+            });
+    }
+
+    function removerPinMapa() {
+        if (markerPinadoMapa) {
+            markerPinadoMapa.remove();
+            markerPinadoMapa = null;
+        }
+        if (popupPinadoMapa) {
+            popupPinadoMapa.remove();
+            popupPinadoMapa = null;
+        }
+    }
+
+    function dispararModalNovaOSComPonto(lat, lng, endereco = '') {
+        if (endereco && !validarPresencaNumeroEndereco(null, endereco)) {
+            if (typeof window.showConfirmModal === 'function') {
+                window.showConfirmModal({
+                    title: 'Número do Imóvel Obrigatório',
+                    message: 'É obrigatório informar o <b>número do imóvel</b> para abrir a Ordem de Serviço.<br><br><div class="text-xs text-on-surface-variant font-medium bg-amber-500/10 text-amber-800 dark:text-amber-300 p-2.5 rounded-xl border border-amber-500/20">💡 Utilize o campo de busca <b>➕ Nova OS</b> acima para pesquisar o endereço com número.</div>',
+                    icon: 'warning',
+                    iconBgClass: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30',
+                    confirmBtnClass: 'bg-amber-600 hover:bg-amber-700 text-white',
+                    confirmText: 'Entendido',
+                    showJustification: false,
+                    showCancelBtn: false,
+                    onConfirm: () => {
+                        const input = document.getElementById('buscaEnderecoPingMapa');
+                        if (input) {
+                            input.focus();
+                            expandirBuscaPingMapa(input);
+                        }
+                    }
+                });
+            } else {
+                alert("⚠️ Atenção: É necessário informar o número do imóvel para abrir a Ordem de Serviço (ex: Rua Voluntários da Pátria, 1400).\n\nPor favor, informe o endereço completo com o número no campo de busca.");
+            }
+            return;
+        }
+
+        const dadosLoc = { lat: parseFloat(lat), lng: parseFloat(lng), endereco: endereco };
+        
+        if (typeof window.abrirModalNovaOS === 'function') {
+            window.abrirModalNovaOS(dadosLoc);
+        } else if (window.parent && typeof window.parent.abrirModalNovaOS === 'function') {
+            window.parent.abrirModalNovaOS(dadosLoc);
+        } else {
+            try { sessionStorage.setItem('os_pre_fill_data', JSON.stringify(dadosLoc)); } catch(e) {}
+            alert(`Iniciando abertura de OS para a localização: ${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+        }
     }
 
     function calcularDistancia(lat1, lon1, lat2, lon2) {
@@ -2440,7 +2851,7 @@
 
     var pendingActionCallback = null;
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false, showCancelBtn = true }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -2448,10 +2859,19 @@
         const modalTitle = document.getElementById('modal-title');
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = document.getElementById('modal-cancel-btn') || (modalConfirmBtn ? modalConfirmBtn.previousElementSibling : null);
         const modalJustificationInput = document.getElementById('modal-justification-input');
         const justificationContainer = document.getElementById('modal-justification-container') || (modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null);
 
         if (!modal || !modalBox) return;
+
+        if (modalCancelBtn) {
+            if (showCancelBtn === false) {
+                modalCancelBtn.classList.add('hidden');
+            } else {
+                modalCancelBtn.classList.remove('hidden');
+            }
+        }
 
         if (modalTitle) modalTitle.textContent = title || 'Confirmar Ação';
         if (modalMessage) modalMessage.innerHTML = message || 'Deseja prosseguir?';
@@ -2543,6 +2963,9 @@
         setTimeout(() => {
             modal.classList.add('hidden');
             modal.classList.remove('flex');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalCancelBtn = document.getElementById('modal-cancel-btn') || (modalConfirmBtn ? modalConfirmBtn.previousElementSibling : null);
+            if (modalCancelBtn) modalCancelBtn.classList.remove('hidden');
             pendingActionCallback = null;
         }, 200);
     };
@@ -2747,6 +3170,12 @@
                     const repo = new window.ChamadosRepository();
                     await repo.updateStatus(targetIdOrProtocol, 'Cancelada', obs);
                 }
+            }
+            if (typeof carregarMapaOSsAbertas === 'function') {
+                await carregarMapaOSsAbertas(true);
+            }
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ action: 'OS_CANCELADA_SUCESSO', protocolo: prot }, '*');
             }
         } catch(e) {
             console.warn("⚠️ Falha ao sincronizar cancelamento no Supabase:", e);
