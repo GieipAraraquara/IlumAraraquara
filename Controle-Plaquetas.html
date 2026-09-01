@@ -282,7 +282,7 @@
                 <span class="material-symbols-outlined text-secondary text-[28px]">pin_drop</span>
                 <h2 class="font-headline-md text-headline-md text-on-surface">Controle de Plaquetas</h2>
             </div>
-            <p class="font-body-md text-body-md text-on-surface-variant">Gestão da tabela <code class="bg-surface-container-high px-1.5 py-0.5 rounded text-secondary font-mono text-xs">localizacao_plaquetas</code> do Supabase — consulta, visualização geográfica e alteração de coordenadas.</p>
+            <p class="font-body-md text-body-md text-on-surface-variant">Consulta, visualização geográfica e alteração de coordenadas das plaquetas.</p>
         </div>
         
         <div class="flex items-center gap-2 flex-wrap">
@@ -297,12 +297,12 @@
         </div>
     </div>
 
-    <!-- KPI Grid (Total de Plaquetas) -->
+    <!-- KPI Grid (Total, Registradas 30d, Atualizadas 30d) -->
     <div class="grid grid-cols-12 gap-card-gap mb-4 max-w-max-width-content mx-auto">
         <!-- Card 1: Total de Plaquetas -->
-        <div class="col-span-12 md:col-span-6 lg:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:200ms]">
             <div class="flex items-center justify-between mb-1">
-                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Plaquetas Cadastradas</span>
+                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Plaquetas</span>
                 <div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
                     <span class="material-symbols-outlined text-[20px]">tag</span>
                 </div>
@@ -312,7 +312,41 @@
             </div>
             <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
                 <span class="material-symbols-outlined text-[15px] text-secondary">database</span>
-                <span>Registros ativos na tabela Supabase (localizacao_plaquetas)</span>
+                <span>Registros ativos no sistema</span>
+            </div>
+        </div>
+
+        <!-- Card 2: Registradas nos Últimos 30 Dias -->
+        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+            <div class="flex items-center justify-between mb-1">
+                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Registradas (30 Dias)</span>
+                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[20px]">add_location_alt</span>
+                </div>
+            </div>
+            <div class="font-headline-lg text-headline-lg text-emerald-600 overflow-visible font-bold" id="kpi-novas-30-dias">
+                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+            </div>
+            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                <span class="material-symbols-outlined text-[15px] text-emerald-600">calendar_month</span>
+                <span>Novas plaquetas nos últimos 30 dias</span>
+            </div>
+        </div>
+
+        <!-- Card 3: Atualizadas nos Últimos 30 Dias -->
+        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+            <div class="flex items-center justify-between mb-1">
+                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Atualizadas (30 Dias)</span>
+                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[20px]">edit_location</span>
+                </div>
+            </div>
+            <div class="font-headline-lg text-headline-lg text-blue-600 overflow-visible font-bold" id="kpi-atualizadas-30-dias">
+                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+            </div>
+            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                <span class="material-symbols-outlined text-[15px] text-blue-600">update</span>
+                <span>Plaquetas editadas nos últimos 30 dias</span>
             </div>
         </div>
     </div>
@@ -1019,12 +1053,57 @@
 
         async function carregarKPIsTotais(client) {
             try {
+                // 1. Total de Plaquetas Cadastradas
                 const resTotal = await client.from('localizacao_plaquetas').select('identificacao', { count: 'exact', head: true });
                 const countTotal = resTotal.count || 0;
                 const elTotal = document.getElementById('kpi-total-plaquetas');
                 if (elTotal) elTotal.innerText = countTotal.toLocaleString('pt-BR');
+
+                // Data limite de 30 dias atrás
+                const data30DiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+                // 2. Quantidade de plaquetas registradas nos últimos 30 dias
+                let countNovas = 0;
+                try {
+                    let resNovas = await client.from('localizacao_plaquetas')
+                        .select('identificacao', { count: 'exact', head: true })
+                        .gte('created_at', data30DiasAtras);
+
+                    if (!resNovas.error && resNovas.count !== null) {
+                        countNovas = resNovas.count;
+                    } else {
+                        // Fallback tentando coluna alternativa de data
+                        let resNovasFB = await client.from('localizacao_plaquetas')
+                            .select('identificacao', { count: 'exact', head: true })
+                            .gte('quando_colocado', data30DiasAtras);
+                        if (!resNovasFB.error && resNovasFB.count !== null) {
+                            countNovas = resNovasFB.count;
+                        }
+                    }
+                } catch (eNovas) {
+                    console.warn("⚠️ Não foi possível consultar registradas nos últimos 30 dias:", eNovas);
+                }
+                const elNovas = document.getElementById('kpi-novas-30-dias');
+                if (elNovas) elNovas.innerText = countNovas.toLocaleString('pt-BR');
+
+                // 3. Quantidade de plaquetas atualizadas nos últimos 30 dias
+                let countAtualizadas = 0;
+                try {
+                    let resAtualiz = await client.from('localizacao_plaquetas')
+                        .select('identificacao', { count: 'exact', head: true })
+                        .gte('updated_at', data30DiasAtras);
+
+                    if (!resAtualiz.error && resAtualiz.count !== null) {
+                        countAtualizadas = resAtualiz.count;
+                    }
+                } catch (eAtualiz) {
+                    console.warn("⚠️ Não foi possível consultar atualizadas nos últimos 30 dias:", eAtualiz);
+                }
+                const elAtualizadas = document.getElementById('kpi-atualizadas-30-dias');
+                if (elAtualizadas) elAtualizadas.innerText = countAtualizadas.toLocaleString('pt-BR');
+
             } catch(e) {
-                console.warn("⚠️ Aviso ao carregar total de plaquetas:", e);
+                console.warn("⚠️ Aviso ao carregar KPIs de plaquetas:", e);
             }
         }
 

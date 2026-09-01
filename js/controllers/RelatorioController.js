@@ -15,8 +15,13 @@ class RelatorioController {
             rangeEnd: '',
             status: 'all',
             problem: 'all',
-            type: 'all'
+            type: 'all',
+            polygon: null
         };
+        this.areaMapInstance = null;
+        this.areaMapMarkers = [];
+        this.areaPolygonPoints = [];
+        this.isDrawingArea = false;
         
         const now = new Date();
         const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -329,7 +334,8 @@ class RelatorioController {
     }
 
     applyFilters() {
-        const { search, dateType, dateField, rangeStart, rangeEnd, status, problem, type } = this.activeFilters;
+        const { search, dateType, dateField, rangeStart, rangeEnd, status, problem, type, polygon } = this.activeFilters;
+        const hasPolygonFilter = Array.isArray(polygon) && polygon.length >= 3;
 
         this.filteredList = this.chamadosList.filter(item => {
             // Termo de busca (Header Input + Dashboard Search)
@@ -376,12 +382,70 @@ class RelatorioController {
                 if (!this.checkDateInPeriod(item.dataAbertura, dateType, rangeStart, rangeEnd)) return false;
             }
 
+            // 5. Filtro Geográfico por Área (Point-in-Polygon)
+            if (hasPolygonFilter) {
+                if (!this.checkOSInPolygon(item, polygon)) return false;
+            }
+
             return true;
         });
 
         this.updateIndicatorText();
         this.updateKPIs();
         this.renderCharts();
+        this.updateSpatialFilterUI();
+    }
+
+    checkOSInPolygon(item, polygon) {
+        if (!polygon || polygon.length < 3) return true;
+
+        const pointsToCheck = [];
+
+        if (item.coordenadasReparoList && Array.isArray(item.coordenadasReparoList)) {
+            item.coordenadasReparoList.forEach(c => {
+                const lng = parseFloat(c.lng);
+                const lat = parseFloat(c.lat);
+                if (!isNaN(lng) && !isNaN(lat)) pointsToCheck.push([lng, lat]);
+            });
+        }
+        if (item.coordenadasInicialList && Array.isArray(item.coordenadasInicialList)) {
+            item.coordenadasInicialList.forEach(c => {
+                const lng = parseFloat(c.lng);
+                const lat = parseFloat(c.lat);
+                if (!isNaN(lng) && !isNaN(lat)) pointsToCheck.push([lng, lat]);
+            });
+        }
+
+        const addStrCoord = (strCoord) => {
+            if (!strCoord) return;
+            const parsed = window.ChamadoModel ? window.ChamadoModel.parseLatLng(strCoord) : null;
+            if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+                pointsToCheck.push([parsed.lng, parsed.lat]);
+            }
+        };
+
+        if (pointsToCheck.length === 0) {
+            addStrCoord(item.coordenadaReparo);
+            addStrCoord(item.coordenadaInicial);
+        }
+
+        if (pointsToCheck.length === 0 && item.pontosDetalhados && Array.isArray(item.pontosDetalhados)) {
+            item.pontosDetalhados.forEach(p => {
+                if (p.coordenadaFinal) addStrCoord(p.coordenadaFinal);
+                if (p.coordenadaInicial) addStrCoord(p.coordenadaInicial);
+            });
+        }
+
+        if (pointsToCheck.length === 0 && item.rawRow) {
+            addStrCoord(item.rawRow.coordenada_reparo || item.rawRow.coordenada_inicial || item.rawRow.coordenada);
+        }
+
+        if (pointsToCheck.length === 0) return false;
+
+        const pip = window.isPointInPolygon || (typeof isPointInPolygon === 'function' ? isPointInPolygon : null);
+        if (!pip) return true;
+
+        return pointsToCheck.some(pt => pip(pt, polygon));
     }
 
     updateIndicatorText() {
@@ -391,10 +455,12 @@ class RelatorioController {
         const count = this.filteredList.length;
         const total = this.chamadosList.length;
 
-        if (count === total && this.activeFilters.dateType === 'all' && !this.activeFilters.rangeStart && !this.activeFilters.rangeEnd && this.activeFilters.status === 'all' && this.activeFilters.type === 'all' && !this.activeFilters.search) {
+        const hasPolygon = Array.isArray(this.activeFilters.polygon) && this.activeFilters.polygon.length >= 3;
+
+        if (count === total && this.activeFilters.dateType === 'all' && !this.activeFilters.rangeStart && !this.activeFilters.rangeEnd && this.activeFilters.status === 'all' && this.activeFilters.type === 'all' && !this.activeFilters.search && !hasPolygon) {
             indText.textContent = `Exibindo Todo o Histórico (${total} OSs)`;
         } else {
-            indText.textContent = `Filtrado: ${count} de ${total} OSs encontradas`;
+            indText.textContent = `Filtrado: ${count} de ${total} OSs encontradas${hasPolygon ? ' (Filtro por Área Ativo)' : ''}`;
         }
     }
 
@@ -725,6 +791,13 @@ class RelatorioController {
     resolveMarcaEMaterial(rawNome, defaultUnidade = 'UN') {
         if (!rawNome) return { marca: 'PRÓPRIO', desc: '', unidade: defaultUnidade };
 
+        if (typeof rawNome === 'object') {
+            const extracted = (rawNome.nome || rawNome.descricao || rawNome.material || rawNome.material_nome || '');
+            rawNome = extracted ? String(extracted) : JSON.stringify(rawNome);
+        } else {
+            rawNome = String(rawNome);
+        }
+
         let nomeClean = rawNome.replace(/\(x\d+\)/i, '').trim();
         if (!nomeClean) return { marca: 'PRÓPRIO', desc: rawNome, unidade: defaultUnidade };
 
@@ -848,19 +921,33 @@ class RelatorioController {
             const rawMats = (item.materiaisConsolidados && Array.isArray(item.materiaisConsolidados) && item.materiaisConsolidados.length > 0)
                 ? item.materiaisConsolidados
                 : (item.materialsList || []);
-            rawMats.forEach(matStr => {
+            rawMats.forEach(matItem => {
+                if (!matItem) return;
+                let matStr = '';
                 let qty = 1;
-                const matchX = matStr.match(/\(x(\d+)\)/i);
-                if (matchX) {
-                    qty = parseInt(matchX[1], 10) || 1;
-                } else {
-                    const matchStartNum = matStr.match(/^(\d+)\s*x?\s+(.*)/i);
-                    if (matchStartNum) {
-                        qty = parseInt(matchStartNum[1], 10) || 1;
-                        matStr = matchStartNum[2];
+
+                if (typeof matItem === 'string') {
+                    matStr = matItem;
+                    const matchX = matStr.match(/\(x(\d+)\)/i);
+                    if (matchX) {
+                        qty = parseInt(matchX[1], 10) || 1;
+                    } else {
+                        const matchStartNum = matStr.match(/^(\d+)\s*x?\s+(.*)/i);
+                        if (matchStartNum) {
+                            qty = parseInt(matchStartNum[1], 10) || 1;
+                            matStr = matchStartNum[2];
+                        }
                     }
+                } else if (typeof matItem === 'object') {
+                    matStr = String(matItem.nome || matItem.descricao || matItem.material || matItem.material_nome || '').trim();
+                    qty = Number(matItem.qtd || matItem.quantidade || matItem.qtd_usada) || 1;
+                } else {
+                    matStr = String(matItem).trim();
                 }
-                registrarMaterial(matStr, qty, prot, 'UN', 'Material de Aplicação');
+
+                if (matStr) {
+                    registrarMaterial(matStr, qty, prot, 'UN', 'Material de Aplicação');
+                }
             });
 
             // B) SESSÕES DE PRAÇA PÚBLICA -> HORA DE ELETRICISTA (materiais_contrato)
@@ -1042,6 +1129,7 @@ class RelatorioController {
         const dashType = document.getElementById('dash-filter-type');
         const dashStatus = document.getElementById('dash-filter-status');
         const dashPeriod = document.getElementById('dash-filter-period');
+        const dashDateField = document.getElementById('dash-filter-date-field');
         const dashStart = document.getElementById('dash-filter-start');
         const dashEnd = document.getElementById('dash-filter-end');
         const btnDashStart = document.getElementById('btn-picker-dash-start');
@@ -1111,6 +1199,7 @@ class RelatorioController {
                 this.activeFilters.dateType = dashPeriod.value;
                 updateCustomDatesVisibility(dashPeriod.value);
             }
+            if (dashDateField) this.activeFilters.dateField = dashDateField.value;
             if (dashStart) this.activeFilters.rangeStart = dashStart.value;
             if (dashEnd) this.activeFilters.rangeEnd = dashEnd.value;
 
@@ -1127,6 +1216,7 @@ class RelatorioController {
         if (dashType) dashType.addEventListener('change', syncAndApply);
         if (dashStatus) dashStatus.addEventListener('change', syncAndApply);
         if (dashPeriod) dashPeriod.addEventListener('change', syncAndApply);
+        if (dashDateField) dashDateField.addEventListener('change', syncAndApply);
         if (dashStart) dashStart.addEventListener('input', syncAndApply);
         if (dashEnd) dashEnd.addEventListener('input', syncAndApply);
 
@@ -1155,6 +1245,7 @@ class RelatorioController {
         }
         if (relatorioDateFieldSelect) {
             relatorioDateFieldSelect.addEventListener('change', (e) => {
+                if (dashDateField) dashDateField.value = e.target.value;
                 this.activeFilters.dateField = e.target.value;
                 this.applyFilters();
             });
@@ -1191,13 +1282,15 @@ class RelatorioController {
                     rangeEnd: '',
                     status: 'all',
                     problem: 'all',
-                    type: 'all'
+                    type: 'all',
+                    polygon: null
                 };
 
                 if (searchInput) searchInput.value = '';
                 if (dashType) dashType.value = 'all';
                 if (dashStatus) dashStatus.value = 'all';
                 if (dashPeriod) dashPeriod.value = 'all';
+                if (dashDateField) dashDateField.value = 'abertura';
                 if (dashStart) dashStart.value = '';
                 if (dashEnd) dashEnd.value = '';
 
@@ -1210,7 +1303,9 @@ class RelatorioController {
                 if (relatorioProblemSelect) relatorioProblemSelect.value = 'all';
 
                 updateCustomDatesVisibility('all');
+                this.limparDesenhoArea();
                 this.applyFilters();
+                this.updateSpatialFilterUI();
             });
         }
 
@@ -1248,6 +1343,679 @@ class RelatorioController {
             deselectAllCols.addEventListener('click', () => {
                 document.querySelectorAll('.col-checkbox').forEach(cb => cb.checked = false);
             });
+        }
+    }
+
+    // =========================================================================
+    // MODAL E FILTRO DE ÁREA GEOGRÁFICA (POINT-IN-POLYGON)
+    // =========================================================================
+
+    abrirModalFiltroArea() {
+        const modal = document.getElementById('modal-filtro-area');
+        if (!modal) return;
+        modal.classList.remove('hidden');
+
+        this.setupBairroAutocomplete();
+
+        setTimeout(() => {
+            this.initAreaMap();
+        }, 100);
+    }
+
+    fecharModalFiltroArea() {
+        const modal = document.getElementById('modal-filtro-area');
+        if (modal) modal.classList.add('hidden');
+        this.desativarModoDesenhoArea();
+    }
+
+    initAreaMap() {
+        const container = document.getElementById('map-filtro-area-canvas');
+        if (!container) return;
+
+        if (this.areaMapInstance) {
+            this.areaMapInstance.resize();
+            return;
+        }
+
+        if (typeof mapboxgl === 'undefined') {
+            console.warn('⚠️ [RelatorioController] Mapbox GL JS não carregado.');
+            return;
+        }
+
+        const token = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+        mapboxgl.accessToken = token;
+
+        this.areaMapInstance = new mapboxgl.Map({
+            container: 'map-filtro-area-canvas',
+            style: 'mapbox://styles/mapbox/streets-v12',
+            center: [-48.176, -21.789],
+            zoom: 12.5
+        });
+
+        this.areaMapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+        this.areaMapInstance.on('load', () => {
+            this.renderOSPointsOnAreaMap();
+
+            if (this.activeFilters.polygon && this.activeFilters.polygon.length >= 3) {
+                this.areaPolygonPoints = [...this.activeFilters.polygon];
+                this.renderExistingPolygonOnAreaMap();
+            }
+        });
+    }
+
+    renderOSPointsOnAreaMap() {
+        if (!this.areaMapInstance) return;
+
+        const features = [];
+        this.chamadosList.forEach(item => {
+            const parsed = window.ChamadoModel ? window.ChamadoModel.parseLatLng(item.coordenadaReparo || item.coordenadaInicial) : null;
+            if (parsed && !isNaN(parsed.lat) && !isNaN(parsed.lng)) {
+                features.push({
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: [parsed.lng, parsed.lat] },
+                    properties: {
+                        protocolo: item.protocolo,
+                        status: item.normalizedStatus
+                    }
+                });
+            }
+        });
+
+        if (features.length === 0) return;
+
+        const geojson = { type: 'FeatureCollection', features };
+
+        if (this.areaMapInstance.getSource('os-points-source')) {
+            this.areaMapInstance.getSource('os-points-source').setData(geojson);
+        } else {
+            this.areaMapInstance.addSource('os-points-source', { type: 'geojson', data: geojson });
+            this.areaMapInstance.addLayer({
+                id: 'os-points-circle',
+                type: 'circle',
+                source: 'os-points-source',
+                paint: {
+                    'circle-radius': 4.5,
+                    'circle-color': [
+                        'match',
+                        ['get', 'status'],
+                        'concluida', '#10b981',
+                        'aberto', '#ef4444',
+                        'em_andamento', '#f59e0b',
+                        '#3b82f6'
+                    ],
+                    'circle-stroke-width': 1,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-opacity': 0.8
+                }
+            });
+        }
+    }
+
+    toggleModoDesenhoArea() {
+        if (this.isDrawingArea) {
+            this.desativarModoDesenhoArea();
+        } else {
+            this.ativarModoDesenhoArea();
+        }
+    }
+
+    ativarModoDesenhoArea() {
+        this.isDrawingArea = true;
+        this.areaPolygonPoints = [];
+        this.limparMarkersDesenhoArea();
+
+        const txtBtn = document.getElementById('txt-btn-area-desenhar');
+        if (txtBtn) txtBtn.textContent = 'Clique no Mapa (Duplo Clique p/ Fechar)';
+
+        if (this.areaMapInstance) {
+            this.areaMapInstance.getCanvas().style.cursor = 'crosshair';
+            this._onClickAreaMap = (e) => this.handleCliqueDesenhoArea(e);
+            this._onDblClickAreaMap = (e) => this.handleDblClickFinalizarArea(e);
+
+            this.areaMapInstance.on('click', this._onClickAreaMap);
+            this.areaMapInstance.on('dblclick', this._onDblClickAreaMap);
+        }
+    }
+
+    desativarModoDesenhoArea() {
+        this.isDrawingArea = false;
+        const txtBtn = document.getElementById('txt-btn-area-desenhar');
+        if (txtBtn) txtBtn.textContent = 'Redesenhar Área no Mapa';
+
+        if (this.areaMapInstance) {
+            this.areaMapInstance.getCanvas().style.cursor = '';
+            if (this._onClickAreaMap) this.areaMapInstance.off('click', this._onClickAreaMap);
+            if (this._onDblClickAreaMap) this.areaMapInstance.off('dblclick', this._onDblClickAreaMap);
+        }
+    }
+
+    handleCliqueDesenhoArea(e) {
+        if (!this.isDrawingArea) return;
+        const pt = [e.lngLat.lng, e.lngLat.lat];
+        this.areaPolygonPoints.push(pt);
+
+        const elV = document.createElement('div');
+        elV.className = "w-3.5 h-3.5 bg-amber-500 border-2 border-white rounded-full shadow-md";
+        const m = new mapboxgl.Marker({ element: elV }).setLngLat(pt).addTo(this.areaMapInstance);
+        if (!this.areaMapMarkers) this.areaMapMarkers = [];
+        this.areaMapMarkers.push(m);
+
+        this.atualizarCamadaPoligonoArea();
+    }
+
+    handleDblClickFinalizarArea(e) {
+        if (!this.isDrawingArea) return;
+        if (e) e.preventDefault();
+
+        if (this.areaPolygonPoints.length >= 3) {
+            const first = this.areaPolygonPoints[0];
+            const last = this.areaPolygonPoints[this.areaPolygonPoints.length - 1];
+            if (first[0] !== last[0] || first[1] !== last[1]) {
+                this.areaPolygonPoints.push([...first]);
+            }
+            this.atualizarCamadaPoligonoArea();
+
+            const infoContainer = document.getElementById('info-status-poligono-container');
+            const infoStatus = document.getElementById('info-status-poligono');
+            const txtStatus = document.getElementById('txt-status-poligono');
+            if (infoContainer) infoContainer.classList.remove('hidden');
+            if (infoStatus && txtStatus) {
+                infoStatus.classList.remove('hidden');
+                txtStatus.textContent = `✓ Polígono manual demarcado (${this.areaPolygonPoints.length - 1} vértices)`;
+            }
+        }
+        this.desativarModoDesenhoArea();
+    }
+
+    atualizarCamadaPoligonoArea() {
+        if (!this.areaMapInstance) return;
+        const pts = this.areaPolygonPoints;
+        if (pts.length === 0) return;
+
+        const coords = pts.length > 2 ? [pts] : [[...pts, pts[0]]];
+        const geojson = {
+            type: 'Feature',
+            geometry: { type: 'Polygon', coordinates: coords }
+        };
+
+        if (this.areaMapInstance.getSource('area-filtro-source')) {
+            this.areaMapInstance.getSource('area-filtro-source').setData(geojson);
+        } else {
+            this.areaMapInstance.addSource('area-filtro-source', { type: 'geojson', data: geojson });
+            this.areaMapInstance.addLayer({
+                id: 'area-filtro-fill',
+                type: 'fill',
+                source: 'area-filtro-source',
+                paint: { 'fill-color': '#f59e0b', 'fill-opacity': 0.22 }
+            });
+            this.areaMapInstance.addLayer({
+                id: 'area-filtro-outline',
+                type: 'line',
+                source: 'area-filtro-source',
+                paint: { 'line-color': '#d97706', 'line-width': 2.8, 'line-dasharray': [2, 1] }
+            });
+        }
+    }
+
+    renderExistingPolygonOnAreaMap() {
+        if (!this.areaMapInstance || !this.areaPolygonPoints || this.areaPolygonPoints.length < 3) return;
+
+        this.limparMarkersDesenhoArea();
+        if (!this.areaMapMarkers) this.areaMapMarkers = [];
+
+        this.areaPolygonPoints.forEach(pt => {
+            const elV = document.createElement('div');
+            elV.className = "w-3.5 h-3.5 bg-amber-500 border-2 border-white rounded-full shadow-md";
+            const m = new mapboxgl.Marker({ element: elV }).setLngLat(pt).addTo(this.areaMapInstance);
+            this.areaMapMarkers.push(m);
+        });
+
+        this.atualizarCamadaPoligonoArea();
+
+        const infoContainer = document.getElementById('info-status-poligono-container');
+        const infoStatus = document.getElementById('info-status-poligono');
+        const txtStatus = document.getElementById('txt-status-poligono');
+        if (infoContainer) infoContainer.classList.remove('hidden');
+        if (infoStatus && txtStatus) {
+            infoStatus.classList.remove('hidden');
+            txtStatus.textContent = `✓ Polígono ativo (${this.areaPolygonPoints.length - 1} vértices)`;
+        }
+    }
+
+    async buscarBairroEContorno() {
+        const input = document.getElementById('input-busca-bairro');
+        const btn = document.getElementById('btn-buscar-bairro');
+        if (!input || !input.value.trim()) {
+            alert('Por favor, digite o nome do bairro a ser localizado.');
+            return;
+        }
+
+        const bairro = input.value.trim();
+        const origBtnHtml = btn ? btn.innerHTML : '';
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = `<span class="material-symbols-outlined animate-spin text-[16px]">sync</span><span>Buscando...</span>`;
+        }
+
+        try {
+            // 1. Tentar busca via OpenStreetMap Nominatim API com formato GeoJSON de polígono (Passo 1: Bairro + Araraquara - SP, Brasil)
+            let queryUrl = `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(bairro + ', Araraquara - SP, Brasil')}`;
+            let response = await fetch(queryUrl, { headers: { 'Accept-Language': 'pt-BR,pt;q=0.9' } });
+            let results = await response.json();
+
+            // Passo 2: Se sem resultados, tentar "Bairro, Araraquara" mais flexível
+            if (!Array.isArray(results) || results.length === 0) {
+                queryUrl = `https://nominatim.openstreetmap.org/search?format=json&polygon_geojson=1&q=${encodeURIComponent(bairro + ', Araraquara')}`;
+                response = await fetch(queryUrl, { headers: { 'Accept-Language': 'pt-BR,pt;q=0.9' } });
+                results = await response.json();
+            }
+
+            let polyPoints = null;
+            let placeNameFound = '';
+
+            if (Array.isArray(results) && results.length > 0) {
+                const matchPoly = results.find(r => r.geojson && (r.geojson.type === 'Polygon' || r.geojson.type === 'MultiPolygon'));
+
+                if (matchPoly) {
+                    placeNameFound = matchPoly.name || matchPoly.display_name.split(',')[0];
+                    if (matchPoly.geojson.type === 'Polygon') {
+                        polyPoints = matchPoly.geojson.coordinates[0];
+                    } else if (matchPoly.geojson.type === 'MultiPolygon') {
+                        const polyList = matchPoly.geojson.coordinates;
+                        let largest = polyList[0][0];
+                        polyList.forEach(p => {
+                            if (p[0].length > largest.length) largest = p[0];
+                        });
+                        polyPoints = largest;
+                    }
+                } else {
+                    const firstMatch = results[0];
+                    placeNameFound = firstMatch.name || firstMatch.display_name.split(',')[0];
+                    if (firstMatch.boundingbox && firstMatch.boundingbox.length === 4) {
+                        const [latMin, latMax, lonMin, lonMax] = firstMatch.boundingbox.map(Number);
+                        polyPoints = [
+                            [lonMin, latMin],
+                            [lonMax, latMin],
+                            [lonMax, latMax],
+                            [lonMin, latMax],
+                            [lonMin, latMin]
+                        ];
+                    }
+                }
+            }
+
+            // 2. Se Nominatim não retornou polígono, tentar fallback via Mapbox Geocoding API
+            if (!polyPoints && typeof mapboxgl !== 'undefined' && mapboxgl.accessToken) {
+                const mapboxGeocodingUrl = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(bairro + ', Araraquara SP')}.json?proximity=-48.176,-21.789&types=neighborhood,locality,place,district,sublocality&access_token=${mapboxgl.accessToken}`;
+                const mbResp = await fetch(mapboxGeocodingUrl);
+                const mbData = await mbResp.json();
+
+                if (mbData && mbData.features && mbData.features.length > 0) {
+                    const feat = mbData.features[0];
+                    placeNameFound = feat.text || bairro;
+                    if (feat.bbox && feat.bbox.length === 4) {
+                        const [minLng, minLat, maxLng, maxLat] = feat.bbox;
+                        polyPoints = [
+                            [minLng, minLat],
+                            [maxLng, minLat],
+                            [maxLng, maxLat],
+                            [minLng, maxLat],
+                            [minLng, minLat]
+                        ];
+                    } else if (feat.center && feat.center.length === 2) {
+                        const cLng = feat.center[0];
+                        const cLat = feat.center[1];
+                        const delta = 0.008;
+                        polyPoints = [
+                            [cLng - delta, cLat - delta],
+                            [cLng + delta, cLat - delta],
+                            [cLng + delta, cLat + delta],
+                            [cLng - delta, cLat + delta],
+                            [cLng - delta, cLat - delta]
+                        ];
+                    }
+                }
+            }
+
+            if (!polyPoints || polyPoints.length < 3) {
+                alert(`Não foi possível localizar o contorno exato do bairro "${bairro}". Verifique o nome ou desenhe a área manualmente no mapa.`);
+                return;
+            }
+
+            // Normalização segura de pares de coordenadas [lng, lat]
+            this.areaPolygonPoints = polyPoints.map(pt => {
+                if (Array.isArray(pt)) {
+                    return [parseFloat(pt[0]), parseFloat(pt[1])];
+                } else if (typeof pt === 'string') {
+                    const parts = pt.trim().split(/\s+/);
+                    return [parseFloat(parts[0]), parseFloat(parts[1])];
+                }
+                return null;
+            }).filter(pt => pt && !isNaN(pt[0]) && !isNaN(pt[1]));
+
+            if (this.areaPolygonPoints.length < 3) {
+                alert(`Formato de coordenadas inválido para o bairro "${bairro}". Desenhe a área manualmente no mapa.`);
+                return;
+            }
+
+            this.renderExistingPolygonOnAreaMap();
+
+            if (this.areaMapInstance) {
+                const bounds = new mapboxgl.LngLatBounds();
+                this.areaPolygonPoints.forEach(pt => bounds.extend(pt));
+                this.areaMapInstance.fitBounds(bounds, { padding: 40, maxZoom: 16 });
+            }
+
+            const infoContainer = document.getElementById('info-status-poligono-container');
+            const infoStatus = document.getElementById('info-status-poligono');
+            const txtStatus = document.getElementById('txt-status-poligono');
+            const txtBairro = document.getElementById('txt-bairro-nome-identificado');
+
+            if (infoContainer) infoContainer.classList.remove('hidden');
+            if (infoStatus) infoStatus.classList.remove('hidden');
+            if (txtStatus) txtStatus.textContent = `✓ Contorno do bairro demarcado (${this.areaPolygonPoints.length - 1} vértices)`;
+            if (txtBairro) txtBairro.textContent = `Bairro: ${placeNameFound || bairro}`;
+
+        } catch (err) {
+            console.error('❌ [RelatorioController] Erro ao buscar contorno do bairro:', err);
+            alert('Ocorreu um erro ao conectar com o serviço de mapas para localizar o bairro.');
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = origBtnHtml;
+            }
+        }
+    }
+
+    setupBairroAutocomplete() {
+        const input = document.getElementById('input-busca-bairro');
+        const list = document.getElementById('suggestions-bairro-list');
+        if (!input || !list || this._hasBairroAutocompleteSetup) return;
+
+        this._hasBairroAutocompleteSetup = true;
+
+        // Lista mestre expandida de bairros de Araraquara
+        const baseAraraquaraBairros = [
+            "Centro", "Vila Santana", "Vila Xavier", "Selmi Dei", "Carmo", "Jardim Fonte Luminosa",
+            "Yolanda Ópice", "Jardim Universal", "Jardim Martinez", "Vale do Sol", "Santa Angelina",
+            "Vila Suconasa", "São Geraldo", "Jardim Dom Pedro I", "Jardim Maria Luiza", "Jardim Paulistano",
+            "Quitandinha", "Jardim Alvorada", "Santana", "Vila Ferroviária", "Jardim Marivan",
+            "Jardim das Estações", "Jardim Paraíso", "Jardim Santa Lucrécia", "Distrito Industrial",
+            "Jardim Imperador", "Jardim Brasil", "Jardim América", "Parque Pinheiros", "Jardim Adalberto Roxo",
+            "Jardim Melhado", "Jardim Roseiras", "Jardim Tamoio", "Jardim Serra Azul", "Jardim das Hortênsias",
+            "Jardim Indaiá", "Parque São Paulo", "Jardim Acapulco", "Vila Harmonia", "Jardim Botânico",
+            "Chácara Flora", "Parque Gramado", "Jardim Residencial D'Domenico", "Bueno de Andrada",
+            "Jardim Del Rey", "Jardim Água Branca", "Jardim Igaçaba", "Residencial dos Oitis", "Valle Verde", "Parque Residencial Damha"
+        ];
+
+        let debounceTimer = null;
+        let selectedIndex = -1;
+
+        const getMatchingSuggestions = async (query) => {
+            const cleanQ = query.toLowerCase().trim();
+            if (!cleanQ) return [];
+
+            const matchesLocal = new Set();
+
+            // 1. Filtrar lista estática mestre
+            baseAraraquaraBairros.forEach(b => {
+                if (b.toLowerCase().includes(cleanQ)) matchesLocal.add(b);
+            });
+
+            // 2. Extrair bairros dos chamados da tela
+            if (this.chamadosList && this.chamadosList.length > 0) {
+                this.chamadosList.forEach(item => {
+                    const addr = String(item.endereco || item.pracaNome || '');
+                    if (addr && addr.toLowerCase().includes(cleanQ)) {
+                        const parts = addr.split('-').map(p => p.trim());
+                        parts.forEach(p => {
+                            if (p.toLowerCase().includes(cleanQ) && p.length < 35 && !p.toLowerCase().includes('rua') && !p.toLowerCase().includes('av')) {
+                                matchesLocal.add(p);
+                            }
+                        });
+                    }
+                });
+            }
+
+            const results = Array.from(matchesLocal).slice(0, 6).map(name => ({
+                title: name,
+                subtitle: 'Bairro / Região - Araraquara - SP',
+                source: 'local'
+            }));
+
+            // 3. Consultar OpenStreetMap Nominatim em tempo real para 100% de cobertura (ex: Vila Santana)
+            if (cleanQ.length >= 2) {
+                try {
+                    const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cleanQ + ', Araraquara')}&addressdetails=1&limit=5`;
+                    const resNom = await fetch(nomUrl, { headers: { 'Accept-Language': 'pt-BR,pt;q=0.9' } });
+                    const dataNom = await resNom.json();
+
+                    if (Array.isArray(dataNom)) {
+                        dataNom.forEach(item => {
+                            const name = item.name || (item.display_name ? item.display_name.split(',')[0] : null);
+                            if (name && !results.some(r => r.title.toLowerCase() === name.toLowerCase())) {
+                                results.push({
+                                    title: name,
+                                    subtitle: item.display_name || 'Bairro / Região - Araraquara',
+                                    source: 'nominatim'
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('⚠️ [RelatorioController] Falha ao consultar sugestões no Nominatim:', e);
+                }
+            }
+
+            // 4. Complementar via Mapbox Geocoding Autocomplete API
+            if (typeof mapboxgl !== 'undefined' && mapboxgl.accessToken && cleanQ.length >= 2 && results.length < 6) {
+                try {
+                    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(cleanQ)}.json?country=br&proximity=-48.176,-21.789&types=neighborhood,locality,district,sublocality,place&limit=4&access_token=${mapboxgl.accessToken}`;
+                    const res = await fetch(url);
+                    const data = await res.json();
+
+                    if (data && data.features) {
+                        data.features.forEach(feat => {
+                            const name = feat.text;
+                            if (name && !results.some(r => r.title.toLowerCase() === name.toLowerCase())) {
+                                results.push({
+                                    title: name,
+                                    subtitle: feat.place_name || 'Região Geográfica',
+                                    source: 'mapbox'
+                                });
+                            }
+                        });
+                    }
+                } catch (e) {
+                    console.warn('⚠️ [RelatorioController] Falha na busca remota Mapbox:', e);
+                }
+            }
+
+            return results.slice(0, 8);
+        };
+
+        const renderList = (items) => {
+            list.innerHTML = '';
+            selectedIndex = -1;
+
+            if (items.length === 0) {
+                list.classList.add('hidden');
+                return;
+            }
+
+            items.forEach((item, idx) => {
+                const el = document.createElement('div');
+                el.className = `px-3.5 py-2 hover:bg-secondary/10 cursor-pointer flex items-center justify-between transition-colors suggestion-item text-xs`;
+                el.dataset.index = idx;
+                el.dataset.title = item.title;
+
+                el.innerHTML = `
+                    <div class="flex items-center gap-2 overflow-hidden">
+                        <span class="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+                        <div class="truncate">
+                            <span class="font-bold text-on-surface text-xs">${item.title}</span>
+                            <span class="text-[10px] text-on-surface-variant block truncate">${item.subtitle}</span>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-semibold text-secondary/80 bg-secondary/10 px-1.5 py-0.5 rounded">Bairro</span>
+                `;
+
+                el.addEventListener('click', () => {
+                    input.value = item.title;
+                    list.classList.add('hidden');
+                    this.buscarBairroEContorno();
+                });
+
+                list.appendChild(el);
+            });
+
+            list.classList.remove('hidden');
+        };
+
+        const updateActiveItem = (items) => {
+            items.forEach((it, i) => {
+                if (i === selectedIndex) {
+                    it.classList.add('bg-secondary/20');
+                    input.value = it.dataset.title;
+                } else {
+                    it.classList.remove('bg-secondary/20');
+                }
+            });
+        };
+
+        input.addEventListener('input', (e) => {
+            const q = e.target.value;
+            clearTimeout(debounceTimer);
+            if (!q.trim()) {
+                list.classList.add('hidden');
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                const suggestions = await getMatchingSuggestions(q);
+                renderList(suggestions);
+            }, 120);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            const items = list.querySelectorAll('.suggestion-item');
+
+            if (e.key === 'Enter') {
+                if (!list.classList.contains('hidden') && selectedIndex >= 0 && items[selectedIndex]) {
+                    e.preventDefault();
+                    items[selectedIndex].click();
+                } else {
+                    list.classList.add('hidden');
+                    this.buscarBairroEContorno();
+                }
+                return;
+            }
+
+            if (list.classList.contains('hidden') || items.length === 0) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex + 1) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                selectedIndex = (selectedIndex - 1 + items.length) % items.length;
+                updateActiveItem(items);
+            } else if (e.key === 'Escape') {
+                list.classList.add('hidden');
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!input.contains(e.target) && !list.contains(e.target)) {
+                list.classList.add('hidden');
+            }
+        });
+    }
+
+    limparBuscaBairro() {
+        const input = document.getElementById('input-busca-bairro');
+        if (input) input.value = '';
+        const list = document.getElementById('suggestions-bairro-list');
+        if (list) list.classList.add('hidden');
+        const txtBairro = document.getElementById('txt-bairro-nome-identificado');
+        if (txtBairro) txtBairro.textContent = '';
+    }
+
+    limparDesenhoArea() {
+        this.areaPolygonPoints = [];
+        this.limparBuscaBairro();
+        this.limparMarkersDesenhoArea();
+        this.desativarModoDesenhoArea();
+    }
+
+    limparMarkersDesenhoArea() {
+        if (this.areaMapMarkers) {
+            this.areaMapMarkers.forEach(m => m.remove());
+        }
+        this.areaMapMarkers = [];
+        if (this.areaMapInstance) {
+            if (this.areaMapInstance.getLayer('area-filtro-fill')) this.areaMapInstance.removeLayer('area-filtro-fill');
+            if (this.areaMapInstance.getLayer('area-filtro-outline')) this.areaMapInstance.removeLayer('area-filtro-outline');
+            if (this.areaMapInstance.getSource('area-filtro-source')) this.areaMapInstance.removeSource('area-filtro-source');
+        }
+        const infoContainer = document.getElementById('info-status-poligono-container');
+        const infoStatus = document.getElementById('info-status-poligono');
+        if (infoContainer) infoContainer.classList.add('hidden');
+        if (infoStatus) infoStatus.classList.add('hidden');
+    }
+
+    confirmarFiltroArea() {
+        if (!this.areaPolygonPoints || this.areaPolygonPoints.length < 3) {
+            alert('Por favor, desenhe uma área no mapa com pelo menos 3 pontos antes de aplicar o filtro.');
+            return;
+        }
+
+        this.activeFilters.polygon = [...this.areaPolygonPoints];
+        this.fecharModalFiltroArea();
+        this.applyFilters();
+        this.updateSpatialFilterUI();
+    }
+
+    removerFiltroArea() {
+        this.activeFilters.polygon = null;
+        this.areaPolygonPoints = [];
+        this.limparMarkersDesenhoArea();
+        this.applyFilters();
+        this.updateSpatialFilterUI();
+    }
+
+    updateSpatialFilterUI() {
+        const badge = document.getElementById('spatial-filter-badge');
+        const badgeText = document.getElementById('spatial-filter-badge-text');
+        const btnOpen = document.getElementById('btn-open-spatial-filter');
+
+        const hasPolygon = Array.isArray(this.activeFilters.polygon) && this.activeFilters.polygon.length >= 3;
+
+        if (badge) {
+            if (hasPolygon) {
+                badge.classList.remove('hidden');
+                badge.classList.add('flex');
+                if (badgeText) badgeText.textContent = `Área Delimitada (${this.filteredList.length} OSs)`;
+            } else {
+                badge.classList.remove('flex');
+                badge.classList.add('hidden');
+            }
+        }
+
+        if (btnOpen) {
+            if (hasPolygon) {
+                btnOpen.classList.remove('bg-secondary/10', 'text-secondary', 'border-secondary/40');
+                btnOpen.classList.add('bg-amber-500', 'text-white', 'border-amber-600');
+                const spanTxt = btnOpen.querySelector('span:last-child');
+                if (spanTxt) spanTxt.textContent = 'Editar Área no Mapa';
+            } else {
+                btnOpen.classList.remove('bg-amber-500', 'text-white', 'border-amber-600');
+                btnOpen.classList.add('bg-secondary/10', 'text-secondary', 'border-secondary/40');
+                const spanTxt = btnOpen.querySelector('span:last-child');
+                if (spanTxt) spanTxt.textContent = 'Filtrar por Área';
+            }
         }
     }
 

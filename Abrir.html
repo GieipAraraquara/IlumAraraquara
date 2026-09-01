@@ -2704,6 +2704,7 @@
         if (msg) msg.innerText = '';
         estadoPontoRapido.validado = false;
         estadoPontoRapido.plaqueta = '';
+        estadoPontoRapido.hasPlaquetaDuplicadaTag = false;
       }
 
       async function validarPlaquetaRapida() {
@@ -2719,21 +2720,41 @@
         try {
           var client = obterSupabaseClient();
           if (client) {
-            var resP = await client.from('cadastro_postes').select('*').eq('plaqueta', plaq).maybeSingle();
-            if (resP && resP.data) {
-              var row = resP.data;
-              var lat = parseFloat(row.latitude || row.lat || 0);
-              var lng = parseFloat(row.longitude || row.lng || 0);
+            var resP = await client.from('localizacao_plaquetas').select('*').ilike('identificacao', plaq);
+            var rowsP = (resP && resP.data && resP.data.length > 0) ? resP.data : null;
+            if (!rowsP) {
+              var resPostes = await client.from('cadastro_postes').select('*').eq('plaqueta', plaq);
+              if (resPostes && resPostes.data && resPostes.data.length > 0) {
+                rowsP = resPostes.data;
+              }
+            }
+            if (rowsP && rowsP.length > 0) {
+              var row = rowsP[0];
+              var coordsParsed = (typeof extrairCoordenadasPlaquetaRow === 'function') ? extrairCoordenadasPlaquetaRow(row) : null;
+              var lat = coordsParsed ? coordsParsed.lat : parseFloat(row.latitude || row.lat || 0);
+              var lng = coordsParsed ? coordsParsed.lng : parseFloat(row.longitude || row.lng || 0);
               if (lat && lng) {
                 estadoPontoRapido.lat = lat;
                 estadoPontoRapido.lng = lng;
                 estadoPontoRapido.plaqueta = plaq;
-                estadoPontoRapido.endereco = row.endereco || row.logradouro || '';
+                estadoPontoRapido.endereco = row.endereco || row.logradouro || row.bairro || '';
                 estadoPontoRapido.validado = true;
+
+                var temTagDuplicado = rowsP.some(function(r) {
+                  var obs = r.observacao || r['Observação'] || r.observacoes || r.observacao_especial || '';
+                  return obs.toUpperCase().indexOf('DUPLICADO') !== -1;
+                });
+                estadoPontoRapido.hasPlaquetaDuplicadaTag = temTagDuplicado;
 
                 if (input) input.classList.add('input-validado');
                 if (btn) { btn.disabled = false; btn.className = 'btn-secundario px-4 input-validado'; btn.innerText = '✓ OK'; }
-                if (msg) msg.innerText = '';
+                if (msg) {
+                  if (temTagDuplicado) {
+                    msg.innerHTML = '<span class="text-amber-700 font-semibold text-xs bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block mt-1">⚠️ Plaqueta com tag DUPLICADO: A OS ficará "Pendente aprovação" (Coordenada duvidosa).</span>';
+                  } else {
+                    msg.innerText = '';
+                  }
+                }
                 return;
               }
             }
@@ -2752,14 +2773,27 @@
               estadoPontoRapido.endereco = first.endereco || '';
               estadoPontoRapido.validado = true;
 
+              var temTagDupGas = res.coordenadas.some(function(c) {
+                var obs = c.observacao || c['Observação'] || c.observacoes || '';
+                return obs.toUpperCase().indexOf('DUPLICADO') !== -1;
+              });
+              estadoPontoRapido.hasPlaquetaDuplicadaTag = temTagDupGas;
+
               if (input) input.classList.add('input-validado');
               if (btn) { btn.className = 'btn-secundario px-4 input-validado'; btn.innerText = '✓ OK'; }
-              if (msg) msg.innerText = '';
+              if (msg) {
+                if (temTagDupGas) {
+                  msg.innerHTML = '<span class="text-amber-700 font-semibold text-xs bg-amber-50 px-2 py-1 rounded border border-amber-200 inline-block mt-1">⚠️ Plaqueta com tag DUPLICADO: A OS ficará "Pendente aprovação" (Coordenada duvidosa).</span>';
+                } else {
+                  msg.innerText = '';
+                }
+              }
             } else {
               if (input) input.classList.add('input-invalido');
               if (btn) { btn.className = 'btn-secundario px-4 input-invalido'; btn.innerText = 'X Erro'; }
               if (msg) msg.innerText = 'Plaqueta não encontrada.';
               estadoPontoRapido.validado = false;
+              estadoPontoRapido.hasPlaquetaDuplicadaTag = false;
             }
           })
           .catch(function() {
@@ -2896,10 +2930,13 @@
 
         var userAuth = window.usuarioLogadoSupabase || {};
         var protExtraido = gerarNovoProtocolo('iluminacao');
-        var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
+        var temPlaquetaTagDuplicadoR = (modo === 'plaqueta' && estadoPontoRapido.hasPlaquetaDuplicadaTag === true);
+        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicadoR) ? "Pendente" : "Aberta";
 
         var motivoAprovacaoRapida = null;
-        if (statusOS === "Pendente") {
+        if (temPlaquetaTagDuplicadoR) {
+          motivoAprovacaoRapida = "Coordenada da plaqueta duvidosa";
+        } else if (statusOS === "Pendente") {
           var listaDupR = window.protocolosConsolidadosRapido || (typeof protocolosConsolidados !== 'undefined' ? protocolosConsolidados : []);
           if (listaDupR && listaDupR.length > 0) {
             var listaProtsR = listaDupR.map(function(p) {
@@ -3924,7 +3961,7 @@
       function resetarValidacaoPonto(idx) {
         var pt = pontosData[idx];
         if(!pt) return;
-        pt.enderecoValidado = false; pt.latAtual = null; pt.lngAtual = null; pt.isPlaquetaDuplicadaOrigem = false; pt.listaProximos = [];
+        pt.enderecoValidado = false; pt.latAtual = null; pt.lngAtual = null; pt.isPlaquetaDuplicadaOrigem = false; pt.hasPlaquetaDuplicadaTag = false; pt.listaProximos = [];
         
         var sug = document.getElementById('mapboxSuggestions_' + idx);
         if (sug) { sug.style.display = 'none'; sug.innerHTML = ''; }
@@ -4378,10 +4415,12 @@
               rows.forEach(function(row) {
                 var coordsParsed = extrairCoordenadasPlaquetaRow(row);
                 if (coordsParsed) {
+                  var obsRow = row.observacao || row['Observação'] || row.observacoes || row.observacao_especial || row.observacao_divergente || '';
                   coordenadas.push({
                     lat: coordsParsed.lat,
                     lng: coordsParsed.lng,
-                    endereco: row.endereco || row.bairro || ''
+                    endereco: row.endereco || row.bairro || '',
+                    observacao: obsRow
                   });
                 }
               });
@@ -4405,6 +4444,18 @@
               resetarValidacaoPonto(idx);
               input.value = pl; 
               var pt = pontosData[idx];
+
+              var temTagDuplicado = coordenadas.some(function(c) {
+                  return (c.observacao || '').toUpperCase().indexOf('DUPLICADO') !== -1;
+              });
+              pt.hasPlaquetaDuplicadaTag = temTagDuplicado;
+
+              if (temTagDuplicado) {
+                  var elMsgErr = document.getElementById('msgErroPonto_' + idx);
+                  if (elMsgErr) {
+                      elMsgErr.innerHTML = '<div class="mt-1 text-xs text-amber-700 bg-amber-50 p-1.5 rounded border border-amber-200 font-medium">⚠️ Plaqueta com tag DUPLICADO: Esta OS será enviada para aprovação (Coordenada da plaqueta duvidosa).</div>';
+                  }
+              }
 
               if (coordenadas.length === 1) {
                   pt.isPlaquetaDuplicadaOrigem = false;
@@ -5727,10 +5778,25 @@
 
         var protExtraido = gerarNovoProtocolo('iluminacao');
         var userAuth = window.usuarioLogadoSupabase || {};
-        var statusOS = (forcarSalvar === true) ? "Pendente" : "Aberta";
+        var temPlaquetaTagDuplicado = false;
+        for (var i = 0; i < qtdAtual; i++) {
+           var ptState = pontosData[i];
+           var ptRef = (ptState && ptState.usarMesmoEndereco) ? pontosData[0] : ptState;
+           var modoSel = ptState.usarMesmoEndereco 
+               ? (document.querySelector('input[name="tipoLocal_0"]:checked')?.value || 'plaqueta') 
+               : (document.querySelector('input[name="tipoLocal_' + i + '"]:checked')?.value || 'plaqueta');
+           if (modoSel === 'plaqueta' && ptRef && ptRef.hasPlaquetaDuplicadaTag === true) {
+               temPlaquetaTagDuplicado = true;
+               break;
+           }
+        }
+
+        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicado) ? "Pendente" : "Aberta";
 
         var motivoAprovacaoViaria = null;
-        if (statusOS === "Pendente") {
+        if (temPlaquetaTagDuplicado) {
+          motivoAprovacaoViaria = "Coordenada da plaqueta duvidosa";
+        } else if (statusOS === "Pendente") {
           if (typeof protocolosConsolidados !== 'undefined' && protocolosConsolidados && protocolosConsolidados.length > 0) {
             var listaProtsV = protocolosConsolidados.map(function(p) {
               var pStr = String(p.protocolo || p.id || '').trim();

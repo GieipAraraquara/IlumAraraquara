@@ -1822,13 +1822,21 @@ class AuditoriaController {
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 bg-white">
-                                    ${fState.materiais.length > 0 ? fState.materiais.map((matStr, mIdx) => {
+                                    ${fState.materiais.length > 0 ? fState.materiais.map((matItem, mIdx) => {
                                         let displayQtd = '1';
-                                        let displayNome = matStr;
-                                        const matchQtd = matStr.match(/\(x?(\d+(\.\d+)?)\)$/i);
-                                        if (matchQtd) {
-                                            displayQtd = matchQtd[1];
-                                            displayNome = matStr.replace(/\(x?\d+(\.\d+)?\)$/i, '').trim();
+                                        let displayNome = '';
+                                        if (typeof matItem === 'string') {
+                                            displayNome = matItem;
+                                            const matchQtd = matItem.match(/\(x?(\d+(\.\d+)?)\)$/i);
+                                            if (matchQtd) {
+                                                displayQtd = matchQtd[1];
+                                                displayNome = matItem.replace(/\(x?\d+(\.\d+)?\)$/i, '').trim();
+                                            }
+                                        } else if (matItem && typeof matItem === 'object') {
+                                            displayNome = String(matItem.nome || matItem.descricao || matItem.material || '').trim();
+                                            displayQtd = String(matItem.qtd || matItem.quantidade || 1);
+                                        } else if (matItem !== null && matItem !== undefined) {
+                                            displayNome = String(matItem).trim();
                                         }
 
                                         return `

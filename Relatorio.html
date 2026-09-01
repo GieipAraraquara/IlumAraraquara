@@ -20,9 +20,12 @@
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
+    <script src="js/services/MapService.js?v=30"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="js/controllers/RelatorioController.js?v=11"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="js/controllers/RelatorioController.js?v=12"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -295,8 +298,8 @@
                     </div>
                 </div>
 
-                <!-- Grid de 5 Colunas -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3 flex-1">
+                <!-- Grid de 6 Colunas -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 flex-1">
                     
                     <!-- 1º: Tipo de Iluminação -->
                     <div class="flex flex-col gap-0.5">
@@ -338,7 +341,17 @@
                         </select>
                     </div>
 
-                    <!-- 4º: Data Início com Widget + Máscara DD/MM/YYYY -->
+                    <!-- 4º: Considerar Data -->
+                    <div class="flex flex-col gap-0.5">
+                        <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Considerar Data</label>
+                        <select id="dash-filter-date-field" class="w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-2.5 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                            <option value="abertura">Data de Abertura</option>
+                            <option value="conclusao">Data de Conclusão</option>
+                            <option value="ambas">Abertura ou Conclusão</option>
+                        </select>
+                    </div>
+
+                    <!-- 5º: Data Início com Widget + Máscara DD/MM/YYYY -->
                     <div id="box-dash-filter-start" class="flex flex-col gap-0.5 opacity-40 pointer-events-none transition-all duration-200">
                         <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">De (Início)</label>
                         <div class="relative w-full flex items-center">
@@ -350,7 +363,7 @@
                         </div>
                     </div>
 
-                    <!-- 5º: Data Fim com Widget + Máscara DD/MM/YYYY -->
+                    <!-- 6º: Data Fim com Widget + Máscara DD/MM/YYYY -->
                     <div id="box-dash-filter-end" class="flex flex-col gap-0.5 opacity-40 pointer-events-none transition-all duration-200">
                         <label class="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider">Até (Fim)</label>
                         <div class="relative w-full flex items-center">
@@ -365,7 +378,20 @@
                 </div>
 
                 <!-- Botões de Ação -->
-                <div class="flex items-center justify-end gap-2 border-t xl:border-t-0 xl:border-l border-outline-variant/60 pt-2 xl:pt-0 xl:pl-3">
+                <div class="flex flex-wrap items-center justify-end gap-2 border-t xl:border-t-0 xl:border-l border-outline-variant/60 pt-2 xl:pt-0 xl:pl-3">
+                    <button type="button" id="btn-open-spatial-filter" onclick="window.relatorioController.abrirModalFiltroArea()" title="Filtrar por Área Geográfica no Mapa" class="p-2 px-3 rounded-lg border border-secondary/40 text-secondary bg-secondary/10 hover:bg-secondary hover:text-white transition-all text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-xs whitespace-nowrap">
+                        <span class="material-symbols-outlined text-[18px]">polyline</span>
+                        <span>Filtrar por Área</span>
+                    </button>
+
+                    <div id="spatial-filter-badge" class="hidden items-center gap-1.5 bg-amber-500/10 text-amber-800 border border-amber-500/40 rounded-lg px-2.5 py-1.5 text-xs font-semibold">
+                        <span class="material-symbols-outlined text-[16px] text-amber-600">polyline</span>
+                        <span id="spatial-filter-badge-text">Área Ativa</span>
+                        <button type="button" onclick="window.relatorioController.removerFiltroArea()" class="hover:text-error text-amber-900 transition-colors ml-1 cursor-pointer flex items-center" title="Remover filtro de área">
+                            <span class="material-symbols-outlined text-[15px]">close</span>
+                        </button>
+                    </div>
+
                     <button id="btn-reset-dash-filters" title="Limpar todos os filtros do dashboard" class="p-2 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/50 hover:bg-error/5 transition-all text-xs font-semibold flex items-center gap-1 cursor-pointer">
                         <span class="material-symbols-outlined text-[18px]">restart_alt</span>
                         <span class="hidden sm:inline">Limpar</span>
@@ -513,10 +539,10 @@
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-outline-variant/60 pb-4">
                     <div>
                         <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
-                            <span class="material-symbols-outlined text-secondary">filter_alt</span>
-                            Filtros e Exportação Personalizada de CSV por Período
+                            <span class="material-symbols-outlined text-secondary">download</span>
+                            Exportação Personalizada de CSV
                         </h3>
-                        <p class="font-body-md text-body-md text-on-surface-variant">Defina o período (intervalo de datas), status, tipo de iluminação e as colunas desejadas para exportar</p>
+                        <p class="font-body-md text-body-md text-on-surface-variant">Selecione as colunas desejadas para exportar a base de dados filtrada pelo Controle do Dashboard</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <span id="count-filtered-badge" class="px-3 py-1.5 bg-secondary/10 text-secondary font-bold text-xs rounded-full">---</span>
@@ -525,86 +551,6 @@
                             <span>Baixar Planilha CSV</span>
                         </button>
                     </div>
-                </div>
-
-                <!-- Filter Controls Bar com Customização Direta por Período na Mesma Ordem -->
-                <div class="flex flex-wrap items-end gap-3 mb-5">
-                    
-                    <!-- 1º: Tipo de Iluminação -->
-                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
-                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Tipo Iluminação</label>
-                        <select id="relatorio-type-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
-                            <option value="all">Todas as Áreas</option>
-                            <option value="praca">Praça Pública (P)</option>
-                            <option value="viaria">Iluminação Viária (I)</option>
-                        </select>
-                    </div>
-
-                    <!-- 2º: Status da OS -->
-                    <div class="flex flex-col gap-1 min-w-[150px] flex-1">
-                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Status da OS</label>
-                        <select id="relatorio-status-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
-                            <option value="all">Todos os Status</option>
-                            <option value="aberto">Em Aberto</option>
-                            <option value="em_andamento">Em Andamento</option>
-                            <option value="concluida">Concluída</option>
-                            <option value="pendente">Pendente de Aprovação</option>
-                            <option value="cancelada">Cancelada</option>
-                            <option value="rejeitada">Rejeitada</option>
-                        </select>
-                    </div>
-
-                    <!-- 3º: Período -->
-                    <div class="flex flex-col gap-1 min-w-[160px] flex-1">
-                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Atalho de Período</label>
-                        <select id="relatorio-date-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
-                            <option value="all">Todo o Histórico</option>
-                            <option value="hoje">Hoje</option>
-                            <option value="ontem">Ontem</option>
-                            <option value="7dias">Últimos 7 dias</option>
-                            <option value="15dias">Últimos 15 dias</option>
-                            <option value="30dias">Últimos 30 dias</option>
-                            <option value="mes_atual">Mês Atual</option>
-                            <option value="mes_anterior">Mês Anterior</option>
-                            <option value="ano_atual">Ano Atual</option>
-                            <option value="custom">Personalizado...</option>
-                        </select>
-                    </div>
-
-                    <!-- Considerar Data -->
-                    <div class="flex flex-col gap-1 min-w-[150px] flex-1">
-                        <label class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Considerar Data</label>
-                        <select id="relatorio-date-field-select" class="w-full text-xs font-semibold border border-outline-variant rounded-lg px-3 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer">
-                            <option value="abertura">Data de Abertura</option>
-                            <option value="conclusao">Data de Conclusão</option>
-                            <option value="ambas">Abertura ou Conclusão</option>
-                        </select>
-                    </div>
-
-                    <!-- Data Inicial customizada CSV (dd/mm/aaaa) -->
-                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
-                        <label for="relatorio-range-start" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Data Inicial (dd/mm/aaaa)</label>
-                        <div class="relative w-full flex items-center">
-                            <input type="text" id="relatorio-range-start" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer"/>
-                            <input type="date" id="picker-relatorio-range-start" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
-                            <button type="button" id="btn-picker-relatorio-start" title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer">
-                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Data Final customizada CSV (dd/mm/aaaa) -->
-                    <div class="flex flex-col gap-1 min-w-[140px] flex-1">
-                        <label for="relatorio-range-end" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Data Final (dd/mm/aaaa)</label>
-                        <div class="relative w-full flex items-center">
-                            <input type="text" id="relatorio-range-end" placeholder="dd/mm/aaaa" maxlength="10" inputmode="numeric" class="w-full text-xs font-semibold border border-outline-variant rounded-lg pl-3 pr-8 py-2 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface cursor-pointer"/>
-                            <input type="date" id="picker-relatorio-range-end" class="sr-only opacity-0 absolute pointer-events-none w-0 h-0" />
-                            <button type="button" id="btn-picker-relatorio-end" title="Abrir calendário" class="absolute right-1 text-on-surface-variant/70 hover:text-secondary p-1 rounded-md cursor-pointer">
-                                <span class="material-symbols-outlined text-[18px]">calendar_today</span>
-                            </button>
-                        </div>
-                    </div>
-
                 </div>
 
                 <!-- Column Checkboxes for Custom CSV Exporter -->
@@ -781,6 +727,89 @@
     </div>
 
 </main>
+
+<!-- Modal de Seleção de Área Geográfica no Mapa -->
+<div id="modal-filtro-area" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden m-4 animate-fade-in-up">
+        <!-- Header do Modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/80">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center font-bold">
+                    <span class="material-symbols-outlined text-[22px]">polyline</span>
+                </div>
+                <div>
+                    <h3 class="font-headline-sm text-sm sm:text-base font-bold text-on-surface">Seleção de Área Geográfica para Relatório</h3>
+                    <p class="text-xs text-on-surface-variant">Clique no mapa para adicionar pontos e delimitar um polígono. Duplo clique encerra o traçado.</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.relatorioController.fecharModalFiltroArea()" class="p-1.5 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Toolbar de Busca de Bairro e Controles do Mapa -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 px-6 py-2.5 bg-surface-container/70 border-b border-outline-variant/40 text-xs">
+            <!-- Input de Busca de Bairro Automático com Sugestões -->
+            <div class="relative flex-1 flex items-center gap-1.5 z-30">
+                <div class="relative w-full">
+                    <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+                    <input type="text" id="input-busca-bairro" autocomplete="off" placeholder="Buscar bairro (ex: Centro, Vila Xavier, Selmi Dei)..." class="w-full pl-8 pr-7 py-1.5 rounded-lg border border-outline-variant bg-surface text-on-surface text-xs focus:ring-2 focus:ring-secondary/50 focus:border-secondary outline-none transition-all" />
+                    <button type="button" onclick="document.getElementById('input-busca-bairro').value=''; window.relatorioController.limparBuscaBairro();" class="absolute right-2 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface text-xs" title="Limpar busca">
+                        <span class="material-symbols-outlined text-[15px]">close</span>
+                    </button>
+                    <!-- Floating Suggestions List -->
+                    <div id="suggestions-bairro-list" class="absolute left-0 right-0 top-full mt-1 bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto hidden divide-y divide-outline-variant/30"></div>
+                </div>
+                <button type="button" id="btn-buscar-bairro" onclick="window.relatorioController.buscarBairroEContorno()" class="bg-primary hover:bg-primary/90 text-white px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition-all shadow-xs cursor-pointer text-xs whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[16px]">travel_explore</span>
+                    <span>Buscar Contorno</span>
+                </button>
+            </div>
+
+            <!-- Botões de Ação de Desenho Manual -->
+            <div class="flex items-center gap-2">
+                <button type="button" id="btn-area-desenhar" onclick="window.relatorioController.toggleModoDesenhoArea()" class="bg-secondary hover:bg-secondary-container text-white px-3 py-1.5 rounded-lg font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[16px]">edit_location_alt</span>
+                    <span id="txt-btn-area-desenhar">Desenhar Livremente</span>
+                </button>
+                <button type="button" id="btn-area-limpar" onclick="window.relatorioController.limparDesenhoArea()" class="border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/50 hover:bg-error/5 px-2.5 py-1.5 rounded-lg font-semibold flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap">
+                    <span class="material-symbols-outlined text-[16px]">delete</span>
+                    <span>Limpar</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Indicator de Status do Polígono -->
+        <div id="info-status-poligono-container" class="px-6 py-1.5 bg-amber-500/10 border-b border-amber-500/20 hidden flex items-center justify-between text-xs">
+            <div id="info-status-poligono" class="font-semibold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 hidden">
+                <span class="material-symbols-outlined text-[16px] text-amber-600">check_circle</span>
+                <span id="txt-status-poligono">0 vértices demarcados</span>
+            </div>
+            <span id="txt-bairro-nome-identificado" class="text-[11px] font-bold text-amber-700 italic"></span>
+        </div>
+
+        <!-- Container do Canvas Mapbox -->
+        <div class="relative w-full h-[400px] sm:h-[480px] bg-slate-100">
+            <div id="map-filtro-area-canvas" class="w-full h-full"></div>
+            <!-- Dica Visual Overlay -->
+            <div class="absolute bottom-3 left-3 z-10 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-outline-variant/60 shadow-md text-[11px] font-medium text-on-surface flex items-center gap-2 pointer-events-none">
+                <span class="material-symbols-outlined text-secondary text-[16px]">info</span>
+                <span>Todas as OSs com coordenadas dentro da área marcada serão filtradas.</span>
+            </div>
+        </div>
+
+        <!-- Footer do Modal -->
+        <div class="flex items-center justify-end gap-3 px-6 py-3.5 border-t border-outline-variant/60 bg-surface-container-low/80">
+            <button type="button" onclick="window.relatorioController.fecharModalFiltroArea()" class="px-4 py-2 rounded-xl text-xs font-semibold border border-outline-variant text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer">
+                Cancelar
+            </button>
+            <button type="button" id="btn-confirmar-area" onclick="window.relatorioController.confirmarFiltroArea()" class="bg-[#059669] hover:bg-[#047857] text-white px-5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-md active:scale-95 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                <span>Aplicar Filtro de Área</span>
+            </button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>
