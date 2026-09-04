@@ -20,12 +20,13 @@
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
-    <script src="js/services/MapService.js?v=30"></script>
+    <script src="js/services/MapService.js?v=31"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
-    <script src="js/controllers/RelatorioController.js?v=12"></script>
+    <script src="js/controllers/AuditoriaController.js?v=30"></script>
+    <script src="js/controllers/RelatorioController.js?v=22"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -172,6 +173,34 @@
         .sidebar-collapsed .sidebar-text { display: none; }
         .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
         .sidebar-collapsed .sidebar-profile-info { display: none; }
+
+        .dropdown-lista {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 60;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+        }
+        .dropdown-item {
+            padding: 0.625rem 0.875rem;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.8125rem;
+            color: #1e293b;
+            transition: background-color 0.15s ease;
+        }
+        .dropdown-item:hover {
+            background-color: #f3e8ff;
+            color: #6b21a8;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
@@ -639,9 +668,9 @@
                         <p class="font-body-md text-body-md text-on-surface-variant">Consolidação de materiais e horas de equipe acumulados no mês selecionado para prestação de contas</p>
                     </div>
                     <div class="flex items-center gap-3">
-                        <button onclick="window.relatorioController.exportarMedicaoMensalCSV()" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer" title="Exportar tabela de medição mensal formatada em CSV">
+                        <button id="btn-exportar-medicao" onclick="window.relatorioController.exportarMedicaoAtivaCSV()" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer" title="Exportar tabela de medição formatada em CSV">
                             <span class="material-symbols-outlined text-[18px]">download_for_offline</span>
-                            <span>Exportar Medição Mensal (CSV)</span>
+                            <span id="txt-btn-exportar-medicao">Exportar Medição (CSV)</span>
                         </button>
                     </div>
                 </div>
@@ -696,18 +725,51 @@
                     </div>
                 </div>
 
-                <!-- Measurement Detailed Table -->
-                <div class="w-full overflow-x-auto border border-outline-variant/60 rounded-xl">
+                <!-- Sub-Tabs de Visualização da Medição (Por Material x Por Protocolo) -->
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 pt-2 border-t border-outline-variant/40">
+                    <div class="inline-flex p-1 bg-surface-container/70 border border-outline-variant/60 rounded-xl shadow-2xs self-start">
+                        <button type="button" id="btn-medicao-view-material" onclick="window.relatorioController.switchMedicaoSubView('material')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-surface-container-lowest text-secondary shadow-xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">inventory_2</span>
+                            <span>Consolidado por Material</span>
+                        </button>
+                        <button type="button" id="btn-medicao-view-protocolo" onclick="window.relatorioController.switchMedicaoSubView('protocolo')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">assignment</span>
+                            <span>Detalhamento por Protocolo (OS)</span>
+                        </button>
+                    </div>
+
+                    <!-- Contador da Visão por Protocolo -->
+                    <div id="toolbar-medicao-protocolo" class="hidden items-center">
+                        <span id="badge-count-protocolos-medicao" class="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg whitespace-nowrap">
+                            0 OS(s)
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 1. VISÃO CONSOLIDADA POR MATERIAL -->
+                <div id="container-medicao-por-material" class="w-full overflow-x-auto border border-outline-variant/60 rounded-xl">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
                             <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant text-on-surface-variant font-label-md uppercase tracking-wider">
-                                <th class="py-3 px-4 w-28">Marca</th>
-                                <th class="py-3 px-4">Descrição do Item de Contrato / Material</th>
-                                <th class="py-3 px-4 text-center w-20">Unid.</th>
-                                <th class="py-3 px-4 text-right w-36">Qtd. Medida</th>
-                                <th class="py-3 px-4 text-center w-24">OSs Aplicadas</th>
-                                <th class="py-3 px-4">Origem / Categoria</th>
-                                <th class="py-3 px-4">Protocolos OSs</th>
+                                <th class="py-3 px-4 relative align-middle">
+                                    <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-mat-desc-filter-trigger" onclick="window.relatorioController.toggleMedicaoMatDescFilterDropdown(event)" title="Filtrar por Item ou Material">
+                                        <span class="font-label-md uppercase tracking-wider">Item de Contrato / Material Utilizado</span>
+                                        <span class="material-symbols-outlined text-[16px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="medicao-mat-desc-filter-indicator"></span>
+                                    </button>
+                                </th>
+                                <th class="py-3 px-4 text-center w-20 align-middle">Unid.</th>
+                                <th class="py-3 px-4 text-right w-36 align-middle">Qtd. Medida</th>
+                                <th class="py-3 px-4 text-center w-24 align-middle">OSs Aplicadas</th>
+                                <th class="py-3 px-4 align-middle">Origem / Categoria</th>
+                                <th class="py-3 px-4 relative align-middle min-w-[160px]">
+                                    <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-mat-prot-filter-trigger" onclick="window.relatorioController.toggleMedicaoMatProtFilterDropdown(event)" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolos OSs</span>
+                                        <span class="material-symbols-outlined text-[16px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="medicao-mat-prot-filter-indicator"></span>
+                                    </button>
+                                </th>
+                                <th class="py-3 px-4 text-center w-28 align-middle">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="medicao-tbody" class="divide-y divide-outline-variant/40 bg-surface-container-lowest font-data-tabular">
@@ -721,11 +783,74 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- 2. VISÃO DETALHADA POR PROTOCOLO (NOVA VARIAÇÃO) -->
+                <div id="container-medicao-por-protocolo" class="hidden w-full overflow-x-auto border border-outline-variant/60 rounded-xl">
+                    <table class="w-full text-left border-collapse text-xs table-fixed">
+                        <thead>
+                            <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant text-on-surface-variant font-label-md uppercase tracking-wider">
+                                <!-- Coluna 1: Protocolo com Filtro -->
+                                <th class="py-3 px-3 w-36 relative align-middle" data-col="0">
+                                    <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-protocolo-col-filter-trigger" onclick="window.relatorioController.toggleMedicaoProtocoloFilterDropdown(event)" title="Filtrar por Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
+                                        <span class="material-symbols-outlined text-[16px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="medicao-protocolo-filter-indicator"></span>
+                                    </button>
+                                </th>
+
+                                <!-- Coluna 2: Status com Filtro -->
+                                <th class="py-3 px-3 w-32 relative align-middle" data-col="1">
+                                    <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-status-col-filter-trigger" onclick="window.relatorioController.toggleMedicaoStatusFilterDropdown(event)" title="Filtrar por Status">
+                                        <span class="font-label-md uppercase tracking-wider">Status</span>
+                                        <span class="material-symbols-outlined text-[16px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="medicao-status-filter-indicator"></span>
+                                    </button>
+                                </th>
+
+                                <!-- Coluna 3: Data Conclusão (quebra em 2 linhas e formato dd/mm/yy) -->
+                                <th class="py-2.5 px-2 w-24 sm:w-28 text-center align-middle" data-col="2">
+                                    <span class="font-label-md uppercase tracking-wider block text-[11px] leading-tight text-center">Data<br/>Conclusão</span>
+                                </th>
+
+                                <!-- Coluna 4: Endereço / Praça (quebra de linha e preparado para múltiplos pontos) -->
+                                <th class="py-3 px-3 w-72 sm:w-80 align-middle" data-col="3">
+                                    <span class="font-label-md uppercase tracking-wider px-1 block">Endereço / Praça</span>
+                                </th>
+
+                                <!-- Coluna 5: Materiais & Mão de Obra Utilizados com Filtro -->
+                                <th class="py-3 px-4 w-auto align-middle" data-col="4">
+                                    <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-mat-filter-trigger" onclick="window.relatorioController.toggleMaterialFilterDropdown(event)" title="Filtrar por Material ou Mão de Obra">
+                                        <span class="font-label-md uppercase tracking-wider">Materiais & Mão de Obra Utilizados</span>
+                                        <span class="material-symbols-outlined text-[16px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="medicao-mat-filter-indicator"></span>
+                                    </button>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody id="medicao-protocolos-tbody" class="divide-y divide-outline-variant/40 bg-surface-container-lowest font-data-tabular">
+                            <!-- Linhas de protocolos injetadas dinamicamente -->
+                        </tbody>
+                    </table>
+                    <div id="medicao-protocolos-empty-state" class="hidden py-8 text-center text-on-surface-variant/70">
+                        <div class="flex flex-col items-center justify-center gap-1.5">
+                            <span class="material-symbols-outlined text-[28px] text-on-surface-variant/40">assignment_late</span>
+                            <span class="text-xs font-medium">Nenhuma ordem de serviço com materiais ou serviços encontrada para este mês/filtro.</span>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
     </div>
 
+    <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
+    <button id="btn-scroll-bottom" 
+            onclick="window.handleScrollFABClick()" 
+            class="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center cursor-pointer opacity-0 pointer-events-none group border border-white/20" 
+            title="Rolar até o fundo" 
+            aria-label="Rolar até o fundo">
+        <span id="btn-scroll-bottom-icon" class="material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5">arrow_downward</span>
+    </button>
 </main>
 
 <!-- Modal de Seleção de Área Geográfica no Mapa -->
@@ -810,6 +935,542 @@
         </div>
     </div>
 </div>
+
+<!-- Modal de Detalhamento & Substituição de Item em Lote na Medição -->
+<div id="modal-detalhes-medicao" onclick="if (event.target === this) window.relatorioController.fecharModalDetalhesMedicao()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/80 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden m-4 animate-fade-in-up">
+        <!-- Header do Modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/90 shrink-0" style="padding: 1.125rem 1.5rem;">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center font-bold shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">published_with_changes</span>
+                </div>
+                <div>
+                    <h3 class="font-headline-sm text-base font-bold text-slate-900 flex items-center gap-2">
+                        <span>Gerenciar & Substituir Item em Lote</span>
+                        <span id="badge-item-categoria" class="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200"></span>
+                    </h3>
+                    <p class="text-xs text-slate-500">Substitua este material em múltiplos protocolos simultaneamente ou edite OSs individualmente</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.relatorioController.fecharModalDetalhesMedicao()" class="p-1.5 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Conteúdo Rolável -->
+        <div class="p-6 overflow-y-auto space-y-6 flex-1 bg-surface-container-lowest" style="padding: 1.5rem;">
+            
+            <!-- Card Informativo do Item Selecionado -->
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs" style="padding: 1.25rem;">
+                <div class="space-y-1.5 min-w-0">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[15px] text-secondary">inventory_2</span>
+                        <span>Item Selecionado para Medição</span>
+                    </div>
+                    <div class="flex items-center gap-2.5 flex-wrap">
+                        <span id="info-modal-marca" class="inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-100 text-purple-800 border border-purple-200 uppercase tracking-wider shadow-2xs">---</span>
+                        <span id="info-modal-descricao" class="font-bold text-base text-slate-900 leading-tight">---</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-6 divide-x divide-slate-200 shrink-0">
+                    <div class="pr-2 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Quantidade Total</span>
+                        <span id="info-modal-qtd-total" class="font-mono font-bold text-lg text-purple-700">0</span>
+                    </div>
+                    <div class="pl-6 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Protocolos Afetados</span>
+                        <span id="info-modal-count-oss" class="font-mono font-bold text-lg text-secondary">0 OS(s)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Caixa de Substituição em Lote -->
+            <div class="border border-purple-200 bg-purple-50/40 rounded-xl p-5 space-y-4 shadow-xs" style="padding: 1.25rem;">
+                <div class="flex items-center justify-between border-b border-purple-200/60 pb-3">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] text-purple-700">swap_horizontal_circle</span>
+                        <span>Ferramenta de Alteração em Lote</span>
+                    </h4>
+                    <span class="text-[11px] text-purple-700 font-medium">Troca automatizada com auditamento do operador</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                    <!-- Escolha do Novo Material -->
+                    <div class="md:col-span-6 flex flex-col gap-1.5 relative">
+                        <label class="text-xs font-bold text-slate-800 flex items-center justify-between">
+                            <span>Substituir por Novo Material / Item:</span>
+                            <span class="text-[11px] text-slate-500 font-normal">Selecione ou digite para buscar</span>
+                        </label>
+                        <div class="relative w-full">
+                            <input type="text" id="input-novo-material-lote" placeholder="Digite para buscar material no catálogo (ex: LUMINARIA LED 50W)..." autocomplete="off" oninput="window.relatorioController.filtrarMateriaisLote();" onclick="window.relatorioController.mostrarTodosMateriaisLote();" onfocus="window.relatorioController.mostrarTodosMateriaisLote();" class="w-full text-xs font-semibold border border-slate-300 rounded-lg px-3.5 py-2.5 focus:ring-2 focus:ring-purple-600 focus:border-transparent outline-none bg-white text-slate-900 shadow-2xs transition-all" />
+                            <!-- Custom Autocomplete Floating Dropdown Matching Finalizar.html -->
+                            <div id="dropdown-materiais-lote" class="dropdown-lista"></div>
+                        </div>
+                    </div>
+
+                    <!-- Fator de Quantidade: De X para Y -->
+                    <div class="md:col-span-4 flex flex-col gap-1.5">
+                        <label class="text-xs font-bold text-slate-800">Modo de Quantidade:</label>
+                        <div class="flex items-center gap-1.5">
+                            <div class="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 focus-within:ring-2 focus-within:ring-purple-600 shadow-2xs w-full">
+                                <span class="text-[11px] font-bold text-slate-500 uppercase flex-shrink-0">De:</span>
+                                <input type="number" id="input-qtd-de-lote" min="1" value="1" class="w-full text-xs font-bold text-slate-900 outline-none bg-transparent" placeholder="1" />
+                            </div>
+                            <span class="material-symbols-outlined text-[16px] text-purple-600 flex-shrink-0">arrow_forward</span>
+                            <div class="flex items-center gap-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 focus-within:ring-2 focus-within:ring-purple-600 shadow-2xs w-full">
+                                <span class="text-[11px] font-bold text-slate-500 uppercase flex-shrink-0">Para:</span>
+                                <input type="number" id="input-qtd-para-lote" min="1" value="1" class="w-full text-xs font-bold text-slate-900 outline-none bg-transparent" placeholder="1" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botão de Ação Batch -->
+                    <div class="md:col-span-2">
+                        <button type="button" id="btn-executar-substituicao-lote" onclick="window.relatorioController.executarSubstituicaoLote()" class="w-full bg-purple-700 hover:bg-purple-800 text-white font-bold text-xs py-2.5 px-3.5 rounded-lg shadow-md transition-all active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap">
+                            <span class="material-symbols-outlined text-[18px]">transform</span>
+                            <span>Mudar em Lote</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela de Protocolos Envolvidos (Integrada ao Scroll Principal) -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] text-secondary">format_list_bulleted</span>
+                        <span>Protocolos com Este Item Aplicado</span>
+                    </h4>
+                    <div class="flex items-center gap-3 text-xs">
+                        <label class="flex items-center gap-2 font-bold text-slate-700 cursor-pointer select-none">
+                            <input type="checkbox" id="chk-selecionar-todos-protocolos" checked onchange="window.relatorioController.toggleSelecionarTodosProtocolos(this.checked)" class="rounded text-purple-700 focus:ring-purple-600 cursor-pointer w-4 h-4" />
+                            <span>Selecionar Todos para Lote</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="border border-slate-200 rounded-xl overflow-hidden shadow-2xs bg-white">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead class="bg-slate-100 border-b border-slate-200 text-slate-700 font-bold uppercase text-[11px] tracking-wider">
+                            <tr>
+                                <th class="py-3 px-3.5 w-10 text-center">
+                                    <span class="sr-only">Seleção</span>
+                                </th>
+                                <th class="py-3 px-3.5">Protocolo</th>
+                                <th class="py-3 px-3.5">Tipo / Status</th>
+                                <th class="py-3 px-3.5">Problema Encontrado</th>
+                                <th class="py-3 px-3.5">Endereço / Local</th>
+                                <th class="py-3 px-3.5 text-center">Qtd. deste Item</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-protocolos-item" class="divide-y divide-slate-100 bg-white font-data-tabular">
+                            <!-- Preenchido via JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Footer do Modal -->
+        <div class="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50/90 shrink-0" style="padding: 1rem 1.5rem;">
+            <span class="text-xs text-slate-500">Qualquer alteração será auditada com seu usuário e data/hora.</span>
+            <button type="button" onclick="window.relatorioController.fecharModalDetalhesMedicao()" class="px-5 py-2 rounded-xl text-xs font-semibold border border-slate-300 text-slate-700 hover:bg-slate-200/60 transition-all cursor-pointer">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Visualização do Ponto no Mapbox -->
+<div id="modal-mapa-ponto" onclick="if (event.target === this) window.closeMapaPontoModal()" class="fixed inset-0 z-[65000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-ponto-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] sm:h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header do Modal (Sólido) -->
+        <div class="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex-shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[24px]">location_on</span>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="hidden sm:inline-block text-sm sm:text-base font-bold text-slate-900 truncate" id="modal-mapa-protocolo">Protocolo #---</h3>
+                </div>
+            </div>
+
+            <!-- Ações do Cabeçalho: Botões Waze / Google Maps e Fechar -->
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <a id="modal-mapa-btn-gmaps" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('gmaps', event)" target="_blank" title="Navegar via Google Maps" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-blue-600">map</span>
+                    <span class="text-[11px] sm:text-xs">Maps</span>
+                </a>
+                <a id="modal-mapa-btn-waze" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('waze', event)" target="_blank" title="Navegar via Waze" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-cyan-600">navigation</span>
+                    <span class="text-[11px] sm:text-xs">Waze</span>
+                </a>
+                <button onclick="window.closeMapaPontoModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-0.5" title="Fechar Modal (Esc)">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Canvas do Mapa & Card Informativo Flutuante -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-ponto-canvas" class="w-full h-full"></div>
+
+            <!-- Card Informativo Glassmorphism (Localização, Plaqueta, Problema) -->
+            <div class="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm bg-white/95 backdrop-blur-md border border-slate-200 p-3.5 sm:p-4 rounded-xl shadow-xl text-xs space-y-2 z-10 text-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="font-bold text-slate-900 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px] text-blue-600">pin_drop</span>
+                        <span>Detalhes da Localização</span>
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200" id="modal-mapa-card-tipo">Endereço</span>
+                </div>
+                <div class="space-y-1.5">
+                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-slate-700 font-medium">---</span></p>
+                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-blue-600 font-bold">---</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dropdown Flutuante de Filtro de Protocolo na Medição -->
+<div id="medicao-protocol-filter-dropdown" class="hidden fixed bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-[99999] p-3 w-72 animate-fade-in-up">
+    <div class="flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Tipo / Protocolo</span>
+            <button type="button" onclick="window.relatorioController.toggleMedicaoProtocoloFilterDropdown(event)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <div class="flex gap-2">
+            <button type="button" id="medicao-protocol-btn-praca" onclick="window.relatorioController.toggleMedicaoProtocolPrefix('P')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Praça (começam com P)">
+                <span class="material-symbols-outlined text-[15px]">park</span>
+                <span>Praça (P)</span>
+            </button>
+            <button type="button" id="medicao-protocol-btn-viaria" onclick="window.relatorioController.toggleMedicaoProtocolPrefix('I')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Viária (começam com I)">
+                <span class="material-symbols-outlined text-[15px]">alt_route</span>
+                <span>Viária (I)</span>
+            </button>
+        </div>
+        <div class="relative">
+            <input type="text" id="medicao-protocol-search-col-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+        </div>
+        <button type="button" class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="window.relatorioController.clearMedicaoProtocolFilter()">Limpar Filtro</button>
+    </div>
+</div>
+
+<!-- Dropdown Flutuante de Filtro de Status na Medição -->
+<div id="medicao-status-filter-dropdown" class="hidden fixed bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-[99999] p-3 w-56 animate-fade-in-up">
+    <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+        <div class="flex items-center justify-between px-1 mb-1">
+            <span class="text-label-sm text-on-surface-variant font-semibold uppercase">Filtrar por Status</span>
+            <button type="button" onclick="window.relatorioController.toggleMedicaoStatusFilterDropdown(event)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium text-xs">
+            <input type="checkbox" id="medicao-status-cb-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Todos os status</span>
+        </label>
+        <div class="border-t border-outline-variant/40 my-0.5"></div>
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-xs">
+            <input type="checkbox" name="medicao-status-filter" value="concluida" checked class="medicao-status-cb rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Concluída</span>
+        </label>
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-xs">
+            <input type="checkbox" name="medicao-status-filter" value="em_andamento" checked class="medicao-status-cb rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Em andamento</span>
+        </label>
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-xs">
+            <input type="checkbox" name="medicao-status-filter" value="pendente" checked class="medicao-status-cb rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Pendente aprovação</span>
+        </label>
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-xs">
+            <input type="checkbox" name="medicao-status-filter" value="cancelada" checked class="medicao-status-cb rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Cancelada</span>
+        </label>
+        <label class="flex items-center gap-2 px-2 py-1 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-xs">
+            <input type="checkbox" name="medicao-status-filter" value="rejeitada" checked class="medicao-status-cb rounded text-secondary focus:ring-secondary cursor-pointer">
+            <span>Rejeitada / Recusada</span>
+        </label>
+        <div class="border-t border-outline-variant my-1 pt-1">
+            <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.relatorioController.clearMedicaoStatusFilter()">Limpar Filtro</button>
+        </div>
+    </div>
+</div>
+
+<!-- Dropdown Flutuante de Filtro de Materiais na Medição por Protocolo -->
+<div id="medicao-mat-filter-dropdown" class="hidden fixed bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-[99999] p-3 w-72 animate-fade-in-up">
+    <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Insumo / Material</span>
+            <button type="button" onclick="window.relatorioController.toggleMaterialFilterDropdown(event)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <div class="relative">
+            <input type="text" id="medicao-mat-search-input" placeholder="Digite o nome do material..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface" />
+            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+        </div>
+        <button type="button" class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="window.relatorioController.clearMaterialFilter()">Limpar Filtro</button>
+    </div>
+</div>
+
+<!-- Dropdown Flutuante de Filtro de Descrição no Consolidado por Material -->
+<div id="medicao-mat-desc-filter-dropdown" class="hidden fixed bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-[99999] p-3 w-72 animate-fade-in-up">
+    <div class="flex flex-col gap-2">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Descrição / Material</span>
+            <button type="button" onclick="window.relatorioController.toggleMedicaoMatDescFilterDropdown(event)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <div class="relative">
+            <input type="text" id="medicao-mat-desc-search-input" placeholder="Digite o material ou item..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface" />
+            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+        </div>
+        <button type="button" class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="window.relatorioController.clearMedicaoMatDescFilter()">Limpar Filtro</button>
+    </div>
+</div>
+
+<!-- Dropdown Flutuante de Filtro de Protocolo no Consolidado por Material -->
+<div id="medicao-mat-prot-filter-dropdown" class="hidden fixed bg-surface-container-lowest border border-outline-variant/80 rounded-xl shadow-2xl z-[99999] p-3 w-72 animate-fade-in-up">
+    <div class="flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Filtrar por Tipo / Protocolo</span>
+            <button type="button" onclick="window.relatorioController.toggleMedicaoMatProtFilterDropdown(event)" class="text-slate-400 hover:text-slate-700 cursor-pointer">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+            </button>
+        </div>
+        <div class="flex gap-2">
+            <button type="button" id="medicao-mat-prot-btn-praca" onclick="window.relatorioController.toggleMedicaoMatProtPrefix('P')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Praça (começam com P)">
+                <span class="material-symbols-outlined text-[15px]">park</span>
+                <span>Praça (P)</span>
+            </button>
+            <button type="button" id="medicao-mat-prot-btn-viaria" onclick="window.relatorioController.toggleMedicaoMatProtPrefix('I')" class="protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40" title="Filtrar apenas protocolos de Viária (começam com I)">
+                <span class="material-symbols-outlined text-[15px]">alt_route</span>
+                <span>Viária (I)</span>
+            </button>
+        </div>
+        <div class="relative">
+            <input type="text" id="medicao-mat-prot-search-input" placeholder="Digite o protocolo..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+            <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+        </div>
+        <button type="button" class="text-error font-label-md mt-0.5 hover:underline text-left cursor-pointer" onclick="window.relatorioController.clearMedicaoMatProtFilter()">Limpar Filtro</button>
+    </div>
+</div>
+
+<!-- Modal Detalhes OS Auditoria/Painel -->
+<div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) fecharDetalhesOSModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modalDetalhesOSBox" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">assignment</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="detalheModalProtocolo">Protocolo #---</h3>
+                        <span id="detalheModalStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Concluída</span>
+                        <span id="detalheModalAuditBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">Auditoria Pendente</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md mt-0.5" id="detalheModalDataSub">Abertura: --/--/---- | Conclusão: --/--/----</p>
+                </div>
+            </div>
+            <button type="button" onclick="fecharDetalhesOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5" id="detalheModalConteudo">
+            <div class="flex items-center justify-center py-12 text-on-surface-variant text-sm">
+                Carregando detalhes do protocolo...
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
+            <button type="button" onclick="fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Galeria de Fotos Cloudinary (Lightbox) -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[70000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Principal -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Thumbnails geradas via JS -->
+        </div>
+    </div>
+</div>
+
+<script>
+    var galeriaFotosAtualList = [];
+    var galeriaFotosIndexAtual = 0;
+
+    window.fecharDetalhesOSModal = function() {
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (!modal || !box) return;
+        box.classList.remove('scale-100', 'opacity-100');
+        box.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+        }, 200);
+    };
+
+    window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
+        let listFotos = [];
+        let titleProt = 'Fotos da OS';
+
+        if (Array.isArray(protocolo)) {
+            listFotos = protocolo;
+            titleProt = 'Evidência Fotográfica';
+        } else {
+            const list = (window.chamadosListCache || (window.relatorioController ? window.relatorioController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : [])) || [];
+            const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+            
+            if (osObj && osObj.fotosEvidencias && osObj.fotosEvidencias.length > 0) {
+                listFotos = osObj.fotosEvidencias;
+                titleProt = `Fotos da OS #${osObj.protocolo}`;
+            }
+        }
+
+        if (!listFotos || listFotos.length === 0) {
+            alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
+            return;
+        }
+
+        galeriaFotosAtualList = listFotos;
+        galeriaFotosIndexAtual = (typeof indexInicial === 'number' && indexInicial >= 0) ? indexInicial : 0;
+
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (!elModal) return;
+
+        const elProt = document.getElementById('galeriaModalProtocolo');
+        if (elProt) elProt.innerText = titleProt;
+
+        window.renderizarFotoModalAtual();
+
+        elModal.classList.remove('hidden');
+        elModal.classList.add('flex');
+    };
+
+    window.renderizarFotoModalAtual = function() {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+        if (galeriaFotosIndexAtual < 0) galeriaFotosIndexAtual = 0;
+        if (galeriaFotosIndexAtual >= galeriaFotosAtualList.length) galeriaFotosIndexAtual = galeriaFotosAtualList.length - 1;
+
+        const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+
+        const imgEl = document.getElementById('galeriaModalImgPrincipal');
+        const tituloEl = document.getElementById('galeriaModalTituloFoto');
+        const counterEl = document.getElementById('galeriaModalCounter');
+        const linkCloudinaryEl = document.getElementById('galeriaModalLinkCloudinary');
+        const stripEl = document.getElementById('galeriaModalThumbnailsStrip');
+
+        if (imgEl) imgEl.src = foto.url;
+        if (tituloEl) tituloEl.innerText = foto.titulo || `Evidência Fotográfica ${galeriaFotosIndexAtual + 1}`;
+        if (counterEl) counterEl.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+        if (linkCloudinaryEl) linkCloudinaryEl.href = foto.url;
+
+        if (stripEl) {
+            stripEl.innerHTML = '';
+            galeriaFotosAtualList.forEach((f, idx) => {
+                const isSelected = idx === galeriaFotosIndexAtual;
+                const thumbDiv = document.createElement('div');
+                thumbDiv.className = `w-14 h-10 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 ${isSelected ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'}`;
+                thumbDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    galeriaFotosIndexAtual = idx;
+                    window.renderizarFotoModalAtual();
+                };
+                thumbDiv.innerHTML = `<img src="${f.url}" class="w-full h-full object-cover" alt="Thumb ${idx+1}" />`;
+                stripEl.appendChild(thumbDiv);
+            });
+        }
+
+        const btnPrev = document.getElementById('btnGaleriaPrev');
+        const btnNext = document.getElementById('btnGaleriaNext');
+        if (btnPrev && btnNext) {
+            if (galeriaFotosAtualList.length <= 1) {
+                btnPrev.style.display = 'none';
+                btnNext.style.display = 'none';
+            } else {
+                btnPrev.style.display = 'flex';
+                btnNext.style.display = 'flex';
+            }
+        }
+    };
+
+    window.navegarGaleriaFotos = function(delta) {
+        if (!galeriaFotosAtualList || galeriaFotosAtualList.length <= 1) return;
+        galeriaFotosIndexAtual = (galeriaFotosIndexAtual + delta + galeriaFotosAtualList.length) % galeriaFotosAtualList.length;
+        window.renderizarFotoModalAtual();
+    };
+
+    window.fecharGaleriaFotosModal = function() {
+        const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+        if (elModal) {
+            elModal.classList.add('hidden');
+            elModal.classList.remove('flex');
+        }
+    };
+
+    document.addEventListener('keydown', (e) => {
+        const modalGaleria = document.getElementById('modalGaleriaFotosCloudinary');
+        if (modalGaleria && !modalGaleria.classList.contains('hidden')) {
+            if (e.key === 'Escape') window.fecharGaleriaFotosModal();
+            if (e.key === 'ArrowLeft') window.navegarGaleriaFotos(-1);
+            if (e.key === 'ArrowRight') window.navegarGaleriaFotos(1);
+        }
+        const modalDetalhes = document.getElementById('modalDetalhesOSAuditoria');
+        if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && (modalGaleria ? modalGaleria.classList.contains('hidden') : true)) {
+            if (e.key === 'Escape') window.fecharDetalhesOSModal();
+        }
+    });
+</script>
 
 </body>
 </html>

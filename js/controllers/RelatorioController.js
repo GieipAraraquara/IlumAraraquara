@@ -30,6 +30,20 @@ class RelatorioController {
             selectedMonth: currentMonthStr, // Formato 'YYYY-MM'
             status: 'concluida' // 'concluida', 'all'
         };
+        this.selectedMedicaoItem = null;
+        this.editingOS = null;
+        this.materiaisContratoCache = [];
+        this.medicaoSubView = 'material'; // 'material' ou 'protocolo'
+        this.medicaoProtocoloSearch = '';
+        this.medicaoProtocoloTipo = 'all'; // 'all', 'viaria', 'praca'
+        this.medicaoMaterialFilter = '';
+        this.medicaoColProtocolSearch = '';
+        this.medicaoProtocolPrefix = '';
+        this.medicaoStatusFilterList = [];
+        this.medicaoProtocolosData = [];
+        this.medicaoConsolidadoDescFilter = '';
+        this.medicaoConsolidadoProtSearch = '';
+        this.medicaoConsolidadoProtPrefix = '';
     }
 
     async init() {
@@ -45,6 +59,7 @@ class RelatorioController {
 
         window.addEventListener('auth-ready', () => this.checkManutentorAccess());
 
+        this.carregarMateriaisContrato();
         this.populateMedicaoMonthSelect();
         this.setupEventListeners();
         this.checkManutentorAccess();
@@ -788,6 +803,15 @@ class RelatorioController {
         return [];
     }
 
+    normalizarTexto(str) {
+        if (!str) return '';
+        return String(str)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toLowerCase()
+            .trim();
+    }
+
     resolveMarcaEMaterial(rawNome, defaultUnidade = 'UN') {
         if (!rawNome) return { marca: 'PRÓPRIO', desc: '', unidade: defaultUnidade };
 
@@ -814,9 +838,9 @@ class RelatorioController {
             };
         }
 
-        const cleanUpper = nomeClean.toUpperCase();
+        const cleanNorm = this.normalizarTexto(nomeClean);
 
-        // 1. Tentar casar no cache da tabela materiais_contrato
+        // 1. Tentar casar no cache da tabela materiais_contrato (sem distinção de acentos)
         if (this.materiaisContratoCache && this.materiaisContratoCache.length > 0) {
             for (const row of this.materiaisContratoCache) {
                 const dbMarca = (row.Marca || row.marca || row.Fabricante || row.fabricante || '').trim();
@@ -824,8 +848,8 @@ class RelatorioController {
                 const dbUnid = (row['Unidade de Medida'] || row.Unidade || row.unidade || row.und || row['unidade_de_medida'] || '').trim();
 
                 if (dbDesc) {
-                    const dbDescUpper = dbDesc.toUpperCase();
-                    if (cleanUpper === dbDescUpper || cleanUpper.includes(dbDescUpper) || dbDescUpper.includes(cleanUpper)) {
+                    const dbDescNorm = this.normalizarTexto(dbDesc);
+                    if (cleanNorm === dbDescNorm || cleanNorm.includes(dbDescNorm) || dbDescNorm.includes(cleanNorm)) {
                         return {
                             marca: dbMarca || 'PRÓPRIO',
                             desc: dbDesc,
@@ -1024,18 +1048,77 @@ class RelatorioController {
         if (elTotalOSs) elTotalOSs.textContent = medicaoData.totalOSsMedidas.toLocaleString('pt-BR');
         if (elTiposItens) elTiposItens.textContent = medicaoData.totalItensDiferentes.toLocaleString('pt-BR');
 
+        if (this.medicaoSubView === 'protocolo') {
+            this.renderMedicaoPorProtocolo();
+        }
+
+        const descFilter = this.normalizarTexto(this.medicaoConsolidadoDescFilter);
+        const protSearch = this.normalizarTexto(this.medicaoConsolidadoProtSearch);
+        const protPrefix = (this.medicaoConsolidadoProtPrefix || '').toUpperCase();
+
+        // Indicador visual na coluna de descrição
+        const indDesc = document.getElementById('medicao-mat-desc-filter-indicator');
+        if (indDesc) {
+            if (descFilter) indDesc.classList.remove('hidden');
+            else indDesc.classList.add('hidden');
+        }
+
+        // Indicador visual na coluna de protocolos
+        const indProt = document.getElementById('medicao-mat-prot-filter-indicator');
+        if (indProt) {
+            if (protSearch || protPrefix) indProt.classList.remove('hidden');
+            else indProt.classList.add('hidden');
+        }
+
+        const filteredItems = medicaoData.items.filter(item => {
+            // Filtro por descrição do item (ou marca)
+            if (descFilter) {
+                const descNorm = this.normalizarTexto(item.descricao);
+                const marcaNorm = this.normalizarTexto(item.marca);
+                if (!descNorm.includes(descFilter) && !marcaNorm.includes(descFilter)) {
+                    return false;
+                }
+            }
+
+            // Filtro por prefixo de protocolo (Praça P / Viária I)
+            if (protPrefix) {
+                const hasMatchingPrefix = Array.from(item.protocolosSet).some(p => {
+                    const pUpper = String(p || '').toUpperCase().trim();
+                    return pUpper.startsWith(protPrefix);
+                });
+                if (!hasMatchingPrefix) return false;
+            }
+
+            // Filtro por busca textual de protocolo
+            if (protSearch) {
+                const hasMatchingProt = Array.from(item.protocolosSet).some(p => 
+                    this.normalizarTexto(p).includes(protSearch)
+                );
+                if (!hasMatchingProt) return false;
+            }
+
+            return true;
+        });
+
+        this.medicaoConsolidadoFilteredItems = filteredItems;
+
         tbody.innerHTML = '';
 
-        if (medicaoData.items.length === 0) {
+        if (filteredItems.length === 0) {
             if (emptyState) emptyState.classList.remove('hidden');
             return;
         }
 
         if (emptyState) emptyState.classList.add('hidden');
 
-        medicaoData.items.forEach(item => {
+        filteredItems.forEach(item => {
             const tr = document.createElement('tr');
-            tr.className = 'border-b border-outline-variant/60 hover:bg-surface-container-low transition-colors align-middle';
+            tr.className = 'border-b border-outline-variant/60 hover:bg-purple-50/50 transition-colors align-middle cursor-pointer group';
+            tr.onclick = (e) => {
+                if (!e.target.closest('button')) {
+                    this.abrirModalDetalhesMedicao(item);
+                }
+            };
 
             const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
             const qtdFmt = isHoras ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal.toLocaleString('pt-BR');
@@ -1045,40 +1128,70 @@ class RelatorioController {
 
             const protList = Array.from(item.protocolosSet).slice(0, 3).join(', ') + (item.protocolosSet.size > 3 ? ` ... (+${item.protocolosSet.size - 3})` : '');
 
-            tr.innerHTML = `
-                <td class="py-3 px-4 font-mono font-bold text-xs text-on-surface whitespace-nowrap">${this.escapeCSVCell(item.marca)}</td>
-                <td class="py-3 px-4 font-bold text-on-surface text-xs max-w-[280px]">
-                    <div class="flex items-center gap-1.5">
-                        ${isHoras ? '<span class="material-symbols-outlined text-purple-600 text-[18px]">engineering</span>' : '<span class="material-symbols-outlined text-secondary text-[18px]">inventory_2</span>'}
-                        <span>${item.descricao}</span>
+            let itemDisplayHtml = '';
+            if (isHoras) {
+                itemDisplayHtml = `
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-amber-50 text-amber-950 border border-amber-300/80 shadow-2xs">
+                        <span class="material-symbols-outlined text-amber-700 text-[16px] shrink-0">engineering</span>
+                        <span class="font-semibold text-xs leading-tight">${item.descricao}</span>
                     </div>
+                `;
+            } else {
+                itemDisplayHtml = `
+                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs bg-surface-container-lowest text-slate-800 border border-outline-variant/70 shadow-2xs group-hover:border-purple-300 transition-colors">
+                        <span class="material-symbols-outlined text-secondary text-[16px] shrink-0">inventory_2</span>
+                        <span class="font-semibold text-xs leading-tight text-slate-800">${item.descricao}</span>
+                        ${item.marca && item.marca !== 'PRÓPRIO' ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 border border-purple-200 rounded shrink-0">${item.marca}</span>` : ''}
+                    </div>
+                `;
+            }
+
+            tr.innerHTML = `
+                <td class="py-3 px-4 align-middle">
+                    ${itemDisplayHtml}
                 </td>
-                <td class="py-3 px-4 text-center font-bold text-xs uppercase whitespace-nowrap">
+                <td class="py-3 px-4 text-center font-bold text-xs uppercase whitespace-nowrap align-middle">
                     <span class="px-2 py-0.5 rounded ${isHoras ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}">
                         ${item.unidade}
                     </span>
                 </td>
-                <td class="py-3 px-4 text-right font-mono font-bold text-sm ${isHoras ? 'text-purple-700' : 'text-secondary'} whitespace-nowrap">
+                <td class="py-3 px-4 text-right font-mono font-bold text-sm ${isHoras ? 'text-purple-700' : 'text-secondary'} whitespace-nowrap align-middle">
                     ${qtdFmt}
                 </td>
-                <td class="py-3 px-4 text-center font-bold text-xs whitespace-nowrap">${item.qtdOSsSet.size} OS(s)</td>
-                <td class="py-3 px-4 whitespace-nowrap">
+                <td class="py-3 px-4 text-center font-bold text-xs whitespace-nowrap align-middle">${item.qtdOSsSet.size} OS(s)</td>
+                <td class="py-3 px-4 whitespace-nowrap align-middle">
                     <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold inline-block ${badgeCategory}">
                         ${item.categoria}
                     </span>
                 </td>
-                <td class="py-3 px-4 text-xs font-mono text-on-surface-variant truncate max-w-[180px]" title="${Array.from(item.protocolosSet).join(', ')}">
+                <td class="py-3 px-4 text-xs font-mono text-on-surface-variant truncate max-w-[200px] align-middle" title="${Array.from(item.protocolosSet).join(', ')}">
                     ${protList}
                 </td>
+                <td class="py-3 px-4 text-center whitespace-nowrap align-middle">
+                    <button type="button" class="btn-gerenciar-item-medicao px-3 py-1.5 rounded-lg bg-purple-700/10 hover:bg-purple-700 hover:text-white text-purple-700 font-bold text-xs flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer group-hover:scale-105" title="Detalhar protocolos e alterar item em lote">
+                        <span class="material-symbols-outlined text-[16px]">published_with_changes</span>
+                        <span>Gerenciar</span>
+                    </button>
+                </td>
             `;
+
+            const btnGerenciar = tr.querySelector('.btn-gerenciar-item-medicao');
+            if (btnGerenciar) {
+                btnGerenciar.onclick = (e) => {
+                    e.stopPropagation();
+                    this.abrirModalDetalhesMedicao(item);
+                };
+            }
+
             tbody.appendChild(tr);
         });
     }
 
     exportarMedicaoMensalCSV() {
         const medicaoData = this.calcularMedicaoMensal();
-        if (!medicaoData.items || medicaoData.items.length === 0) {
-            alert('Nenhum dado de medição disponível para o mês selecionado.');
+        const items = this.medicaoConsolidadoFilteredItems || medicaoData.items;
+        if (!items || items.length === 0) {
+            alert('Nenhum dado de medição disponível para o mês/filtro selecionado.');
             return;
         }
 
@@ -1094,7 +1207,7 @@ class RelatorioController {
 
         let csvLines = [headers.join(';')];
 
-        medicaoData.items.forEach(item => {
+        items.forEach(item => {
             const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
             const qtdFmt = isHoras ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal;
 
@@ -1113,6 +1226,735 @@ class RelatorioController {
         const periodLabel = this.medicaoFilters.selectedMonth || 'Mes_Atual';
         const dateStr = new Date().toISOString().split('T')[0];
         this.downloadCSV(`Medicao_Mensal_Materiais_E_Sessoes_${periodLabel}_${dateStr}.csv`, csvLines.join('\n'));
+    }
+
+    // =========================================================================
+    // VISÃO DE MEDIÇÃO DETALHADA POR PROTOCOLO (OS)
+    // =========================================================================
+
+    switchMedicaoSubView(subView) {
+        this.medicaoSubView = subView;
+        const btnMaterial = document.getElementById('btn-medicao-view-material');
+        const btnProtocolo = document.getElementById('btn-medicao-view-protocolo');
+        const containerMaterial = document.getElementById('container-medicao-por-material');
+        const containerProtocolo = document.getElementById('container-medicao-por-protocolo');
+        const toolbarProtocolo = document.getElementById('toolbar-medicao-protocolo');
+        const txtBtnExportar = document.getElementById('txt-btn-exportar-medicao');
+
+        if (subView === 'protocolo') {
+            if (btnMaterial) {
+                btnMaterial.className = "px-3.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 cursor-pointer";
+            }
+            if (btnProtocolo) {
+                btnProtocolo.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-surface-container-lowest text-secondary shadow-xs cursor-pointer";
+            }
+            if (containerMaterial) containerMaterial.classList.add('hidden');
+            if (containerProtocolo) containerProtocolo.classList.remove('hidden');
+            if (toolbarProtocolo) {
+                toolbarProtocolo.classList.remove('hidden');
+                toolbarProtocolo.classList.add('flex');
+            }
+            if (txtBtnExportar) {
+                txtBtnExportar.textContent = 'Exportar por Protocolo (CSV)';
+            }
+            this.renderMedicaoPorProtocolo();
+        } else {
+            // Padrão: 'material'
+            if (btnMaterial) {
+                btnMaterial.className = "px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-surface-container-lowest text-secondary shadow-xs cursor-pointer";
+            }
+            if (btnProtocolo) {
+                btnProtocolo.className = "px-3.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 cursor-pointer";
+            }
+            if (containerMaterial) containerMaterial.classList.remove('hidden');
+            if (containerProtocolo) containerProtocolo.classList.add('hidden');
+            if (toolbarProtocolo) {
+                toolbarProtocolo.classList.add('hidden');
+                toolbarProtocolo.classList.remove('flex');
+            }
+            if (txtBtnExportar) {
+                txtBtnExportar.textContent = 'Exportar Medição Mensal (CSV)';
+            }
+            this.renderMedicaoMensal();
+        }
+    }
+
+    calcularMedicaoPorProtocolo() {
+        const { selectedMonth, status } = this.medicaoFilters;
+        const { startDate, endDate, periodLabelBR } = this.getMedicaoPeriodDates(selectedMonth);
+
+        // 1. Filtrar lista de chamados no período de medição e status
+        const listToMeasure = this.chamadosList.filter(item => {
+            if (status === 'concluida' && item.normalizedStatus !== 'concluida') {
+                return false;
+            }
+
+            const refDate = item.dataConclusao || item.dataAbertura;
+            if (!refDate) return false;
+
+            const t = refDate.getTime();
+            return t >= startDate.getTime() && t <= endDate.getTime();
+        });
+
+        const protocolosResult = [];
+
+        listToMeasure.forEach(item => {
+            const prot = item.protocolo || 'OS-SEM-PROT';
+            const matsDaOS = [];
+            let totalQtdOS = 0;
+            let totalHorasOS = 0;
+
+            // A) MATERIAIS FÍSICOS UTILIZADOS NA OS (VIÁRIA E PRAÇA CONSOLIDADOS DE TODOS OS FECHAMENTOS)
+            const rawMats = (item.materiaisConsolidados && Array.isArray(item.materiaisConsolidados) && item.materiaisConsolidados.length > 0)
+                ? item.materiaisConsolidados
+                : (item.materialsList || []);
+
+            rawMats.forEach(matItem => {
+                if (!matItem) return;
+                let matStr = '';
+                let qty = 1;
+
+                if (typeof matItem === 'string') {
+                    matStr = matItem;
+                    const matchX = matStr.match(/\(x(\d+)\)/i);
+                    if (matchX) {
+                        qty = parseInt(matchX[1], 10) || 1;
+                    } else {
+                        const matchStartNum = matStr.match(/^(\d+)\s*x?\s+(.*)/i);
+                        if (matchStartNum) {
+                            qty = parseInt(matchStartNum[1], 10) || 1;
+                            matStr = matchStartNum[2];
+                        }
+                    }
+                } else if (typeof matItem === 'object') {
+                    matStr = String(matItem.nome || matItem.descricao || matItem.material || matItem.material_nome || '').trim();
+                    qty = Number(matItem.qtd || matItem.quantidade || matItem.qtd_usada) || 1;
+                } else {
+                    matStr = String(matItem).trim();
+                }
+
+                if (matStr) {
+                    const { marca, desc, unidade } = this.resolveMarcaEMaterial(matStr, 'UN');
+                    matsDaOS.push({
+                        marca: marca,
+                        descricao: desc,
+                        unidade: unidade || 'UN',
+                        quantidade: qty,
+                        categoria: 'Material Aplicado',
+                        isMaoDeObra: false
+                    });
+                    totalQtdOS += qty;
+                }
+            });
+
+            // B) SESSÕES DE PRAÇA PÚBLICA -> HORA DE ELETRICISTA
+            const sessoes = item.sessoesList || [];
+            sessoes.forEach(sess => {
+                let durMin = sess.duracao_minutos;
+                if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
+                    const dtInc = new Date(sess.inicio);
+                    const dtFim = new Date(sess.fim);
+                    if (!isNaN(dtInc.getTime()) && !isNaN(dtFim.getTime())) {
+                        durMin = Math.max(1, Math.round((dtFim.getTime() - dtInc.getTime()) / 60000));
+                    }
+                }
+
+                if (durMin && durMin > 0) {
+                    const horasSessao = durMin / 60;
+                    const numEletricistas = parseInt(sess.qtd_eletricistas, 10) || 1;
+                    const totalHorasCalculadas = horasSessao * numEletricistas;
+
+                    totalHorasOS += totalHorasCalculadas;
+
+                    matsDaOS.push({
+                        marca: 'MÃO DE OBRA',
+                        descricao: 'ELETRICISTA COM ENCARGOS COMPLEMENTARES (H)',
+                        unidade: 'H',
+                        quantidade: totalHorasCalculadas,
+                        categoria: 'Sessão de Praça (Mão de Obra)',
+                        isMaoDeObra: true
+                    });
+                }
+
+                if (sess.materiais && Array.isArray(sess.materiais)) {
+                    sess.materiais.forEach(sMat => {
+                        const { marca, desc, unidade } = this.resolveMarcaEMaterial(sMat, 'UN');
+                        matsDaOS.push({
+                            marca: marca,
+                            descricao: desc,
+                            unidade: unidade || 'UN',
+                            quantidade: 1,
+                            categoria: 'Material em Sessão Praça',
+                            isMaoDeObra: false
+                        });
+                        totalQtdOS += 1;
+                    });
+                }
+            });
+
+            if (matsDaOS.length > 0) {
+                const formatShortDate = (d) => {
+                    if (!d) return '--/--/--';
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const year = String(d.getFullYear()).slice(-2);
+                    return `${day}/${month}/${year}`;
+                };
+
+                let addressPoints = [];
+                if (item.addressPointsIniciais && Array.isArray(item.addressPointsIniciais) && item.addressPointsIniciais.length > 0) {
+                    addressPoints = item.addressPointsIniciais;
+                } else if (item.pontosDetalhados && Array.isArray(item.pontosDetalhados) && item.pontosDetalhados.length > 0) {
+                    addressPoints = item.pontosDetalhados.map(p => p.enderecoInicial || p.enderecoFinal || item.endereco).filter(Boolean);
+                }
+                if (addressPoints.length === 0) {
+                    addressPoints = [item.endereco || item.pracaNome || 'Endereço não informado'];
+                }
+
+                protocolosResult.push({
+                    protocolo: prot,
+                    chamado: item,
+                    isPraca: item.isPraca,
+                    pracaNome: item.pracaNome || '',
+                    tipoLabel: item.isPraca ? 'Praça Pública' : 'Viária',
+                    status: item.statusBadgeLabel || item.status,
+                    normalizedStatus: item.normalizedStatus,
+                    dataAbertura: item.dataAbertura,
+                    dataConclusao: item.dataConclusao,
+                    dataRefStr: formatShortDate(item.dataConclusao || item.dataAbertura),
+                    endereco: addressPoints[0] || item.endereco || item.pracaNome || 'Endereço não informado',
+                    points: addressPoints,
+                    problema: item.problemaEncontrado || item.problemaInicial || '',
+                    materiais: matsDaOS,
+                    totalQtdMateriais: totalQtdOS,
+                    totalHorasEletricista: totalHorasOS,
+                    tecnico: item.displayOperadorFinalizacao || item.displayOperadorAbertura || item.operador || 'Técnico Responsável'
+                });
+            }
+        });
+
+        // Ordena pela data mais recente de conclusão/abertura
+        protocolosResult.sort((a, b) => {
+            const dtA = a.dataConclusao ? a.dataConclusao.getTime() : (a.dataAbertura ? a.dataAbertura.getTime() : 0);
+            const dtB = b.dataConclusao ? b.dataConclusao.getTime() : (b.dataAbertura ? b.dataAbertura.getTime() : 0);
+            return dtB - dtA;
+        });
+
+        return {
+            protocolos: protocolosResult,
+            periodLabelBR: periodLabelBR
+        };
+    }
+
+    closeAllMedicaoFilterDropdowns() {
+        [
+            'medicao-protocol-filter-dropdown',
+            'medicao-status-filter-dropdown',
+            'medicao-mat-filter-dropdown',
+            'medicao-mat-desc-filter-dropdown',
+            'medicao-mat-prot-filter-dropdown'
+        ].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.classList.add('hidden');
+                el.style.display = 'none';
+            }
+        });
+    }
+
+    openFloatingDropdown(triggerBtn, dropdownEl, alignRight = false) {
+        if (!triggerBtn || !dropdownEl) return;
+
+        if (dropdownEl.parentElement !== document.body) {
+            document.body.appendChild(dropdownEl);
+        }
+
+        const isCurrentlyHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+        this.closeAllMedicaoFilterDropdowns();
+
+        if (isCurrentlyHidden) {
+            dropdownEl.style.position = 'fixed';
+            dropdownEl.style.zIndex = '99999';
+            dropdownEl.style.display = 'block';
+            dropdownEl.classList.remove('hidden');
+
+            const rect = triggerBtn.getBoundingClientRect();
+            const dropdownHeight = dropdownEl.offsetHeight || 240;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+
+            if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 6)}px`;
+            } else {
+                dropdownEl.style.top = `${rect.bottom + 6}px`;
+            }
+
+            if (alignRight) {
+                dropdownEl.style.left = 'auto';
+                dropdownEl.style.right = `${Math.max(12, window.innerWidth - rect.right)}px`;
+            } else {
+                dropdownEl.style.left = `${Math.max(12, Math.min(rect.left, window.innerWidth - 300))}px`;
+                dropdownEl.style.right = 'auto';
+            }
+        }
+    }
+
+    toggleMedicaoProtocoloFilterDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const trigger = document.getElementById('medicao-protocolo-col-filter-trigger');
+        const dropdown = document.getElementById('medicao-protocol-filter-dropdown');
+        this.openFloatingDropdown(trigger, dropdown);
+        const input = document.getElementById('medicao-protocol-search-col-input');
+        if (input && dropdown && !dropdown.classList.contains('hidden')) {
+            setTimeout(() => input.focus(), 50);
+        }
+    }
+
+    toggleMedicaoStatusFilterDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const trigger = document.getElementById('medicao-status-col-filter-trigger');
+        const dropdown = document.getElementById('medicao-status-filter-dropdown');
+        this.openFloatingDropdown(trigger, dropdown);
+    }
+
+    toggleMaterialFilterDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const triggerBtn = document.getElementById('medicao-mat-filter-trigger');
+        const dropdownEl = document.getElementById('medicao-mat-filter-dropdown');
+        this.openFloatingDropdown(triggerBtn, dropdownEl);
+        const input = document.getElementById('medicao-mat-search-input');
+        if (input && dropdownEl && !dropdownEl.classList.contains('hidden')) {
+            setTimeout(() => input.focus(), 50);
+        }
+    }
+
+    toggleMedicaoProtocolPrefix(prefix) {
+        if (this.medicaoProtocolPrefix === prefix) {
+            this.medicaoProtocolPrefix = '';
+        } else {
+            this.medicaoProtocolPrefix = prefix;
+        }
+        this.updateProtocolPrefixUI();
+        this.renderMedicaoPorProtocolo();
+    }
+
+    updateProtocolPrefixUI() {
+        const btnPraca = document.getElementById('medicao-protocol-btn-praca');
+        const btnViaria = document.getElementById('medicao-protocol-btn-viaria');
+        const activeClass = 'protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-white border-secondary shadow-xs';
+        const inactiveClass = 'protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40';
+
+        if (btnPraca) {
+            btnPraca.className = (this.medicaoProtocolPrefix === 'P') ? activeClass : inactiveClass;
+        }
+        if (btnViaria) {
+            btnViaria.className = (this.medicaoProtocolPrefix === 'I') ? activeClass : inactiveClass;
+        }
+    }
+
+    clearMedicaoProtocolFilter() {
+        this.medicaoColProtocolSearch = '';
+        this.medicaoProtocolPrefix = '';
+        const input = document.getElementById('medicao-protocol-search-col-input');
+        if (input) input.value = '';
+        this.updateProtocolPrefixUI();
+        this.closeAllMedicaoFilterDropdowns();
+        this.renderMedicaoPorProtocolo();
+    }
+
+    clearMedicaoStatusFilter() {
+        this.medicaoStatusFilterList = [];
+        const allCb = document.getElementById('medicao-status-cb-all');
+        if (allCb) allCb.checked = true;
+        document.querySelectorAll('.medicao-status-cb').forEach(cb => cb.checked = true);
+        this.closeAllMedicaoFilterDropdowns();
+        this.renderMedicaoPorProtocolo();
+    }
+
+    onMedicaoStatusCheckboxChange() {
+        const cbs = Array.from(document.querySelectorAll('.medicao-status-cb'));
+        const allCb = document.getElementById('medicao-status-cb-all');
+        const checkedValues = cbs.filter(cb => cb.checked).map(cb => cb.value);
+
+        if (checkedValues.length === cbs.length) {
+            if (allCb) allCb.checked = true;
+            this.medicaoStatusFilterList = [];
+        } else {
+            if (allCb) allCb.checked = false;
+            this.medicaoStatusFilterList = checkedValues.length > 0 ? checkedValues : ['__none__'];
+        }
+        this.renderMedicaoPorProtocolo();
+    }
+
+    onMedicaoStatusAllChange(e) {
+        const checked = e.target.checked;
+        document.querySelectorAll('.medicao-status-cb').forEach(cb => cb.checked = checked);
+        this.medicaoStatusFilterList = checked ? [] : ['__none__'];
+        this.renderMedicaoPorProtocolo();
+    }
+
+    clearMaterialFilter() {
+        this.medicaoMaterialFilter = '';
+        const input = document.getElementById('medicao-mat-search-input');
+        if (input) input.value = '';
+        const ind = document.getElementById('medicao-mat-filter-indicator');
+        if (ind) ind.classList.add('hidden');
+        this.closeAllMedicaoFilterDropdowns();
+        this.renderMedicaoPorProtocolo();
+    }
+
+    toggleMedicaoMatDescFilterDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const trigger = document.getElementById('medicao-mat-desc-filter-trigger');
+        const dropdown = document.getElementById('medicao-mat-desc-filter-dropdown');
+        this.openFloatingDropdown(trigger, dropdown);
+        const input = document.getElementById('medicao-mat-desc-search-input');
+        if (input && dropdown && !dropdown.classList.contains('hidden')) {
+            setTimeout(() => input.focus(), 50);
+        }
+    }
+
+    clearMedicaoMatDescFilter() {
+        this.medicaoConsolidadoDescFilter = '';
+        const input = document.getElementById('medicao-mat-desc-search-input');
+        if (input) input.value = '';
+        const ind = document.getElementById('medicao-mat-desc-filter-indicator');
+        if (ind) ind.classList.add('hidden');
+        this.closeAllMedicaoFilterDropdowns();
+        this.renderMedicaoMensal();
+    }
+
+    toggleMedicaoMatProtFilterDropdown(event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const trigger = document.getElementById('medicao-mat-prot-filter-trigger');
+        const dropdown = document.getElementById('medicao-mat-prot-filter-dropdown');
+        this.openFloatingDropdown(trigger, dropdown);
+        const input = document.getElementById('medicao-mat-prot-search-input');
+        if (input && dropdown && !dropdown.classList.contains('hidden')) {
+            setTimeout(() => input.focus(), 50);
+        }
+    }
+
+    toggleMedicaoMatProtPrefix(prefix) {
+        if (this.medicaoConsolidadoProtPrefix === prefix) {
+            this.medicaoConsolidadoProtPrefix = '';
+        } else {
+            this.medicaoConsolidadoProtPrefix = prefix;
+        }
+        this.updateMedicaoMatProtPrefixUI();
+        this.renderMedicaoMensal();
+    }
+
+    updateMedicaoMatProtPrefixUI() {
+        const btnPraca = document.getElementById('medicao-mat-prot-btn-praca');
+        const btnViaria = document.getElementById('medicao-mat-prot-btn-viaria');
+        const activeClass = 'protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-secondary text-white border-secondary shadow-xs';
+        const inactiveClass = 'protocol-type-btn flex-1 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40';
+
+        if (btnPraca) {
+            btnPraca.className = (this.medicaoConsolidadoProtPrefix === 'P') ? activeClass : inactiveClass;
+        }
+        if (btnViaria) {
+            btnViaria.className = (this.medicaoConsolidadoProtPrefix === 'I') ? activeClass : inactiveClass;
+        }
+    }
+
+    clearMedicaoMatProtFilter() {
+        this.medicaoConsolidadoProtSearch = '';
+        this.medicaoConsolidadoProtPrefix = '';
+        const input = document.getElementById('medicao-mat-prot-search-input');
+        if (input) input.value = '';
+        this.updateMedicaoMatProtPrefixUI();
+        const ind = document.getElementById('medicao-mat-prot-filter-indicator');
+        if (ind) ind.classList.add('hidden');
+        this.closeAllMedicaoFilterDropdowns();
+        this.renderMedicaoMensal();
+    }
+
+    renderMedicaoPorProtocolo() {
+        const tbody = document.getElementById('medicao-protocolos-tbody');
+        const emptyState = document.getElementById('medicao-protocolos-empty-state');
+        const badgeCount = document.getElementById('badge-count-protocolos-medicao');
+        if (!tbody) return;
+
+        const data = this.calcularMedicaoPorProtocolo();
+        this.medicaoProtocolosData = data.protocolos;
+
+        const searchTerm = this.normalizarTexto(this.medicaoProtocoloSearch);
+        const tipoFilter = this.medicaoProtocoloTipo || 'all';
+        const matFilter = this.normalizarTexto(this.medicaoMaterialFilter);
+        const colProtSearch = this.normalizarTexto(this.medicaoColProtocolSearch);
+        const protPrefix = (this.medicaoProtocolPrefix || '').toUpperCase();
+        const hasStatusFilter = this.medicaoStatusFilterList && this.medicaoStatusFilterList.length > 0;
+
+        // Indicador visual na coluna do filtro de materiais
+        const indMat = document.getElementById('medicao-mat-filter-indicator');
+        if (indMat) {
+            if (matFilter) indMat.classList.remove('hidden');
+            else indMat.classList.add('hidden');
+        }
+
+        // Indicador visual na coluna do filtro de protocolo
+        const indProt = document.getElementById('medicao-protocolo-filter-indicator');
+        if (indProt) {
+            if (colProtSearch || protPrefix) indProt.classList.remove('hidden');
+            else indProt.classList.add('hidden');
+        }
+
+        // Indicador visual na coluna do filtro de status
+        const indStatus = document.getElementById('medicao-status-filter-indicator');
+        if (indStatus) {
+            if (hasStatusFilter) indStatus.classList.remove('hidden');
+            else indStatus.classList.add('hidden');
+        }
+
+        const filtered = data.protocolos.filter(os => {
+            // 1. Filtro de Tipo Geral (da toolbar superior: all, praca, viaria)
+            if (tipoFilter === 'praca' && !os.isPraca) return false;
+            if (tipoFilter === 'viaria' && os.isPraca) return false;
+
+            // 2. Filtro de Prefixo de Protocolo na Coluna (Praça 'P' / Viária 'I')
+            if (protPrefix) {
+                const pUpper = String(os.protocolo || '').toUpperCase().trim();
+                const startsWithPrefix = pUpper.startsWith(protPrefix);
+                if (protPrefix === 'P' && !startsWithPrefix && !os.isPraca) return false;
+                if (protPrefix === 'I' && !startsWithPrefix && os.isPraca) return false;
+            }
+
+            // 3. Filtro de Busca Específica na Coluna de Protocolo
+            if (colProtSearch) {
+                if (!this.normalizarTexto(os.protocolo).includes(colProtSearch)) {
+                    return false;
+                }
+            }
+
+            // 4. Filtro de Status na Coluna
+            if (hasStatusFilter) {
+                if (this.medicaoStatusFilterList.includes('__none__')) return false;
+                if (!this.medicaoStatusFilterList.includes(os.normalizedStatus)) {
+                    return false;
+                }
+            }
+
+            // 5. Filtro de Material na Coluna (sem distinção de acentos ou maiúsculas/minúsculas)
+            if (matFilter) {
+                const matchMatFilter = os.materiais.some(m => 
+                    this.normalizarTexto(m.descricao).includes(matFilter) ||
+                    this.normalizarTexto(m.marca).includes(matFilter)
+                );
+                if (!matchMatFilter) return false;
+            }
+
+            // 6. Filtro Geral de Busca da Barra Superior (sem distinção de acentos)
+            if (searchTerm) {
+                const matchProt = this.normalizarTexto(os.protocolo).includes(searchTerm);
+                const matchEnd = this.normalizarTexto(os.endereco).includes(searchTerm);
+                const matchPraca = this.normalizarTexto(os.pracaNome).includes(searchTerm);
+                const matchProb = this.normalizarTexto(os.problema).includes(searchTerm);
+                const matchMat = os.materiais.some(m => 
+                    this.normalizarTexto(m.descricao).includes(searchTerm) ||
+                    this.normalizarTexto(m.marca).includes(searchTerm)
+                );
+
+                if (!matchProt && !matchEnd && !matchPraca && !matchProb && !matchMat) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        if (badgeCount) {
+            if (searchTerm || matFilter || tipoFilter !== 'all') {
+                badgeCount.textContent = `${filtered.length} de ${data.protocolos.length} OS(s)`;
+            } else {
+                badgeCount.textContent = `${filtered.length} OS(s) com materiais`;
+            }
+        }
+
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            if (emptyState) emptyState.classList.remove('hidden');
+            return;
+        }
+
+        if (emptyState) emptyState.classList.add('hidden');
+
+        filtered.forEach(os => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b border-outline-variant/60 hover:bg-purple-50/60 transition-colors align-top group cursor-pointer';
+            tr.onclick = (e) => {
+                if (e.target.closest('.btn-mapa-endereco')) {
+                    return;
+                }
+                window.abrirDetalhesOSModal(os.protocolo);
+            };
+
+            const stNorm = os.normalizedStatus;
+            let badgeSt = 'bg-blue-100 text-blue-800 border-blue-200';
+            if (stNorm === 'concluida') badgeSt = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+            else if (stNorm === 'cancelada' || stNorm === 'rejeitada') badgeSt = 'bg-rose-100 text-rose-800 border-rose-200';
+            else if (stNorm === 'pendente') badgeSt = 'bg-amber-100 text-amber-800 border-amber-200';
+
+            // Isolamento da quantidade de insumos por item em destaque
+            const materiaisChips = os.materiais.map(m => {
+                if (m.isMaoDeObra) {
+                    return `
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-amber-50 text-amber-950 border border-amber-300/80 shadow-2xs">
+                            <span class="px-1.5 py-0.5 rounded bg-amber-600 text-white font-mono font-bold text-[11px] shadow-xs shrink-0">${m.quantidade.toFixed(2)} H</span>
+                            <span class="font-semibold text-xs leading-tight">${m.descricao}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-surface-container-lowest text-slate-800 border border-outline-variant/70 shadow-2xs group-hover:border-purple-300 transition-colors">
+                            <span class="px-1.5 py-0.5 rounded bg-purple-700 text-white font-mono font-bold text-[11px] shadow-xs shrink-0">${m.quantidade}x</span>
+                            <span class="font-semibold text-xs leading-tight text-slate-800">${m.descricao}</span>
+                            ${m.marca && m.marca !== 'PRÓPRIO' ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 border border-purple-200 rounded shrink-0">${m.marca}</span>` : ''}
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            let enderecoHtml = '';
+            if (os.points && os.points.length > 1) {
+                const firstPoint = os.points[0];
+                const extraPoints = os.points.slice(1);
+                enderecoHtml = `
+                    <div class="flex flex-col gap-1 w-full">
+                        <div class="flex items-start gap-1.5 w-full">
+                            <button type="button" onclick="window.abrirMapaPonto('${os.protocolo}', 0, event)" class="btn-mapa-endereco inline-flex items-start gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir Ponto #1 no mapa Mapbox: ${firstPoint}">
+                                <span class="material-symbols-outlined text-[17px] text-secondary group-hover/loc:scale-110 transition-transform shrink-0 mt-0.5">location_on</span>
+                                <span class="font-medium group-hover/loc:underline text-xs leading-snug break-words text-left flex-1 min-w-0">${firstPoint}</span>
+                            </button>
+                            <button type="button" class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 shrink-0 border border-secondary/20" onclick="window.toggleInlinePoints(this, ${extraPoints.length}, event)" title="Expandir/Recolher pontos da OS">
+                                <span class="btn-text">+${extraPoints.length}</span>
+                                <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                            </button>
+                        </div>
+                        <div class="extra-points hidden flex-col gap-1.5 font-medium text-on-surface mt-1.5 w-full pl-2 border-l-2 border-secondary/30">
+                            ${extraPoints.map((p, idx) => `
+                                <button type="button" onclick="window.abrirMapaPonto('${os.protocolo}', ${idx + 1}, event)" class="btn-mapa-endereco inline-flex items-start gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir Ponto #${idx + 2} no mapa Mapbox: ${p}">
+                                    <span class="material-symbols-outlined text-[15px] text-secondary/80 group-hover/loc:scale-110 transition-transform shrink-0 mt-0.5">location_on</span>
+                                    <span class="font-medium group-hover/loc:underline text-xs leading-snug break-words text-left flex-1 min-w-0">${p}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                const pText = (os.points && os.points[0]) || os.endereco || 'Endereço não informado';
+                enderecoHtml = `
+                    <button type="button" onclick="window.abrirMapaPonto('${os.protocolo}', 0, event)" class="btn-mapa-endereco inline-flex items-start gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox: ${pText}">
+                        <span class="material-symbols-outlined text-[17px] text-secondary group-hover/loc:scale-110 transition-transform shrink-0 mt-0.5">location_on</span>
+                        <span class="font-medium group-hover/loc:underline text-xs leading-snug break-words text-left flex-1 min-w-0">${pText}</span>
+                    </button>
+                `;
+            }
+            if (os.problema) {
+                enderecoHtml += `<div class="text-[10px] text-slate-500 break-words leading-tight pl-6 mt-1" title="${os.problema}">${os.problema}</div>`;
+            }
+
+            tr.innerHTML = `
+                <td class="py-3 px-3 font-mono font-bold text-xs whitespace-nowrap align-top">
+                    <span class="text-secondary group-hover:underline font-bold" title="OS #${os.protocolo}">
+                        ${os.protocolo}
+                    </span>
+                </td>
+                <td class="py-3 px-3 whitespace-nowrap align-top">
+                    <span class="px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeSt}">
+                        ${os.status}
+                    </span>
+                </td>
+                <td class="py-3 px-2 font-mono font-bold text-xs text-on-surface whitespace-nowrap text-center align-top">
+                    ${os.dataRefStr}
+                </td>
+                <td class="py-3 px-3 text-xs text-on-surface align-top overflow-hidden">
+                    ${enderecoHtml}
+                </td>
+                <td class="py-3 px-4 align-top">
+                    <div class="flex flex-wrap gap-1.5 py-0.5 w-full">
+                        ${materiaisChips}
+                    </div>
+                </td>
+            `;
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    exportarMedicaoPorProtocoloCSV() {
+        const data = this.calcularMedicaoPorProtocolo();
+        if (!data.protocolos || data.protocolos.length === 0) {
+            alert('Nenhuma ordem de serviço com materiais disponível para o mês selecionado.');
+            return;
+        }
+
+        const headers = [
+            'Protocolo',
+            'Tipo OS',
+            'Status',
+            'Data Conclusão / Referência',
+            'Endereço / Praça',
+            'Problema',
+            'Marca Material / Serviço',
+            'Descrição Material / Serviço',
+            'Unidade',
+            'Quantidade Utilizada',
+            'Categoria / Origem',
+            'Técnico Responsável'
+        ];
+
+        let csvLines = [headers.join(';')];
+
+        data.protocolos.forEach(os => {
+            os.materiais.forEach(m => {
+                const qtdFmt = m.isMaoDeObra ? m.quantidade.toFixed(2) : m.quantidade;
+                const row = [
+                    this.escapeCSVCell(os.protocolo),
+                    this.escapeCSVCell(os.tipoLabel),
+                    this.escapeCSVCell(os.status),
+                    this.escapeCSVCell(os.dataRefStr),
+                    this.escapeCSVCell(os.endereco),
+                    this.escapeCSVCell(os.problema),
+                    this.escapeCSVCell(m.marca),
+                    this.escapeCSVCell(m.descricao),
+                    this.escapeCSVCell(m.unidade),
+                    this.escapeCSVCell(qtdFmt),
+                    this.escapeCSVCell(m.categoria),
+                    this.escapeCSVCell(os.tecnico)
+                ];
+                csvLines.push(row.join(';'));
+            });
+        });
+
+        const periodLabel = this.medicaoFilters.selectedMonth || 'Mes_Atual';
+        const dateStr = new Date().toISOString().split('T')[0];
+        this.downloadCSV(`Medicao_Mensal_Por_Protocolo_${periodLabel}_${dateStr}.csv`, csvLines.join('\n'));
+    }
+
+    exportarMedicaoAtivaCSV() {
+        if (this.medicaoSubView === 'protocolo') {
+            this.exportarMedicaoPorProtocoloCSV();
+        } else {
+            this.exportarMedicaoMensalCSV();
+        }
     }
 
     setupEventListeners() {
@@ -1331,6 +2173,91 @@ class RelatorioController {
             });
         }
 
+        // =========================================================================
+        // CONTROLE DE BUSCA E FILTROS DA VISÃO POR PROTOCOLO (OS)
+        // =========================================================================
+        const inputProtSearch = document.getElementById('medicao-protocolo-search');
+        if (inputProtSearch) {
+            inputProtSearch.addEventListener('input', (e) => {
+                this.medicaoProtocoloSearch = e.target.value.toLowerCase().trim();
+                const btnClear = document.getElementById('btn-clear-protocolo-search');
+                if (btnClear) {
+                    if (this.medicaoProtocoloSearch) btnClear.classList.remove('hidden');
+                    else btnClear.classList.add('hidden');
+                }
+                this.renderMedicaoPorProtocolo();
+            });
+        }
+
+        const selectProtTipo = document.getElementById('medicao-protocolo-tipo-filter');
+        if (selectProtTipo) {
+            selectProtTipo.addEventListener('change', (e) => {
+                this.medicaoProtocoloTipo = e.target.value;
+                this.renderMedicaoPorProtocolo();
+            });
+        }
+
+        const inputMatColSearch = document.getElementById('medicao-mat-search-input');
+        if (inputMatColSearch) {
+            inputMatColSearch.addEventListener('input', (e) => {
+                this.medicaoMaterialFilter = e.target.value.toLowerCase().trim();
+                this.renderMedicaoPorProtocolo();
+            });
+        }
+
+        const inputProtColSearch = document.getElementById('medicao-protocol-search-col-input');
+        if (inputProtColSearch) {
+            inputProtColSearch.addEventListener('input', (e) => {
+                this.medicaoColProtocolSearch = e.target.value.trim();
+                this.renderMedicaoPorProtocolo();
+            });
+        }
+
+        const statusAllCb = document.getElementById('medicao-status-cb-all');
+        if (statusAllCb) {
+            statusAllCb.addEventListener('change', (e) => this.onMedicaoStatusAllChange(e));
+        }
+
+        document.querySelectorAll('.medicao-status-cb').forEach(cb => {
+            cb.addEventListener('change', () => this.onMedicaoStatusCheckboxChange());
+        });
+
+        const inputMatDescSearch = document.getElementById('medicao-mat-desc-search-input');
+        if (inputMatDescSearch) {
+            inputMatDescSearch.addEventListener('input', (e) => {
+                this.medicaoConsolidadoDescFilter = e.target.value.trim();
+                this.renderMedicaoMensal();
+            });
+        }
+
+        const inputMatProtSearch = document.getElementById('medicao-mat-prot-search-input');
+        if (inputMatProtSearch) {
+            inputMatProtSearch.addEventListener('input', (e) => {
+                this.medicaoConsolidadoProtSearch = e.target.value.trim();
+                this.renderMedicaoMensal();
+            });
+        }
+
+        // Fecha todos os dropdowns de filtro da medição ao clicar fora
+        document.addEventListener('click', (e) => {
+            const dropdownIds = [
+                { dropId: 'medicao-mat-filter-dropdown', trigId: 'medicao-mat-filter-trigger' },
+                { dropId: 'medicao-protocol-filter-dropdown', trigId: 'medicao-protocolo-col-filter-trigger' },
+                { dropId: 'medicao-status-filter-dropdown', trigId: 'medicao-status-col-filter-trigger' },
+                { dropId: 'medicao-mat-desc-filter-dropdown', trigId: 'medicao-mat-desc-filter-trigger' },
+                { dropId: 'medicao-mat-prot-filter-dropdown', trigId: 'medicao-mat-prot-filter-trigger' }
+            ];
+
+            dropdownIds.forEach(({ dropId, trigId }) => {
+                const drop = document.getElementById(dropId);
+                const trig = document.getElementById(trigId);
+                if (drop && trig && !drop.contains(e.target) && !trig.contains(e.target)) {
+                    drop.style.display = 'none';
+                    drop.classList.add('hidden');
+                }
+            });
+        });
+
         // Select All / Deselect All columns handler
         const selectAllCols = document.getElementById('btn-select-all-cols');
         const deselectAllCols = document.getElementById('btn-deselect-all-cols');
@@ -1344,6 +2271,15 @@ class RelatorioController {
                 document.querySelectorAll('.col-checkbox').forEach(cb => cb.checked = false);
             });
         }
+
+        // Listener global para fechar o dropdown de materiais do lote ao clicar fora
+        document.addEventListener('click', (e) => {
+            const input = document.getElementById('input-novo-material-lote');
+            const dropdown = document.getElementById('dropdown-materiais-lote');
+            if (dropdown && input && !dropdown.contains(e.target) && !input.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     }
 
     // =========================================================================
@@ -2266,9 +3202,460 @@ class RelatorioController {
         const dateStr = new Date().toISOString().split('T')[0];
         this.downloadCSV(`Relatorio_OS_Filtrado_Personalizado_${dateStr}.csv`, csvLines.join('\n'));
     }
+
+    /**
+     * Carrega a lista oficial de materiais do contrato Supabase (tabela materiais_contrato)
+     */
+    async carregarMateriaisContrato() {
+        try {
+            const client = window.supabaseClient || (typeof window.obterSupabaseClient === 'function' ? window.obterSupabaseClient() : null);
+            if (!client) return;
+
+            const { data, error } = await client
+                .from('materiais_contrato')
+                .select('*');
+
+            if (!error && data && data.length > 0) {
+                this.materiaisContratoCache = data;
+            }
+        } catch (e) {
+            console.warn('⚠️ [RelatorioController] Falha ao carregar materiais_contrato:', e);
+        }
+    }
+
+    /**
+     * Exibe o dropdown com todas as opções de materiais do contrato para substituição em lote
+     */
+    mostrarTodosMateriaisLote() {
+        const input = document.getElementById('input-novo-material-lote');
+        const filterVal = input ? input.value.trim().toLowerCase() : '';
+        this.renderDropdownMateriaisLote(filterVal);
+    }
+
+    /**
+     * Filtra o dropdown de materiais do contrato conforme digitação
+     */
+    filtrarMateriaisLote() {
+        const input = document.getElementById('input-novo-material-lote');
+        const filterVal = input ? input.value.trim().toLowerCase() : '';
+        this.renderDropdownMateriaisLote(filterVal);
+    }
+
+    /**
+     * Renderiza o menu suspenso de sugestões (estilo dropdown-lista do Finalizar.html)
+     */
+    renderDropdownMateriaisLote(filterText = '') {
+        const dropdown = document.getElementById('dropdown-materiais-lote');
+        if (!dropdown) return;
+
+        dropdown.innerHTML = '';
+
+        if (!this.materiaisContratoCache || this.materiaisContratoCache.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        const filtered = this.materiaisContratoCache.filter(row => {
+            const dbDesc = (row['Material/Serviço'] || row.Material || row.Serviço || row.descricao || row.nome || row.material || row.item || row['material_servico'] || row['material/servico'] || '').trim();
+            const dbMarca = (row.Marca || row.marca || row.Fabricante || row.fabricante || '').trim();
+            const fullText = `${dbMarca} ${dbDesc}`.toLowerCase();
+            return !filterText || fullText.includes(filterText);
+        });
+
+        if (filtered.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+
+        filtered.slice(0, 40).forEach(row => {
+            const dbDesc = (row['Material/Serviço'] || row.Material || row.Serviço || row.descricao || row.nome || row.material || row.item || row['material_servico'] || row['material/servico'] || '').trim();
+            const dbMarca = (row.Marca || row.marca || row.Fabricante || row.fabricante || '').trim();
+            const dbUnid = (row['Unidade de Medida'] || row.Unidade || row.unidade || row.und || '').trim();
+            const labelStr = dbMarca ? `${dbMarca} - ${dbDesc} (${dbUnid || 'UN'})` : `${dbDesc} (${dbUnid || 'UN'})`;
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'dropdown-item flex items-center justify-between gap-2';
+            itemDiv.innerHTML = `
+                <div class="flex items-center gap-2 min-w-0">
+                    <span class="material-symbols-outlined text-[16px] text-purple-600 shrink-0">inventory_2</span>
+                    <span class="truncate font-semibold text-slate-800 text-xs">${labelStr}</span>
+                </div>
+                ${dbMarca ? `<span class="text-[10px] font-mono font-bold uppercase bg-purple-100 text-purple-800 px-1.5 py-0.5 rounded border border-purple-200 shrink-0">${dbMarca}</span>` : ''}
+            `;
+
+            itemDiv.onmousedown = (e) => {
+                e.preventDefault();
+                const input = document.getElementById('input-novo-material-lote');
+                if (input) input.value = labelStr;
+                dropdown.style.display = 'none';
+            };
+
+            dropdown.appendChild(itemDiv);
+        });
+
+        dropdown.style.display = 'block';
+    }
+
+    /**
+     * Sincroniza o estado do checkbox "Selecionar Todos para Lote" com os itens individuais
+     */
+    atualizarCheckboxSelecionarTodos() {
+        const checkboxes = Array.from(document.querySelectorAll('#tbody-protocolos-item .chk-protocolo-lote'));
+        const checkedBoxes = Array.from(document.querySelectorAll('#tbody-protocolos-item .chk-protocolo-lote:checked'));
+        const chkMaster = document.getElementById('chk-selecionar-todos-protocolos');
+        if (chkMaster) {
+            chkMaster.checked = (checkboxes.length > 0 && checkedBoxes.length === checkboxes.length);
+            chkMaster.indeterminate = (checkedBoxes.length > 0 && checkedBoxes.length < checkboxes.length);
+        }
+    }
+
+    /**
+     * Abre o modal de Detalhamento e Substituição em Lote para um item do relatório de medição
+     * @param {Object} item - Objeto do item agregador
+     */
+    abrirModalDetalhesMedicao(item) {
+        if (!item) return;
+        this.selectedMedicaoItem = item;
+
+        const modal = document.getElementById('modal-detalhes-medicao');
+        const elMarca = document.getElementById('info-modal-marca');
+        const elDesc = document.getElementById('info-modal-descricao');
+        const elQtdTotal = document.getElementById('info-modal-qtd-total');
+        const elCountOSs = document.getElementById('info-modal-count-oss');
+        const elCategoria = document.getElementById('badge-item-categoria');
+        const inputNovoMat = document.getElementById('input-novo-material-lote');
+        const inputQtdDe = document.getElementById('input-qtd-de-lote');
+        const inputQtdPara = document.getElementById('input-qtd-para-lote');
+        const tbodyProt = document.getElementById('tbody-protocolos-item');
+
+        if (elMarca) elMarca.textContent = item.marca || 'PRÓPRIO';
+        if (elDesc) elDesc.textContent = item.descricao || 'Item sem descrição';
+        if (elQtdTotal) elQtdTotal.textContent = (item.unidade === 'H' ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal.toLocaleString('pt-BR')) + ' ' + item.unidade;
+        if (elCountOSs) elCountOSs.textContent = `${item.protocolosSet.size} OS(s)`;
+        if (elCategoria) elCategoria.textContent = item.categoria || 'Material';
+        if (inputNovoMat) inputNovoMat.value = '';
+        if (inputQtdDe) inputQtdDe.value = '1';
+        if (inputQtdPara) inputQtdPara.value = '1';
+
+        // Esconde dropdown prévio
+        const dropdownLote = document.getElementById('dropdown-materiais-lote');
+        if (dropdownLote) dropdownLote.style.display = 'none';
+
+        // Preenche a tabela de protocolos afetados
+        if (tbodyProt) {
+            tbodyProt.innerHTML = '';
+            const protArray = Array.from(item.protocolosSet);
+
+            // Filtra os chamados correspondentes na lista principal
+            const chamadosEnvolvidos = this.chamadosList.filter(ch => protArray.includes(ch.protocolo) || protArray.includes(ch.id));
+
+            if (chamadosEnvolvidos.length === 0) {
+                tbodyProt.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-6 text-center text-slate-500 italic">Nenhum protocolo encontrado na memória local.</td>
+                    </tr>
+                `;
+            } else {
+                chamadosEnvolvidos.forEach(chamado => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-100 hover:bg-purple-50/60 transition-colors align-middle cursor-pointer group';
+                    
+                    // Permite abrir os detalhes da OS ao clicar em qualquer lugar da linha (exceto checkbox e botões)
+                    tr.onclick = (e) => {
+                        if (e.target.tagName === 'INPUT' || e.target.closest('input') || e.target.closest('button')) return;
+                        window.abrirDetalhesOSModal(chamado.protocolo);
+                    };
+
+                    const isPraca = chamado.isPraca;
+                    const stNorm = chamado.normalizedStatus;
+
+                    let badgeSt = 'bg-blue-100 text-blue-800 border-blue-200';
+                    if (stNorm === 'concluida') badgeSt = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                    else if (stNorm === 'cancelada' || stNorm === 'rejeitada') badgeSt = 'bg-rose-100 text-rose-800 border-rose-200';
+                    else if (stNorm === 'pendente') badgeSt = 'bg-amber-100 text-amber-800 border-amber-200';
+
+                    // Problema Encontrado com formatação e badge idêntico ao AuditoriaController
+                    const rawProblemText = chamado.problemaEncontrado || chamado.problemaInicial || 'Outros problemas';
+                    const problemText = (window.ChamadoModel && window.ChamadoModel.formatLocationText)
+                        ? window.ChamadoModel.formatLocationText(rawProblemText)
+                        : String(rawProblemText).trim();
+                    const probLower = problemText.toLowerCase();
+
+                    let problemBgColor = 'bg-slate-100 text-slate-700 border border-slate-200';
+                    if (probLower.includes('queimada') || probLower.includes('apagada') || probLower.includes('intermitente') || probLower.includes('sem luz')) {
+                        problemBgColor = 'bg-[#fef3c7] text-[#92400e] border border-amber-200';
+                    } else if (probLower.includes('acesa')) {
+                        problemBgColor = 'bg-[#dbeafe] text-[#1e40af] border border-blue-200';
+                    } else if (probLower.includes('quebrada') || probLower.includes('braço') || probLower.includes('braco') || probLower.includes('danificada')) {
+                        problemBgColor = 'bg-[#ffedd5] text-[#9a3412] border border-orange-200';
+                    } else if (probLower.includes('nenhum')) {
+                        problemBgColor = 'bg-[#d1fae5] text-[#065f46] border border-emerald-200';
+                    }
+
+                    // Calcula a quantidade deste item específico nesta OS
+                    let qtdItemNestaOS = 0;
+                    const rawMats = (chamado.materiaisConsolidados && chamado.materiaisConsolidados.length > 0)
+                        ? chamado.materiaisConsolidados
+                        : (chamado.materialsList || []);
+                    
+                    rawMats.forEach(m => {
+                        let mStr = typeof m === 'string' ? m : (m.nome || m.descricao || m.material || '');
+                        let mQtd = typeof m === 'object' ? (m.qtd || m.quantidade || 1) : 1;
+                        if (typeof m === 'string') {
+                            const matchX = mStr.match(/\(x(\d+)\)/i);
+                            if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                        }
+                        const resolved = this.resolveMarcaEMaterial(mStr);
+                        if (resolved.desc.toUpperCase() === item.descricao.toUpperCase() || mStr.toUpperCase().includes(item.descricao.toUpperCase())) {
+                            qtdItemNestaOS += Number(mQtd);
+                        }
+                    });
+
+                    if (qtdItemNestaOS === 0) qtdItemNestaOS = 1;
+
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3.5 text-center" onclick="event.stopPropagation()">
+                            <input type="checkbox" class="chk-protocolo-lote rounded text-purple-700 focus:ring-purple-600 cursor-pointer" data-protocolo="${chamado.protocolo}" checked onchange="window.relatorioController.atualizarCheckboxSelecionarTodos()" />
+                        </td>
+                        <td class="py-2.5 px-3.5 font-mono font-bold text-slate-800 group-hover:text-purple-700 transition-colors">
+                            <span class="underline underline-offset-2 decoration-purple-300">${chamado.protocolo}</span>
+                        </td>
+                        <td class="py-2.5 px-3.5 whitespace-nowrap">
+                            <div class="flex items-center gap-1.5">
+                                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${isPraca ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}">${isPraca ? 'Praça' : 'Viária'}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeSt}">${chamado.statusBadgeLabel || chamado.status}</span>
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3.5 whitespace-nowrap">
+                            <span class="px-2.5 py-1 rounded-full text-[11px] font-bold inline-block text-center shadow-2xs ${problemBgColor}">
+                                ${problemText}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3.5 max-w-[220px] truncate text-slate-600 font-medium" title="${chamado.endereco}">
+                            ${chamado.endereco || 'Sem endereço'}
+                        </td>
+                        <td class="py-2.5 px-3.5 text-center font-mono font-bold text-purple-700">
+                            ${qtdItemNestaOS} ${item.unidade}
+                        </td>
+                    `;
+
+                    tbodyProt.appendChild(tr);
+                });
+            }
+        }
+
+        this.atualizarCheckboxSelecionarTodos();
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    fecharModalDetalhesMedicao() {
+        const modal = document.getElementById('modal-detalhes-medicao');
+        if (modal) modal.classList.add('hidden');
+        this.selectedMedicaoItem = null;
+    }
+
+    toggleSelecionarTodosProtocolos(checked) {
+        const checkboxes = document.querySelectorAll('#tbody-protocolos-item .chk-protocolo-lote');
+        checkboxes.forEach(cb => cb.checked = checked);
+    }
+
+    /**
+     * Executa a substituição do item em lote nos protocolos selecionados
+     */
+    async executarSubstituicaoLote() {
+        if (!this.selectedMedicaoItem) {
+            alert('Nenhum item selecionado para substituição.');
+            return;
+        }
+
+        const inputNovoMat = document.getElementById('input-novo-material-lote');
+        const inputQtdDe = document.getElementById('input-qtd-de-lote');
+        const inputQtdPara = document.getElementById('input-qtd-para-lote');
+        const btnExecutar = document.getElementById('btn-executar-substituicao-lote');
+
+        const novoMatValue = inputNovoMat ? inputNovoMat.value.trim() : '';
+        const qtdDe = inputQtdDe ? (parseInt(inputQtdDe.value, 10) || 1) : 1;
+        const qtdPara = inputQtdPara ? (parseInt(inputQtdPara.value, 10) || 1) : 1;
+
+        if (!novoMatValue) {
+            alert('Por favor, digite ou selecione o novo material para realizar a substituição em lote.');
+            if (inputNovoMat) inputNovoMat.focus();
+            return;
+        }
+
+        const checkboxes = Array.from(document.querySelectorAll('#tbody-protocolos-item .chk-protocolo-lote:checked'));
+        if (checkboxes.length === 0) {
+            alert('Selecione pelo menos um protocolo na lista para aplicar a substituição.');
+            return;
+        }
+
+        const itemAntigoDesc = this.selectedMedicaoItem.descricao;
+        const numProtocolos = checkboxes.length;
+
+        const confirmMsg = `Tem certeza que deseja substituir o item:\n\n` +
+            `❌ ITEM ORIGINAL: "${itemAntigoDesc}"\n` +
+            `✅ NOVO ITEM: "${novoMatValue}"\n\n` +
+            `📊 QUANTIDADE: De ${qtdDe} para ${qtdPara}\n\n` +
+            `em ${numProtocolos} protocolo(s) selecionado(s)?\n\n` +
+            `Esta alteração atualizará os registros do banco de dados e gravará o histórico de auditamento com seu usuário.`;
+
+        if (!confirm(confirmMsg)) return;
+
+        if (btnExecutar) {
+            btnExecutar.disabled = true;
+            btnExecutar.innerHTML = `<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Substituindo...`;
+        }
+
+        try {
+            let sucessos = 0;
+
+            for (const cb of checkboxes) {
+                const protStr = cb.getAttribute('data-protocolo');
+                const chamado = this.chamadosList.find(c => c.protocolo === protStr || c.id === protStr);
+
+                if (!chamado) continue;
+
+                if (chamado.fechamentosList && chamado.fechamentosList.length > 0) {
+                    for (const fech of chamado.fechamentosList) {
+                        let matArr = Array.isArray(fech.materiais) ? [...fech.materiais] : [];
+                        let alterouFech = false;
+
+                        let novosMats = matArr.map(mItem => {
+                            let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
+                            let mQtd = typeof mItem === 'object' ? (mItem.qtd || mItem.quantidade || 1) : 1;
+
+                            if (typeof mItem === 'string') {
+                                const matchX = mNome.match(/\(x(\d+)\)/i);
+                                if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                            }
+
+                            const resolved = this.resolveMarcaEMaterial(mNome);
+                            if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
+                                alterouFech = true;
+                                return {
+                                    nome: novoMatValue,
+                                    qtd: qtdPara
+                                };
+                            }
+                            return mItem;
+                        });
+
+                        if (alterouFech) {
+                            await this.service.updateMaterial(chamado.protocolo, novosMats, fech.id, fech.numero);
+                        }
+                    }
+                } else {
+                    let matArr = Array.isArray(chamado.materialsList) ? [...chamado.materialsList] : (chamado.materialUtilizado ? [chamado.materialUtilizado] : []);
+                    let alterouOS = false;
+
+                    let novosMats = matArr.map(mItem => {
+                        let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
+                        let mQtd = typeof mItem === 'object' ? (mItem.qtd || mItem.quantidade || 1) : 1;
+
+                        if (typeof mItem === 'string') {
+                            const matchX = mNome.match(/\(x(\d+)\)/i);
+                            if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                        }
+
+                        const resolved = this.resolveMarcaEMaterial(mNome);
+                        if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
+                            alterouOS = true;
+                            return {
+                                nome: novoMatValue,
+                                qtd: qtdPara
+                            };
+                        }
+                        return mItem;
+                    });
+
+                    if (alterouOS) {
+                        await this.service.updateMaterial(chamado.protocolo, novosMats);
+                    }
+                }
+
+                // Registra o Log de Auditoria em Lote
+                if (window.LogsRepository) {
+                    await window.LogsRepository.registrarLog({
+                        protocolo: chamado.protocolo,
+                        tabelaOrigem: chamado.isPraca ? 'ordens_servico_pracas' : 'ordens_servico',
+                        tipoAcao: 'ALTERACAO_MATERIAL_EM_LOTE',
+                        descricao: `Substituição em lote no Relatório de Medição: "${itemAntigoDesc}" alterado para "${novoMatValue}" (De ${qtdDe} para ${qtdPara})`,
+                        dadosAnteriores: { material_anterior: itemAntigoDesc, quantidade_de: qtdDe },
+                        dadosNovos: { material_novo: novoMatValue, quantidade_para: qtdPara },
+                        origemTela: 'Relatorio - Medicao'
+                    });
+                }
+
+                sucessos++;
+            }
+
+            alert(`✅ Substituição em lote realizada com sucesso em ${sucessos} protocolo(s)!`);
+            this.fecharModalDetalhesMedicao();
+
+            await this.loadData();
+        } catch (err) {
+            console.error('❌ [RelatorioController] Erro ao executar substituição em lote:', err);
+            alert('⚠️ Ocorreu uma falha ao processar algumas alterações. Verifique o console para detalhes.');
+        } finally {
+            if (btnExecutar) {
+                btnExecutar.disabled = false;
+                btnExecutar.innerHTML = `<span class="material-symbols-outlined text-[18px]">transform</span><span>Mudar em Lote</span>`;
+            }
+        }
+    }
+
 }
 
 window.RelatorioController = RelatorioController;
+
+// Global helper for OS detail modal router across controllers
+window.abrirDetalhesOSModal = function(id) {
+    if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+        if (!window.auditoriaController.chamadosList || window.auditoriaController.chamadosList.length === 0) {
+            if (window.relatorioController && window.relatorioController.chamadosList) {
+                window.auditoriaController.chamadosList = window.relatorioController.chamadosList;
+            }
+        }
+        return window.auditoriaController.abrirDetalhesOSModal(id);
+    }
+    if (window.painelController && typeof window.painelController.abrirDetalhesOSModal === 'function') {
+        return window.painelController.abrirDetalhesOSModal(id);
+    }
+    if (typeof window.abrirModalDetalhesPrincipal === 'function') {
+        window.abrirModalDetalhesPrincipal(id);
+    } else {
+        console.warn('Controller não encontrado para abrir detalhes da OS:', id);
+    }
+};
+
+if (typeof window.toggleInlinePoints !== 'function') {
+    window.toggleInlinePoints = function(btn, extraCount, event) {
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
+        const container = btn.closest('td');
+        if (!container) return;
+        const extraPoints = container.querySelector('.extra-points');
+        const btnText = btn.querySelector('.btn-text');
+        const btnIcon = btn.querySelector('.btn-icon');
+
+        if (extraPoints) {
+            const isHidden = extraPoints.classList.contains('hidden');
+            if (isHidden) {
+                extraPoints.classList.remove('hidden');
+                extraPoints.classList.add('flex');
+                if (btnText) btnText.textContent = 'Recolher';
+                if (btnIcon) btnIcon.textContent = 'expand_less';
+            } else {
+                extraPoints.classList.add('hidden');
+                extraPoints.classList.remove('flex');
+                if (btnText) btnText.textContent = `+${extraCount}`;
+                if (btnIcon) btnIcon.textContent = 'expand_more';
+            }
+        }
+    };
+}
 
 function initController() {
     if (!window.relatorioController) {

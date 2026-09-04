@@ -88,6 +88,7 @@ class AppSidebar extends HTMLElement {
             { id: 'auditoria', label: 'Auditoria', icon: 'fact_check', href: 'Auditoria.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
             { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
+            { id: 'fotos', label: 'Banco de Fotos', icon: 'photo_library', href: 'Fotos.html' },
             { id: 'plaquetas', label: 'Plaquetas', icon: 'pin_drop', href: 'Controle-Plaquetas.html' },
             { id: 'configuracoes', label: 'Configurações', icon: 'settings', href: '#', mtAuto: true },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";' }
@@ -351,13 +352,33 @@ window.addEventListener('message', (event) => {
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
         } else if (event.data.action === 'FECHAR_MODAL_FINALIZAR') {
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
+        } else if (event.data.action === 'OS_CRIADA_SILENCIOSO') {
+            // A OS foi cadastrada no banco e o formulário exibiu o popup com o número do protocolo.
+            // Atualiza os dados das telas em segundo plano SEM fechar o modal, permitindo que o usuário visualize o protocolo com calma.
+            if (window.painelController && typeof window.painelController.loadData === 'function') {
+                window.painelController.loadData();
+            } else if (typeof window.carregarChamados === 'function') {
+                window.carregarChamados();
+            } else if (typeof window.applyCombinedFilters === 'function') {
+                window.applyCombinedFilters();
+            }
+
+            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                window.auditoriaController.loadData();
+            } else if (typeof window.carregarDadosAuditoria === 'function') {
+                window.carregarDadosAuditoria();
+            }
+
+            if (typeof window.carregarMapaOSsAbertas === 'function') {
+                window.carregarMapaOSsAbertas(true);
+            }
         } else if (
             event.data.action === 'OS_CRIADA_SUCESSO' ||
-            event.data.action === 'OS_CRIADA_SILENCIOSO' ||
             event.data.action === 'OS_CONCLUIDA_SUCESSO' ||
             event.data.action === 'OS_EDITADA_SUCESSO' ||
             event.data.action === 'OS_CANCELADA_SUCESSO'
         ) {
+            // Fechamento definitivo do modal após confirmação do usuário no popup
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
 
@@ -400,6 +421,7 @@ function loadScriptIfNeeded(src) {
     else if (cleanSrc.includes('AuditoriaController')) expectedGlobal = 'AuditoriaController';
     else if (cleanSrc.includes('PainelController')) expectedGlobal = 'PainelController';
     else if (cleanSrc.includes('RelatorioController')) expectedGlobal = 'RelatorioController';
+    else if (cleanSrc.includes('FotosController')) expectedGlobal = 'FotosController';
 
     const existingScript = Array.from(document.querySelectorAll('script')).find(s => {
         const sSrc = s.getAttribute('src');
@@ -431,6 +453,7 @@ function updateSidebarActiveState(targetUrl) {
     let activeId = 'painel';
     if (lower.includes('manutentor')) activeId = 'painel-manutentor';
     else if (lower.includes('auditoria')) activeId = 'auditoria';
+    else if (lower.includes('foto')) activeId = 'fotos';
     else if (lower.includes('plaqueta')) activeId = 'plaquetas';
     else if (lower.includes('mapa')) activeId = 'mapa';
     else if (lower.includes('relat')) activeId = 'relatorios';
@@ -523,6 +546,14 @@ function reinitPageControllers(targetUrl) {
             window.relatorioController.init();
         } else {
             console.warn('⚠️ [SPA] RelatorioController não disponível para inicialização.');
+        }
+    } else if (page.includes('foto')) {
+        const Controller = window.FotosController || (typeof FotosController !== 'undefined' ? FotosController : null);
+        if (Controller) {
+            window.fotosController = new Controller();
+            window.fotosController.init();
+        } else {
+            console.warn('⚠️ [SPA] FotosController não disponível para inicialização.');
         }
     }
 }
@@ -670,11 +701,120 @@ window.navigateSPA = async function(targetUrl, pushState = true) {
         // Reiniciar controller correspondente
         reinitPageControllers(targetUrl);
 
+        // Re-inicializar botão flutuante de scroll
+        if (typeof window.initScrollToBottomButton === 'function') {
+            window.initScrollToBottomButton();
+        }
+
     } catch (err) {
         console.warn('⚠️ Falha no carregamento SPA:', err);
         window.location.href = targetUrl;
     }
 };
+
+/**
+ * Global Scroll Floating Action Button (FAB) Initialization
+ * Gerencia o botão flutuante de rolar até o fundo/topo nos painéis da aplicação
+ */
+window.initScrollToBottomButton = function() {
+    let scrollBtn = document.getElementById('btn-scroll-bottom');
+    if (!scrollBtn) {
+        scrollBtn = document.createElement('button');
+        scrollBtn.id = 'btn-scroll-bottom';
+        scrollBtn.className = 'fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center cursor-pointer opacity-0 pointer-events-none group border border-white/20';
+        scrollBtn.setAttribute('title', 'Rolar até o fundo');
+        scrollBtn.setAttribute('aria-label', 'Rolar até o fundo');
+        scrollBtn.setAttribute('onclick', 'window.handleScrollFABClick()');
+        scrollBtn.innerHTML = `<span id="btn-scroll-bottom-icon" class="material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5">arrow_downward</span>`;
+        document.body.appendChild(scrollBtn);
+    } else if (scrollBtn.parentElement !== document.body) {
+        document.body.appendChild(scrollBtn);
+    }
+
+    const mainContent = document.getElementById('main-content');
+    if (!mainContent) return;
+
+    const updateVisibility = () => {
+        const container = document.getElementById('main-content') || document.documentElement;
+        const scrollTop = container.scrollTop || window.scrollY || 0;
+        const scrollHeight = container.scrollHeight || document.documentElement.scrollHeight || 0;
+        const clientHeight = container.clientHeight || window.innerHeight || 0;
+
+        const btn = document.getElementById('btn-scroll-bottom');
+        const icon = document.getElementById('btn-scroll-bottom-icon');
+        if (!btn) return;
+
+        // Exibe o botão apenas se o conteúdo for maior que a tela visível por pelo menos 50px
+        const isScrollable = scrollHeight > clientHeight + 50;
+
+        if (isScrollable) {
+            btn.classList.remove('opacity-0', 'pointer-events-none');
+            btn.classList.add('opacity-100', 'pointer-events-auto');
+
+            const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 120);
+
+            if (isNearBottom) {
+                btn.setAttribute('title', 'Rolar até o topo');
+                btn.setAttribute('aria-label', 'Rolar até o topo');
+                if (icon) {
+                    icon.textContent = 'arrow_upward';
+                    icon.className = 'material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:-translate-y-0.5';
+                }
+            } else {
+                btn.setAttribute('title', 'Rolar até o fundo');
+                btn.setAttribute('aria-label', 'Rolar até o fundo');
+                if (icon) {
+                    icon.textContent = 'arrow_downward';
+                    icon.className = 'material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5';
+                }
+            }
+        } else {
+            btn.classList.remove('opacity-100', 'pointer-events-auto');
+            btn.classList.add('opacity-0', 'pointer-events-none');
+        }
+    };
+
+    window.handleScrollFABClick = function() {
+        const container = document.getElementById('main-content') || document.documentElement;
+        const target = document.getElementById('main-content') || window;
+        const scrollTop = container.scrollTop || window.scrollY || 0;
+        const scrollHeight = container.scrollHeight || document.documentElement.scrollHeight || 0;
+        const clientHeight = container.clientHeight || window.innerHeight || 0;
+
+        const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 120);
+
+        if (isNearBottom) {
+            if (target.scrollTo) {
+                target.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                target.scrollTop = 0;
+            }
+        } else {
+            if (target.scrollTo) {
+                target.scrollTo({ top: container.scrollHeight || scrollHeight, behavior: 'smooth' });
+            } else {
+                target.scrollTop = container.scrollHeight || scrollHeight;
+            }
+        }
+    };
+
+    mainContent.removeEventListener('scroll', updateVisibility);
+    mainContent.addEventListener('scroll', updateVisibility, { passive: true });
+    window.removeEventListener('resize', updateVisibility);
+    window.addEventListener('resize', updateVisibility, { passive: true });
+
+    updateVisibility();
+    setTimeout(updateVisibility, 300);
+    setTimeout(updateVisibility, 1000);
+    setTimeout(updateVisibility, 2500);
+};
+
+// Auto-inicialização na carga do documento
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => window.initScrollToBottomButton());
+} else {
+    window.initScrollToBottomButton();
+}
 
 // Intercepta cliques nos links da sidebar e navegação interna da aplicação
 document.addEventListener('click', (e) => {
@@ -687,7 +827,7 @@ document.addEventListener('click', (e) => {
     // Se for link para páginas HTML internas do app (Painel.html, Auditoria.html, Mapa.html, Painel-Manutentor.html)
     if (href.endsWith('.html') || href.includes('.html?')) {
         const cleanHref = href.split('?')[0].toLowerCase();
-        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor') || cleanHref.includes('relat')) {
+        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor') || cleanHref.includes('relat') || cleanHref.includes('foto')) {
             e.preventDefault();
             window.navigateSPA(href, true);
         }
@@ -702,4 +842,5 @@ if (!window._spaPopstateBound) {
         window.navigateSPA(page + window.location.search, false);
     });
 }
+
 

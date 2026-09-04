@@ -110,7 +110,7 @@ class ChamadoModel {
         this.problemaEncontrado = probFinExtraido || data.problema_encontrado || (ptsFinal && ptsFinal[0]?.problema) || '';
         this.qtdInicial = parseInt(data.qtd_inicial, 10) || (ptsInicial ? ptsInicial.length : (data.quantidade ? parseInt(data.quantidade, 10) : 1));
         this.qtdFinal = parseInt(data.qtd_final, 10) || (ptsFinal ? ptsFinal.length : this.qtdInicial);
-        this.endereco = endExtraido;
+        this.endereco = ChamadoModel.isValidLocationText(endExtraido) ? endExtraido : '';
         this.coordenadaInicial = coordExtraida;
         this.coordenadaReparo = coordRepExtraida;
         this.descricao = data.descricao || data.observacao || data.observacoes || data.obs || '';
@@ -148,6 +148,45 @@ class ChamadoModel {
             if (part) return part;
         }
         return full;
+    }
+
+    /**
+     * Formata o texto do motivo de pendência/aprovação, transformando qualquer protocolo
+     * mencionado (ex: #IP3IM2M050826) em botão interativo para abrir os detalhes daquela OS.
+     * @param {string} motivo Texto do motivo
+     * @param {object} options { isTable: boolean, stopPropagation: boolean }
+     * @returns {string} HTML seguro com botões clicáveis
+     */
+    static formatarMotivoHtml(motivo, options = {}) {
+        if (!motivo) return '';
+        const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : '';
+        const isTable = Boolean(options.isTable);
+        const btnClass = isTable
+            ? 'inline-flex items-center gap-1 font-mono font-bold text-[11px] text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-300 hover:border-blue-400 px-1.5 py-0.5 rounded shadow-2xs transition-all cursor-pointer select-none mx-0.5 active:scale-95'
+            : 'inline-flex items-center gap-1 font-mono font-bold text-xs text-blue-700 hover:text-blue-900 bg-white hover:bg-blue-50 border border-blue-300 hover:border-blue-400 px-2 py-0.5 rounded shadow-2xs transition-all cursor-pointer align-middle select-none mx-0.5 active:scale-95';
+
+        const escapeHtml = (str) => String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        const safeText = escapeHtml(motivo);
+
+        // Regex para capturar #PROTOCOLO ou protocolos no formato IP... / PC...
+        const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/g;
+
+        return safeText.replace(regex, (match, p1, p2) => {
+            const rawProt = p1 || p2;
+            const cleanProt = String(rawProt).replace(/^#/, '').trim();
+            const displayProt = '#' + cleanProt;
+            const iconSize = isTable ? '12px' : '13px';
+            return `<button type="button" onclick="${stopProp}window.abrirDetalhesOSModal('${cleanProt}')" class="${btnClass}" title="Abrir Ordem de Serviço ${displayProt}"><span class="material-symbols-outlined text-[${iconSize}] text-blue-600 pointer-events-none">open_in_new</span><span>${displayProt}</span></button>`;
+        });
+    }
+
+    get motivoFormatadoHtml() {
+        return ChamadoModel.formatarMotivoHtml(this.motivoAprovacao, { isTable: false });
     }
 
     /**
@@ -790,7 +829,7 @@ class ChamadoModel {
 
             const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
             const hasInicialData = !!pIni || (i === 0 && Boolean(plqIni || coordIni || probIni || this.plaquetaInicial || this.coordenadaInicial || this.problemaInicial));
-            const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado')) || isConcluida;
+            const hasFinalData = !!pFin || Boolean((plqFin && plqFin !== 'Não informada') || (coordFin && coordFin !== 'Não informada') || (probFin && probFin !== 'Não informado')) || (i === 0 && isConcluida);
 
             let numFech = pFin ? (pFin.fechamento || pFin.numero_fechamento || pFin.numero || null) : null;
             if (!numFech && hasFinalData) numFech = 1;
@@ -1757,8 +1796,12 @@ class ChamadoModel {
      * Helper to validate if a location field is valid (not empty, null, or '[---]')
      */
     static isValidLocationText(val) {
+        if (val === null || val === undefined) return false;
         const formatted = ChamadoModel.formatLocationText(val);
-        return formatted.length > 0 && formatted !== '[---]' && formatted !== '---' && formatted !== 'null';
+        if (!formatted || formatted === '[---]' || formatted === '---' || formatted === 'null' || formatted === 'undefined') return false;
+        const lower = formatted.toLowerCase().replace(/^[📍📡\s]+/, '').trim();
+        if (lower.includes('buscando...') || lower.includes('buscando…') || lower === 'buscando') return false;
+        return formatted.length > 0;
     }
 
     /**
@@ -1768,7 +1811,8 @@ class ChamadoModel {
         if (val === null || val === undefined) return false;
         const str = ChamadoModel.formatLocationText(val).trim();
         if (!str || str === '[---]' || str === '---' || str === 'null' || str === 'undefined') return false;
-        const lower = str.toLowerCase();
+        const lower = str.toLowerCase().replace(/^[📍📡\s]+/, '').trim();
+        if (lower.includes('buscando...') || lower.includes('buscando…') || lower === 'buscando') return false;
         if (lower === 'não informado' || lower === 'nao informado' || lower === 'endereço não informado' || lower === 'endereco nao informado') return false;
         if (lower.startsWith('coord:') || lower.startsWith('coordenada:') || lower.startsWith('coord ')) return false;
         if (/^-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?$/.test(str)) return false;
@@ -1784,7 +1828,8 @@ class ChamadoModel {
             if (list && list.length > 0) {
                 const formatted = list.map(p => {
                     const parts = [];
-                    const end = p.enderecoInicial || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
+                    const rawEnd = p.enderecoInicial || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
+                    const end = (rawEnd && ChamadoModel.isValidLocationText(rawEnd)) ? rawEnd : null;
                     const plq = p.plaquetaInicial;
                     const coord = p.coordenadaInicial;
                     if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
@@ -1818,7 +1863,8 @@ class ChamadoModel {
             if (list && list.length > 0) {
                 const formatted = list.map(p => {
                     const parts = [];
-                    const end = p.enderecoFinal || p.enderecoInicial;
+                    const rawEnd = p.enderecoFinal || p.enderecoInicial;
+                    const end = (rawEnd && ChamadoModel.isValidLocationText(rawEnd)) ? rawEnd : null;
                     const plq = p.plaquetaFinal || p.plaquetaInicial;
                     const coord = p.coordenadaFinal || p.coordenadaInicial;
                     if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);

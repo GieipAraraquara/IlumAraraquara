@@ -487,7 +487,7 @@
                                                 <span>Concluída</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
-                                                <input type="checkbox" name="status-filter" value="cancelada" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <input type="checkbox" name="status-filter" value="cancelada" class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Cancelada</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
@@ -592,6 +592,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
+    <button id="btn-scroll-bottom" 
+            onclick="window.handleScrollFABClick()" 
+            class="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center cursor-pointer opacity-0 pointer-events-none group border border-white/20" 
+            title="Rolar até o fundo" 
+            aria-label="Rolar até o fundo">
+        <span id="btn-scroll-bottom-icon" class="material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5">arrow_downward</span>
+    </button>
 </main>
 
 <!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->

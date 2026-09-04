@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
-    <title>Dashboard - Luz Araraquara</title>
+    <title>Banco de Fotos & Evidências - Luz Araraquara</title>
     
     <!-- Favicon & PWA Icons -->
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -23,6 +23,7 @@
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/controllers/PainelController.js?v=33"></script>
+    <script src="js/controllers/FotosController.js?v=1"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -282,138 +283,211 @@
     requestAnimationFrame(animate);
 </script>
 
-<app-sidebar active="painel"></app-sidebar>
+<app-sidebar active="fotos"></app-sidebar>
 
-<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+<app-header placeholder="Buscar fotos por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
 
 <main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
 
-    <div class="flex justify-between items-end mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
+    <!-- Page Header & Title Section -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:100ms]">
         <div>
-            <h2 class="font-headline-md text-headline-md text-on-surface mb-2">Visão Geral do Painel</h2>
-            <p class="font-body-md text-body-md text-on-surface-variant">Status em tempo real das operações de serviço</p>
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-[30px] text-secondary">photo_library</span>
+                <h2 class="font-headline-md text-headline-md text-on-surface font-bold">Banco de Fotos & Evidências</h2>
+            </div>
+            <p class="font-body-md text-body-md text-on-surface-variant mt-1">Consulta centralizada de todas as fotografias registradas nas Ordens de Serviço</p>
         </div>
-        <button onclick="abrirModalNovaOS()" class="bg-secondary text-white px-4 py-2.5 rounded-xl font-label-md text-label-md font-semibold flex items-center gap-2 hover:bg-secondary-container hover:text-on-secondary-container transition-all shadow-sm active:scale-95 cursor-pointer">
-            <span class="material-symbols-outlined text-[20px]">add</span>
-            <span>Nova Ordem de Serviço</span>
-        </button>
+        
+        <div class="flex items-center gap-2">
+            <button onclick="window.fotosController.loadData()" class="bg-surface-container-lowest border border-outline-variant/60 text-on-surface px-4 py-2.5 rounded-xl font-label-md text-xs font-semibold flex items-center gap-2 hover:bg-surface-container-low transition-all shadow-2xs active:scale-95 cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">refresh</span>
+                <span>Atualizar Fotos</span>
+            </button>
+        </div>
     </div>
 
     <!-- KPI Grid -->
     <div class="grid grid-cols-12 gap-card-gap mb-card-gap max-w-max-width-content mx-auto">
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
-            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de OS</div>
-            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
-            <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+12% vs mês anterior</span></div>
-        </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
-            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Aberto</div>
-            <div class="font-headline-lg text-headline-lg text-error overflow-visible"><div class="h-8 w-16 bg-surface-container-high animate-pulse rounded my-1"></div></div>
-            <div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Requer atenção</span></div>
-        </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
-            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Concluídas</div>
-            <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
-            <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm"><div class="h-3.5 w-28 bg-surface-container-high animate-pulse rounded inline-block"></div></span></div>
-        </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
-            <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Tempo Médio de Resolução</div>
-            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div>
-            <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_down</span><span class="font-label-sm text-label-sm">-0.5 dias vs mês anterior</span></div>
-        </div>
-    </div>
-
-    <!-- Tabela Nova: Pendentes para aprovação -->
-    <div id="container-pendentes-aprovacao" class="hidden grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-card-gap opacity-0 animate-fade-in-up [animation-delay:550ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
-            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-amber-600 text-[20px]">pending_actions</span>
-                    <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Pendentes para aprovação</h3>
+        <!-- KPI 1: Total de Fotos -->
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Fotos</div>
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">photo_library</span>
                 </div>
             </div>
-            
-            <div class="w-full min-h-[120px]">
-                <table class="w-full text-left border-collapse table-fixed max-w-full" id="pendentes-os-table">
-                    <thead>
-                        <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
-                            <!-- Column 1: Protocolo -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
-                                <div class="relative inline-block text-left group/protocol-filter">
-                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-protocol-filter-trigger" title="Filtrar por Protocolo">
-                                        <span class="font-label-md uppercase tracking-wider">Protocolo</span>
-                                        <span class="material-symbols-outlined text-[18px]">search</span>
-                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-protocol-filter-indicator"></span>
-                                    </button>
-                                </div>
-                                <div class="resizer"></div>
-                            </th>
-                            
-                            <!-- Column 2: Data -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 120px; min-width: 120px;" data-col="1">
-                                <div class="relative inline-block text-left group/date-filter">
-                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-date-filter-trigger">
-                                        <span class="font-label-md uppercase tracking-wider">Data</span>
-                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
-                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-filter-active-indicator"></span>
-                                    </button>
-                                </div>
-                                <div class="resizer"></div>
-                            </th>
-                            
-                            <!-- Column 3: Ponto / Localização -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" data-col="2">
-                                <div class="flex items-center gap-1">Ponto / Localização</div>
-                                <div class="resizer"></div>
-                            </th>
-                            
-                            <!-- Column 4: Problema -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 200px; min-width: 200px;" data-col="3">
-                                <div class="relative inline-block text-left">
-                                    <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-problem-filter-trigger">
-                                        <span class="font-label-md uppercase tracking-wider">Problema</span>
-                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
-                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="pendentes-problem-filter-indicator"></span>
-                                    </button>
-                                </div>
-                                <div class="resizer"></div>
-                            </th>
-                            
-                            <!-- Column 5: Motivo -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 200px; min-width: 200px;" data-col="4">
-                                <div class="flex items-center gap-1">Motivo</div>
-                                <div class="resizer"></div>
-                            </th>
-                            
-                            <!-- Column 6: Ações -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 160px; min-width: 160px;" data-col="5">
-                                Ações
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody class="font-data-tabular text-data-tabular text-on-surface">
-                        <tr id="no-pendentes-results" class="hidden">
-                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
-                                <div class="flex flex-col items-center justify-center gap-1.5">
-                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
-                                    <span class="text-xs">Nenhum protocolo pendente de aprovação para os filtros selecionados.</span>
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div id="kpi-total-fotos" class="font-headline-lg text-headline-lg text-secondary font-bold">---</div>
+            <div class="flex items-center gap-1 mt-2 text-on-surface-variant text-xs">
+                <span class="material-symbols-outlined text-[15px] text-secondary">database</span>
+                <span>Armazenadas no banco</span>
+            </div>
+        </div>
+
+        <!-- KPI 2: Fotos Viária -->
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Iluminação Viária</div>
+                <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">lightbulb</span>
+                </div>
+            </div>
+            <div id="kpi-fotos-viaria" class="font-headline-lg text-headline-lg text-amber-700 font-bold">---</div>
+            <div class="flex items-center gap-1 mt-2 text-amber-700 text-xs">
+                <span class="material-symbols-outlined text-[15px]">alt_route</span>
+                <span>Fotografias dos postes</span>
+            </div>
+        </div>
+
+        <!-- KPI 3: Fotos Praça -->
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Praças Públicas</div>
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">park</span>
+                </div>
+            </div>
+            <div id="kpi-fotos-praca" class="font-headline-lg text-headline-lg text-emerald-700 font-bold">---</div>
+            <div class="flex items-center gap-1 mt-2 text-emerald-700 text-xs">
+                <span class="material-symbols-outlined text-[15px]">location_city</span>
+                <span>Entrada, andamento e fecho</span>
+            </div>
+        </div>
+
+        <!-- KPI 4: Fotos Anexadas Hoje -->
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
+            <div class="flex items-center justify-between mb-2">
+                <div class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Fotos Anexadas Hoje</div>
+                <div class="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-600 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">today</span>
+                </div>
+            </div>
+            <div id="kpi-fotos-hoje" class="font-headline-lg text-headline-lg text-purple-700 font-bold">---</div>
+            <div class="flex items-center gap-1 mt-2 text-purple-700 text-xs">
+                <span class="material-symbols-outlined text-[15px]">schedule</span>
+                <span>Movimentação das últimas 24h</span>
             </div>
         </div>
     </div>
 
-    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
-            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
-                <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
+    <!-- Painel de Filtros Avançados -->
+    <div class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-2xl border border-outline-variant p-4 shadow-sm mb-6 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:550ms]">
+        <!-- Linha 1: Filtros de Seleção e Busca -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+            <!-- Busca Textual -->
+            <div class="md:col-span-4 relative">
+                <input type="text" 
+                       id="fotos-search-input" 
+                       placeholder="Buscar por protocolo, plaqueta, endereço ou técnico..." 
+                       class="w-full font-body-md text-xs border border-outline-variant rounded-xl pl-9 pr-4 py-2.5 focus:ring-2 focus:ring-secondary/40 focus:border-secondary outline-none bg-surface-container-lowest text-on-surface placeholder:text-on-surface-variant/60 shadow-2xs transition-all" />
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-on-surface-variant/60">search</span>
             </div>
+
+            <!-- Tipo de Foto (do Finalizar.html) -->
+            <div class="md:col-span-3">
+                <select id="filter-tipo-foto" class="w-full font-body-md text-xs font-medium border border-outline-variant rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-secondary/40 focus:border-secondary outline-none bg-surface-container-lowest text-on-surface shadow-2xs cursor-pointer">
+                    <option value="todos">Todos os Tipos de Foto</option>
+                    <option value="problema">Problema Encontrado (Antes)</option>
+                    <option value="reparo">Reparo Efetuado (Depois)</option>
+                    <option value="plaqueta">Plaqueta do Poste</option>
+                    <option value="entrada">Foto de Entrada (Praça)</option>
+                    <option value="andamento">Foto do Andamento (Praça)</option>
+                    <option value="outros">Evidências Gerais / Outros</option>
+                </select>
+            </div>
+
+            <!-- Tipo de OS -->
+            <div class="md:col-span-2">
+                <select id="filter-tipo-os" class="w-full font-body-md text-xs font-medium border border-outline-variant rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-secondary/40 focus:border-secondary outline-none bg-surface-container-lowest text-on-surface shadow-2xs cursor-pointer">
+                    <option value="todos">Todas as OSs</option>
+                    <option value="viaria">Iluminação Viária</option>
+                    <option value="praca">Praça Pública</option>
+                </select>
+            </div>
+
+            <!-- Período -->
+            <div class="md:col-span-3 flex items-center gap-2">
+                <select id="filter-periodo" class="w-full font-body-md text-xs font-medium border border-outline-variant rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-secondary/40 focus:border-secondary outline-none bg-surface-container-lowest text-on-surface shadow-2xs cursor-pointer">
+                    <option value="todos">Todo o Período</option>
+                    <option value="hoje">Hoje</option>
+                    <option value="7dias">Últimos 7 dias</option>
+                    <option value="30dias">Últimos 30 dias</option>
+                    <option value="personalizado">Personalizado...</option>
+                </select>
+
+                <button onclick="window.fotosController.clearFilters()" 
+                        class="p-2.5 rounded-xl border border-outline-variant text-on-surface-variant hover:text-error hover:bg-error/10 hover:border-error/30 transition-all shrink-0 cursor-pointer" 
+                        title="Limpar Filtros">
+                    <span class="material-symbols-outlined text-[18px]">filter_alt_off</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Intervalo de Datas Personalizado -->
+        <div id="custom-date-range-box" class="hidden mt-3 pt-3 border-t border-outline-variant/50 grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md">
+            <div>
+                <label class="font-label-sm text-[11px] font-semibold text-on-surface-variant block mb-1">Data Inicial:</label>
+                <input type="date" id="fotos-range-start" class="w-full font-body-md text-xs border border-outline-variant rounded-lg px-3 py-2 outline-none focus:border-secondary bg-surface-container-lowest text-on-surface" />
+            </div>
+            <div>
+                <label class="font-label-sm text-[11px] font-semibold text-on-surface-variant block mb-1">Data Final:</label>
+                <input type="date" id="fotos-range-end" class="w-full font-body-md text-xs border border-outline-variant rounded-lg px-3 py-2 outline-none focus:border-secondary bg-surface-container-lowest text-on-surface" />
+            </div>
+        </div>
+
+        <!-- Quick Category Chips -->
+        <div class="mt-3 pt-3 border-t border-outline-variant/40 flex flex-wrap items-center gap-2">
+            <span class="font-label-sm text-[11px] font-bold uppercase tracking-wider text-on-surface-variant/70 mr-1">Filtros Rápidos:</span>
             
-            <div class="w-full min-h-[300px]">
-                <table class="w-full text-left border-collapse table-fixed max-w-full" id="os-table">
+            <button onclick="window.fotosController.setCategoryFilter('todos')" data-cat="todos" class="cat-chip-btn px-3 py-1.5 rounded-full font-label-sm text-xs font-bold bg-secondary text-white shadow-xs cursor-pointer transition-all flex items-center gap-1.5">
+                <span>Todas</span>
+            </button>
+            <button onclick="window.fotosController.setCategoryFilter('problema')" data-cat="problema" class="cat-chip-btn px-3 py-1.5 rounded-full font-label-sm text-xs font-semibold bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:bg-surface-container-low cursor-pointer transition-all flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>Problema Encontrado</span>
+            </button>
+            <button onclick="window.fotosController.setCategoryFilter('reparo')" data-cat="reparo" class="cat-chip-btn px-3 py-1.5 rounded-full font-label-sm text-xs font-semibold bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:bg-surface-container-low cursor-pointer transition-all flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span>Reparo Efetuado</span>
+            </button>
+            <button onclick="window.fotosController.setCategoryFilter('plaqueta')" data-cat="plaqueta" class="cat-chip-btn px-3 py-1.5 rounded-full font-label-sm text-xs font-semibold bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:bg-surface-container-low cursor-pointer transition-all flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                <span>Plaqueta</span>
+            </button>
+            <button onclick="window.fotosController.setCategoryFilter('entrada')" data-cat="entrada" class="cat-chip-btn px-3 py-1.5 rounded-full font-label-sm text-xs font-semibold bg-surface-container-lowest border border-outline-variant/60 text-on-surface-variant hover:bg-surface-container-low cursor-pointer transition-all flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                <span>Fotos de Praça</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Contador e Cabeçalho da Galeria -->
+    <div class="flex items-center justify-between mb-4 max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
+        <h3 class="font-bold text-on-surface text-sm flex items-center gap-2">
+            <span>Galeria de Imagens</span>
+            <span id="fotos-count-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary/15 text-secondary">Carregando fotos...</span>
+        </h3>
+    </div>
+
+    <!-- Grid Responsivo de Fotos -->
+    <div id="fotos-grid-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-w-max-width-content mx-auto mb-10 opacity-0 animate-fade-in-up [animation-delay:650ms]">
+        <!-- Preenchido via FotosController.js -->
+    </div>
+
+    <!-- Empty State -->
+    <div id="fotos-empty-state" class="hidden text-center py-16 max-w-max-width-content mx-auto bg-surface-container-lowest/80 border border-outline-variant rounded-2xl p-8 my-6">
+        <div class="w-16 h-16 rounded-full bg-surface-container-high text-on-surface-variant flex items-center justify-center mx-auto mb-3">
+            <span class="material-symbols-outlined text-[36px]">image_not_supported</span>
+        </div>
+        <h4 class="font-headline-sm font-bold text-on-surface text-base">Nenhuma foto encontrada</h4>
+        <p class="text-body-md text-on-surface-variant text-xs mt-1 max-w-md mx-auto">Não encontramos fotografias correspondentes aos filtros selecionados. Tente ajustar a busca ou limpar os filtros de data e tipo.</p>
+        <button onclick="window.fotosController.clearFilters()" class="mt-4 px-4 py-2 bg-secondary text-white rounded-xl font-semibold text-xs hover:bg-secondary-container transition-all cursor-pointer">
+            Limpar Todos os Filtros
+        </button>
+    </div>
+
+    <div class="hidden">
+        <table id="os-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
                             <!-- Column 1: Protocolo com Filtro -->
@@ -682,9 +756,6 @@
                         </tr>
                     </tbody>
                 </table>
-            </div>
-            </div>
-        </div>
     </div>
 
     <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
@@ -696,6 +767,81 @@
         <span id="btn-scroll-bottom-icon" class="material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5">arrow_downward</span>
     </button>
 </main>
+
+<!-- Modal Lightbox (Visualizador em Alta Resolução) -->
+<div id="modal-foto-lightbox" class="fixed inset-0 z-[99999] bg-slate-950/90 backdrop-blur-md hidden flex flex-col items-center justify-between p-4 sm:p-6 transition-all duration-300">
+    <!-- Top Header Bar -->
+    <div class="w-full flex items-center justify-between text-white border-b border-white/10 pb-4 max-w-6xl">
+        <div class="flex items-center gap-3">
+            <span id="lightbox-cat-badge" class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-secondary text-white">Categoria</span>
+            <div>
+                <h3 id="lightbox-title" class="font-bold text-sm sm:text-base text-white">Título da Fotografia</h3>
+                <span id="lightbox-protocolo" class="font-mono text-xs text-slate-300 font-semibold">Protocolo #---</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <span id="lightbox-counter" class="text-xs font-mono bg-white/10 px-3 py-1.5 rounded-full text-slate-300">0 de 0</span>
+            
+            <a id="lightbox-link-direct" href="#" target="_blank" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all" title="Abrir imagem em tamanho original em nova aba">
+                <span class="material-symbols-outlined text-[20px]">open_in_new</span>
+            </a>
+
+            <button onclick="window.fotosController.copyPhotoLink()" class="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all" title="Copiar link da imagem">
+                <span class="material-symbols-outlined text-[20px]">content_copy</span>
+            </button>
+
+            <button onclick="window.fotosController.closeLightbox()" class="p-2 rounded-full bg-rose-500/20 text-rose-300 hover:bg-rose-500 hover:text-white transition-all" title="Fechar visualização (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Center Display Area with Prev/Next Navigation -->
+    <div class="relative w-full flex-1 flex items-center justify-center my-4 overflow-hidden max-w-6xl">
+        <!-- Botão Anterior -->
+        <button onclick="window.fotosController.prevLightboxPhoto()" class="absolute left-2 sm:left-4 z-20 w-12 h-12 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm border border-white/10 hover:scale-110 transition-all shadow-lg cursor-pointer">
+            <span class="material-symbols-outlined text-[28px]">chevron_left</span>
+        </button>
+
+        <!-- Imagem Principal -->
+        <img id="lightbox-img" src="" alt="Visualização em Alta Resolução" class="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300" />
+
+        <!-- Botão Próximo -->
+        <button onclick="window.fotosController.nextLightboxPhoto()" class="absolute right-2 sm:right-4 z-20 w-12 h-12 rounded-full bg-slate-900/60 hover:bg-slate-900 text-white flex items-center justify-center backdrop-blur-sm border border-white/10 hover:scale-110 transition-all shadow-lg cursor-pointer">
+            <span class="material-symbols-outlined text-[28px]">chevron_right</span>
+        </button>
+    </div>
+
+    <!-- Bottom Footer Bar (Metadata & OS Button) -->
+    <div class="w-full bg-slate-900/80 border border-white/10 rounded-2xl p-4 max-w-6xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-slate-300 backdrop-blur-md">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full sm:w-auto">
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Local / Endereço</span>
+                <span id="lightbox-address" class="font-medium text-white truncate max-w-[200px] block">--</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Plaqueta / Identificação</span>
+                <span id="lightbox-plaqueta" class="font-mono font-bold text-amber-300">--</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Tipo de Ordem</span>
+                <span id="lightbox-os-type" class="font-medium text-emerald-400">--</span>
+            </div>
+            <div>
+                <span class="text-[10px] text-slate-400 uppercase font-bold block">Técnico / Responsável</span>
+                <span id="lightbox-tecnico" class="font-medium text-white">--</span>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <button id="lightbox-btn-ver-os" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-secondary text-white font-semibold text-xs hover:bg-secondary-container transition-all flex items-center justify-center gap-2 shadow-lg cursor-pointer">
+                <span class="material-symbols-outlined text-[18px]">visibility</span>
+                <span>Ver Detalhes Completos da OS</span>
+            </button>
+        </div>
+    </div>
+</div>
 
 <!-- Modal de Confirmação de Ação em Status (Com Fundo Desfocado) -->
 <div id="confirm-modal" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">

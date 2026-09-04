@@ -197,6 +197,32 @@
         }
         .marker-duplicado-text { color: #ffffff; font-size: 11px; font-weight: bold; line-height: 1; }
 
+        /* Reincidente (1 OS Aberta + Histórico no local) - Ícone Pasta */
+        .marker-reincidente-badge {
+            width: 26px; height: 26px; border: 2px solid #ffffff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: pointer; z-index: 24;
+            transition: box-shadow 0.15s ease, filter 0.15s ease;
+        }
+        .marker-reincidente-badge:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 3px 12px rgba(0,0,0,0.55);
+        }
+        .marker-reincidente-text { color: #ffffff; font-size: 11px; font-weight: bold; line-height: 1; display: flex; align-items: center; justify-content: center; }
+
+        /* Histórico Puro (Apenas Concluídas/Canceladas agrupadas) - Ícone Histórico */
+        .marker-historico-badge {
+            width: 24px; height: 24px; border: 2px solid #ffffff;
+            border-radius: 50%; background-color: #475569; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; z-index: 20;
+            transition: box-shadow 0.15s ease, filter 0.15s ease;
+        }
+        .marker-historico-badge:hover {
+            filter: brightness(1.18);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.5);
+        }
+        .marker-historico-text { color: #ffffff; font-size: 10px; font-weight: bold; line-height: 1; display: flex; align-items: center; justify-content: center; }
+
         /* Modal fullscreen for map */
         .modal-fullscreen-map {
             position: fixed !important;
@@ -436,7 +462,9 @@
                 <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Tipo:</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Normal</span>
                 <span class="flex items-center gap-1 font-bold text-on-surface"><span class="w-3 h-3 bg-slate-600 rounded-[2px] rotate-45 flex items-center justify-center text-[7px] text-white"><span class="-rotate-45">⚡</span></span> Urgente</span>
-                <span class="flex items-center gap-1 font-bold text-amber-600"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
+                <span class="flex items-center gap-1 font-bold text-amber-600" title="2 ou mais OSs Abertas concorrentes"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
+                <span class="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400" title="1 OS Aberta + histórico anterior no local"><span class="w-3.5 h-3.5 rounded-full bg-amber-600 border border-white flex items-center justify-center text-[8px] text-white">📁</span> Reincidente</span>
+                <span class="flex items-center gap-1 font-bold text-slate-600 dark:text-slate-400" title="Apenas chamados finalizados neste local"><span class="w-3.5 h-3.5 rounded-full bg-slate-600 border border-white flex items-center justify-center text-[8px] text-white">🕒</span> Histórico</span>
                 <span class="border-l border-outline-variant pl-2 font-bold text-secondary" id="statMapaOSsAbertas">Inicializando mapa...</span>
             </div>
 
@@ -1658,7 +1686,12 @@
                 grp.forEach(gItem => {
                     const key = String(gItem.os.id || gItem.os.protocolo);
                     if (!osMap.has(key)) {
-                        osMap.set(key, { os: gItem.os, pontos: [] });
+                        osMap.set(key, { 
+                            os: gItem.os, 
+                            pontos: [], 
+                            diasEmAberto: gItem.diasEmAberto, 
+                            corMarker: gItem.corMarker 
+                        });
                     }
                     osMap.get(key).pontos.push(gItem.pt);
                 });
@@ -1666,39 +1699,83 @@
                 const totalOSsUnicas = osMap.size;
 
                 if (totalOSsUnicas > 1) {
-                    const temAbertaNoGrupo = grp.some(gItem => {
-                        const st = (gItem.os.status || "Aberta").toLowerCase();
+                    const osList = Array.from(osMap.values());
+                    const ossAbertas = osList.filter(item => {
+                        const st = (item.os.status || "Aberta").toLowerCase();
                         return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
                     });
+                    const ossHistorico = osList.filter(item => {
+                        const st = (item.os.status || "Aberta").toLowerCase();
+                        return (st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || st.includes("cancel"));
+                    });
 
-                    let corMarkerDup = "#188038";
-                    if (!temAbertaNoGrupo) {
-                        corMarkerDup = "rgba(26, 115, 232, 0.6)";
-                    } else {
-                        let maxDiasGrp = 0;
-                        grp.forEach(gItem => {
-                            if (gItem.diasEmAberto > maxDiasGrp) {
-                                maxDiasGrp = gItem.diasEmAberto;
+                    const qtdAbertas = ossAbertas.length;
+                    const qtdHistorico = ossHistorico.length;
+
+                    // CASO 1: DUPLICATA REAL (2+ OSs ABERTAS SIMULTÂNEAS) -> ALERTA COM PULSO ⚠️
+                    if (qtdAbertas >= 2) {
+                        let maxDiasAbertas = 0;
+                        ossAbertas.forEach(item => {
+                            if (item.diasEmAberto > maxDiasAbertas) {
+                                maxDiasAbertas = item.diasEmAberto;
                             }
                         });
-                        if (maxDiasGrp > 7) corMarkerDup = "#d93025";
-                        else if (maxDiasGrp > 3) corMarkerDup = "#f2994a";
+
+                        let corMarkerDup = "#188038";
+                        if (maxDiasAbertas > 7) corMarkerDup = "#d93025";
+                        else if (maxDiasAbertas > 3) corMarkerDup = "#f2994a";
+
+                        const elDup = document.createElement('div');
+                        elDup.className = 'marker-duplicado-badge';
+                        elDup.style.backgroundColor = corMarkerDup;
+                        elDup.title = `⚠️ ${qtdAbertas} OSs Abertas concorrentes neste local (${totalOSsUnicas} no total)`;
+                        elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${qtdAbertas}</span>`;
+
+                        marker = new mapboxgl.Marker({ element: elDup })
+                            .setLngLat([grp[0].lng, grp[0].lat])
+                            .addTo(mapOSsInstance);
+
+                        marker.getElement().addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            exibirPopupQuadradosFlutuantesDuplicados(grp, [grp[0].lng, grp[0].lat]);
+                        });
+
+                    // CASO 2: REINCIDÊNCIA (1 OS ABERTA + HISTÓRICO PASSADO) -> ÍCONE DE PASTA 📁 COM COR DA OS ABERTA
+                    } else if (qtdAbertas === 1 && qtdHistorico >= 1) {
+                        const osAbertaItem = ossAbertas[0];
+                        const corAberta = osAbertaItem.corMarker || "#188038";
+
+                        const elReinc = document.createElement('div');
+                        elReinc.className = 'marker-reincidente-badge';
+                        elReinc.style.backgroundColor = corAberta;
+                        elReinc.title = `📁 OS #${osAbertaItem.os.protocolo} (Aberta) + ${qtdHistorico} atendimento(s) anterior(es) no local`;
+                        elReinc.innerHTML = `<span class="marker-reincidente-text">📁${totalOSsUnicas}</span>`;
+
+                        marker = new mapboxgl.Marker({ element: elReinc })
+                            .setLngLat([grp[0].lng, grp[0].lat])
+                            .addTo(mapOSsInstance);
+
+                        marker.getElement().addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            exibirPopupQuadradosFlutuantesDuplicados(grp, [grp[0].lng, grp[0].lat]);
+                        });
+
+                    // CASO 3: APENAS HISTÓRICO (0 ABERTAS, 2+ CONCLUÍDAS/CANCELADAS) -> ÍCONE DE HISTÓRICO 🕒 NEUTRO
+                    } else {
+                        const elHist = document.createElement('div');
+                        elHist.className = 'marker-historico-badge';
+                        elHist.title = `🕒 Histórico: ${totalOSsUnicas} chamados finalizados neste local (${grp.length} pontos)`;
+                        elHist.innerHTML = `<span class="marker-historico-text">🕒${totalOSsUnicas}</span>`;
+
+                        marker = new mapboxgl.Marker({ element: elHist })
+                            .setLngLat([grp[0].lng, grp[0].lat])
+                            .addTo(mapOSsInstance);
+
+                        marker.getElement().addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            exibirPopupQuadradosFlutuantesDuplicados(grp, [grp[0].lng, grp[0].lat]);
+                        });
                     }
-
-                    const elDup = document.createElement('div');
-                    elDup.className = 'marker-duplicado-badge';
-                    elDup.style.backgroundColor = corMarkerDup;
-                    elDup.title = `⚠️ ${totalOSsUnicas} OSs distintas neste local (${grp.length} pontos de problema)`;
-                    elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${totalOSsUnicas}</span>`;
-
-                    marker = new mapboxgl.Marker({ element: elDup })
-                        .setLngLat([grp[0].lng, grp[0].lat])
-                        .addTo(mapOSsInstance);
-
-                    marker.getElement().addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        exibirPopupQuadradosFlutuantesDuplicados(grp, [grp[0].lng, grp[0].lat]);
-                    });
                 } else {
                     const item = grp[0];
                     const os = item.os;
@@ -2231,12 +2308,31 @@
 
         const totalUnicas = osMap.size;
 
+        const isAbertaFn = (os) => {
+            const st = (os.status || "Aberta").toLowerCase();
+            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+        };
+
+        const osList = Array.from(osMap.values());
+        const ossAbertas = osList.filter(item => isAbertaFn(item.os));
+        const ossHistorico = osList.filter(item => !isAbertaFn(item.os));
+
+        // Ordena para que as OSs Abertas fiquem sempre no início (à esquerda)
+        osList.sort((a, b) => {
+            const aAberta = isAbertaFn(a.os);
+            const bAberta = isAbertaFn(b.os);
+            if (aAberta && !bAberta) return -1;
+            if (!aAberta && bAberta) return 1;
+            return (b.os.protocolo || 0) - (a.os.protocolo || 0);
+        });
+
         let cardWidthClass = "w-64 sm:w-72";
 
         let htmlCards = '';
-        osMap.forEach(grpOS => {
+        osList.forEach(grpOS => {
             const os = grpOS.os;
             const pontos = grpOS.pontos;
+            const isAbertaThisOS = isAbertaFn(os);
             const dataStr = os.data || os.formattedDateShort || (os.dataAbertura ? (os.dataAbertura.toLocaleDateString ? os.dataAbertura.toLocaleDateString('pt-BR') : os.dataAbertura) : '--/--/----');
             
             // Extrai Operador ou Munícipe
@@ -2347,10 +2443,14 @@
                 <span class="material-symbols-outlined text-[16px]">visibility</span>
             </button>`;
 
+            const cardBorderClass = "border border-slate-200 dark:border-slate-700/80";
+
             htmlCards += `
-            <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-3.5 shadow-md hover:border-blue-500 transition-all flex flex-col justify-between space-y-2 overflow-hidden">
-                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-                    <span class="font-bold text-sm text-blue-600 dark:text-blue-400">#${os.protocolo}</span>
+            <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 ${cardBorderClass} rounded-2xl p-3.5 shadow-md hover:border-blue-500 transition-all flex flex-col justify-between space-y-2 overflow-hidden">
+                <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 gap-2">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <span class="font-bold text-sm text-blue-600 dark:text-blue-400 truncate">#${os.protocolo}</span>
+                    </div>
                     ${badgeAging}
                 </div>
                 <div class="text-xs text-slate-800 dark:text-slate-200 space-y-1">
@@ -2371,12 +2471,38 @@
             </div>`;
         });
 
+        let headerIcon = 'warning';
+        let headerIconColor = 'text-rose-400';
+        let headerTextColor = 'text-rose-300';
+        let headerBorder = 'border-rose-500/30';
+        let headerTitle = `${totalUnicas} Chamados Distintos Neste Local`;
+
+        if (ossAbertas.length >= 2) {
+            headerIcon = 'warning';
+            headerIconColor = 'text-rose-400';
+            headerTextColor = 'text-rose-300';
+            headerBorder = 'border-rose-500/30';
+            headerTitle = `⚠️ ${ossAbertas.length} Chamados Abertos Concorrentes (${totalUnicas} no local)`;
+        } else if (ossAbertas.length === 1 && ossHistorico.length >= 1) {
+            headerIcon = 'folder_open';
+            headerIconColor = 'text-amber-400';
+            headerTextColor = 'text-amber-300';
+            headerBorder = 'border-amber-500/30';
+            headerTitle = `📁 1 OS Aberta + ${ossHistorico.length} Atendimento(s) Anterior(es) no Local`;
+        } else {
+            headerIcon = 'history';
+            headerIconColor = 'text-blue-400';
+            headerTextColor = 'text-blue-300';
+            headerBorder = 'border-blue-500/30';
+            headerTitle = `🕒 Histórico do Local (${ossHistorico.length} chamados finalizados)`;
+        }
+
         const popupHTML = `
         <div class="popup-duplicados-container bg-slate-900 border border-slate-700/80 rounded-2xl p-3 shadow-lg overflow-hidden text-slate-100 font-sans">
-            <div class="flex items-center justify-between mb-2.5 pb-2 border-b border-rose-500/30 px-1">
+            <div class="flex items-center justify-between mb-2.5 pb-2 border-b ${headerBorder} px-1">
                 <div class="flex items-center gap-1.5">
-                    <span class="material-symbols-outlined text-rose-400 text-[18px]">warning</span>
-                    <strong class="text-xs text-rose-300 font-bold">${totalUnicas} Chamados Distintos Neste Local</strong>
+                    <span class="material-symbols-outlined ${headerIconColor} text-[18px]">${headerIcon}</span>
+                    <strong class="text-xs ${headerTextColor} font-bold">${headerTitle}</strong>
                 </div>
             </div>
             <div class="flex flex-row gap-3 overflow-x-auto overflow-y-auto max-h-[60vh] sm:max-h-[460px] p-1">
@@ -2432,16 +2558,55 @@
 
         const totalOSsUnicas = osMap.size;
 
+        const isAbertaFn = (os) => {
+            const st = (os.status || "Aberta").toLowerCase();
+            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+        };
+
+        const osList = Array.from(osMap.values());
+        const ossAbertas = osList.filter(item => isAbertaFn(item.os));
+        const ossHistorico = osList.filter(item => !isAbertaFn(item.os));
+
+        osList.sort((a, b) => {
+            const aAberta = isAbertaFn(a.os);
+            const bAberta = isAbertaFn(b.os);
+            if (aAberta && !bAberta) return -1;
+            if (!aAberta && bAberta) return 1;
+            return (b.os.protocolo || 0) - (a.os.protocolo || 0);
+        });
+
+        let titleSidebar = `⚠️ ${totalOSsUnicas} OSs Distintas no Mesmo Local`;
+        let descSidebar = `📍 <b>Alerta de Duplicidade:</b> Chamados múltiplos detectados nesta mesma localização ou plaqueta (${grp.length} pontos no total).`;
+        let borderHeader = 'border-error/30';
+        let titleColor = 'text-error';
+
+        if (ossAbertas.length >= 2) {
+            titleSidebar = `⚠️ ${ossAbertas.length} Chamados Abertos Concorrentes`;
+            descSidebar = `🚨 <b>Duplicidade Ativa:</b> Múltiplas OSs pendentes registradas no mesmo local (${totalOSsUnicas} no total).`;
+            borderHeader = 'border-error/30';
+            titleColor = 'text-error';
+        } else if (ossAbertas.length === 1 && ossHistorico.length >= 1) {
+            titleSidebar = `📁 1 OS Aberta + ${ossHistorico.length} Histórico(s)`;
+            descSidebar = `ℹ️ <b>Reincidência:</b> Há 1 chamado aberto atual e histórico de atendimentos anteriores no mesmo local.`;
+            borderHeader = 'border-amber-500/30';
+            titleColor = 'text-amber-600 dark:text-amber-400';
+        } else {
+            titleSidebar = `🕒 Histórico: ${ossHistorico.length} Chamados Finalizados`;
+            descSidebar = `📜 <b>Histórico do Local:</b> Todos os chamados neste endereço/plaqueta já foram concluídos ou cancelados.`;
+            borderHeader = 'border-slate-500/30';
+            titleColor = 'text-slate-600 dark:text-slate-300';
+        }
+
         let html = `
-        <div class="flex justify-between items-center border-b border-error/30 pb-2 mb-2">
-            <strong class="text-sm text-error flex items-center gap-1">⚠️ ${totalOSsUnicas} OSs Distintas no Mesmo Local</strong>
+        <div class="flex justify-between items-center border-b ${borderHeader} pb-2 mb-2">
+            <strong class="text-sm ${titleColor} flex items-center gap-1">${titleSidebar}</strong>
             <button type="button" onclick="document.getElementById('painelLateralOS').style.display='none'" class="text-on-surface-variant hover:text-on-surface text-lg cursor-pointer">&times;</button>
         </div>
-        <div class="text-[11px] text-on-surface-variant bg-amber-500/10 border border-amber-500/30 p-2 rounded-lg mb-3">
-            📍 <b>Alerta de Duplicidade:</b> Chamados múltiplos detectados nesta mesma localização ou plaqueta (${grp.length} pontos no total).
+        <div class="text-[11px] text-on-surface-variant bg-surface-container-high/60 border ${borderHeader} p-2 rounded-lg mb-3">
+            ${descSidebar}
         </div>`;
 
-        osMap.forEach(osGroup => {
+        osList.forEach(osGroup => {
             const os = osGroup.os;
             const pontosOS = osGroup.pontos;
             const diasEmAberto = osGroup.diasEmAberto;

@@ -20,11 +20,44 @@ class ChamadosRepository {
         return window.supabaseClient;
     }
 
+    clearCache() {
+        try {
+            sessionStorage.removeItem('chamados_repo_cache_v1');
+        } catch (e) {}
+    }
+
     /**
      * Fetches all OSs from Supabase, prioritizing unified view vw_todas_ordens_servico,
-     * falling back to ordens_servico or chamados.
+     * falling back to ordens_servico or chamados. Supports sessionStorage caching with TTL.
      */
-    async fetchAllChamados() {
+    async fetchAllChamados(forceRefresh = false) {
+        const CACHE_KEY = 'chamados_repo_cache_v1';
+        const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
+
+        if (!forceRefresh) {
+            try {
+                const cachedRaw = sessionStorage.getItem(CACHE_KEY);
+                if (cachedRaw) {
+                    const parsed = JSON.parse(cachedRaw);
+                    if (parsed && (Date.now() - parsed.timestamp < CACHE_TTL_MS) && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                        console.log(`⚡ [ChamadosRepository] Retornando ${parsed.data.length} registros do cache de sessão (sessionStorage)`);
+                        return parsed.data.map((row) => {
+                            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+                            if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                                return ModelClass.fromRow(row);
+                            }
+                            if (ModelClass && typeof ModelClass === 'function') {
+                                return new ModelClass(row);
+                            }
+                            return row;
+                        });
+                    }
+                }
+            } catch (errCache) {
+                console.warn('⚠️ [ChamadosRepository] Erro ao ler cache de sessão:', errCache);
+            }
+        }
+
         try {
             const client = this.getClient();
 
@@ -111,6 +144,17 @@ class ChamadosRepository {
             }
 
             console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
+
+            if (data && data.length > 0) {
+                try {
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                        timestamp: Date.now(),
+                        data: data
+                    }));
+                } catch (eSave) {
+                    console.warn('⚠️ [ChamadosRepository] Não foi possível salvar no sessionStorage:', eSave);
+                }
+            }
             
             return (data || []).map((row) => {
                 const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
@@ -325,6 +369,7 @@ class ChamadosRepository {
                 }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de status:', err));
             }
 
+            this.clearCache();
             return updatedData;
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateStatus:', err);

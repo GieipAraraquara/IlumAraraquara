@@ -351,45 +351,6 @@
         </div>
     </div>
 
-    <!-- Barra de Filtros e Busca -->
-    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-4 opacity-0 animate-fade-in-up [animation-delay:550ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            
-            <!-- Campo de Busca em Tempo Real (Suporta múltiplas plaquetas: C0012 C0013) -->
-            <div class="relative flex-1 min-w-[280px]">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/60 text-[20px]">search</span>
-                <input type="text" id="input-busca-plaqueta" placeholder="Buscar identificações (ex: C0012 C0013) ou empresa/observação..." class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl pl-10 pr-9 py-2 text-xs font-medium text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary transition-all placeholder:text-on-surface-variant/50" />
-                <button type="button" id="btn-limpar-busca" onclick="window.limparBuscaPlaqueta()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-on-surface p-0.5 rounded-full transition-colors cursor-pointer">
-                    <span class="material-symbols-outlined text-[18px]">cancel</span>
-                </button>
-            </div>
-
-            <div class="flex items-center gap-2 flex-wrap">
-                <!-- Filtro por Empresa -->
-                <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
-                    <span class="material-symbols-outlined text-[18px] text-on-surface-variant">domain</span>
-                    <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Empresa:</label>
-                    <select id="select-filtro-empresa" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 p-0 pr-4">
-                        <option value="all">Todas as Empresas</option>
-                        <option value="FORTNORT">FORTNORT</option>
-                        <option value="ILUMITERRA">ILUMITERRA</option>
-                        <option value="OUTRA">Outras</option>
-                    </select>
-                </div>
-
-                <!-- Quantidade por Página -->
-                <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
-                    <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Exibir:</label>
-                    <select id="select-itens-por-pagina" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 p-0 pr-2">
-                        <option value="25" selected>25 por pág.</option>
-                        <option value="50">50 por pág.</option>
-                        <option value="100">100 por pág.</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- Tabela Principal de Plaquetas -->
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
         <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
@@ -400,11 +361,20 @@
                 </div>
                 
                 <div class="flex items-center gap-3">
+                    <!-- Quantidade por Página -->
+                    <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
+                        <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Exibir:</label>
+                        <select id="select-itens-por-pagina" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 py-0 pl-1 pr-6">
+                            <option value="25" selected>25 por pág.</option>
+                            <option value="50">50 por pág.</option>
+                            <option value="100">100 por pág.</option>
+                        </select>
+                    </div>
+
                     <button type="button" id="btn-ver-mapa-multi" onclick="window.abrirMapaMultiPlaquetasModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs active:scale-95 cursor-pointer">
                         <span class="material-symbols-outlined text-[18px]">map</span>
                         <span id="label-btn-mapa-multi">Ver 0 no Mapa</span>
                     </button>
-                    <span class="text-xs text-on-surface-variant font-medium" id="info-contagem-tabela">Carregando registros...</span>
                 </div>
             </div>
             
@@ -439,20 +409,78 @@
                                 <div class="resizer"></div>
                             </th>
                             
-                            <!-- Coluna 4: Empresa -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 180px; min-width: 180px;" data-col="3">
-                                <div class="flex items-center gap-1.5">
-                                    <span>Empresa</span>
-                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">domain</span>
+                            <!-- Coluna 4: Empresa (Com Filtro no Cabeçalho) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 190px; min-width: 190px;" data-col="3">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="empresa-filter-trigger" title="Filtrar por Empresa">
+                                        <span class="font-label-md uppercase tracking-wider">Empresa</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="empresa-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-56 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-3 animate-fade-in-up hidden" id="empresa-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar por Empresa</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors font-medium">
+                                                <input type="checkbox" id="empresa-filter-all" value="all" checked class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Todas as empresas</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="empresa-filter" value="FORTNORT" checked class="empresa-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>FORTNORT</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="empresa-filter" value="ILUMITERRA" checked class="empresa-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>ILUMITERRA</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="empresa-filter" value="OUTRA" checked class="empresa-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Outras</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.clearEmpresaFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="resizer"></div>
                             </th>
                             
-                            <!-- Coluna 5: Observação -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" data-col="4">
-                                <div class="flex items-center gap-1.5">
-                                    <span>Observação</span>
-                                    <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">notes</span>
+                            <!-- Coluna 5: Observação (Com Filtro no Cabeçalho) -->
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" data-col="4">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="obs-filter-trigger" title="Filtrar por Observação">
+                                        <span class="font-label-md uppercase tracking-wider">Observação</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-secondary hidden" id="obs-filter-indicator"></span>
+                                    </button>
+                                    
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-lg z-50 p-3 animate-fade-in-up hidden" id="obs-filter-dropdown">
+                                        <div class="flex flex-col gap-2 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-1">Filtrar por Observação</span>
+                                            
+                                            <div class="flex flex-col gap-1">
+                                                <button type="button" id="obs-btn-duplicado" onclick="window.toggleObsPreset('DUPLICADO')" class="obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40">
+                                                    <span class="material-symbols-outlined text-[16px] text-rose-600">content_copy</span>
+                                                    <span>Apenas Duplicados</span>
+                                                </button>
+                                                <button type="button" id="obs-btn-com-obs" onclick="window.toggleObsPreset('HAS_OBS')" class="obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40">
+                                                    <span class="material-symbols-outlined text-[16px] text-blue-600">notes</span>
+                                                    <span>Com Observação</span>
+                                                </button>
+                                            </div>
+
+                                            <div class="relative">
+                                                <input type="text" id="obs-search-input" placeholder="Buscar em observações..." class="w-full text-xs border border-outline-variant rounded-md px-3 py-1.5 pl-8 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+
+                                            <div class="border-t border-outline-variant pt-1 mt-0.5">
+                                                <button type="button" class="w-full text-left px-1 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.clearObsFilter()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="resizer"></div>
                             </th>
@@ -529,6 +557,15 @@
             </div>
         </div>
     </div>
+
+    <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
+    <button id="btn-scroll-bottom" 
+            onclick="window.handleScrollFABClick()" 
+            class="fixed bottom-6 right-6 z-40 w-12 h-12 rounded-full bg-secondary text-white shadow-lg hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 flex items-center justify-center cursor-pointer opacity-0 pointer-events-none group border border-white/20" 
+            title="Rolar até o fundo" 
+            aria-label="Rolar até o fundo">
+        <span id="btn-scroll-bottom-icon" class="material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5">arrow_downward</span>
+    </button>
 </main>
 
 <!-- MODAL 1: Visualização do Mapa e Edição Direta de Coordenadas -->
@@ -725,6 +762,57 @@
     </div>
 </div>
 
+<!-- MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA -->
+<div id="modal-historico-plaqueta" onclick="if (event.target === this) window.fecharModalHistoricoPlaqueta()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-historico-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-3xl w-full h-[85vh] max-h-[700px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">history</span>
+                </div>
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-slate-900" id="historico-modal-titulo">Histórico de Posições</h3>
+                    <p class="text-xs text-slate-500 font-medium">Registro de alterações e movimentações desta plaqueta no tempo.</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.fecharModalHistoricoPlaqueta()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body -->
+        <div class="flex-1 overflow-y-auto p-5 space-y-4">
+            <div id="historico-loading" class="text-center py-8 text-slate-500 font-medium hidden">
+                <span class="material-symbols-outlined text-[32px] animate-spin text-purple-600 mb-2">sync</span>
+                <p>Carregando histórico do Supabase...</p>
+            </div>
+
+            <div id="historico-empty" class="text-center py-10 text-slate-500 hidden">
+                <span class="material-symbols-outlined text-[40px] text-slate-300 mb-2">location_off</span>
+                <p class="font-bold text-slate-700">Nenhum histórico registrado</p>
+                <p class="text-xs text-slate-400 mt-1">As alterações de posição desta plaqueta serão gravadas automaticamente aqui.</p>
+            </div>
+
+            <div id="historico-content" class="hidden">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 bg-slate-100 text-slate-700 font-bold uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Data / Hora</th>
+                            <th class="py-2.5 px-3">Posição Registrada</th>
+                            <th class="py-2.5 px-3">Nº da OS</th>
+                            <th class="py-2.5 px-3">Usuário / Origem</th>
+                            <th class="py-2.5 px-3">Observação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-historico-plaqueta" class="divide-y divide-slate-200 text-slate-800">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- CONTROLLER E LÓGICA DE GERENCIAMENTO DE PLAQUETAS -->
 <script>
     (function() {
@@ -737,6 +825,10 @@
         
         let buscaTexto = '';
         let filtroEmpresa = 'all';
+        let filtroEmpresaSel = ['all'];
+        let filtroObsPreset = ''; // '', 'DUPLICADO', 'HAS_OBS'
+        let filtroObsTexto = '';
+        let timeoutDebounceObs = null;
         
         let plaquetaEmVisualizacaoMap = null;
         let mapboxInstance = null;
@@ -781,6 +873,21 @@
             if (selectEmpresa) {
                 selectEmpresa.addEventListener('change', (e) => {
                     filtroEmpresa = e.target.value;
+                    if (filtroEmpresa === 'all') {
+                        filtroEmpresaSel = ['all'];
+                        const empresaFilterAll = document.getElementById('empresa-filter-all');
+                        if (empresaFilterAll) empresaFilterAll.checked = true;
+                        document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox').forEach(cb => cb.checked = true);
+                        document.getElementById('empresa-filter-indicator')?.classList.add('hidden');
+                    } else {
+                        filtroEmpresaSel = [filtroEmpresa];
+                        document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox').forEach(cb => {
+                            cb.checked = (cb.value === filtroEmpresa);
+                        });
+                        const empresaFilterAll = document.getElementById('empresa-filter-all');
+                        if (empresaFilterAll) empresaFilterAll.checked = false;
+                        document.getElementById('empresa-filter-indicator')?.classList.remove('hidden');
+                    }
                     carregarPlaquetas(1);
                 });
             }
@@ -800,8 +907,237 @@
                 });
             }
 
+            setupHeaderFilters();
+
             // Sync resizers
             initResizers();
+        }
+
+        function setupHeaderFilters() {
+            const empresaTrigger = document.getElementById('empresa-filter-trigger');
+            const empresaDropdown = document.getElementById('empresa-filter-dropdown');
+            const obsTrigger = document.getElementById('obs-filter-trigger');
+            const obsDropdown = document.getElementById('obs-filter-dropdown');
+
+            const empresaFilterAll = document.getElementById('empresa-filter-all');
+            const empresaCheckboxes = document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox');
+            const obsSearchInput = document.getElementById('obs-search-input');
+
+            // Mover dropdowns para o body portal prevenindo corte no overflow da tabela
+            [empresaDropdown, obsDropdown].forEach(d => {
+                if (d && d.parentElement !== document.body) {
+                    document.body.appendChild(d);
+                }
+            });
+
+            function closeAllHeaderDropdowns() {
+                [empresaDropdown, obsDropdown].forEach(d => {
+                    if (d) {
+                        d.classList.add('hidden');
+                        d.style.display = 'none';
+                    }
+                });
+            }
+
+            function openFloatingHeaderDropdown(triggerBtn, dropdownEl) {
+                if (!triggerBtn || !dropdownEl) return;
+
+                if (dropdownEl.parentElement !== document.body) {
+                    document.body.appendChild(dropdownEl);
+                }
+
+                const isHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+                closeAllHeaderDropdowns();
+
+                if (isHidden) {
+                    dropdownEl.style.position = 'fixed';
+                    dropdownEl.style.zIndex = '99999';
+                    dropdownEl.style.display = 'block';
+                    dropdownEl.classList.remove('hidden');
+
+                    const rect = triggerBtn.getBoundingClientRect();
+                    const dropdownHeight = dropdownEl.offsetHeight || 220;
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+
+                    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                        dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 4)}px`;
+                    } else {
+                        dropdownEl.style.top = `${rect.bottom + 4}px`;
+                    }
+
+                    dropdownEl.style.left = `${Math.max(12, rect.left)}px`;
+                    dropdownEl.style.right = 'auto';
+
+                    if (dropdownEl.id === 'obs-filter-dropdown') {
+                        setTimeout(() => obsSearchInput?.focus(), 50);
+                    }
+                }
+            }
+
+            empresaTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openFloatingHeaderDropdown(empresaTrigger, empresaDropdown);
+            });
+
+            obsTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openFloatingHeaderDropdown(obsTrigger, obsDropdown);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (empresaDropdown && !empresaDropdown.contains(e.target) && !empresaTrigger?.contains(e.target)) {
+                    empresaDropdown.classList.add('hidden');
+                    empresaDropdown.style.display = 'none';
+                }
+                if (obsDropdown && !obsDropdown.contains(e.target) && !obsTrigger?.contains(e.target)) {
+                    obsDropdown.classList.add('hidden');
+                    obsDropdown.style.display = 'none';
+                }
+            });
+
+            window.addEventListener('scroll', () => {
+                const activeEl = document.activeElement;
+                if (activeEl && (
+                    activeEl.id === 'obs-search-input' ||
+                    activeEl.closest('#empresa-filter-dropdown') ||
+                    activeEl.closest('#obs-filter-dropdown')
+                )) {
+                    return;
+                }
+                closeAllHeaderDropdowns();
+            }, true);
+
+            window.addEventListener('resize', closeAllHeaderDropdowns);
+
+            if (empresaFilterAll) {
+                empresaFilterAll.addEventListener('change', (e) => {
+                    const isChecked = e.target.checked;
+                    empresaCheckboxes.forEach(cb => cb.checked = isChecked);
+                    updateEmpresaFilterState();
+                });
+            }
+
+            empresaCheckboxes.forEach(cb => {
+                cb.addEventListener('change', () => {
+                    updateEmpresaFilterState();
+                });
+            });
+
+            if (obsSearchInput) {
+                obsSearchInput.addEventListener('input', (e) => {
+                    filtroObsTexto = e.target.value;
+                    filtroObsPreset = '';
+                    atualizarObsFilterUI();
+
+                    if (timeoutDebounceObs) clearTimeout(timeoutDebounceObs);
+                    timeoutDebounceObs = setTimeout(() => {
+                        carregarPlaquetas(1);
+                    }, 350);
+                });
+            }
+        }
+
+        function updateEmpresaFilterState() {
+            const checkedBoxes = document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox:checked');
+            const checkedValues = Array.from(checkedBoxes).map(cb => cb.value);
+            const empresaFilterAll = document.getElementById('empresa-filter-all');
+            const empresaIndicator = document.getElementById('empresa-filter-indicator');
+            const totalCheckboxes = document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox').length;
+
+            if (empresaFilterAll) {
+                empresaFilterAll.checked = (checkedValues.length === totalCheckboxes && totalCheckboxes > 0);
+            }
+
+            if (checkedValues.length === totalCheckboxes || checkedValues.length === 0) {
+                filtroEmpresaSel = ['all'];
+                filtroEmpresa = 'all';
+                if (empresaIndicator) empresaIndicator.classList.add('hidden');
+            } else {
+                filtroEmpresaSel = checkedValues;
+                filtroEmpresa = (checkedValues.length === 1) ? checkedValues[0] : 'CUSTOM';
+                if (empresaIndicator) empresaIndicator.classList.remove('hidden');
+            }
+
+            const selectEmpresa = document.getElementById('select-filtro-empresa');
+            if (selectEmpresa) {
+                if (filtroEmpresaSel.length === 1 && ['FORTNORT', 'ILUMITERRA', 'OUTRA'].includes(filtroEmpresaSel[0])) {
+                    selectEmpresa.value = filtroEmpresaSel[0];
+                } else {
+                    selectEmpresa.value = 'all';
+                }
+            }
+
+            carregarPlaquetas(1);
+        }
+
+        window.clearEmpresaFilter = function() {
+            const empresaFilterAll = document.getElementById('empresa-filter-all');
+            const empresaCheckboxes = document.querySelectorAll('input[name="empresa-filter"].empresa-checkbox');
+            if (empresaFilterAll) empresaFilterAll.checked = true;
+            empresaCheckboxes.forEach(cb => cb.checked = true);
+
+            filtroEmpresaSel = ['all'];
+            filtroEmpresa = 'all';
+            const empresaIndicator = document.getElementById('empresa-filter-indicator');
+            if (empresaIndicator) empresaIndicator.classList.add('hidden');
+
+            const selectEmpresa = document.getElementById('select-filtro-empresa');
+            if (selectEmpresa) selectEmpresa.value = 'all';
+
+            carregarPlaquetas(1);
+        };
+
+        window.toggleObsPreset = function(presetKey) {
+            const obsSearchInput = document.getElementById('obs-search-input');
+            if (obsSearchInput) obsSearchInput.value = '';
+            filtroObsTexto = '';
+
+            if (filtroObsPreset === presetKey) {
+                filtroObsPreset = '';
+            } else {
+                filtroObsPreset = presetKey;
+            }
+
+            atualizarObsFilterUI();
+            carregarPlaquetas(1);
+        };
+
+        window.clearObsFilter = function() {
+            filtroObsPreset = '';
+            filtroObsTexto = '';
+            const obsSearchInput = document.getElementById('obs-search-input');
+            if (obsSearchInput) obsSearchInput.value = '';
+
+            atualizarObsFilterUI();
+            carregarPlaquetas(1);
+        };
+
+        function atualizarObsFilterUI() {
+            const obsIndicator = document.getElementById('obs-filter-indicator');
+            const btnDuplicado = document.getElementById('obs-btn-duplicado');
+            const btnComObs = document.getElementById('obs-btn-com-obs');
+
+            const hasActiveFilter = Boolean(filtroObsPreset || filtroObsTexto.trim());
+            if (obsIndicator) {
+                obsIndicator.classList.toggle('hidden', !hasActiveFilter);
+            }
+
+            if (btnDuplicado) {
+                if (filtroObsPreset === 'DUPLICADO') {
+                    btnDuplicado.className = 'obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-secondary text-white border-secondary shadow-xs';
+                } else {
+                    btnDuplicado.className = 'obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40';
+                }
+            }
+
+            if (btnComObs) {
+                if (filtroObsPreset === 'HAS_OBS') {
+                    btnComObs.className = 'obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-secondary text-white border-secondary shadow-xs';
+                } else {
+                    btnComObs.className = 'obs-preset-btn px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all text-left flex items-center gap-2 cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40';
+                }
+            }
         }
 
         window.limparBuscaPlaqueta = function() {
@@ -850,12 +1186,36 @@
                 }
 
                 // Filtro de empresa
-                if (filtroEmpresa !== 'all') {
+                if (!filtroEmpresaSel.includes('all') && filtroEmpresaSel.length > 0) {
+                    if (filtroEmpresaSel.length === 1 && filtroEmpresaSel[0] === 'OUTRA') {
+                        query = query.not('Empresa', 'ilike', '%FORTNORT%').not('Empresa', 'ilike', '%ILUMITERRA%');
+                    } else {
+                        const conds = [];
+                        filtroEmpresaSel.forEach(emp => {
+                            if (emp === 'OUTRA') {
+                                conds.push('and(Empresa.not.ilike.%FORTNORT%,Empresa.not.ilike.%ILUMITERRA%)');
+                            } else {
+                                conds.push(`Empresa.ilike.%${emp}%`);
+                            }
+                        });
+                        query = query.or(conds.join(','));
+                    }
+                } else if (filtroEmpresa !== 'all') {
                     if (filtroEmpresa === 'OUTRA') {
                         query = query.not('Empresa', 'ilike', '%FORTNORT%').not('Empresa', 'ilike', '%ILUMITERRA%');
                     } else {
                         query = query.ilike('Empresa', `%${filtroEmpresa}%`);
                     }
+                }
+
+                // Filtro de observação
+                if (filtroObsPreset === 'DUPLICADO') {
+                    query = query.ilike('Observação', '%DUPLICADO%');
+                } else if (filtroObsPreset === 'HAS_OBS') {
+                    query = query.not('Observação', 'is', null).neq('Observação', '');
+                } else if (filtroObsTexto.trim()) {
+                    const qObs = filtroObsTexto.trim();
+                    query = query.ilike('Observação', `%${qObs}%`);
                 }
 
                 // Paginacao
@@ -1036,6 +1396,9 @@
                         <div class="flex items-center justify-center gap-1.5">
                             <button type="button" onclick="window.abrirMapaPlaquetaModal('${plq.identificacao}')" class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all cursor-pointer active:scale-95" title="Ver / Editar no Mapa">
                                 <span class="material-symbols-outlined text-[18px]">map</span>
+                            </button>
+                            <button type="button" onclick="window.abrirModalHistoricoPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 transition-all cursor-pointer active:scale-95" title="Ver Histórico de Posições">
+                                <span class="material-symbols-outlined text-[18px]">history</span>
                             </button>
                             <button type="button" onclick="window.abrirModalEditarPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-all cursor-pointer active:scale-95" title="Editar dados da Plaqueta">
                                 <span class="material-symbols-outlined text-[18px]">edit</span>
@@ -1303,6 +1666,18 @@
                 if (error) {
                     alert("Erro ao atualizar coordenadas no Supabase: " + error.message);
                 } else {
+                    try {
+                        const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
+                        await client.from('historico_localizacao_plaquetas').insert([{
+                            identificacao: plaquetaEmVisualizacaoMap.identificacao,
+                            latitude: newLat,
+                            longitude: newLng,
+                            origem: 'EDICAO_MAPA',
+                            usuario: userNome,
+                            observacao: 'Localização ajustada via mapa Mapbox'
+                        }]);
+                    } catch (hErr) { console.warn('Aviso histórico:', hErr); }
+
                     alert(`✅ Localização da plaqueta #${plaquetaEmVisualizacaoMap.identificacao} atualizada com sucesso!`);
                     window.fecharMapaPlaquetaModal();
                     carregarPlaquetas(paginaAtual);
@@ -1427,6 +1802,20 @@
                 if (res.error) {
                     alert("Erro ao salvar plaqueta no Supabase: " + res.error.message);
                 } else {
+                    if (!isNaN(latVal) && !isNaN(lngVal)) {
+                        try {
+                            const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
+                            await client.from('historico_localizacao_plaquetas').insert([{
+                                identificacao: identificacao,
+                                latitude: latVal,
+                                longitude: lngVal,
+                                origem: idOriginal ? 'EDICAO_FORMULARIO' : 'CADASTRO_NOVA_PLAQUETA',
+                                usuario: userNome,
+                                observacao: idOriginal ? 'Dados editados no Formulário' : 'Novo cadastro de plaqueta'
+                            }]);
+                        } catch (hErr) { console.warn('Aviso histórico:', hErr); }
+                    }
+
                     alert(`✅ Plaqueta ${identificacao} salva com sucesso!`);
                     window.fecharFormPlaquetaModal();
                     carregarPlaquetas(paginaAtual);
@@ -1665,6 +2054,126 @@
             setTimeout(() => {
                 modal.classList.add('hidden');
                 modal.style.display = 'none';
+            }, 200);
+        };
+
+        // =========================================================================
+        // LÓGICA DO MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA
+        // =========================================================================
+        window.abrirModalHistoricoPlaqueta = async function(identificacao) {
+            const modal = document.getElementById('modal-historico-plaqueta');
+            const modalBox = document.getElementById('modal-historico-plaqueta-box');
+            const titulo = document.getElementById('historico-modal-titulo');
+            const loading = document.getElementById('historico-loading');
+            const empty = document.getElementById('historico-empty');
+            const content = document.getElementById('historico-content');
+            const tbody = document.getElementById('tbody-historico-plaqueta');
+
+            if (!modal || !modalBox) return;
+
+            if (titulo) titulo.innerText = `Histórico de Posições #${identificacao}`;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 50);
+
+            if (loading) loading.classList.remove('hidden');
+            if (empty) empty.classList.add('hidden');
+            if (content) content.classList.add('hidden');
+            if (tbody) tbody.innerHTML = '';
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                if (loading) loading.classList.add('hidden');
+                if (empty) {
+                    empty.classList.remove('hidden');
+                    empty.querySelector('p').innerText = "Erro: Cliente Supabase não disponível.";
+                }
+                return;
+            }
+
+            try {
+                const { data, error } = await client
+                    .from('historico_localizacao_plaquetas')
+                    .select('*')
+                    .ilike('identificacao', identificacao)
+                    .order('created_at', { ascending: false });
+
+                if (loading) loading.classList.add('hidden');
+
+                if (error) {
+                    console.error('❌ Erro ao buscar histórico:', error);
+                    if (empty) {
+                        empty.classList.remove('hidden');
+                        empty.querySelector('.font-bold').innerText = "Falha ao consultar histórico";
+                        empty.querySelector('.text-xs').innerText = error.message;
+                    }
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    if (empty) empty.classList.remove('hidden');
+                    return;
+                }
+
+                if (content) content.classList.remove('hidden');
+
+                data.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition-colors';
+
+                    const dt = item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '---';
+                    const lat = parseFloat(item.latitude);
+                    const lng = parseFloat(item.longitude);
+                    const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+
+                    const locHtml = hasCoords 
+                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono font-semibold">
+                            <span class="material-symbols-outlined text-[14px]">location_on</span>
+                            ${lat.toFixed(5)}, ${lng.toFixed(5)}
+                           </a>`
+                        : `<span class="text-amber-600 font-medium">Sem coords</span>`;
+
+                    const osHtml = item.numero_os 
+                        ? `<span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">#${item.numero_os}</span>`
+                        : `<span class="text-slate-400">---</span>`;
+
+                    const userHtml = `<div>
+                        <span class="font-bold text-slate-900">${item.usuario || 'Sistema'}</span>
+                        <div class="text-[10px] text-slate-500 font-mono">${item.origem || 'FINALIZAR_OS'}</div>
+                    </div>`;
+
+                    const obsHtml = `<span class="text-slate-600">${item.observacao || '---'}</span>`;
+
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-600">${dt}</td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">${locHtml}</td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">${osHtml}</td>
+                        <td class="py-2.5 px-3">${userHtml}</td>
+                        <td class="py-2.5 px-3">${obsHtml}</td>
+                    `;
+
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error('❌ Exceção histórico:', err);
+                if (loading) loading.classList.add('hidden');
+                if (empty) empty.classList.remove('hidden');
+            }
+        };
+
+        window.fecharModalHistoricoPlaqueta = function() {
+            const modal = document.getElementById('modal-historico-plaqueta');
+            const modalBox = document.getElementById('modal-historico-plaqueta-box');
+            if (!modal || !modalBox) return;
+
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
             }, 200);
         };
 

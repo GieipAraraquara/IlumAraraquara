@@ -743,16 +743,66 @@ class AuditoriaController {
     /**
      * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
      */
-    abrirDetalhesOSModal(id) {
+    /**
+     * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
+     */
+    async abrirDetalhesOSModal(id) {
+        if (!id) return;
+        const cleanId = String(id || '').replace(/^#/, '').trim();
+        const upperClean = cleanId.toUpperCase();
+
         const list = this.chamadosList || window.chamadosListCache || [];
-        let item = list.find(c => String(c.id) === String(id) || String(c.protocolo).toUpperCase() === String(id).toUpperCase());
+        let item = list.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === upperClean || cid === upperClean;
+        });
+
+        // Se não encontrar na memória local, consulta o Supabase sob demanda
+        if (!item && window.supabaseClient) {
+            try {
+                const client = window.supabaseClient;
+                let { data: row } = await client
+                    .from('ordens_servico')
+                    .select('*')
+                    .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
+                    .maybeSingle();
+
+                if (!row) {
+                    const resPraca = await client
+                        .from('ordens_servico_pracas')
+                        .select('*')
+                        .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
+                        .maybeSingle();
+                    if (resPraca && resPraca.data) row = resPraca.data;
+                }
+
+                if (!row) {
+                    const resLeg = await client
+                        .from('chamados')
+                        .select('*')
+                        .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
+                        .maybeSingle();
+                    if (resLeg && resLeg.data) row = resLeg.data;
+                }
+
+                if (row && window.ChamadoModel) {
+                    const ModelClass = window.ChamadoModel;
+                    item = (typeof ModelClass.fromRow === 'function') ? ModelClass.fromRow(row) : new ModelClass(row);
+                    if (this.chamadosList) this.chamadosList.push(item);
+                    if (window.chamadosListCache) window.chamadosListCache.push(item);
+                }
+            } catch (errRemoto) {
+                console.warn('⚠️ [AuditoriaController] Erro ao buscar OS remota sob demanda:', errRemoto);
+            }
+        }
         
         if (!item && window.ChamadoModel) {
             // Fallback com mock realista de coordenadas para teste de audit em linhas estáticas
-            const isDivergenteTest = String(id).includes('004') || String(id).includes('270726');
+            const isDivergenteTest = String(cleanId).includes('004') || String(cleanId).includes('270726');
             item = new window.ChamadoModel({
-                id: id,
-                protocolo: id,
+                id: cleanId,
+                protocolo: cleanId,
                 status: 'Concluída',
                 data_abertura: '2023-08-09T10:00:00Z',
                 data_conclusao: '2023-08-09T14:30:00Z',
@@ -771,6 +821,18 @@ class AuditoriaController {
             });
         }
         if (!item) return;
+
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const isModalAlreadyOpen = modal && !modal.classList.contains('hidden');
+
+        if (!this.modalHistory) this.modalHistory = [];
+
+        if (!isModalAlreadyOpen) {
+            this.modalHistory = [];
+        } else if (this.currentModalProtocolo && this.currentModalProtocolo !== item.protocolo && !this._isNavigatingHistory) {
+            this.modalHistory.push(this.currentModalProtocolo);
+        }
+        this.currentModalProtocolo = item.protocolo;
 
         const elProt = document.getElementById('detalheModalProtocolo');
         if (elProt) elProt.innerText = `Protocolo #${item.protocolo}`;
@@ -811,7 +873,6 @@ class AuditoriaController {
         }
         this.setupGlobalAuditTooltip();
 
-        const modal = document.getElementById('modalDetalhesOSAuditoria');
         const box = document.getElementById('modalDetalhesOSBox');
         if (modal && box) {
             modal.classList.remove('hidden');
@@ -819,6 +880,20 @@ class AuditoriaController {
                 box.classList.remove('scale-95', 'opacity-0');
                 box.classList.add('scale-100', 'opacity-100');
             }, 10);
+        }
+    }
+
+    /**
+     * Retorna à OS anterior quando navegando por links de OSs duplicadas/vinculadas no modal
+     */
+    async voltarModalOS() {
+        if (!this.modalHistory || this.modalHistory.length === 0) return;
+        const prevProtocol = this.modalHistory.pop();
+        this._isNavigatingHistory = true;
+        try {
+            await this.abrirDetalhesOSModal(prevProtocol);
+        } finally {
+            this._isNavigatingHistory = false;
         }
     }
 
@@ -1105,7 +1180,25 @@ class AuditoriaController {
             `;
         }).join('');
 
+        const historyBannerHtml = (this.modalHistory && this.modalHistory.length > 0) ? `
+            <div class="p-2.5 bg-blue-50/95 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 shadow-2xs mb-3">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-[18px] text-blue-600 shrink-0">link</span>
+                    <span>Visualizando OS referenciada como duplicata <strong class="font-mono font-bold text-blue-800">#${item.protocolo}</strong></span>
+                </div>
+                <button type="button" onclick="window.auditoriaController.voltarModalOS()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 hover:bg-blue-100 hover:text-blue-900 border border-blue-300 hover:border-blue-400 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px]">arrow_back</span>
+                    <span>Voltar para #${this.modalHistory[this.modalHistory.length - 1]}</span>
+                </button>
+            </div>
+        ` : '';
+
+        const motivoAprovacaoHtml = item.motivoAprovacao 
+            ? (window.ChamadoModel && typeof window.ChamadoModel.formatarMotivoHtml === 'function' ? window.ChamadoModel.formatarMotivoHtml(item.motivoAprovacao, { isTable: false }) : item.motivoAprovacao)
+            : '';
+
         return `
+        ${historyBannerHtml}
         <!-- Seção 1: Solicitante & Ações Administrativas no Topo -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-1">
@@ -1118,7 +1211,7 @@ class AuditoriaController {
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
-                ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">${item.motivoAprovacao}</span></div>` : ''}
+                ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-flex items-center flex-wrap gap-1 mt-0.5 shadow-2xs">${motivoAprovacaoHtml}</span></div>` : ''}
             </div>
 
             <!-- Bloco 2: Ações Administrativas -->
@@ -1338,9 +1431,9 @@ class AuditoriaController {
                                  <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1 text-xs flex flex-col justify-between h-full">
                                      <div class="space-y-1">
                                          <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Fechamento #${p.fechamento || p.numeroFechamento || 1}</div>
-                                         <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (item.plaquetaFinal || 'Não informada')}</span></div>
-                                         <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (item.coordenadaReparo || 'Não informada')}</span></div>
-                                         <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (item.problemaEncontrado || 'Não informado')}</span></div>
+                                         <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (pIdx === 0 ? (item.plaquetaFinal || 'Não informada') : 'Não informada')}</span></div>
+                                         <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
+                                         <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
                                          ${isRealAddr(p.enderecoFinal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${p.enderecoFinal}</span></div>` : ''}
                                      </div>
                                      ${navFin.hasNav ? `

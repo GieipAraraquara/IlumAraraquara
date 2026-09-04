@@ -1273,7 +1273,7 @@
         if (!protocolo) return;
 
         protocolo = String(protocolo).trim().toUpperCase();
-        const isPraca = protocolo.startsWith('PC') || (osData && osData.tipo === 'praca');
+        const isPraca = protocolo.startsWith('P') || (osData && osData.tipo === 'praca');
 
         if (isPraca) {
           alternarTipoOS('praca');
@@ -2200,10 +2200,14 @@
             var agora = new Date();
             var dia = agora.getDate().toString().padStart(2, '0');
             var mes = (agora.getMonth() + 1).toString().padStart(2, '0');
-            var ano = agora.getFullYear().toString().slice(-2);
-            var dateStr = dia + mes + ano;
+            var ano2Digitos = agora.getFullYear() % 100;
+            var offsetAno = ano2Digitos - 26;
+            var anoLetra = (offsetAno >= 0 && offsetAno < 26)
+              ? String.fromCharCode(65 + offsetAno)
+              : ano2Digitos.toString();
+            var dateStr = dia + mes + anoLetra;
             
-            var prefixo = 'IP';
+            var prefixo = 'I';
             var digitoRandom = Math.floor(Math.random() * 10).toString();
             
             var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -2414,6 +2418,61 @@
             console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
           } catch(errFechInsert) {
             console.warn('⚠️ Não foi possível salvar em fechamentos_os:', errFechInsert);
+          }
+
+          // Atualização e gravação do histórico de posição das plaquetas atendidas nesta OS
+          try {
+            for (var pIdx = 0; pIdx < arrPontosPayload.length; pIdx++) {
+              var pt = arrPontosPayload[pIdx];
+              if (pt.plaqueta && pt.lat && pt.lng) {
+                var pLat = parseFloat(String(pt.lat).replace(',', '.'));
+                var pLng = parseFloat(String(pt.lng).replace(',', '.'));
+                if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) {
+                  var plaqUpper = String(pt.plaqueta).trim().toUpperCase();
+                  
+                  // 1. Atualizar ou Inserir na tabela principal localizacao_plaquetas
+                  var resPlaq = await client.from('localizacao_plaquetas')
+                    .select('identificacao')
+                    .ilike('identificacao', plaqUpper)
+                    .maybeSingle();
+
+                  if (resPlaq && resPlaq.data) {
+                    await client.from('localizacao_plaquetas').update({
+                      latitude: pLat,
+                      longitude: pLng,
+                      Latitude: pLat,
+                      Longitude: pLng,
+                      updated_at: new Date().toISOString()
+                    }).ilike('identificacao', plaqUpper);
+                  } else {
+                    await client.from('localizacao_plaquetas').insert([{
+                      identificacao: plaqUpper,
+                      latitude: pLat,
+                      longitude: pLng,
+                      Latitude: pLat,
+                      Longitude: pLng,
+                      "QTD. Lum.": 1,
+                      Empresa: 'FORTNORT',
+                      Observação: 'Cadastrada via Finalização OS #' + protFinal
+                    }]);
+                  }
+
+                  // 2. Gravar no histórico de posições com metadados do protocolo e técnico
+                  await client.from('historico_localizacao_plaquetas').insert([{
+                    identificacao: plaqUpper,
+                    latitude: pLat,
+                    longitude: pLng,
+                    numero_os: protFinal,
+                    origem: 'FINALIZAR_OS',
+                    usuario: nomeOperadorFinalizacao,
+                    observacao: 'Posição atualizada ao finalizar OS #' + protFinal
+                  }]);
+                }
+              }
+            }
+            console.log('✅ Localização e histórico das plaquetas gravados com sucesso!');
+          } catch(errPlaqHist) {
+            console.warn('⚠️ Não foi possível atualizar localização/histórico das plaquetas:', errPlaqHist);
           }
 
           if (window.offlineSyncService) {

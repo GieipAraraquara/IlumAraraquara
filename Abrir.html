@@ -835,8 +835,23 @@
       <div class="modal-content text-center max-w-sm p-6">
         <div class="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto text-3xl mb-3">✓</div>
         <h3 class="text-emerald-700 font-bold text-lg mb-2">OS Cadastrada!</h3>
-        <p id="msgSucessoTexto" class="text-sm text-slate-600 mb-5 leading-relaxed"></p>
-        <button type="button" class="btn-primario" onclick="fecharSucesso()">OK, Fechar</button>
+        <p id="msgSucessoTexto" class="text-sm text-slate-600 mb-4 leading-relaxed"></p>
+        <div id="boxCopiarProtocolo" class="mb-4 hidden">
+          <button type="button" onclick="copiarProtocoloSucesso()" id="btnCopiarProtocolo" class="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-xs rounded-xl border border-blue-200 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-xs">
+            <span class="material-symbols-outlined text-[18px]">content_copy</span>
+            <span id="btnCopiarProtocoloTexto">Copiar Protocolo</span>
+          </button>
+        </div>
+        <div class="flex items-center gap-2.5 mt-2">
+          <button type="button" class="flex-1 py-2.5 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs sm:text-sm font-semibold rounded-xl border border-slate-300 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5" onclick="fecharSucesso()">
+            <span class="material-symbols-outlined text-[18px]">close</span>
+            <span>OK, Fechar</span>
+          </button>
+          <button type="button" class="flex-1 py-2.5 px-3 bg-[#0051d5] hover:bg-[#0041ab] text-white text-xs sm:text-sm font-semibold rounded-xl transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 shadow-sm" onclick="continuarCadastrandoNovaOS()">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            <span>Nova OS</span>
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1430,23 +1445,44 @@
         return res;
       }
 
+      var ultimoMsGerado = 0;
+      var contadorColisao = 0;
+
       function gerarNovoProtocolo(tipoOS) {
         var agora = new Date();
         var dia = agora.getDate().toString().padStart(2, '0');
         var mes = (agora.getMonth() + 1).toString().padStart(2, '0');
-        var ano = agora.getFullYear().toString().slice(-2);
-        var dateStr = dia + mes + ano; // Formato DDMMYY
         
-        var prefixo = (tipoOS === 'praca') ? 'PC' : 'IP';
-        var digitoRandom = Math.floor(Math.random() * 10).toString();
+        // Mapeamento do ano: A para 26, B para 27, C para 28, etc.
+        var ano2Digitos = agora.getFullYear() % 100;
+        var offsetAno = ano2Digitos - 26;
+        var anoLetra = (offsetAno >= 0 && offsetAno < 26)
+          ? String.fromCharCode(65 + offsetAno)
+          : ano2Digitos.toString();
+
+        var dateStr = dia + mes + anoLetra; // Formato DDMM + LetraAno (ex: 0409A)
         
-        var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        var randomCode = '';
-        for (var i = 0; i < 4; i++) {
-          randomCode += chars.charAt(Math.floor(Math.random() * chars.length));
+        // Prefixo simplificado: I para viária, P para praça
+        var prefixo = (tipoOS === 'praca') ? 'P' : 'I';
+        
+        // Considera horas, minutos, segundos e milissegundos com precisão temporal
+        var hora = agora.getHours().toString().padStart(2, '0');
+        var min = agora.getMinutes().toString().padStart(2, '0');
+        var sec = agora.getSeconds().toString().padStart(2, '0');
+        var ms = agora.getMilliseconds().toString().padStart(3, '0');
+
+        var numTimestamp = parseInt(hora + min + sec + ms, 10);
+        // Garantia anti-colisão se chamado consecutivamente no mesmo milissegundo
+        if (numTimestamp <= ultimoMsGerado) {
+          contadorColisao++;
+          numTimestamp += contadorColisao;
+        } else {
+          contadorColisao = 0;
+          ultimoMsGerado = numTimestamp;
         }
 
-        return prefixo + digitoRandom + randomCode + dateStr;
+        var timeCode = numTimestamp.toString(36).toUpperCase().padStart(6, '0');
+        return prefixo + timeCode + dateStr;
       }
 
       // =========================================================================
@@ -2002,6 +2038,12 @@
         // Se for uma Nova OS (sem sessionOs), limpa o estado de edição e restaura o formulário padrão
         isModoEdicao = false;
         osRecordEmEdicao = null;
+
+        var mSuc = document.getElementById('modalSucesso');
+        if (mSuc) mSuc.style.display = 'none';
+        var boxCop = document.getElementById('boxCopiarProtocolo');
+        if (boxCop) boxCop.classList.add('hidden');
+        if (typeof ultimoProtocoloGerado !== 'undefined') ultimoProtocoloGerado = null;
 
         var tabTipoOS = document.querySelector('.tab-tipo-os');
         if (tabTipoOS) tabTipoOS.style.display = '';
@@ -3032,8 +3074,7 @@
               .then(function() {
                 btnSalvar.disabled = false;
                 btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
-                document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Modo Offline Ativado!</strong><br>A OS Modo Rápido foi gravada no dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>";
-                document.getElementById('modalSucesso').style.display = 'flex';
+                exibirModalSucesso("📱 <strong>Modo Offline Ativado!</strong><br>A OS Modo Rápido foi gravada no dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>", protExtraido);
                 descongelarGpsRapido();
               });
             return;
@@ -3045,8 +3086,7 @@
             btnSalvar.disabled = false;
             btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
 
-            document.getElementById('msgSucessoTexto').innerHTML = "OS Modo Rápido Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
-            document.getElementById('modalSucesso').style.display = 'flex';
+            exibirModalSucesso("OS Modo Rápido Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>", protExtraido);
             descongelarGpsRapido();
 
             if (window.parent && window.parent !== window) {
@@ -3065,8 +3105,7 @@
 
             if (!isGovBrUser && window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))) {
               window.offlineSyncService.savePendingSubmission('abertura_viaria', protExtraido, payloadOSViaria);
-              document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>";
-              document.getElementById('modalSucesso').style.display = 'flex';
+              exibirModalSucesso("📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>", protExtraido);
               descongelarGpsRapido();
               return;
             }
@@ -5078,6 +5117,28 @@
         if (btn) { btn.disabled = false; btn.innerText = "Salvar"; }
       }
 
+      async function garantirEnderecoGeocodificado(lat, lng, endAtual) {
+        var str = (endAtual || '').trim();
+        var lower = str.toLowerCase().replace(/^[📍📡\s]+/, '').trim();
+        var ehBuscando = !lower || lower.includes('buscando...') || lower.includes('buscando…') || lower === 'buscando';
+
+        if (ehBuscando && lat && lng && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lng))) {
+          try {
+            var urlRev = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' + lng + ',' + lat + '.json?access_token=' + MAPBOX_TOKEN + '&country=br&language=pt';
+            var res = await fetch(urlRev);
+            var data = await res.json();
+            if (data && data.features && data.features.length > 0 && data.features[0].place_name) {
+              return data.features[0].place_name;
+            }
+          } catch(e) {
+            console.warn('⚠️ [Geocodificação Await] Não foi possível obter o endereço em tempo real:', e);
+          }
+          return '';
+        }
+
+        return ehBuscando ? '' : str;
+      }
+
       // =========================================================================
       // VALIDAÇÃO GLOBAL E ENVIO (ILUMINAÇÃO OU PRAÇA)
       // =========================================================================
@@ -5221,6 +5282,18 @@
         var btn = document.getElementById('btnSalvar');
         var msg = document.getElementById('mensagem');
         btn.disabled = true;
+
+        if (dados) {
+          var pLatP = null, pLngP = null;
+          if (dados.pracaCoordenada) {
+            var partsP = dados.pracaCoordenada.split(',');
+            if (partsP.length >= 2) {
+              pLatP = parseFloat(partsP[0]);
+              pLngP = parseFloat(partsP[1]);
+            }
+          }
+          dados.pracaEndereco = await garantirEnderecoGeocodificado(pLatP, pLngP, dados.pracaEndereco);
+        }
 
         if (isModoEdicao && osRecordEmEdicao) {
           btn.innerText = "Atualizando OS de Praça no Supabase...";
@@ -5386,8 +5459,7 @@
             window.offlineSyncService.savePendingSubmission('abertura_praca', protExtraido, payloadPraca)
               .then(function() {
                 resetarBotaoSalvar();
-                document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Modo Offline Ativado!</strong><br>A OS da Praça Pública foi gravada no seu dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>";
-                document.getElementById('modalSucesso').style.display = 'flex';
+                exibirModalSucesso("📱 <strong>Modo Offline Ativado!</strong><br>A OS da Praça Pública foi gravada no seu dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>", protExtraido);
                 if (window.parent && window.parent !== window) {
                   window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
                 }
@@ -5402,8 +5474,7 @@
             var msgTexto = (statusOS === "Pendente")
               ? "OS de Praça Cadastrada como <strong>Pendente (Aguardando Avaliação)</strong>!<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong>"
               : "OS de Praça Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
-            document.getElementById('msgSucessoTexto').innerHTML = msgTexto;
-            document.getElementById('modalSucesso').style.display = 'flex';
+            exibirModalSucesso(msgTexto, protExtraido);
             
             if (window.parent && window.parent !== window) {
               window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
@@ -5411,6 +5482,7 @@
 
             var token = localStorage.getItem('os_token');
             if (token && typeof callServer === 'function') {
+              dados.protocolo = protExtraido;
               try { callServer('salvarOS', [dados, token]); } catch(e) {}
             }
           })
@@ -5419,8 +5491,7 @@
             if (!isGovBrUser && window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))) {
               window.offlineSyncService.savePendingSubmission('abertura_praca', protExtraido, payloadPraca);
               resetarBotaoSalvar();
-              document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>";
-              document.getElementById('modalSucesso').style.display = 'flex';
+              exibirModalSucesso("📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>", protExtraido);
               return;
             }
             resetarBotaoSalvar();
@@ -5662,10 +5733,10 @@
       // =========================================================================
       // ENVIO DEFINITIVO E RESET GERAL (ILUMINAÇÃO VIÁRIA)
       // =========================================================================
-      function executarEnvioFinalMultiplo(forcarSalvar) {
+      async function executarEnvioFinalMultiplo(forcarSalvar) {
         var btn = document.getElementById('btnSalvar');
         var msg = document.getElementById('mensagem');
-        btn.disabled = true; btn.innerText = "A gravar OS no servidor...";
+        btn.disabled = true; btn.innerText = "Concluindo geocodificação e gravando OS...";
 
         var arrPontosPayload = [];
 
@@ -5708,7 +5779,11 @@
                end = endTextoValidado || ((modoSel === 'endereco' && elEndI) ? elEndI.value.trim() : (ptState.endereco || ""));
                isDup = ptState.isPlaquetaDuplicadaOrigem;
            }
-           
+
+           var latVal = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.latAtual ? Number(pontosData[0].latAtual).toFixed(6) : null);
+           var lngVal = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.lngAtual ? Number(pontosData[0].lngAtual).toFixed(6) : null);
+           end = await garantirEnderecoGeocodificado(latVal, lngVal, end);
+
            var elProb = document.getElementById('tipoProblema_' + i);
            var prob = elProb ? elProb.value : "";
            if (prob === "Outros") {
@@ -5719,8 +5794,8 @@
            arrPontosPayload.push({
              modo: modoSel,
              tipoLocal: modoSel,
-             lat: ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : null,
-             lng: ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : null,
+             lat: latVal,
+             lng: lngVal,
              plaqueta: plaq,
              endereco: end,
              coordenada: coordStr,
@@ -5844,8 +5919,7 @@
             window.offlineSyncService.savePendingSubmission('abertura_viaria', protExtraido, payloadOSViaria)
               .then(function() {
                 resetarBotaoSalvar();
-                document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Modo Offline Ativado!</strong><br>A Ordem de Serviço foi gravada no seu dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>";
-                document.getElementById('modalSucesso').style.display = 'flex';
+                exibirModalSucesso("📱 <strong>Modo Offline Ativado!</strong><br>A Ordem de Serviço foi gravada no seu dispositivo.<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Ela será enviada ao servidor automaticamente assim que a conexão retornar.</span>", protExtraido);
                 if (window.parent && window.parent !== window) {
                   window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
                 }
@@ -5860,8 +5934,7 @@
             var msgTexto = (statusOS === "Pendente")
               ? "Ordem de Serviço Cadastrada como <strong>Pendente (Aguardando Avaliação)</strong>!<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong>"
               : "Ordem de Serviço Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
-            document.getElementById('msgSucessoTexto').innerHTML = msgTexto;
-            document.getElementById('modalSucesso').style.display = 'flex';
+            exibirModalSucesso(msgTexto, protExtraido);
           
           if (window.parent && window.parent !== window) {
             window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
@@ -5869,6 +5942,7 @@
 
           var token = localStorage.getItem('os_token');
           if (token && typeof callServer === 'function') {
+            dadosFinais.protocolo = protExtraido;
             try { callServer('salvarOSComVerificacao', [dadosFinais, token, forcarSalvar === true]); } catch(e) {}
           }
         }).catch(function(err) {
@@ -5876,8 +5950,7 @@
           if (!isGovBrUser && window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network') || err.message.includes('Failed'))) {
             window.offlineSyncService.savePendingSubmission('abertura_viaria', protExtraido, payloadOSViaria);
             resetarBotaoSalvar();
-            document.getElementById('msgSucessoTexto').innerHTML = "📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>";
-            document.getElementById('modalSucesso').style.display = 'flex';
+            exibirModalSucesso("📱 <strong>Sinal Instável! OS Salva no Dispositivo!</strong><br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong><br><span class='text-xs text-slate-500'>Será enviada ao servidor automaticamente assim que a rede estabilizar.</span>", protExtraido);
             return;
           }
           resetarBotaoSalvar();
@@ -5894,8 +5967,80 @@
         }
       }
 
-      function fecharSucesso() {
-        document.getElementById('modalSucesso').style.display = 'none';
+      var ultimoProtocoloGerado = null;
+
+      function exibirModalSucesso(msgTexto, protocolo) {
+        ultimoProtocoloGerado = protocolo || null;
+        var msgEl = document.getElementById('msgSucessoTexto');
+        if (msgEl) msgEl.innerHTML = msgTexto;
+        var boxCopiar = document.getElementById('boxCopiarProtocolo');
+        var btnTxt = document.getElementById('btnCopiarProtocoloTexto');
+        if (boxCopiar && btnTxt) {
+          if (protocolo) {
+            boxCopiar.classList.remove('hidden');
+            btnTxt.innerText = 'Copiar Protocolo (' + protocolo + ')';
+          } else {
+            boxCopiar.classList.add('hidden');
+          }
+        }
+        var modal = document.getElementById('modalSucesso');
+        if (modal) modal.style.display = 'flex';
+      }
+
+      function copiarProtocoloSucesso() {
+        if (!ultimoProtocoloGerado) return;
+        var btnTxt = document.getElementById('btnCopiarProtocoloTexto');
+        var setCopiado = function() {
+          if (btnTxt) {
+            btnTxt.innerText = 'Protocolo Copiado! ✓';
+            setTimeout(function() {
+              if (btnTxt && ultimoProtocoloGerado) {
+                btnTxt.innerText = 'Copiar Protocolo (' + ultimoProtocoloGerado + ')';
+              } else if (btnTxt) {
+                btnTxt.innerText = 'Copiar Protocolo';
+              }
+            }, 2500);
+          }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(ultimoProtocoloGerado).then(setCopiado).catch(function() {
+            fallbackCopyText(ultimoProtocoloGerado, setCopiado);
+          });
+        } else {
+          fallbackCopyText(ultimoProtocoloGerado, setCopiado);
+        }
+      }
+
+      function fallbackCopyText(text, cb) {
+        try {
+          var temp = document.createElement('input');
+          temp.value = text;
+          document.body.appendChild(temp);
+          temp.select();
+          document.execCommand('copy');
+          document.body.removeChild(temp);
+          if (cb) cb();
+        } catch(e) {}
+      }
+
+      function limparFormularioAposSucesso() {
+        var modal = document.getElementById('modalSucesso');
+        if (modal) modal.style.display = 'none';
+        var boxCopiar = document.getElementById('boxCopiarProtocolo');
+        if (boxCopiar) boxCopiar.classList.add('hidden');
+        ultimoProtocoloGerado = null;
+
+        // Limpa estado de edição para garantir que chamados subsequentes criem nova OS
+        isModoEdicao = false;
+        osRecordEmEdicao = null;
+        try { sessionStorage.removeItem('os_para_edicao'); } catch(e) {}
+        var bannerEd = document.getElementById('bannerModoEdicao');
+        if (bannerEd) bannerEd.remove();
+        var tabTipoOS = document.querySelector('.tab-tipo-os');
+        if (tabTipoOS) tabTipoOS.style.display = '';
+        var h1Title = document.querySelector('#appPrincipal h1, #appPrincipal h2');
+        if (h1Title) h1Title.textContent = 'Abertura de Ordem de Serviço';
+
         document.getElementById('municipe').value = '';
         var cpfIn = document.getElementById('cpfSolicitanteInput');
         if (cpfIn) { cpfIn.value = ''; cpfIn.dataset.rawCpf = ''; }
@@ -5948,9 +6093,19 @@
         }
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+
+      function continuarCadastrandoNovaOS() {
+        limparFormularioAposSucesso();
+        // Não envia mensagem de fechamento para o pai. O modal permanece aberto pronto para o próximo chamado!
+      }
+
+      function fecharSucesso() {
+        var protCriado = ultimoProtocoloGerado;
+        limparFormularioAposSucesso();
 
         if (window.parent && window.parent !== window) {
-          window.parent.postMessage({ action: 'OS_CRIADA_SUCESSO' }, '*');
+          window.parent.postMessage({ action: 'OS_CRIADA_SUCESSO', protocolo: protCriado }, '*');
         }
       }
 
