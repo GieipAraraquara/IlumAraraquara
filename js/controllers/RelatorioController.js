@@ -785,7 +785,7 @@ class RelatorioController {
                 }
             }
         } catch (e) {
-            console.warn('⚠️ [RelatorioController] Falha ao carregar materiais_contrato:', e);
+            console.warn('⚠️ [RelatorioController] Falha ao carregar materiais_contrato do Supabase:', e);
         }
 
         try {
@@ -813,7 +813,7 @@ class RelatorioController {
     }
 
     resolveMarcaEMaterial(rawNome, defaultUnidade = 'UN') {
-        if (!rawNome) return { marca: 'PRÓPRIO', desc: '', unidade: defaultUnidade };
+        if (!rawNome) return { marca: 'PRÓPRIO', desc: '', unidade: defaultUnidade, valorUnitario: 0, valorUnitarioBdi: 0 };
 
         if (typeof rawNome === 'object') {
             const extracted = (rawNome.nome || rawNome.descricao || rawNome.material || rawNome.material_nome || '');
@@ -823,7 +823,7 @@ class RelatorioController {
         }
 
         let nomeClean = rawNome.replace(/\(x\d+\)/i, '').trim();
-        if (!nomeClean) return { marca: 'PRÓPRIO', desc: rawNome, unidade: defaultUnidade };
+        if (!nomeClean) return { marca: 'PRÓPRIO', desc: rawNome, unidade: defaultUnidade, valorUnitario: 0, valorUnitarioBdi: 0 };
 
         // Remover aspas externas e sufixos de unidade como (UN), (M), (H) etc.
         nomeClean = nomeClean.replace(/^["'\s]+|["'\s]+$/g, '').trim();
@@ -831,10 +831,24 @@ class RelatorioController {
 
         // Se for mão de obra de sessão de praça
         if (nomeClean.toUpperCase().includes('ELETRICISTA')) {
+            let precoUnit = 0;
+            let precoBdi = 0;
+            if (this.materiaisContratoCache && this.materiaisContratoCache.length > 0) {
+                const rowEl = this.materiaisContratoCache.find(r => {
+                    const desc = (r['Material/Serviço'] || r.descricao || r.material || '').toUpperCase();
+                    return desc.includes('ELETRICISTA');
+                });
+                if (rowEl) {
+                    precoUnit = Number(rowEl.valor_unitario) || 0;
+                    precoBdi = Number(rowEl.valor_unitario_bdi) || 0;
+                }
+            }
             return {
                 marca: 'MÃO DE OBRA',
-                desc: nomeClean,
-                unidade: 'H'
+                desc: 'ELETRICISTA COM ENCARGOS COMPLEMENTARES',
+                unidade: 'H',
+                valorUnitario: precoUnit,
+                valorUnitarioBdi: precoBdi
             };
         }
 
@@ -846,6 +860,8 @@ class RelatorioController {
                 const dbMarca = (row.Marca || row.marca || row.Fabricante || row.fabricante || '').trim();
                 const dbDesc = (row['Material/Serviço'] || row.Material || row.Serviço || row.descricao || row.nome || row.material || row.item || row['material_servico'] || row['material/servico'] || '').trim();
                 const dbUnid = (row['Unidade de Medida'] || row.Unidade || row.unidade || row.und || row['unidade_de_medida'] || '').trim();
+                const dbValUnit = Number(row.valor_unitario || row.ValorUnitario || row.valor_unit || 0);
+                const dbValBdi = Number(row.valor_unitario_bdi || row.ValorUnitarioBdi || row.valor_bdi || 0);
 
                 if (dbDesc) {
                     const dbDescNorm = this.normalizarTexto(dbDesc);
@@ -853,7 +869,9 @@ class RelatorioController {
                         return {
                             marca: dbMarca || 'PRÓPRIO',
                             desc: dbDesc,
-                            unidade: dbUnid || defaultUnidade
+                            unidade: dbUnid || defaultUnidade,
+                            valorUnitario: dbValUnit,
+                            valorUnitarioBdi: dbValBdi
                         };
                     }
                 }
@@ -879,7 +897,9 @@ class RelatorioController {
                 return {
                     marca: candidateMarca,
                     desc: candidateDesc,
-                    unidade: defaultUnidade
+                    unidade: defaultUnidade,
+                    valorUnitario: 0,
+                    valorUnitarioBdi: 0
                 };
             }
         }
@@ -887,7 +907,9 @@ class RelatorioController {
         return {
             marca: 'PRÓPRIO',
             desc: nomeClean,
-            unidade: defaultUnidade
+            unidade: defaultUnidade,
+            valorUnitario: 0,
+            valorUnitarioBdi: 0
         };
     }
 
@@ -912,11 +934,13 @@ class RelatorioController {
         const materiaisMap = {};
         const countOSsComMaterial = new Set();
         let totalHorasEletricista = 0;
+        let totalValorSemBdi = 0;
+        let totalValorComBdi = 0;
 
         const registrarMaterial = (rawNome, qtd, protocolo, defaultUnidade = 'UN', categoria = 'Material Aplicado') => {
             if (!rawNome) return;
 
-            const { marca, desc, unidade } = this.resolveMarcaEMaterial(rawNome, defaultUnidade);
+            const { marca, desc, unidade, valorUnitario, valorUnitarioBdi } = this.resolveMarcaEMaterial(rawNome, defaultUnidade);
             const finalUnidade = defaultUnidade !== 'UN' ? defaultUnidade : unidade;
             const key = `${marca.toUpperCase()}||${desc.toUpperCase()}`;
 
@@ -926,13 +950,20 @@ class RelatorioController {
                     descricao: desc,
                     unidade: finalUnidade,
                     quantidadeTotal: 0,
+                    valorUnitario: Number(valorUnitario) || 0,
+                    valorUnitarioBdi: Number(valorUnitarioBdi) || 0,
+                    valorTotalSemBdi: 0,
+                    valorTotalComBdi: 0,
                     qtdOSsSet: new Set(),
                     protocolosSet: new Set(),
                     categoria: categoria
                 };
             }
 
-            materiaisMap[key].quantidadeTotal += Number(qtd) || 1;
+            const numQtd = Number(qtd) || 1;
+            materiaisMap[key].quantidadeTotal += numQtd;
+            materiaisMap[key].valorTotalSemBdi = materiaisMap[key].quantidadeTotal * materiaisMap[key].valorUnitario;
+            materiaisMap[key].valorTotalComBdi = materiaisMap[key].quantidadeTotal * materiaisMap[key].valorUnitarioBdi;
             materiaisMap[key].qtdOSsSet.add(protocolo);
             materiaisMap[key].protocolosSet.add(protocolo);
             countOSsComMaterial.add(protocolo);
@@ -1012,11 +1043,16 @@ class RelatorioController {
 
         const arrayMateriais = Object.values(materiaisMap).sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
 
+        totalValorSemBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalSemBdi || 0), 0);
+        totalValorComBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalComBdi || 0), 0);
+
         return {
             items: arrayMateriais,
             totalOSsMedidas: countOSsComMaterial.size,
             totalHorasEletricista: totalHorasEletricista.toFixed(2),
             totalItensDiferentes: arrayMateriais.length,
+            totalValorSemBdi: totalValorSemBdi,
+            totalValorComBdi: totalValorComBdi,
             periodLabelBR: periodLabelBR
         };
     }
@@ -1039,6 +1075,12 @@ class RelatorioController {
         const elTotalHoras = document.getElementById('kpi-medicao-horas');
         const elTotalOSs = document.getElementById('kpi-medicao-oss');
         const elTiposItens = document.getElementById('kpi-medicao-tipos');
+        const elValorBdi = document.getElementById('kpi-medicao-valor-bdi');
+        const elValorSemBdi = document.getElementById('kpi-medicao-valor-sem-bdi');
+
+        const formatCurrency = (val) => {
+            return (Number(val) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        };
 
         if (elTotalItens) {
             const somaQtds = medicaoData.items.reduce((acc, i) => acc + i.quantidadeTotal, 0);
@@ -1047,6 +1089,8 @@ class RelatorioController {
         if (elTotalHoras) elTotalHoras.innerHTML = `${medicaoData.totalHorasEletricista} <span class="text-body-lg font-body-lg">H</span>`;
         if (elTotalOSs) elTotalOSs.textContent = medicaoData.totalOSsMedidas.toLocaleString('pt-BR');
         if (elTiposItens) elTiposItens.textContent = medicaoData.totalItensDiferentes.toLocaleString('pt-BR');
+        if (elValorBdi) elValorBdi.textContent = formatCurrency(medicaoData.totalValorComBdi);
+        if (elValorSemBdi) elValorSemBdi.textContent = `s/ BDI: ${formatCurrency(medicaoData.totalValorSemBdi)}`;
 
         if (this.medicaoSubView === 'protocolo') {
             this.renderMedicaoPorProtocolo();
@@ -1103,6 +1147,8 @@ class RelatorioController {
         this.medicaoConsolidadoFilteredItems = filteredItems;
 
         tbody.innerHTML = '';
+        const tfoot = document.getElementById('medicao-tfoot');
+        if (tfoot) tfoot.innerHTML = '';
 
         if (filteredItems.length === 0) {
             if (emptyState) emptyState.classList.remove('hidden');
@@ -1110,6 +1156,10 @@ class RelatorioController {
         }
 
         if (emptyState) emptyState.classList.add('hidden');
+
+        let somaFiltradaQtd = 0;
+        let somaFiltradaSemBdi = 0;
+        let somaFiltradaComBdi = 0;
 
         filteredItems.forEach(item => {
             const tr = document.createElement('tr');
@@ -1122,6 +1172,13 @@ class RelatorioController {
 
             const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
             const qtdFmt = isHoras ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal.toLocaleString('pt-BR');
+            const unitSemBdiFmt = item.valorUnitario > 0 ? formatCurrency(item.valorUnitario) : '<span class="text-slate-400">R$ 0,00</span>';
+            const unitComBdiFmt = item.valorUnitarioBdi > 0 ? formatCurrency(item.valorUnitarioBdi) : '<span class="text-slate-400">R$ 0,00</span>';
+            const totalComBdiFmt = item.valorTotalComBdi > 0 ? formatCurrency(item.valorTotalComBdi) : '<span class="text-slate-400">R$ 0,00</span>';
+
+            somaFiltradaQtd += item.quantidadeTotal;
+            somaFiltradaSemBdi += (item.valorTotalSemBdi || 0);
+            somaFiltradaComBdi += (item.valorTotalComBdi || 0);
 
             let badgeCategory = 'bg-blue-100 text-blue-800 border border-blue-200';
             if (isHoras) badgeCategory = 'bg-purple-100 text-purple-900 border border-purple-300 font-bold';
@@ -1150,15 +1207,24 @@ class RelatorioController {
                 <td class="py-3 px-4 align-middle">
                     ${itemDisplayHtml}
                 </td>
-                <td class="py-3 px-4 text-center font-bold text-xs uppercase whitespace-nowrap align-middle">
+                <td class="py-3 px-3 text-center font-bold text-xs uppercase whitespace-nowrap align-middle">
                     <span class="px-2 py-0.5 rounded ${isHoras ? 'bg-purple-100 text-purple-800' : 'bg-slate-100 text-slate-700'}">
                         ${item.unidade}
                     </span>
                 </td>
-                <td class="py-3 px-4 text-right font-mono font-bold text-sm ${isHoras ? 'text-purple-700' : 'text-secondary'} whitespace-nowrap align-middle">
+                <td class="py-3 px-3 text-right font-mono font-bold text-xs ${isHoras ? 'text-purple-700' : 'text-secondary'} whitespace-nowrap align-middle">
                     ${qtdFmt}
                 </td>
-                <td class="py-3 px-4 text-center font-bold text-xs whitespace-nowrap align-middle">${item.qtdOSsSet.size} OS(s)</td>
+                <td class="py-3 px-3 text-right font-mono text-xs text-slate-600 whitespace-nowrap align-middle">
+                    ${unitSemBdiFmt}
+                </td>
+                <td class="py-3 px-3 text-right font-mono font-bold text-xs text-purple-900 whitespace-nowrap align-middle">
+                    ${unitComBdiFmt}
+                </td>
+                <td class="py-3 px-3 text-right font-mono font-bold text-xs text-emerald-700 whitespace-nowrap align-middle">
+                    ${totalComBdiFmt}
+                </td>
+                <td class="py-3 px-3 text-center font-bold text-xs whitespace-nowrap align-middle">${item.qtdOSsSet.size} OS(s)</td>
                 <td class="py-3 px-4 whitespace-nowrap align-middle">
                     <span class="px-2.5 py-1 rounded-full text-[11px] font-semibold inline-block ${badgeCategory}">
                         ${item.categoria}
@@ -1167,24 +1233,26 @@ class RelatorioController {
                 <td class="py-3 px-4 text-xs font-mono text-on-surface-variant truncate max-w-[200px] align-middle" title="${Array.from(item.protocolosSet).join(', ')}">
                     ${protList}
                 </td>
-                <td class="py-3 px-4 text-center whitespace-nowrap align-middle">
-                    <button type="button" class="btn-gerenciar-item-medicao px-3 py-1.5 rounded-lg bg-purple-700/10 hover:bg-purple-700 hover:text-white text-purple-700 font-bold text-xs flex items-center justify-center gap-1 transition-all shadow-xs cursor-pointer group-hover:scale-105" title="Detalhar protocolos e alterar item em lote">
-                        <span class="material-symbols-outlined text-[16px]">published_with_changes</span>
-                        <span>Gerenciar</span>
-                    </button>
-                </td>
             `;
-
-            const btnGerenciar = tr.querySelector('.btn-gerenciar-item-medicao');
-            if (btnGerenciar) {
-                btnGerenciar.onclick = (e) => {
-                    e.stopPropagation();
-                    this.abrirModalDetalhesMedicao(item);
-                };
-            }
 
             tbody.appendChild(tr);
         });
+
+        // Renderiza linha de totais no tfoot
+        if (tfoot) {
+            tfoot.innerHTML = `
+                <tr class="text-slate-800 bg-slate-100/90 border-t-2 border-slate-300">
+                    <td class="py-3 px-4 uppercase tracking-wider font-bold text-xs">Totalização Geral (${filteredItems.length} itens)</td>
+                    <td class="py-3 px-3 text-center text-xs text-slate-500 font-normal">--</td>
+                    <td class="py-3 px-3 text-right font-mono font-bold text-xs text-secondary">${somaFiltradaQtd.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}</td>
+                    <td class="py-3 px-3 text-right font-mono font-bold text-xs text-slate-700">${formatCurrency(somaFiltradaSemBdi)}</td>
+                    <td class="py-3 px-3 text-right font-mono font-bold text-xs text-purple-900">--</td>
+                    <td class="py-3 px-3 text-right font-mono font-bold text-xs text-emerald-800">${formatCurrency(somaFiltradaComBdi)}</td>
+                    <td class="py-3 px-3 text-center font-bold text-xs">${medicaoData.totalOSsMedidas} OS(s)</td>
+                    <td colspan="2" class="py-3 px-4 text-right text-[11px] text-slate-500 font-medium">BDI do Contrato: 21,50% incluso</td>
+                </tr>
+            `;
+        }
     }
 
     exportarMedicaoMensalCSV() {
@@ -1200,6 +1268,9 @@ class RelatorioController {
             'Descrição do Item de Contrato / Material',
             'Unidade',
             'Quantidade Medida no Mês',
+            'Valor Unitário (s/ BDI)',
+            'Valor Unitário (c/ BDI)',
+            'Valor Total (c/ BDI)',
             'Qtd. OSs Onde Foi Aplicado',
             'Origem / Tipo de Item',
             'Protocolos de Ordens de Serviço'
@@ -1210,12 +1281,18 @@ class RelatorioController {
         items.forEach(item => {
             const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
             const qtdFmt = isHoras ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal;
+            const unitSemBdiFmt = (item.valorUnitario || 0).toFixed(2).replace('.', ',');
+            const unitComBdiFmt = (item.valorUnitarioBdi || 0).toFixed(2).replace('.', ',');
+            const totalComBdiFmt = (item.valorTotalComBdi || 0).toFixed(2).replace('.', ',');
 
             const row = [
                 this.escapeCSVCell(item.marca),
                 this.escapeCSVCell(item.descricao),
                 this.escapeCSVCell(item.unidade),
                 this.escapeCSVCell(qtdFmt),
+                this.escapeCSVCell(`R$ ${unitSemBdiFmt}`),
+                this.escapeCSVCell(`R$ ${unitComBdiFmt}`),
+                this.escapeCSVCell(`R$ ${totalComBdiFmt}`),
                 this.escapeCSVCell(item.qtdOSsSet.size),
                 this.escapeCSVCell(item.categoria),
                 this.escapeCSVCell(Array.from(item.protocolosSet).join(' | '))
@@ -1255,7 +1332,7 @@ class RelatorioController {
                 toolbarProtocolo.classList.add('flex');
             }
             if (txtBtnExportar) {
-                txtBtnExportar.textContent = 'Exportar por Protocolo (CSV)';
+                txtBtnExportar.textContent = 'Exportar (CSV)';
             }
             this.renderMedicaoPorProtocolo();
         } else {
@@ -1273,7 +1350,7 @@ class RelatorioController {
                 toolbarProtocolo.classList.remove('flex');
             }
             if (txtBtnExportar) {
-                txtBtnExportar.textContent = 'Exportar Medição Mensal (CSV)';
+                txtBtnExportar.textContent = 'Exportar (CSV)';
             }
             this.renderMedicaoMensal();
         }
@@ -1334,12 +1411,17 @@ class RelatorioController {
                 }
 
                 if (matStr) {
-                    const { marca, desc, unidade } = this.resolveMarcaEMaterial(matStr, 'UN');
+                    const { marca, desc, unidade, valorUnitario, valorUnitarioBdi } = this.resolveMarcaEMaterial(matStr, 'UN');
+                    const vUnit = Number(valorUnitario) || 0;
+                    const vUnitBdi = Number(valorUnitarioBdi) || 0;
                     matsDaOS.push({
                         marca: marca,
                         descricao: desc,
                         unidade: unidade || 'UN',
                         quantidade: qty,
+                        valorUnitario: vUnit,
+                        valorUnitarioBdi: vUnitBdi,
+                        subtotalComBdi: qty * vUnitBdi,
                         categoria: 'Material Aplicado',
                         isMaoDeObra: false
                     });
@@ -1366,11 +1448,18 @@ class RelatorioController {
 
                     totalHorasOS += totalHorasCalculadas;
 
+                    const resEletricista = this.resolveMarcaEMaterial('ELETRICISTA COM ENCARGOS COMPLEMENTARES (H)', 'H');
+                    const vUnit = Number(resEletricista.valorUnitario) || 0;
+                    const vUnitBdi = Number(resEletricista.valorUnitarioBdi) || 0;
+
                     matsDaOS.push({
                         marca: 'MÃO DE OBRA',
                         descricao: 'ELETRICISTA COM ENCARGOS COMPLEMENTARES (H)',
                         unidade: 'H',
                         quantidade: totalHorasCalculadas,
+                        valorUnitario: vUnit,
+                        valorUnitarioBdi: vUnitBdi,
+                        subtotalComBdi: totalHorasCalculadas * vUnitBdi,
                         categoria: 'Sessão de Praça (Mão de Obra)',
                         isMaoDeObra: true
                     });
@@ -1378,12 +1467,17 @@ class RelatorioController {
 
                 if (sess.materiais && Array.isArray(sess.materiais)) {
                     sess.materiais.forEach(sMat => {
-                        const { marca, desc, unidade } = this.resolveMarcaEMaterial(sMat, 'UN');
+                        const { marca, desc, unidade, valorUnitario, valorUnitarioBdi } = this.resolveMarcaEMaterial(sMat, 'UN');
+                        const vUnit = Number(valorUnitario) || 0;
+                        const vUnitBdi = Number(valorUnitarioBdi) || 0;
                         matsDaOS.push({
                             marca: marca,
                             descricao: desc,
                             unidade: unidade || 'UN',
                             quantidade: 1,
+                            valorUnitario: vUnit,
+                            valorUnitarioBdi: vUnitBdi,
+                            subtotalComBdi: 1 * vUnitBdi,
                             categoria: 'Material em Sessão Praça',
                             isMaoDeObra: false
                         });
@@ -1917,6 +2011,9 @@ class RelatorioController {
             'Descrição Material / Serviço',
             'Unidade',
             'Quantidade Utilizada',
+            'Valor Unitário (s/ BDI)',
+            'Valor Unitário (c/ BDI)',
+            'Subtotal (c/ BDI)',
             'Categoria / Origem',
             'Técnico Responsável'
         ];
@@ -1926,6 +2023,10 @@ class RelatorioController {
         data.protocolos.forEach(os => {
             os.materiais.forEach(m => {
                 const qtdFmt = m.isMaoDeObra ? m.quantidade.toFixed(2) : m.quantidade;
+                const unitSemBdiFmt = (m.valorUnitario || 0).toFixed(2).replace('.', ',');
+                const unitComBdiFmt = (m.valorUnitarioBdi || 0).toFixed(2).replace('.', ',');
+                const subtotalComBdiFmt = (m.subtotalComBdi || 0).toFixed(2).replace('.', ',');
+
                 const row = [
                     this.escapeCSVCell(os.protocolo),
                     this.escapeCSVCell(os.tipoLabel),
@@ -1937,6 +2038,9 @@ class RelatorioController {
                     this.escapeCSVCell(m.descricao),
                     this.escapeCSVCell(m.unidade),
                     this.escapeCSVCell(qtdFmt),
+                    this.escapeCSVCell(`R$ ${unitSemBdiFmt}`),
+                    this.escapeCSVCell(`R$ ${unitComBdiFmt}`),
+                    this.escapeCSVCell(`R$ ${subtotalComBdiFmt}`),
                     this.escapeCSVCell(m.categoria),
                     this.escapeCSVCell(os.tecnico)
                 ];
@@ -3323,16 +3427,26 @@ class RelatorioController {
         const elQtdTotal = document.getElementById('info-modal-qtd-total');
         const elCountOSs = document.getElementById('info-modal-count-oss');
         const elCategoria = document.getElementById('badge-item-categoria');
+        const elUnitSemBdi = document.getElementById('info-modal-unit-sem-bdi');
+        const elUnitComBdi = document.getElementById('info-modal-unit-com-bdi');
+        const elTotalMedido = document.getElementById('info-modal-total-medido');
         const inputNovoMat = document.getElementById('input-novo-material-lote');
         const inputQtdDe = document.getElementById('input-qtd-de-lote');
         const inputQtdPara = document.getElementById('input-qtd-para-lote');
         const tbodyProt = document.getElementById('tbody-protocolos-item');
+
+        const formatCurrency = (val) => {
+            return (Number(val) || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        };
 
         if (elMarca) elMarca.textContent = item.marca || 'PRÓPRIO';
         if (elDesc) elDesc.textContent = item.descricao || 'Item sem descrição';
         if (elQtdTotal) elQtdTotal.textContent = (item.unidade === 'H' ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal.toLocaleString('pt-BR')) + ' ' + item.unidade;
         if (elCountOSs) elCountOSs.textContent = `${item.protocolosSet.size} OS(s)`;
         if (elCategoria) elCategoria.textContent = item.categoria || 'Material';
+        if (elUnitSemBdi) elUnitSemBdi.textContent = formatCurrency(item.valorUnitario);
+        if (elUnitComBdi) elUnitComBdi.textContent = formatCurrency(item.valorUnitarioBdi);
+        if (elTotalMedido) elTotalMedido.textContent = formatCurrency(item.valorTotalComBdi);
         if (inputNovoMat) inputNovoMat.value = '';
         if (inputQtdDe) inputQtdDe.value = '1';
         if (inputQtdPara) inputQtdPara.value = '1';

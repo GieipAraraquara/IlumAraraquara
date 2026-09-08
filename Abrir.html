@@ -221,6 +221,7 @@
     <script src="js/services/OfflineSyncService.js"></script>
     <script src="js/guards/authGuard.js?v=9"></script>
     <script src="js/services/PushNotificationService.js"></script>
+    <script src="js/domain/ChamadoModel.js?v=43"></script>
     
     <script>
       tailwind.config = {
@@ -857,20 +858,21 @@
 
     <div id="modalProximidade" class="modal-overlay" style="z-index: 60000;">
       <div class="modal-content">
-        <div class="modal-header text-amber-700">⚠️ PROTOCOLOS EXISTENTES NO LOCAL</div>
+        <div id="modalProximidadeHeader" class="modal-header text-amber-700">⚠️ PROTOCOLOS EXISTENTES NO LOCAL</div>
         <div class="modal-body">
-          <p class="text-sm text-slate-600 mb-3">Foram encontrados protocolos abertos próximos. Verifique se não é o mesmo chamado:</p>
+          <p id="modalProximidadeDesc" class="text-sm text-slate-600 mb-3">Foram encontrados protocolos abertos próximos. Verifique se não é o mesmo chamado:</p>
           <div id="listaProtocolosModal"></div>
           <button type="button" id="btnLoadMap" class="btn-mapa-load mt-2" onclick="carregarMapaComparativo()">Ver Localização no Mapa 🗺️</button>
           <div id="mapaComparativo"></div>
           <div id="legendaMapa" class="text-xs mb-3 hidden gap-3 justify-center">
             <span class="flex items-center gap-1"><span class="text-emerald-500 font-bold">●</span> Nova OS</span>
-            <span class="flex items-center gap-1"><span class="text-red-500 font-bold">●</span> Existente</span>
+            <span id="legendaExistente" class="flex items-center gap-1"><span class="text-red-500 font-bold">●</span> Aberta/Pendente</span>
+            <span id="legendaReparoRecente" class="flex items-center gap-1"><span class="text-amber-500 font-bold">●</span> Reparo Recente</span>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn-secundario" onclick="fecharModal()">Voltar e Cancelar</button>
-          <button type="button" class="btn-primario !w-auto !bg-red-600 hover:!bg-red-700" onclick="confirmarSalvamento()">Confirmar e Salvar</button>
+          <button type="button" class="btn-secundario" onclick="fecharModal()">Cancelar</button>
+          <button type="button" id="btnConfirmarModalProximidade" class="btn-primario !w-auto !bg-red-600 hover:!bg-red-700" onclick="confirmarSalvamento()">Confirmar envio</button>
         </div>
       </div>
     </div>
@@ -891,6 +893,115 @@
       </div>
     </div>
 
+    <div id="modalConsultarProtocolo" class="modal-overlay" style="z-index: 65000; display: none;">
+      <div class="modal-content !max-w-2xl w-full !p-6 shadow-2xl rounded-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div class="flex items-center gap-2.5">
+            <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+              <span class="material-symbols-outlined text-[20px]">search</span>
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-800 text-base leading-tight">Consultar Protocolo</h3>
+              <p class="text-xs text-slate-500">Verifique o andamento e status do chamado</p>
+            </div>
+          </div>
+          <button type="button" onclick="fecharModalConsultarProtocolo()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        <div class="mt-4 space-y-3">
+          <div>
+            <label for="inputConsultaProtocolo" class="block text-xs font-semibold text-slate-700 mb-1.5">Número do Protocolo</label>
+            <div class="flex gap-2">
+              <div class="relative flex-1">
+                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">tag</span>
+                <input type="text" id="inputConsultaProtocolo" placeholder="Ex: I0123450809A ou P..." class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 uppercase font-mono transition-all" onkeydown="if(event.key==='Enter'){event.preventDefault();executarConsultaProtocolo();}" />
+              </div>
+              <button type="button" id="btnExecutarConsulta" onclick="executarConsultaProtocolo()" class="px-4 py-2 bg-[#0051d5] hover:bg-[#0041ab] text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                <span class="material-symbols-outlined text-[18px]">search</span>
+                <span id="btnExecutarConsultaTexto">Buscar</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Spinner / Estado de Carregamento -->
+          <div id="consultaLoading" class="hidden py-6 text-center">
+            <div class="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
+            <p class="text-xs font-medium text-slate-500">Buscando protocolo no sistema...</p>
+          </div>
+
+          <!-- Resultado da Busca -->
+          <div id="consultaResultado" class="hidden animate-fade-in mt-3">
+            <div class="space-y-3 text-xs">
+              <!-- Topo: Protocolo + Badge de Status -->
+              <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between gap-2 shadow-2xs">
+                <div>
+                  <span class="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">Protocolo</span>
+                  <span id="resConsultaProtocolo" class="font-mono font-bold text-sm text-slate-800"></span>
+                </div>
+                <div id="resConsultaStatusBadge" class="px-2.5 py-1 rounded-full font-bold text-[11px] shadow-2xs">
+                  ---
+                </div>
+              </div>
+
+              <!-- Detalhes Gerais -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <span class="material-symbols-outlined text-[13px]">category</span> Tipo de Chamado
+                  </span>
+                  <span id="resConsultaTipo" class="font-semibold text-slate-800 block">---</span>
+                </div>
+
+                <div class="bg-slate-50 p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide flex items-center gap-1 mb-0.5">
+                    <span class="material-symbols-outlined text-[13px]">calendar_today</span> Data de Abertura
+                  </span>
+                  <span id="resConsultaData" class="font-semibold text-slate-800 block">---</span>
+                </div>
+              </div>
+
+              <!-- Seção: Pontos de Manutenção / Localização -->
+              <div id="boxPontosManutencao" class="space-y-2">
+                <!-- Inserido dinamicamente via JavaScript -->
+              </div>
+
+              <!-- Observações do Solicitante -->
+              <div id="boxResConsultaObservacao" class="hidden bg-slate-50 p-3 rounded-xl border border-slate-200/80 shadow-2xs space-y-1">
+                <strong class="text-blue-700 font-bold flex items-center gap-1.5 text-xs">
+                  <span class="material-symbols-outlined text-[15px]">chat</span>
+                  <span>Observação do Solicitante</span>
+                </strong>
+                <div id="resConsultaObservacao" class="text-slate-700 bg-white p-2 rounded-lg border border-slate-200/60 text-[11.5px] leading-relaxed italic"></div>
+              </div>
+
+              <!-- Conclusão / Motivo / Observação de Fechamento -->
+              <div id="boxResConsultaConclusao" class="hidden bg-emerald-50/80 border border-emerald-200 p-3 rounded-xl text-emerald-900 shadow-2xs space-y-1">
+                <strong class="text-emerald-800 font-bold flex items-center gap-1.5 text-xs">
+                  <span class="material-symbols-outlined text-[15px]">task_alt</span>
+                  <span>Conclusão / Justificativa de Atendimento</span>
+                </strong>
+                <div id="resConsultaConclusao" class="bg-white/80 p-2 rounded-lg border border-emerald-200/60 text-[11.5px] font-medium leading-relaxed"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mensagem de Erro / Não Encontrado -->
+          <div id="consultaErro" class="hidden p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-amber-600 text-[20px] flex-shrink-0">info</span>
+            <span id="consultaErroTexto">Protocolo não encontrado.</span>
+          </div>
+        </div>
+
+        <div class="mt-5 pt-3 border-t border-slate-100 flex justify-end gap-2">
+          <button type="button" onclick="fecharModalConsultarProtocolo()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer">
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div id="appPrincipalModalOverlay">
       <div id="appPrincipal">
         
@@ -904,7 +1015,11 @@
               <h2 class="text-base font-bold text-slate-800 leading-tight">Abertura</h2>
             </div>
           </div>
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 sm:gap-3">
+            <button type="button" id="btnHeaderConsultar" onclick="abrirModalConsultarProtocolo()" class="text-blue-600 hover:bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-2xs" title="Consultar Protocolo e Status">
+              <span class="material-symbols-outlined text-[18px]">search</span>
+              <span class="inline">Consultar</span>
+            </button>
             <button type="button" id="btnHeaderLogout" onclick="if(window.AuthGuard)window.AuthGuard.logout();else window.location.href='Login.html';" class="text-rose-600 hover:bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors" title="Sair do Sistema">
               <span class="material-symbols-outlined text-[18px]">logout</span>
               <span class="hidden sm:inline">Sair</span>
@@ -2973,13 +3088,27 @@
         var userAuth = window.usuarioLogadoSupabase || {};
         var protExtraido = gerarNovoProtocolo('iluminacao');
         var temPlaquetaTagDuplicadoR = (modo === 'plaqueta' && estadoPontoRapido.hasPlaquetaDuplicadaTag === true);
-        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicadoR) ? "Pendente" : "Aberta";
+        var temReparoRecenteR = false;
+        var itemReparoRecenteR = null;
+        var listaDupR = window.protocolosConsolidadosRapido || (typeof protocolosConsolidados !== 'undefined' ? protocolosConsolidados : []);
+        if (listaDupR && listaDupR.length > 0) {
+          itemReparoRecenteR = listaDupR.find(function(p) { return p.isReparoRecente; });
+          if (itemReparoRecenteR) temReparoRecenteR = true;
+        }
+
+        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicadoR || temReparoRecenteR) ? "Pendente" : "Aberta";
 
         var motivoAprovacaoRapida = null;
         if (temPlaquetaTagDuplicadoR) {
           motivoAprovacaoRapida = "Coordenada da plaqueta duvidosa";
+        } else if (temReparoRecenteR && itemReparoRecenteR) {
+          var pStrRec = String(itemReparoRecenteR.protocolo || itemReparoRecenteR.id || '').trim();
+          if (!pStrRec.startsWith('#')) pStrRec = '#' + pStrRec;
+          var diasTxt = (itemReparoRecenteR.diasAtras === 0) ? "hoje" : ((itemReparoRecenteR.diasAtras === 1) ? "ontem" : ("há " + itemReparoRecenteR.diasAtras + " dias"));
+          var distNum = (itemReparoRecenteR.distancia !== null && itemReparoRecenteR.distancia !== undefined) ? itemReparoRecenteR.distancia : 0;
+          var distTxt = distNum + (distNum === 1 ? " metro" : " metros");
+          motivoAprovacaoRapida = "Reparo recente " + pStrRec + " (" + diasTxt + ", a " + distTxt + ")";
         } else if (statusOS === "Pendente") {
-          var listaDupR = window.protocolosConsolidadosRapido || (typeof protocolosConsolidados !== 'undefined' ? protocolosConsolidados : []);
           if (listaDupR && listaDupR.length > 0) {
             var listaProtsR = listaDupR.map(function(p) {
               var pStr = String(p.protocolo || p.id || '').trim();
@@ -3033,18 +3162,14 @@
         };
 
         if (forcarSalvar !== true && navigator.onLine) {
-          btnSalvar.innerHTML = '<span>Verificando duplicidade... 🔍</span>';
+          btnSalvar.innerHTML = '<span>Verificando duplicidade e histórico... 🔍</span>';
           try {
             var osProximasRapido = await checarDuplicidadeBackend(lat6, lng6, 0, false);
             if (osProximasRapido && osProximasRapido.length > 0) {
               window.protocolosConsolidadosRapido = osProximasRapido;
-              var htmlModalRapido = "";
-              osProximasRapido.forEach(function(osItem, k) {
-                var txtLoc = osItem.enderecoTexto || osItem.endereco;
-                htmlModalRapido += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + osItem.protocolo + '</strong> (' + osItem.distancia + 'm)<br><span class="text-slate-600 font-medium">' + txtLoc + '</span></div>';
-              });
-              document.getElementById('listaProtocolosModal').innerHTML = htmlModalRapido;
-              document.getElementById('modalProximidade').style.display = 'flex';
+              protocolosConsolidados = osProximasRapido;
+              ptsLocalsGrafico = (lat6 && lng6) ? [{ lat: parseFloat(lat6), lng: parseFloat(lng6) }] : [];
+              exibirModalProximidade(osProximasRapido);
               btnSalvar.disabled = false;
               btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
               descongelarGpsRapido();
@@ -3086,7 +3211,10 @@
             btnSalvar.disabled = false;
             btnSalvar.innerHTML = '<span>Salvar</span><span class="text-lg">⚡</span>';
 
-            exibirModalSucesso("OS Modo Rápido Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>", protExtraido);
+            var msgSucesso = (statusOS === "Pendente")
+              ? "OS Modo Rápido Cadastrada como <strong>Pendente (Aguardando Avaliação)</strong>!<br><strong class='text-amber-600 font-bold'>Protocolo: " + protExtraido + "</strong>"
+              : "OS Modo Rápido Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
+            exibirModalSucesso(msgSucesso, protExtraido);
             descongelarGpsRapido();
 
             if (window.parent && window.parent !== window) {
@@ -4829,6 +4957,105 @@
         return Math.round(R * c);
       }
 
+      function normalizarTextoEndereco(txt) {
+        if (!txt) return "";
+        return String(txt).toLowerCase()
+          .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+          .replace(/\b(avenida|av\.|av)\b/g, 'av')
+          .replace(/\b(rua|r\.|r)\b/g, 'r')
+          .replace(/\b(doutor|dr\.|dr)\b/g, 'dr')
+          .replace(/\b(professor|prof\.|prof)\b/g, 'prof')
+          .replace(/[^a-z0-9]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      }
+
+       function formatarItemProtocoloModal(os, k) {
+        var txtLoc = os.enderecoTexto || os.endereco || "Local";
+        var distNum = (os.distancia !== null && os.distancia !== undefined) ? os.distancia : 0;
+        var distTxt = distNum + (distNum === 1 ? " metro" : " metros");
+        if (os.isReparoRecente) {
+          var diasTxt = (os.diasAtras === 0) ? "hoje" : ((os.diasAtras === 1) ? "ontem" : ("há " + os.diasAtras + " dias"));
+          return '<div class="protocolo-info p-3 mb-2 bg-amber-50/90 rounded-lg border border-amber-300 text-xs text-amber-950 shadow-sm">' +
+                   '<div class="flex items-center justify-between font-bold text-amber-900 mb-1">' +
+                     '<span class="flex items-center gap-1.5"><span class="text-base">🔧</span> REPARO RECENTE NO LOCAL (< 30 dias)</span>' +
+                     '<span class="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold text-[10px] uppercase">' + diasTxt + '</span>' +
+                   '</div>' +
+                   '<div><b>#' + (k+1) + ' Protocolo Anterior:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + distTxt + ')</div>' +
+                   '<div class="text-slate-600 font-medium">' + txtLoc + '</div>' +
+                 '</div>';
+        } else {
+          return '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900">' +
+                   '<div class="font-bold text-amber-800 mb-0.5">⚠️ PROTOCOLO EXISTENTE / EM ABERTO</div>' +
+                   '<b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + distTxt + ')<br>' +
+                   '<span class="text-slate-600 font-medium">' + txtLoc + '</span>' +
+                 '</div>';
+        }
+      }
+
+      function exibirModalProximidade(listaItens) {
+        if (!listaItens || listaItens.length === 0) return;
+
+        var temReparo = listaItens.some(function(it) { return it.isReparoRecente === true || it.tipo === 'reparo_recente'; });
+        var temAberto = listaItens.some(function(it) { return !it.isReparoRecente && it.tipo !== 'reparo_recente'; });
+
+        var modalEl = document.getElementById('modalProximidade');
+        var headerEl = document.getElementById('modalProximidadeHeader') || modalEl.querySelector('.modal-header');
+        var descEl = document.getElementById('modalProximidadeDesc') || modalEl.querySelector('.modal-body > p');
+        var btnConfirmar = document.getElementById('btnConfirmarModalProximidade') || modalEl.querySelector('.modal-footer .btn-primario');
+
+        if (temReparo && !temAberto) {
+          if (headerEl) {
+            headerEl.className = 'modal-header !text-amber-800 flex items-center gap-2 font-bold';
+            headerEl.innerHTML = '<span class="text-xl">🔧</span> REPARO RECENTE NESTE LOCAL (< 30 DIAS)';
+          }
+          if (descEl) {
+            descEl.innerHTML = 'Já foi executado um reparo recente neste mesmo local. Por se tratar de <b>reincidência em menos de 30 dias</b>, este novo chamado será registrado como <b>Pendente de Aprovação</b> da supervisão:';
+          }
+          if (btnConfirmar) {
+            btnConfirmar.innerHTML = 'Confirmar envio';
+            btnConfirmar.className = 'btn-primario !w-auto !bg-amber-600 hover:!bg-amber-700 active:scale-95';
+          }
+        } else if (temReparo && temAberto) {
+          if (headerEl) {
+            headerEl.className = 'modal-header !text-amber-800 flex items-center gap-2 font-bold';
+            headerEl.innerHTML = '<span class="text-xl">⚠️</span> PROTOCOLOS E REPARO RECENTE NO LOCAL';
+          }
+          if (descEl) {
+            descEl.innerHTML = 'Foram identificados protocolos em andamento e histórico de <b>reparo recente (< 30 dias)</b> neste mesmo local. Verifique os dados antes de prosseguir:';
+          }
+          if (btnConfirmar) {
+            btnConfirmar.innerHTML = 'Confirmar envio';
+            btnConfirmar.className = 'btn-primario !w-auto !bg-amber-600 hover:!bg-amber-700 active:scale-95';
+          }
+        } else {
+          if (headerEl) {
+            headerEl.className = 'modal-header text-amber-700 flex items-center gap-2 font-bold';
+            headerEl.innerHTML = '⚠️ PROTOCOLOS EXISTENTES NO LOCAL';
+          }
+          if (descEl) {
+            descEl.innerHTML = 'Foram encontrados protocolos abertos próximos. Verifique se não é o mesmo chamado:';
+          }
+          if (btnConfirmar) {
+            btnConfirmar.innerHTML = 'Confirmar envio';
+            btnConfirmar.className = 'btn-primario !w-auto !bg-red-600 hover:!bg-red-700 active:scale-95';
+          }
+        }
+
+        var legExistente = document.getElementById('legendaExistente');
+        var legReparo = document.getElementById('legendaReparoRecente');
+        if (legExistente) legExistente.style.display = temAberto ? 'inline-flex' : 'none';
+        if (legReparo) legReparo.style.display = temReparo ? 'inline-flex' : 'none';
+
+        var html = "";
+        for (var k = 0; k < listaItens.length; k++) {
+          html += formatarItemProtocoloModal(listaItens[k], k);
+        }
+        document.getElementById('listaProtocolosModal').innerHTML = html;
+        modalEl.style.display = 'flex';
+        if (typeof resetarBotaoSalvar === 'function') resetarBotaoSalvar();
+      }
+
       async function checarDuplicidadeBackend(lat, lng, idx, autoSave) {
         var pt = pontosData[idx] || {};
         var modoSel = "";
@@ -4868,8 +5095,12 @@
                   }
 
                   var matchEndereco = false;
-                  if (end && ponto.endereco && ponto.endereco.toLowerCase().trim() === end.toLowerCase().trim()) {
-                    matchEndereco = true;
+                  if (end && ponto.endereco) {
+                    var nEnd1 = normalizarTextoEndereco(end);
+                    var nEnd2 = normalizarTextoEndereco(ponto.endereco);
+                    if (nEnd1 && nEnd2 && (nEnd1 === nEnd2 || nEnd1.includes(nEnd2) || nEnd2.includes(nEnd1))) {
+                      matchEndereco = true;
+                    }
                   }
 
                   var pLat = parseFloat(ponto.lat || ponto.latitude);
@@ -4898,7 +5129,9 @@
                       endereco: coordStr,
                       enderecoTexto: endExibicao,
                       status: os.status || 'Aberta',
-                      data: os.data_abertura
+                      data: os.data_abertura,
+                      tipo: 'aberta',
+                      isReparoRecente: false
                     });
                   }
                 });
@@ -4922,8 +5155,12 @@
                 }
 
                 var matchEnderecoPraca = false;
-                if (end && os.endereco && os.endereco.toLowerCase().trim() === end.toLowerCase().trim()) {
-                  matchEnderecoPraca = true;
+                if (end && os.endereco) {
+                  var nEnd1 = normalizarTextoEndereco(end);
+                  var nEnd2 = normalizarTextoEndereco(os.endereco);
+                  if (nEnd1 && nEnd2 && (nEnd1 === nEnd2 || nEnd1.includes(nEnd2) || nEnd2.includes(nEnd1))) {
+                    matchEnderecoPraca = true;
+                  }
                 }
 
                 var distMeters = null;
@@ -4940,8 +5177,154 @@
                     endereco: coordStr,
                     enderecoTexto: os.praca_nome || os.endereco || ("Local: " + coordStr),
                     status: os.status || 'Aberta',
-                    data: os.data_abertura
+                    data: os.data_abertura,
+                    tipo: 'aberta',
+                    isReparoRecente: false
                   });
+                }
+              });
+            }
+
+            // 3. Consultar Ordens de Serviço Viárias CONCLUÍDAS (Reparos Recentes) nos últimos 30 dias
+            var dataLimite30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            var resViariasConcluidas = await client.from('ordens_servico')
+              .select('id, protocolo, status, pontos_inicial, pontos_final, data_abertura, data_fechamento')
+              .or('data_fechamento.gte.' + dataLimite30d + ',and(data_fechamento.is.null,data_abertura.gte.' + dataLimite30d + ')')
+              .in('status', ['Concluída', 'Concluido', 'Finalizada', 'Resolvido', 'concluida', 'concluido', 'finalizada']);
+
+            if (resViariasConcluidas.data && resViariasConcluidas.data.length > 0) {
+              resViariasConcluidas.data.forEach(function(os) {
+                var pontosArray = [];
+                if (Array.isArray(os.pontos_final)) {
+                  pontosArray = pontosArray.concat(os.pontos_final);
+                } else if (typeof os.pontos_final === 'string') {
+                  try { pontosArray = pontosArray.concat(JSON.parse(os.pontos_final)); } catch(e) {}
+                }
+                if (Array.isArray(os.pontos_inicial)) {
+                  pontosArray = pontosArray.concat(os.pontos_inicial);
+                } else if (typeof os.pontos_inicial === 'string') {
+                  try { pontosArray = pontosArray.concat(JSON.parse(os.pontos_inicial)); } catch(e) {}
+                }
+
+                var matchReparoRecente = null;
+                pontosArray.forEach(function(ponto) {
+                  if (matchReparoRecente) return;
+                  var matchPlaqueta = false;
+                  if (plaq && ponto.plaqueta && ponto.plaqueta.toString().toUpperCase().trim() === plaq.toUpperCase().trim()) {
+                    matchPlaqueta = true;
+                  }
+
+                  var matchEndereco = false;
+                  if (end && ponto.endereco) {
+                    var nEnd1 = normalizarTextoEndereco(end);
+                    var nEnd2 = normalizarTextoEndereco(ponto.endereco);
+                    if (nEnd1 && nEnd2 && (nEnd1 === nEnd2 || nEnd1.includes(nEnd2) || nEnd2.includes(nEnd1))) {
+                      matchEndereco = true;
+                    }
+                  }
+
+                  var pLat = parseFloat(ponto.lat || ponto.latitude);
+                  var pLng = parseFloat(ponto.lng || ponto.longitude);
+                  if ((isNaN(pLat) || isNaN(pLng)) && ponto.coordenada) {
+                    var parts = ponto.coordenada.split(',');
+                    if (parts.length >= 2) {
+                      pLat = parseFloat(parts[0]);
+                      pLng = parseFloat(parts[1]);
+                    }
+                  }
+
+                  var distMeters = null;
+                  if (!isNaN(pLat) && !isNaN(pLng) && !isNaN(latNum) && !isNaN(lngNum)) {
+                    distMeters = calcularDistanciaMetros(latNum, lngNum, pLat, pLng);
+                  }
+
+                  if (matchPlaqueta || matchEndereco || (distMeters !== null && distMeters <= 50)) {
+                    var distFinal = distMeters !== null ? distMeters : 0;
+                    var dataFim = os.data_fechamento || ponto.data_reparo || os.data_abertura;
+                    var diasAtras = 0;
+                    if (dataFim) {
+                      diasAtras = Math.max(0, Math.floor((Date.now() - new Date(dataFim).getTime()) / (1000 * 60 * 60 * 24)));
+                    }
+
+                    if (diasAtras <= 30) {
+                      var coordStr = (!isNaN(pLat) && !isNaN(pLng)) ? (pLat + ", " + pLng) : (latNum + ", " + lngNum);
+                      var endExibicao = ponto.endereco || (ponto.plaqueta ? ("Plaqueta " + ponto.plaqueta) : ("Local do reparo: " + coordStr));
+
+                      matchReparoRecente = {
+                        protocolo: os.protocolo || ('OS #' + os.id),
+                        distancia: distFinal,
+                        endereco: coordStr,
+                        enderecoTexto: endExibicao,
+                        status: os.status || 'Concluída',
+                        data: dataFim,
+                        diasAtras: diasAtras,
+                        tipo: 'reparo_recente',
+                        isReparoRecente: true
+                      };
+                    }
+                  }
+                });
+
+                if (matchReparoRecente) {
+                  osProximas.push(matchReparoRecente);
+                }
+              });
+            }
+
+            // 4. Consultar Ordens de Praças CONCLUÍDAS nos últimos 30 dias
+            var resPracasConcluidas = await client.from('ordens_servico_pracas')
+              .select('id, protocolo, status, praca_nome, endereco, coordenada, coordenada_reparo, data_abertura, data_fechamento')
+              .or('data_fechamento.gte.' + dataLimite30d + ',and(data_fechamento.is.null,data_abertura.gte.' + dataLimite30d + ')')
+              .in('status', ['Concluída', 'Concluido', 'Finalizada', 'Resolvido', 'concluida', 'concluido', 'finalizada']);
+
+            if (resPracasConcluidas.data && resPracasConcluidas.data.length > 0) {
+              resPracasConcluidas.data.forEach(function(os) {
+                var pLat = null, pLng = null;
+                var coordRef = os.coordenada_reparo || os.coordenada;
+                if (coordRef) {
+                  var parts = coordRef.split(',');
+                  if (parts.length >= 2) {
+                    pLat = parseFloat(parts[0]);
+                    pLng = parseFloat(parts[1]);
+                  }
+                }
+
+                var matchEnderecoPraca = false;
+                if (end && os.endereco) {
+                  var nEnd1 = normalizarTextoEndereco(end);
+                  var nEnd2 = normalizarTextoEndereco(os.endereco);
+                  if (nEnd1 && nEnd2 && (nEnd1 === nEnd2 || nEnd1.includes(nEnd2) || nEnd2.includes(nEnd1))) {
+                    matchEnderecoPraca = true;
+                  }
+                }
+
+                var distMeters = null;
+                if (pLat !== null && pLng !== null && !isNaN(latNum) && !isNaN(lngNum)) {
+                  distMeters = calcularDistanciaMetros(latNum, lngNum, pLat, pLng);
+                }
+
+                if (matchEnderecoPraca || (distMeters !== null && distMeters <= 50)) {
+                  var distFinal = distMeters !== null ? distMeters : 0;
+                  var dataFim = os.data_fechamento || os.data_abertura;
+                  var diasAtras = 0;
+                  if (dataFim) {
+                    diasAtras = Math.max(0, Math.floor((Date.now() - new Date(dataFim).getTime()) / (1000 * 60 * 60 * 24)));
+                  }
+
+                  if (diasAtras <= 30) {
+                    var coordStr = (pLat !== null && pLng !== null) ? (pLat + ", " + pLng) : (latNum + ", " + lngNum);
+                    osProximas.push({
+                      protocolo: os.protocolo || ('OS Praça #' + os.id),
+                      distancia: distFinal,
+                      endereco: coordStr,
+                      enderecoTexto: os.praca_nome || os.endereco || ("Praça: " + coordStr),
+                      status: os.status || 'Concluída',
+                      data: dataFim,
+                      diasAtras: diasAtras,
+                      tipo: 'reparo_recente',
+                      isReparoRecente: true
+                    });
+                  }
                 }
               });
             }
@@ -5006,8 +5389,53 @@
                     endereco: coordStr,
                     enderecoTexto: os.praca_nome || os.endereco || ("Praça: " + dadosFinaisPraca.pracaNome),
                     status: os.status || 'Aberta',
-                    data: os.data_abertura
+                    data: os.data_abertura,
+                    tipo: 'aberta',
+                    isReparoRecente: false
                   });
+                }
+              });
+            }
+
+            // Consultar Praças CONCLUÍDAS nos últimos 30 dias (Reparo Recente)
+            var dataLimite30dPraca = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+            var resPracasConcluidas = await client.from('ordens_servico_pracas')
+              .select('id, protocolo, status, praca_nome, endereco, coordenada, coordenada_reparo, data_abertura, data_fechamento')
+              .or('data_fechamento.gte.' + dataLimite30dPraca + ',and(data_fechamento.is.null,data_abertura.gte.' + dataLimite30dPraca + ')')
+              .in('status', ['Concluída', 'Concluido', 'Finalizada', 'Resolvido', 'concluida', 'concluido', 'finalizada']);
+
+            if (resPracasConcluidas.data && resPracasConcluidas.data.length > 0) {
+              resPracasConcluidas.data.forEach(function(os) {
+                var matchNome = nomePraca && os.praca_nome && os.praca_nome.toLowerCase().trim() === nomePraca;
+                var osCoords = extrairCoordenadasPlaquetaRow(os);
+                var distMeters = null;
+
+                if (osCoords && latNum !== null && lngNum !== null) {
+                  distMeters = calcularDistanciaMetros(latNum, lngNum, osCoords.lat, osCoords.lng);
+                }
+
+                if (matchNome || (distMeters !== null && distMeters <= 50)) {
+                  var distFinal = distMeters !== null ? distMeters : 0;
+                  var coordStr = osCoords ? (osCoords.lat + ", " + osCoords.lng) : dadosFinaisPraca.pracaCoordenada;
+                  var dataFim = os.data_fechamento || os.data_abertura;
+                  var diasAtras = 0;
+                  if (dataFim) {
+                    diasAtras = Math.max(0, Math.floor((Date.now() - new Date(dataFim).getTime()) / (1000 * 60 * 60 * 24)));
+                  }
+
+                  if (diasAtras <= 30) {
+                    osProximas.push({
+                      protocolo: os.protocolo || ('OS Praça #' + os.id),
+                      distancia: distFinal,
+                      endereco: coordStr,
+                      enderecoTexto: os.praca_nome || os.endereco || ("Praça: " + (dadosFinaisPraca.pracaNome || coordStr)),
+                      status: os.status || 'Concluída',
+                      data: dataFim,
+                      diasAtras: diasAtras,
+                      tipo: 'reparo_recente',
+                      isReparoRecente: true
+                    });
+                  }
                 }
               });
             }
@@ -5031,14 +5459,7 @@
           protocolosConsolidados = osProximasUnicas;
           ptsLocalsGrafico = (latNum !== null && lngNum !== null) ? [{ lat: latNum, lng: lngNum }] : [];
 
-          var html = "";
-          for (var k = 0; k < osProximasUnicas.length; k++) {
-            var os = osProximasUnicas[k];
-            html += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + os.distancia + 'm)<br><span class="text-slate-600 font-medium">' + os.enderecoTexto + '</span></div>';
-          }
-          document.getElementById('listaProtocolosModal').innerHTML = html;
-          document.getElementById('modalProximidade').style.display = 'flex';
-          resetarBotaoSalvar();
+          exibirModalProximidade(osProximasUnicas);
         } else {
           executarEnvioFinalPraca(dadosFinaisPraca);
         }
@@ -5375,21 +5796,76 @@
                     dupPracas.push({
                       protocolo: osP.protocolo || ('OS Praça #' + osP.id),
                       distancia: dFinal,
-                      enderecoTexto: osP.praca_nome || osP.endereco || "Praça"
+                      enderecoTexto: osP.praca_nome || osP.endereco || "Praça",
+                      status: osP.status || 'Aberta',
+                      tipo: 'aberta',
+                      isReparoRecente: false
                     });
                   }
                 });
 
+                var dataLimite30dP = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+                var resPracasConclCheck = await client.from('ordens_servico_pracas')
+                  .select('id, protocolo, status, praca_nome, endereco, coordenada, coordenada_reparo, data_abertura, data_fechamento')
+                  .or('data_fechamento.gte.' + dataLimite30dP + ',and(data_fechamento.is.null,data_abertura.gte.' + dataLimite30dP + ')')
+                  .in('status', ['Concluída', 'Concluido', 'Finalizada', 'Resolvido', 'concluida', 'concluido', 'finalizada']);
+
+                if (resPracasConclCheck.data && resPracasConclCheck.data.length > 0) {
+                  resPracasConclCheck.data.forEach(function(osP) {
+                    var matchNome = (nomeP && osP.praca_nome && osP.praca_nome.toLowerCase().trim() === nomeP);
+                    var matchEnd = false;
+                    if (endP && osP.endereco) {
+                      var nEnd1 = normalizarTextoEndereco(endP);
+                      var nEnd2 = normalizarTextoEndereco(osP.endereco);
+                      if (nEnd1 && nEnd2 && (nEnd1 === nEnd2 || nEnd1.includes(nEnd2) || nEnd2.includes(nEnd1))) {
+                        matchEnd = true;
+                      }
+                    }
+
+                    var pLat = null, pLng = null;
+                    var coordRef = osP.coordenada_reparo || osP.coordenada;
+                    if (coordRef) {
+                      var cParts = coordRef.split(',');
+                      if (cParts.length >= 2) {
+                        pLat = parseFloat(cParts[0]);
+                        pLng = parseFloat(cParts[1]);
+                      }
+                    }
+                    var distM = null;
+                    if (pLat !== null && pLng !== null && latNumP !== null && lngNumP !== null && !isNaN(latNumP) && !isNaN(lngNumP)) {
+                      distM = calcularDistanciaMetros(latNumP, lngNumP, pLat, pLng);
+                    }
+
+                    if (matchNome || matchEnd || (distM !== null && distM <= 50)) {
+                      var dFinal = distM !== null ? distM : 0;
+                      var dataFim = osP.data_fechamento || osP.data_abertura;
+                      var diasAtras = 0;
+                      if (dataFim) {
+                        diasAtras = Math.max(0, Math.floor((Date.now() - new Date(dataFim).getTime()) / (1000 * 60 * 60 * 24)));
+                      }
+
+                      if (diasAtras <= 30) {
+                        dupPracas.push({
+                          protocolo: osP.protocolo || ('OS Praça #' + osP.id),
+                          distancia: dFinal,
+                          enderecoTexto: osP.praca_nome || osP.endereco || ("Praça: " + (dados.pracaNome || "Local")),
+                          status: osP.status || 'Concluída',
+                          data: dataFim,
+                          diasAtras: diasAtras,
+                          tipo: 'reparo_recente',
+                          isReparoRecente: true
+                        });
+                      }
+                    }
+                  });
+                }
+
                 if (dupPracas.length > 0) {
                   dadosTempPraca._dupPracas = dupPracas;
                   window.protocolosConsolidadosPraca = dupPracas;
-                  var htmlP = "";
-                  dupPracas.forEach(function(osItem, k) {
-                    htmlP += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + osItem.protocolo + '</strong> (' + osItem.distancia + 'm)<br><span class="text-slate-600 font-medium">' + osItem.enderecoTexto + '</span></div>';
-                  });
-                  document.getElementById('listaProtocolosModal').innerHTML = htmlP;
-                  document.getElementById('modalProximidade').style.display = 'flex';
-                  resetarBotaoSalvar();
+                  protocolosConsolidados = dupPracas;
+                  ptsLocalsGrafico = (latNumP !== null && lngNumP !== null && !isNaN(latNumP) && !isNaN(lngNumP)) ? [{ lat: latNumP, lng: lngNumP }] : [];
+                  exibirModalProximidade(dupPracas);
                   return;
                 }
               }
@@ -5402,13 +5878,27 @@
         btn.innerText = "Gravando OS de Praça...";
         var protExtraido = gerarNovoProtocolo('praca');
         var userAuth = window.usuarioLogadoSupabase || {};
+        var temReparoRecenteP = false;
+        var itemReparoRecenteP = null;
+        var listaDupP = (dados && dados._dupPracas) || window.protocolosConsolidadosPraca || [];
+        if (listaDupP && listaDupP.length > 0) {
+          itemReparoRecenteP = listaDupP.find(function(p) { return p.isReparoRecente; });
+          if (itemReparoRecenteP) temReparoRecenteP = true;
+        }
+
         var isOutraPraca = (dados && (dados.idPraca === 'outra' || !dados.idPraca));
-        var statusOS = (forcarSalvar === true || isOutraPraca) ? "Pendente" : "Aberta";
+        var statusOS = (forcarSalvar === true || isOutraPraca || temReparoRecenteP) ? "Pendente" : "Aberta";
 
         var motivoAprovacaoPraca = null;
         if (statusOS === "Pendente") {
-          var listaDupP = (dados && dados._dupPracas) || window.protocolosConsolidadosPraca || [];
-          if (listaDupP && listaDupP.length > 0) {
+          if (temReparoRecenteP && itemReparoRecenteP) {
+            var pStrRecP = String(itemReparoRecenteP.protocolo || itemReparoRecenteP.id || '').trim();
+            if (!pStrRecP.startsWith('#')) pStrRecP = '#' + pStrRecP;
+            var diasTxt = (itemReparoRecenteP.diasAtras === 0) ? "hoje" : ((itemReparoRecenteP.diasAtras === 1) ? "ontem" : ("há " + itemReparoRecenteP.diasAtras + " dias"));
+            var distNum = (itemReparoRecenteP.distancia !== null && itemReparoRecenteP.distancia !== undefined) ? itemReparoRecenteP.distancia : 0;
+            var distTxt = distNum + (distNum === 1 ? " metro" : " metros");
+            motivoAprovacaoPraca = "Reparo recente " + pStrRecP + " (" + diasTxt + ", a " + distTxt + ")";
+          } else if (listaDupP && listaDupP.length > 0) {
             var listaProtsP = listaDupP.map(function(p) {
               var pStr = String(p.protocolo || p.id || '').trim();
               return pStr.startsWith('#') ? pStr : ('#' + pStr);
@@ -5593,9 +6083,23 @@
         avaliarEEnviarMestre();
       }
 
-      function avaliarEEnviarMestre() {
+      async function avaliarEEnviarMestre() {
          var listaConsolidada = [];
          ptsLocalsGrafico = [];
+
+         var btn = document.getElementById('btnSalvar');
+         if (btn) { btn.disabled = true; btn.innerText = "Verificando histórico e duplicidade..."; }
+
+         for (var i = 0; i < qtdAtual; i++) {
+             var pt = pontosData[i];
+             var latCheck = pt.usarMesmoEndereco ? (pontosData[0] ? pontosData[0].latAtual : null) : pt.latAtual;
+             var lngCheck = pt.usarMesmoEndereco ? (pontosData[0] ? pontosData[0].lngAtual : null) : pt.lngAtual;
+             if (latCheck && lngCheck && (!pt.listaProximos || pt.listaProximos.length === 0)) {
+                try {
+                   await checarDuplicidadeBackend(latCheck, lngCheck, i, false);
+                } catch(e) {}
+             }
+         }
 
          for (var i = 0; i < qtdAtual; i++) {
              var pt = pontosData[i];
@@ -5612,7 +6116,7 @@
                  }
              }
          }
-        var mapaVistos = {};
+         var mapaVistos = {};
          protocolosConsolidados = [];
          listaConsolidada.forEach(function(os) {
            if (!mapaVistos[os.protocolo]) {
@@ -5622,15 +6126,7 @@
          });
 
          if (protocolosConsolidados.length > 0) {
-            var html = "";
-            for (var k = 0; k < protocolosConsolidados.length; k++) {
-              var os = protocolosConsolidados[k];
-              var txtLoc = os.enderecoTexto || os.endereco;
-              html += '<div class="protocolo-info p-3 mb-2 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900"><b>#' + (k+1) + ' Protocolo:</b> <strong class="text-blue-700">' + os.protocolo + '</strong> (' + os.distancia + 'm)<br><span class="text-slate-600 font-medium">' + txtLoc + '</span></div>';
-            }
-            document.getElementById('listaProtocolosModal').innerHTML = html;
-            document.getElementById('modalProximidade').style.display = 'flex';
-            resetarBotaoSalvar();
+            exibirModalProximidade(protocolosConsolidados);
          } else {
             executarEnvioFinalMultiplo();
          }
@@ -5691,7 +6187,7 @@
              encontrouPinos = true;
              var el = document.createElement('div');
              el.className = 'marker-existente';
-             el.style.backgroundColor = '#ef4444';
+             el.style.backgroundColor = os.isReparoRecente ? '#d97706' : '#ef4444';
              el.style.color = 'white';
              el.style.width = '24px';
              el.style.height = '24px';
@@ -5715,9 +6211,9 @@
         setTimeout(function() {
            map.resize();
            if (!bounds.isEmpty()) {
-             map.fitBounds(bounds, { padding: 40, maxZoom: 17 });
+             map.fitBounds(bounds, { padding: 50, maxZoom: 17 });
            }
-        }, 150);
+        }, 300);
       }
 
       function extrairCoordsString(texto) {
@@ -5866,11 +6362,25 @@
            }
         }
 
-        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicado) ? "Pendente" : "Aberta";
+        var temReparoRecenteV = false;
+        var itemReparoRecenteV = null;
+        if (typeof protocolosConsolidados !== 'undefined' && protocolosConsolidados && protocolosConsolidados.length > 0) {
+          itemReparoRecenteV = protocolosConsolidados.find(function(p) { return p.isReparoRecente; });
+          if (itemReparoRecenteV) temReparoRecenteV = true;
+        }
+
+        var statusOS = (forcarSalvar === true || temPlaquetaTagDuplicado || temReparoRecenteV) ? "Pendente" : "Aberta";
 
         var motivoAprovacaoViaria = null;
         if (temPlaquetaTagDuplicado) {
           motivoAprovacaoViaria = "Coordenada da plaqueta duvidosa";
+        } else if (temReparoRecenteV && itemReparoRecenteV) {
+          var pStrRec = String(itemReparoRecenteV.protocolo || itemReparoRecenteV.id || '').trim();
+          if (!pStrRec.startsWith('#')) pStrRec = '#' + pStrRec;
+          var diasTxt = (itemReparoRecenteV.diasAtras === 0) ? "hoje" : ((itemReparoRecenteV.diasAtras === 1) ? "ontem" : ("há " + itemReparoRecenteV.diasAtras + " dias"));
+          var distNum = (itemReparoRecenteV.distancia !== null && itemReparoRecenteV.distancia !== undefined) ? itemReparoRecenteV.distancia : 0;
+          var distTxt = distNum + (distNum === 1 ? " metro" : " metros");
+          motivoAprovacaoViaria = "Reparo recente " + pStrRec + " (" + diasTxt + ", a " + distTxt + ")";
         } else if (statusOS === "Pendente") {
           if (typeof protocolosConsolidados !== 'undefined' && protocolosConsolidados && protocolosConsolidados.length > 0) {
             var listaProtsV = protocolosConsolidados.map(function(p) {
@@ -6219,6 +6729,8 @@
         if (window.parent && window.parent !== window) {
           var logoutBtn = document.getElementById('btnHeaderLogout');
           if (logoutBtn) logoutBtn.style.display = 'none';
+          var consultarBtn = document.getElementById('btnHeaderConsultar');
+          if (consultarBtn) consultarBtn.style.display = 'none';
           var citizenBadge = document.getElementById('citizenProfileBadge');
           if (citizenBadge) citizenBadge.style.display = 'none';
         } else {
@@ -6246,6 +6758,374 @@
         // Carrega e valida sessão Supabase / Gov.br para travas de interface e CPF
         await carregarOperadorESessaoSupabase();
       });
+
+      // =========================================================================
+      // FUNÇÕES DO MODAL DE CONSULTA DE PROTOCOLO E STATUS (EXCLUSIVO ABRIR.HTML)
+      // =========================================================================
+      function abrirModalConsultarProtocolo() {
+        var modal = document.getElementById('modalConsultarProtocolo');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        var input = document.getElementById('inputConsultaProtocolo');
+        if (input) {
+          setTimeout(function() { input.focus(); }, 100);
+        }
+      }
+
+      function fecharModalConsultarProtocolo() {
+        var modal = document.getElementById('modalConsultarProtocolo');
+        if (modal) modal.style.display = 'none';
+      }
+
+      async function executarConsultaProtocolo() {
+        var input = document.getElementById('inputConsultaProtocolo');
+        var loading = document.getElementById('consultaLoading');
+        var resBox = document.getElementById('consultaResultado');
+        var errBox = document.getElementById('consultaErro');
+        var errText = document.getElementById('consultaErroTexto');
+        var btnTexto = document.getElementById('btnExecutarConsultaTexto');
+        var btn = document.getElementById('btnExecutarConsulta');
+
+        if (!input) return;
+        var termo = input.value.trim().replace(/^#/, '');
+
+        if (!termo) {
+          if (errBox && errText) {
+            errText.textContent = "Por favor, digite o número do protocolo para consultar.";
+            errBox.classList.remove('hidden');
+          }
+          if (resBox) resBox.classList.add('hidden');
+          return;
+        }
+
+        if (errBox) errBox.classList.add('hidden');
+        if (resBox) resBox.classList.add('hidden');
+        if (loading) loading.classList.remove('hidden');
+        if (btn) btn.disabled = true;
+        if (btnTexto) btnTexto.textContent = 'Buscando...';
+
+        try {
+          var client = obterSupabaseClient();
+          if (!client) throw new Error("Cliente Supabase não inicializado.");
+
+          var row = null;
+          var tabelaOrigem = '';
+
+          // 1. Busca na tabela ordens_servico (Iluminação Viária)
+          var resV = await client.from('ordens_servico').select('*').eq('protocolo', termo).maybeSingle();
+          if (resV && resV.data) {
+            row = resV.data;
+            tabelaOrigem = 'ordens_servico';
+          } else {
+            // 2. Busca na tabela ordens_servico_pracas (Praça Pública)
+            var resP = await client.from('ordens_servico_pracas').select('*').eq('protocolo', termo).maybeSingle();
+            if (resP && resP.data) {
+              row = resP.data;
+              tabelaOrigem = 'ordens_servico_pracas';
+            } else {
+              // 3. Fallback na tabela legado 'chamados'
+              var resC = await client.from('chamados').select('*').eq('protocolo', termo).maybeSingle();
+              if (resC && resC.data) {
+                row = resC.data;
+                tabelaOrigem = 'chamados';
+              }
+            }
+          }
+
+          if (!row) {
+            if (errBox && errText) {
+              errText.textContent = "Nenhuma Ordem de Serviço encontrada com o protocolo '" + termo + "'. Verifique o número digitado e tente novamente.";
+              errBox.classList.remove('hidden');
+            }
+            return;
+          }
+
+          // Converter para ChamadoModel para unificar extração de pontos, endereços e problemas
+          var chamado = (typeof window.ChamadoModel !== 'undefined') ? new window.ChamadoModel(row) : null;
+
+          // Renderizar informações encontradas
+          var elProt = document.getElementById('resConsultaProtocolo');
+          var elBadge = document.getElementById('resConsultaStatusBadge');
+          var elTipo = document.getElementById('resConsultaTipo');
+          var elData = document.getElementById('resConsultaData');
+          var boxPontos = document.getElementById('boxPontosManutencao');
+          var boxObs = document.getElementById('boxResConsultaObservacao');
+          var elObs = document.getElementById('resConsultaObservacao');
+          var boxConc = document.getElementById('boxResConsultaConclusao');
+          var elConc = document.getElementById('resConsultaConclusao');
+
+          var protExibicao = (chamado && chamado.protocolo) ? chamado.protocolo : (row.protocolo || termo);
+          if (elProt) elProt.textContent = '#' + protExibicao;
+
+          // Status & Badge
+          var rawStatus = (chamado && chamado.rawStatus) ? chamado.rawStatus : String(row.status || 'Aberta').trim();
+          var statusLower = rawStatus.toLowerCase();
+          var badgeClasses = "bg-slate-100 text-slate-700 border border-slate-200";
+
+          if (statusLower.includes('conclu')) {
+            badgeClasses = "bg-emerald-100 text-emerald-800 border border-emerald-300";
+          } else if (statusLower.includes('cancel') || statusLower.includes('rejeit')) {
+            badgeClasses = "bg-rose-100 text-rose-800 border border-rose-300";
+          } else if (statusLower.includes('andamento') || statusLower.includes('execu')) {
+            badgeClasses = "bg-blue-100 text-blue-800 border border-blue-300";
+          } else if (statusLower.includes('abert') || statusLower.includes('pend')) {
+            badgeClasses = "bg-amber-100 text-amber-800 border border-amber-300";
+          }
+
+          if (elBadge) {
+            elBadge.className = "px-2.5 py-1 rounded-full font-bold text-[11px] shadow-2xs " + badgeClasses;
+            elBadge.textContent = rawStatus;
+          }
+
+          // Tipo de Chamado
+          var isPraca = Boolean(
+            (chamado && chamado.isPraca) ||
+            tabelaOrigem === 'ordens_servico_pracas' || 
+            row.praca_nome || 
+            row.pracaNome || 
+            (protExibicao && String(protExibicao).toUpperCase().startsWith('P'))
+          );
+          if (elTipo) {
+            elTipo.textContent = isPraca ? 'Praça Pública' : 'Iluminação Viária';
+          }
+
+          // Data de Abertura formatada
+          var rawData = (chamado && chamado.dataAbertura) ? chamado.dataAbertura : (row.data_abertura || row.dataAbertura || row.created_at || '');
+          var dataFormatada = 'Data não informada';
+          if (rawData) {
+            try {
+              var d = new Date(rawData);
+              if (!isNaN(d.getTime())) {
+                dataFormatada = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+              } else {
+                dataFormatada = String(rawData);
+              }
+            } catch(e) {
+              dataFormatada = String(rawData);
+            }
+          }
+          if (elData) elData.textContent = dataFormatada;
+
+          // Renderizar Pontos de Manutenção / Localização (reutilizando padrão do PainelController)
+          if (boxPontos) {
+            if (isPraca) {
+              var nomePraca = (chamado && chamado.pracaNome) ? chamado.pracaNome : (row.praca_nome || row.pracaNome || 'Praça Pública');
+              var endPraca = (chamado && chamado.endereco) ? chamado.endereco : (row.endereco || '');
+              var probPraca = (chamado && chamado.problemaInicial) ? chamado.problemaInicial : (row.problema_inicial || row.problema || 'Manutenção geral em praça pública');
+
+              boxPontos.innerHTML = `
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 shadow-2xs space-y-2">
+                  <div class="font-bold text-blue-700 text-xs border-b border-slate-200/60 pb-1.5 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                      <span class="material-symbols-outlined text-[16px]">park</span>
+                      <span>Praça Pública</span>
+                    </span>
+                  </div>
+                  <div class="space-y-1 text-xs">
+                    <div><b class="text-slate-600 font-medium">Nome da Praça:</b> <span class="font-bold text-slate-800">${nomePraca}</span></div>
+                    ${endPraca ? `<div><b class="text-slate-600 font-medium">Endereço/Referência:</b> <span class="font-medium text-slate-800">${endPraca}</span></div>` : ''}
+                    <div><b class="text-slate-600 font-medium">Problema(s):</b> <span class="font-medium text-slate-800">${probPraca}</span></div>
+                  </div>
+                </div>
+              `;
+            } else {
+              // Chamado Viário: Extrai lista pareada de pontos via ChamadoModel.pontosDetalhados
+              var pontosList = (chamado && Array.isArray(chamado.pontosDetalhados)) ? chamado.pontosDetalhados : [];
+
+              // Fallback se não gerou lista por ChamadoModel
+              if (pontosList.length === 0) {
+                var rawPts = row.pontos_final || row.pontos_inicial || row.pontos || [];
+                if (typeof rawPts === 'string') {
+                  try { rawPts = JSON.parse(rawPts); } catch(e) { rawPts = []; }
+                }
+                if (Array.isArray(rawPts) && rawPts.length > 0) {
+                  pontosList = rawPts.map(function(pt, idx) {
+                    return {
+                      numero: idx + 1,
+                      hasInicialData: true,
+                      hasFinalData: false,
+                      enderecoInicial: pt.endereco || pt.local || row.endereco || '',
+                      plaquetaInicial: pt.plaqueta || pt.plaqueta_inicial || row.plaqueta_inicial || '',
+                      coordenadaInicial: pt.coordenada || pt.coordenada_inicial || (pt.lat && pt.lng ? (pt.lat + ', ' + pt.lng) : '') || '',
+                      problemaInicial: pt.problema || pt.problema_inicial || row.problema_inicial || ''
+                    };
+                  });
+                } else {
+                  pontosList = [{
+                    numero: 1,
+                    hasInicialData: true,
+                    hasFinalData: false,
+                    enderecoInicial: row.endereco || '',
+                    plaquetaInicial: row.plaqueta_inicial || row.plaqueta || '',
+                    coordenadaInicial: row.coordenada_inicial || row.coordenada || '',
+                    problemaInicial: row.problema_inicial || row.problema || ''
+                  }];
+                }
+              }
+
+              var buildNavLinks = function(coordVal, enderecoVal) {
+                var lat = null, lng = null;
+                if (coordVal) {
+                  if (typeof coordVal === 'string') {
+                    var parts = coordVal.split(',').map(function(s) { return s.trim(); });
+                    if (parts.length >= 2) {
+                      var pLat = parseFloat(parts[0]);
+                      var pLng = parseFloat(parts[1]);
+                      if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) { lat = pLat; lng = pLng; }
+                    }
+                  } else if (typeof coordVal === 'object' && coordVal.lat && coordVal.lng) {
+                    var pLat2 = parseFloat(coordVal.lat);
+                    var pLng2 = parseFloat(coordVal.lng);
+                    if (!isNaN(pLat2) && !isNaN(pLng2) && pLat2 !== 0 && pLng2 !== 0) { lat = pLat2; lng = pLng2; }
+                  }
+                }
+                var gmaps = '#', waze = '#';
+                var isReal = function(v) {
+                  if (!v) return false;
+                  var s = String(v).trim().toLowerCase();
+                  return Boolean(s && s !== '---' && s !== 'não informado' && s !== 'nao informado' && !s.includes('coord'));
+                };
+                if (lat !== null && lng !== null) {
+                  gmaps = 'https://www.google.com/maps/search/?api=1&query=' + lat + ',' + lng;
+                  waze = 'https://waze.com/ul?ll=' + lat + ',' + lng + '&navigate=yes';
+                } else if (isReal(enderecoVal)) {
+                  var addr = String(enderecoVal).trim();
+                  var queryEnc = encodeURIComponent(addr + (addr.toLowerCase().indexOf('araraquara') === -1 ? ', Araraquara - SP' : ''));
+                  gmaps = 'https://www.google.com/maps/search/?api=1&query=' + queryEnc;
+                  waze = 'https://waze.com/ul?q=' + queryEnc + '&navigate=yes';
+                }
+                return { hasNav: (lat !== null || isReal(enderecoVal)), gmaps: gmaps, waze: waze };
+              };
+
+              var htmlPontos = pontosList.map(function(p, pIdx) {
+                var hasIni = p.hasInicialData || (pIdx === 0);
+                var navIni = hasIni ? buildNavLinks(p.coordenadaInicial, p.enderecoInicial) : { hasNav: false };
+                var navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, p.enderecoFinal) : { hasNav: false };
+
+                var endIni = p.enderecoInicial || (pIdx === 0 ? (chamado ? chamado.endereco : row.endereco) : '') || '';
+                var plqIni = p.plaquetaInicial || (pIdx === 0 ? (chamado ? chamado.plaquetaInicial : row.plaqueta_inicial) : '') || '';
+                var coordIni = p.coordenadaInicial || (pIdx === 0 ? (chamado ? chamado.coordenadaInicial : row.coordenada_inicial) : '') || '';
+                var probIni = p.problemaInicial || (pIdx === 0 ? (chamado ? chamado.problemaInicial : row.problema_inicial) : '') || '';
+
+                var plqFin = p.plaquetaFinal || '';
+                var coordFin = p.coordenadaFinal || '';
+                var probFin = p.problemaEncontrado || '';
+                var endFin = p.enderecoFinal || '';
+
+                return `
+                  <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 shadow-2xs space-y-2">
+                    <div class="flex items-center justify-between gap-2 border-b border-slate-200/60 pb-1.5">
+                      <div class="flex items-center gap-1.5 font-bold text-blue-700 text-xs">
+                        <span class="material-symbols-outlined text-[15px]">pin_drop</span>
+                        <span>Ponto #${p.numero || (pIdx + 1)}</span>
+                      </div>
+                      ${p.hasFinalData ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Concluído</span>` : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Abertura / Pendente</span>`}
+                    </div>
+
+                    <div class="grid grid-cols-1 ${p.hasFinalData ? 'md:grid-cols-2' : ''} gap-2 text-xs">
+                      <!-- Bloco Inicial -->
+                      <div class="p-2.5 rounded-lg bg-white border border-slate-200/80 space-y-1">
+                        <div class="font-bold text-slate-700 text-xs border-b border-slate-100 pb-1 flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[13px] text-blue-600">assignment</span>
+                          <span>Dados de Abertura</span>
+                        </div>
+                        <div><b class="text-slate-500 font-medium">Endereço:</b> <span class="font-semibold text-slate-800">${endIni || 'Não informado'}</span></div>
+                        <div><b class="text-slate-500 font-medium">Plaqueta:</b> <span class="font-semibold text-slate-800">${plqIni || 'Não informada'}</span></div>
+                        <div><b class="text-slate-500 font-medium">Problema:</b> <span class="font-medium text-slate-800">${probIni || 'Lâmpada apagada'}</span></div>
+                        ${coordIni ? `<div><b class="text-slate-500 font-medium">Coordenada:</b> <span class="font-mono text-slate-700 text-[11px]">${coordIni}</span></div>` : ''}
+                        ${navIni.hasNav ? `
+                        <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100 mt-1">
+                          <span class="text-[10px] font-semibold text-slate-400">Navegar:</span>
+                          <a href="${navIni.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 active:scale-95 transition-all">
+                            <span class="material-symbols-outlined text-[12px]">map</span> Maps
+                          </a>
+                          <a href="${navIni.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-cyan-50 hover:bg-cyan-100 text-cyan-800 border border-cyan-200 active:scale-95 transition-all">
+                            <span class="material-symbols-outlined text-[12px]">navigation</span> Waze
+                          </a>
+                        </div>
+                        ` : ''}
+                      </div>
+
+                      <!-- Bloco Finalização (Se Houver) -->
+                      ${p.hasFinalData ? `
+                      <div class="p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200/80 space-y-1">
+                        <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1 flex items-center gap-1">
+                          <span class="material-symbols-outlined text-[13px] text-emerald-600">task_alt</span>
+                          <span>Reparo em Campo</span>
+                        </div>
+                        <div><b class="text-slate-500 font-medium">Plaqueta:</b> <span class="font-semibold text-emerald-900">${plqFin || 'Não informada'}</span></div>
+                        <div><b class="text-slate-500 font-medium">Problema Encontrado:</b> <span class="font-medium text-emerald-900">${probFin || 'Reparo concluído'}</span></div>
+                        ${endFin ? `<div><b class="text-slate-500 font-medium">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFin}</span></div>` : ''}
+                        ${coordFin ? `<div><b class="text-slate-500 font-medium">Coordenada Reparo:</b> <span class="font-mono text-emerald-800 text-[11px]">${coordFin}</span></div>` : ''}
+                        ${navFin.hasNav ? `
+                        <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1">
+                          <span class="text-[10px] font-semibold text-emerald-700">Navegar:</span>
+                          <a href="${navFin.gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300 active:scale-95 transition-all">
+                            <span class="material-symbols-outlined text-[12px]">map</span> Maps
+                          </a>
+                          <a href="${navFin.waze}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-semibold bg-cyan-100 hover:bg-cyan-200 text-cyan-800 border border-cyan-300 active:scale-95 transition-all">
+                            <span class="material-symbols-outlined text-[12px]">navigation</span> Waze
+                          </a>
+                        </div>
+                        ` : ''}
+                      </div>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('');
+
+              boxPontos.innerHTML = `
+                <div class="space-y-2">
+                  <div class="font-bold text-slate-700 text-xs flex items-center justify-between">
+                    <span class="flex items-center gap-1.5 text-blue-700">
+                      <span class="material-symbols-outlined text-[16px]">location_on</span>
+                      <span>Pontos de Manutenção (${pontosList.length})</span>
+                    </span>
+                  </div>
+                  ${htmlPontos}
+                </div>
+              `;
+            }
+          }
+
+          // Observações do Solicitante / Munícipe
+          var obsTexto = '';
+          if (chamado && chamado.observacaoInicial) obsTexto = chamado.observacaoInicial;
+          else obsTexto = row.observacao_inicial || row.descricao || row.observacao || '';
+
+          if (obsTexto && boxObs && elObs) {
+            elObs.textContent = obsTexto;
+            boxObs.classList.remove('hidden');
+          } else if (boxObs) {
+            boxObs.classList.add('hidden');
+          }
+
+          // Conclusão / Justificativa / Histórico
+          var conclusaoTexto = '';
+          if (chamado && chamado.motivoAprovacao) conclusaoTexto = chamado.motivoAprovacao;
+          else conclusaoTexto = row.motivo_aprovacao || row.motivo || row.observacao_fechamento || row.historico_sessao || '';
+
+          if (conclusaoTexto && boxConc && elConc) {
+            elConc.textContent = conclusaoTexto;
+            boxConc.classList.remove('hidden');
+          } else if (boxConc) {
+            boxConc.classList.add('hidden');
+          }
+
+          if (resBox) resBox.classList.remove('hidden');
+        } catch(err) {
+          console.error("❌ Erro ao consultar protocolo:", err);
+          if (errBox && errText) {
+            errText.textContent = "Falha ao consultar protocolo: " + (err.message || "Erro desconhecido.");
+            errBox.classList.remove('hidden');
+          }
+        } finally {
+          if (loading) loading.classList.add('hidden');
+          if (btn) btn.disabled = false;
+          if (btnTexto) btnTexto.textContent = 'Buscar';
+        }
+      }
     </script>
   </body>
 </html>

@@ -143,6 +143,7 @@ class ChamadoModel {
         const full = String(this.motivoAprovacao || '').trim();
         if (!full) return '';
         if (full.toLowerCase().includes('duplicata')) return 'Duplicata';
+        if (full.toLowerCase().includes('reparo recente') || full.toLowerCase().includes('reincidência') || full.toLowerCase().includes('reincidencia')) return 'Reparo recente';
         if (full.includes('#')) {
             const part = full.split('#')[0].trim();
             if (part) return part;
@@ -171,7 +172,16 @@ class ChamadoModel {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
 
-        const safeText = escapeHtml(motivo);
+        let safeText = escapeHtml(motivo);
+        // Expandir abreviações para clareza (ex: "há 14d a 19m" -> "há 14 dias, a 19 metros")
+        safeText = safeText.replace(/\(há\s+(\d+)d\s+a\s+(\d+)m\)/gi, (m, d, dist) => {
+            const dTxt = d === '1' ? '1 dia' : `${d} dias`;
+            const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+            return `(há ${dTxt}, a ${mTxt})`;
+        }).replace(/\((hoje|ontem)\s+a\s+(\d+)m\)/gi, (m, quando, dist) => {
+            const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+            return `(${quando}, a ${mTxt})`;
+        });
 
         // Regex para capturar #PROTOCOLO ou protocolos no formato IP... / PC...
         const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/g;

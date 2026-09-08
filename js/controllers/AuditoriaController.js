@@ -83,12 +83,20 @@ class AuditoriaController {
             const explicacao = target.getAttribute('data-audit-explicacao');
             if (!explicacao) return;
 
+            const customTitle = target.getAttribute('data-audit-title') || 'Aponta SIM quando:';
+
             const popover = getOrCreatePopover();
+            const popoverTitle = popover.querySelector('div:first-child');
             const popoverText = popover.querySelector('#audit-global-popover-text');
             if (!popoverText) return;
 
+            if (popoverTitle) {
+                popoverTitle.textContent = customTitle;
+            }
+
             activeTarget = target;
-            popoverText.textContent = explicacao;
+            popoverText.innerHTML = explicacao;
+            popover.style.maxWidth = explicacao.includes('<div') ? '320px' : '260px';
             popover.style.display = 'block';
 
             const rect = target.getBoundingClientRect();
@@ -328,14 +336,136 @@ class AuditoriaController {
             `;
         }
 
-        const renderBadge = (isTrue, titleAttr = '') => `
-            <span class="audit-badge ${isTrue ? 'audit-s' : 'audit-n'}" ${titleAttr ? `title="${titleAttr}"` : ''}>${isTrue ? 'S' : 'N'}</span>
-        `;
+        const rules = window.ChamadoModel ? window.ChamadoModel.AUDIT_RULES : [];
 
         const distM = (item.distanciaCalculadaMetros !== undefined && item.distanciaCalculadaMetros !== null) 
             ? item.distanciaCalculadaMetros 
             : (window.ChamadoModel ? window.ChamadoModel.calcularDistanciaMetros(item.coordenadaInicial, item.coordenadaReparo) : null);
         const distTitle = (distM !== null && !isNaN(distM)) ? `Distância Abertura -> Reparo: ${Math.round(distM)} metros` : 'Distância não calculada';
+
+        const getDivergenceSummaryHtml = (ruleIdx) => {
+            const esc = (t) => {
+                if (t === null || t === undefined) return '';
+                return String(t)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;');
+            };
+
+            const makeCompareHtml = (iniLabel, iniVal, finLabel, finVal, extraNote = '') => `
+                <div class="flex flex-col gap-1.5 text-[11px] leading-tight">
+                    <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">${iniLabel}:</span>
+                        <span class="font-medium text-amber-200 break-words">${esc(iniVal || 'Não informado')}</span>
+                    </div>
+                    <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                        <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">${finLabel}:</span>
+                        <span class="font-medium text-emerald-300 break-words">${esc(finVal || 'Não informado')}</span>
+                    </div>
+                    ${extraNote ? `<div class="text-[10.5px] text-slate-300 italic pt-0.5">${extraNote}</div>` : ''}
+                </div>
+            `;
+
+            switch(ruleIdx) {
+                case 0: // Problema Divergente
+                    return makeCompareHtml('Abertura (Cadastrado)', item.problemaInicial, 'Conclusão (Constatado)', item.problemaEncontrado);
+
+                case 1: // Plaqueta Divergente
+                    return makeCompareHtml('Plaqueta Abertura', item.plaquetaInicial, 'Plaqueta Conclusão', item.plaquetaFinal);
+
+                case 2: // Quantidade Divergente
+                    return makeCompareHtml('Qtd. Abertura', `${item.qtdInicial || 1} ponto(s)`, 'Qtd. Conclusão', `${item.qtdFinal || 1} ponto(s)`);
+
+                case 3: // Distância > 100m
+                    const distTxt = distM !== null && !isNaN(distM) ? `${Math.round(distM)} metros` : (item.formattedDistancia || 'Distância superior a 100m');
+                    return `
+                        <div class="flex flex-col gap-1.5 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-rose-400 block mb-0.5">Distância Medida:</span>
+                                <span class="font-bold text-amber-300 text-xs">${esc(distTxt)}</span>
+                            </div>
+                            <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
+                                Limite permitido: <strong>100 metros</strong> entre a abertura e a realização do serviço.
+                            </div>
+                        </div>
+                    `;
+
+                case 4: // Plaqueta Próxima
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">Proximidade Detectada:</span>
+                                <span class="text-slate-200">Existe outra plaqueta cadastrada a <strong>menos de 20 metros</strong> desta localização.</span>
+                            </div>
+                        </div>
+                    `;
+
+                case 5: // Plaqueta Problemática
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-rose-400 block mb-0.5">Plaqueta: ${esc(item.plaquetaFinal || item.plaquetaInicial || 'Não informada')}</span>
+                                <span class="text-slate-200">Consta duplicada ou possui histórico recorrente recente na base.</span>
+                            </div>
+                        </div>
+                    `;
+
+                case 6: // Anexo Plaqueta Divergente
+                    const ocrTxt = item.textoAuditoriaOCR ? `Texto IA detectado: "${esc(item.textoAuditoriaOCR)}"` : '';
+                    return makeCompareHtml('Plaqueta Informada', item.plaquetaFinal || item.plaquetaInicial, 'Foto / Evidência', ocrTxt || 'Incompatível com a plaqueta informada', 'A imagem anexada da plaqueta divergiu da informação digitada.');
+
+                case 7: // Anexo Faltante
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-amber-400 block mb-0.5">Evidências Pendentes:</span>
+                                <span class="text-slate-200">Algum dos anexos obrigatórios (panorâmica, antes ou depois) não foi enviado.</span>
+                            </div>
+                        </div>
+                    `;
+
+                case 8: // Material Divergente
+                    const mat = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado || 'Mais de um material informado';
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Material Informado:</span>
+                                <span class="font-medium text-amber-200 break-words">${esc(mat)}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-300">Foi solicitado/utilizado mais de um serviço de manutenção no material.</div>
+                        </div>
+                    `;
+
+                case 9: // Problema Externo
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Problema Encontrado:</span>
+                                <span class="font-medium text-rose-300 break-words">${esc(item.problemaEncontrado || 'Não informado')}</span>
+                            </div>
+                            <div class="text-[10px] text-slate-300">Necessita de intervenção da concessionária externa (CPFL).</div>
+                        </div>
+                    `;
+
+                default:
+                    return '';
+            }
+        };
+
+        const renderBadge = (isTrue, ruleIdx, titleAttr = '') => {
+            if (!isTrue) {
+                return `<span class="audit-badge audit-n" ${titleAttr ? `title="${titleAttr}"` : ''}>N</span>`;
+            }
+            const rule = (rules && ruleIdx >= 0 && ruleIdx < rules.length) ? rules[ruleIdx] : null;
+            const label = rule ? rule.label : 'Critério Disparado';
+            const safeLabel = label ? label.replace(/"/g, '&quot;') : '';
+            const summaryHtml = getDivergenceSummaryHtml(ruleIdx);
+            const safeSummary = summaryHtml ? summaryHtml.replace(/"/g, '&quot;') : (rule ? rule.explicacao.replace(/"/g, '&quot;') : '');
+            const combinedTitle = titleAttr ? `${titleAttr} | Critério: ${label}` : `Critério: ${label}`;
+
+            return `<span class="audit-badge audit-s cursor-help" ${safeSummary ? `data-audit-explicacao="${safeSummary}" data-audit-title="Critério: ${safeLabel}"` : ''} title="${combinedTitle}">${isTrue ? 'S' : 'N'}</span>`;
+        };
 
         const isCompleted = item.isAuditoriaConcluida;
 
@@ -345,16 +475,16 @@ class AuditoriaController {
                 <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
                 
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaDivergente)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaDivergente)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isQuantidadeDivergente)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isDistanciaAcima100m, distTitle)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isOutraPlaquetaProxima)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaProblematica)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPrecisaAnexarFoto)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isAnexoFaltante)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isMaterialDivergente)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaExterno)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaDivergente, 0)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaDivergente, 1)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isQuantidadeDivergente, 2)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isDistanciaAcima100m, 3, distTitle)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isOutraPlaquetaProxima, 4)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaProblematica, 5)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPrecisaAnexarFoto, 6)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isAnexoFaltante, 7)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isMaterialDivergente, 8)}</td>
+                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaExterno, 9)}</td>
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">

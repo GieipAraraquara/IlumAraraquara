@@ -469,7 +469,15 @@ class PainelController {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
 
-        const safeText = escapeHtml(motivo);
+        let safeText = escapeHtml(motivo);
+        safeText = safeText.replace(/\(há\s+(\d+)d\s+a\s+(\d+)m\)/gi, (m, d, dist) => {
+            const dTxt = d === '1' ? '1 dia' : `${d} dias`;
+            const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+            return `(há ${dTxt}, a ${mTxt})`;
+        }).replace(/\((hoje|ontem)\s+a\s+(\d+)m\)/gi, (m, quando, dist) => {
+            const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+            return `(${quando}, a ${mTxt})`;
+        });
         const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/g;
 
         return safeText.replace(regex, (match, p1, p2) => {

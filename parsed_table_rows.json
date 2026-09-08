@@ -1,0 +1,770 @@
+[
+  {
+    "quant": "2880",
+    "valorUnit": "R$ 180,27",
+    "valorUnitBdi": "R$ 219,03",
+    "total": "R$ 630.806,40",
+    "peso": "28,16%",
+    "context": "00000011 Próprio Serviço de manutenção em iluminação pública viaria, em poste CPFL, incluindo eletricista, ajudante e caminhão munk, para 1 ponto de reparo - s/ material UN LICITANTE"
+  },
+  {
+    "quant": "800",
+    "valorUnit": "R$ 45,07",
+    "valorUnitBdi": "R$ 54,76",
+    "total": "R$ 43.808,00",
+    "peso": "1,96%",
+    "context": "Próprio Serviço de troca de relé sem análise de defeito em iluminação pública viaria, em poste CPFL, incluindo eletricista, ajudante e caminhão munk, para 1 ponto de troca - s/ material UN LICITANTE"
+  },
+  {
+    "quant": "900",
+    "valorUnit": "R$ 45,07",
+    "valorUnitBdi": "R$ 54,76",
+    "total": "R$ 49.284,00",
+    "peso": "2,20%",
+    "context": "1,96% 1.3 00000038 Próprio Serviço instalação de plaqueta de identificação em braço metálico de iluminação pública viaria, em poste CPFL, incluindo eletricista, ajudante e caminhão munk, para 1 ponto de instalação - s/ material UN LICITANTE"
+  },
+  {
+    "quant": "300",
+    "valorUnit": "R$ 61,29",
+    "valorUnitBdi": "R$ 74,47",
+    "total": "R$ 22.341,00",
+    "peso": "1,00%",
+    "context": "eletricista, ajudante e caminhão munk, para 1 ponto de instalação - s/ material UN LICITANTE 900 R$ 45,07 R$ 54,76 R$ 49.284,00 2,20% 1.4 00000039 Próprio Serviço de poda de arvoré próxima a iluminação pública, incluindo caminhão munk, para 1 ponto de poda, com remoção de residuo UN LICITANTE"
+  },
+  {
+    "quant": "90",
+    "valorUnit": "R$ 90,03",
+    "valorUnitBdi": "R$ 109,39",
+    "total": "R$ 9.845,10",
+    "peso": "0,44%",
+    "context": "Próprio Serviço de poda de arvoré próxima a iluminação pública, incluindo caminhão munk, para 1 ponto de poda, com remoção de residuo UN LICITANTE 300 R$ 61,29 R$ 74,47 R$ 22.341,00 1,00% 1.5 00000010 Próprio Caixa de passagem 30x30x40 UN LICITANTE"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 51,04",
+    "valorUnitBdi": "R$ 62,01",
+    "total": "R$ 12.402,00",
+    "peso": "0,55%",
+    "context": "Caixa de passagem 30x30x40 UN LICITANTE 90 R$ 90,03 R$ 109,39 R$ 9.845,10 0,44% 1.6 06.01.020 CPOS/CDHU 01/2026 ESCAVAÇÃO MANUAL EM SOLO DE 1ª E 2ª CATEGORIA EM CAMPO ABERTO m³ LICITANTE"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 18,81",
+    "valorUnitBdi": "R$ 22,85",
+    "total": "R$ 4.570,00",
+    "peso": "1.8",
+    "context": "E 2ª CATEGORIA EM CAMPO ABERTO m³ LICITANTE 200 R$ 51,04 R$ 62,01 R$ 12.402,00 0,55% 1.7 06.11.040 CPOS/CDHU 01/2026 REATERRO MANUAL APILOADO SEM CONTROLE DE COMPACTAÇÃO m³ LICITANTE"
+  },
+  {
+    "quant": "30",
+    "valorUnit": "R$ 364,07",
+    "valorUnitBdi": "R$ 442,34",
+    "total": "R$ 13.270,20",
+    "peso": "0,59%",
+    "context": "APILOADO SEM CONTROLE DE COMPACTAÇÃO m³ LICITANTE 200 R$ 18,81 R$ 22,85 R$ 4.570,00 1.8 11.04.020 CPOS/CDHU 01/2026 CONCRETO NÃO ESTRUTURAL EXECUTADO NO LOCAL, MÍNIMO 150 KG CIMENTO / M³ m³ LICITANTE"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 21,52",
+    "valorUnitBdi": "R$ 26,15",
+    "total": "R$ 5.230,00",
+    "peso": "0,23%",
+    "context": "NO LOCAL, MÍNIMO 150 KG CIMENTO / M³ m³ LICITANTE 30 R$ 364,07 R$ 442,34 R$ 13.270,20 0,59% 1.9 180222 SBC 03/2026 PINTURA DUAS DEMAOS TINTA ESMALTE EM SUPERFICIE METALICA m² LICITANTE"
+  },
+  {
+    "quant": "300",
+    "valorUnit": "R$ 24,53",
+    "valorUnitBdi": "R$ 29,80",
+    "total": "R$ 8.940,00",
+    "peso": "0,40%",
+    "context": "ESMALTE EM SUPERFICIE METALICA m² LICITANTE 200 R$ 21,52 R$ 26,15 R$ 5.230,00 0,23% 1.10 00000040 Próprio LIMPEZA DE POSTE METÁLICOS E LUMINÁRIAS PÚBLICAS \\(JÁ INSTALADOS\\ UN LICITANTE"
+  },
+  {
+    "quant": "4800",
+    "valorUnit": "R$ 42,85",
+    "valorUnitBdi": "R$ 52,06",
+    "total": "R$ 249.888,00",
+    "peso": "11,16%",
+    "context": "00000040 Próprio LIMPEZA DE POSTE METÁLICOS E LUMINÁRIAS PÚBLICAS \\(JÁ INSTALADOS\\ UN LICITANTE 300 R$ 24,53 R$ 29,80 R$ 8.940,00 0,40% 1.11 88264 SINAPI 02/2026 ELETRICISTA COM ENCARGOS COMPLEMENTARES H LICITANTE"
+  },
+  {
+    "quant": "1200",
+    "valorUnit": "R$ 208,15",
+    "valorUnitBdi": "R$ 252,90",
+    "total": "R$ 303.480,00",
+    "peso": "13,55%",
+    "context": "LICITANTE 4800 R$ 42,85 R$ 52,06 R$ 249.888,00 11,16% 1.12 89272 SINAPI 02/2026 GUINDASTE HIDRÁULICO AUTOPROPELIDO, COM LANÇA TELESCÓPICA 28,80 M, CAPACIDADE MÁXIMA 30 T, POTÊNCIA 97 KW, TRAÇÃO 4 X 4 - CHP DIURNO. AF_11/2014 CHP LICITANTE"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 3.311,37",
+    "valorUnitBdi": "R$ 4.023,31",
+    "total": "R$ 40.233,10",
+    "peso": "1,80%",
+    "context": "DE CONCRETO, INCLUINDO POSTE, DISJUNTOR, CABOS, DPSS E CONECTORES, CONFORME NORMA TECNICA DA CPFL GED-13, DEVIDAMENTE INSTALADO E ATENDENDO A CATEGORIA DE FORNECIMENTO B1 DA CPFL GED-13 UN PADRÃO CPFL"
+  },
+  {
+    "quant": "2",
+    "valorUnit": "R$ 6.547,21",
+    "valorUnitBdi": "R$ 7.954,86",
+    "total": "R$ 15.909,72",
+    "peso": "0,71%",
+    "context": "POSTE DE CONCRETO, INCLUINDO POSTE, DISJUNTOR, CABOS, DPSS E CONECTORES, CONFORME NORMA TECNICA DA CPFL GED-13, DEVIDAMENTE INSTALADO E ATENDENDO A CATEGORIA DE UN PADRÃO CPFL"
+  },
+  {
+    "quant": "2",
+    "valorUnit": "R$ 7.894,00",
+    "valorUnitBdi": "R$ 9.591,21",
+    "total": "R$ 19.182,42",
+    "peso": "0,86%",
+    "context": "POLICARBONATO COM LENTE, AEREO, PARA POSTE DE CONCRETO, INCLUINDO POSTE, DISJUNTOR, CABOS, DPSS E CONECTORES, CONFORME NORMA TECNICA DA CPFL GED-13, DEVIDAMENTE INSTALADO E ATENDENDO A CATEGORIA DE FORNECIMENTO C3 DA CPFL GED-13. UN PADRÃO CPFL"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 866,46",
+    "valorUnitBdi": "R$ 1.052,75",
+    "total": "R$ 5.263,76",
+    "peso": "0,23%",
+    "context": "DA CPFL GED-13, DEVIDAMENTE INSTALADO E ATENDENDO A CATEGORIA DE FORNECIMENTO C3 DA CPFL GED-13. UN PADRÃO CPFL 2 R$ 7.894,00 R$ 9.591,21 R$ 19.182,42 0,86% 2.2 Concreto 1 R$ 40.393,68 R$ 40.393,68 1,80% 2.2.1 68.01.600 CPOS/CDHU 01/2026 POSTE DE CONCRETO CIRCULAR, 200 KG, H = 7,00 M un ROMAGNOLE"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 1.168,86",
+    "valorUnitBdi": "R$ 1.420,16",
+    "total": "R$ 7.100,80",
+    "peso": "0,32%",
+    "context": "2.2 Concreto 1 R$ 40.393,68 R$ 40.393,68 1,80% 2.2.1 68.01.600 CPOS/CDHU 01/2026 POSTE DE CONCRETO CIRCULAR, 200 KG, H = 7,00 M un ROMAGNOLE 5 R$ 866,46 R$ 1.052,75 R$ 5.263,76 0,23% 2.2.2 68.01.730 CPOS/CDHU 01/2026 POSTE DE CONCRETO CIRCULAR, 400 KG, H = 9,00 M un ROMAGNOLE"
+  },
+  {
+    "quant": "12",
+    "valorUnit": "R$ 1.922,44",
+    "valorUnitBdi": "R$ 2.335,76",
+    "total": "R$ 28.029,12",
+    "peso": "1,25%",
+    "context": "ROMAGNOLE 5 R$ 866,46 R$ 1.052,75 R$ 5.263,76 0,23% 2.2.2 68.01.730 CPOS/CDHU 01/2026 POSTE DE CONCRETO CIRCULAR, 400 KG, H = 9,00 M un ROMAGNOLE 5 R$ 1.168,86 R$ 1.420,16 R$ 7.100,80 0,32% 2.2.3 68.01.760 CPOS/CDHU 01/2026 POSTE DE CONCRETO CIRCULAR, 400 KG, H = 12,00 M un ROMAGNOLE"
+  },
+  {
+    "quant": "2",
+    "valorUnit": "R$ 431,92",
+    "valorUnitBdi": "R$ 524,78",
+    "total": "R$ 1.049,56",
+    "peso": "0,05%",
+    "context": "R$ 1.922,44 R$ 2.335,76 R$ 28.029,12 1,25% 2.3 Curvo 1 R$ 6.954,46 R$ 6.954,46 0,31% 2.3.1 105964 SINAPI 02/2026 POSTE DE AÇO CÔNICO CONTÍNUO CURVO DUPLO, FLANGEADO, H=6M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI"
+  },
+  {
+    "quant": "2",
+    "valorUnit": "R$ 403,83",
+    "valorUnitBdi": "R$ 490,65",
+    "total": "R$ 981,30",
+    "peso": "0,04%",
+    "context": "DUPLO, FLANGEADO, H=6M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI 2 R$ 431,92 R$ 524,78 R$ 1.049,56 0,05% 2.3.2 105966 SINAPI 02/2026 POSTE DE AÇO CÔNICO CONTÍNUO CURVO DUPLO, FLANGEADO, H=8M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI"
+  },
+  {
+    "quant": "4",
+    "valorUnit": "R$ 474,47",
+    "valorUnitBdi": "R$ 576,48",
+    "total": "R$ 2.305,92",
+    "peso": "0,10%",
+    "context": "DUPLO, FLANGEADO, H=8M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI 2 R$ 403,83 R$ 490,65 R$ 981,30 0,04% 2.3.3 105957 SINAPI 02/2026 POSTE DE AÇO CÔNICO CONTÍNUO CURVO SIMPLES, FLANGEADO, H=6M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI"
+  },
+  {
+    "quant": "4",
+    "valorUnit": "R$ 538,62",
+    "valorUnitBdi": "R$ 654,42",
+    "total": "R$ 2.617,68",
+    "peso": "0,12%",
+    "context": "SIMPLES, FLANGEADO, H=6M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI 4 R$ 474,47 R$ 576,48 R$ 2.305,92 0,10% 2.3.4 105959 SINAPI 02/2026 POSTE DE AÇO CÔNICO CONTÍNUO CURVO SIMPLES, FLANGEADO, H=8M - FORNECIMENTO E INSTALAÇÃO. AF_04/2025 UN SHOMEI"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 819,61",
+    "valorUnitBdi": "R$ 995,83",
+    "total": "R$ 4.979,15",
+    "peso": "0,22%",
+    "context": "4 R$ 538,62 R$ 654,42 R$ 2.617,68 0,12% 2.4 Telecônico 1 R$ 17.170,30 R$ 17.170,30 0,77% 2.4.1 41.10.500 CPOS/CDHU POSTE TELECÔNICO RETO EM AÇO SAE 1010/1020 GALVANIZADO A FOGO, ALTURA DE 4,00 M un SHOMEI"
+  },
+  {
+    "quant": "3",
+    "valorUnit": "R$ 1.073,05",
+    "valorUnitBdi": "R$ 1.303,76",
+    "total": "R$ 3.911,28",
+    "peso": "0,17%",
+    "context": "1010/1020 GALVANIZADO A FOGO, ALTURA DE 4,00 M un SHOMEI 5 R$ 819,61 R$ 995,83 R$ 4.979,15 0,22% 2.4.2 41.10.430 CPOS/CDHU 01/2026 POSTE TELECÔNICO RETO EM AÇO SAE 1010/1020 GALVANIZADO A FOGO, ALTURA DE 6,00 M un SHOMEI"
+  },
+  {
+    "quant": "3",
+    "valorUnit": "R$ 1.245,03",
+    "valorUnitBdi": "R$ 1.512,71",
+    "total": "R$ 4.538,13",
+    "peso": "0,20%",
+    "context": "1010/1020 GALVANIZADO A FOGO, ALTURA DE 6,00 M un SHOMEI 3 R$ 1.073,05 R$ 1.303,76 R$ 3.911,28 0,17% 2.4.3 41.10.340 CPOS/CDHU 01/2026 POSTE TELECÔNICO RETO EM AÇO SAE 1010/1020 GALVANIZADO A FOGO, ALTURA DE 8,00 M un SHOMEI"
+  },
+  {
+    "quant": "2",
+    "valorUnit": "R$ 1.539,81",
+    "valorUnitBdi": "R$ 1.870,87",
+    "total": "R$ 3.741,74",
+    "peso": "0,17%",
+    "context": "AÇO SAE 1010/1020 GALVANIZADO A FOGO, ALTURA DE 8,00 M un SHOMEI 3 R$ 1.245,03 R$ 1.512,71 R$ 4.538,13 0,20% 2.4.4 41.10.330 CPOS/CDHU 01/2026 POSTE TELECÔNICO RETO EM AÇO SAE 1010/1020 GALVANIZADO A FOGO, ALTURA DE 10,00 M un SHOMEI"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 953,00",
+    "valorUnitBdi": "R$ 1.157,90",
+    "total": "R$ 11.579,00",
+    "peso": "0,52%",
+    "context": "4,00 M ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC 10 R$ 427,02 R$ 5.188,30 0,23% 2.5.2 - MERCADO POSTE DE FIBRA RETO, ALTURA DE 6,00 M ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC"
+  },
+  {
+    "quant": "13",
+    "valorUnit": "R$ 1.339,20",
+    "valorUnitBdi": "R$ 1.627,13",
+    "total": "R$ 21.152,69",
+    "peso": "0,94%",
+    "context": "M ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC 10 R$ 953,00 R$ 1.157,90 R$ 11.579,00 0,52% 2.5.3 - MERCADO POSTE DE FIBRA RETO, ALTURA DE 8,00 M ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 1.672,97",
+    "valorUnitBdi": "R$ 2.032,66",
+    "total": "R$ 10.163,30",
+    "peso": "0,45%",
+    "context": "ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC 13 R$ 1.339,20 R$ 1.627,13 R$ 21.152,69 0,94% 2.5.4 - MERCADO POSTE DE FIBRA RETO, ALTURA DE 10,00 M ÚTIL \\(DESCONSIDERANDO ENGASTAMENTO\\ un POLETEC"
+  },
+  {
+    "quant": "40",
+    "valorUnit": "R$ 86,59",
+    "valorUnitBdi": "R$ 105,21",
+    "total": "R$ 4.208,40",
+    "peso": "0,19%",
+    "context": "PARA ILUMINAÇÃO PÚBLICA, EM TUBO DE AÇO GALVANIZADO, COMPRIMENTO DE 3,50 M, PARA FIXAÇÃO EM POSTE DE CONCRETO - FORNECIMENTO E INSTALAÇÃO. AF_02/2025 UN SHOMEI"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 306,77",
+    "valorUnitBdi": "R$ 372,72",
+    "total": "R$ 1.863,60",
+    "peso": "0,08%",
+    "context": "CONCRETO - FORNECIMENTO E INSTALAÇÃO. AF_02/2025 UN SHOMEI 40 R$ 86,59 R$ 105,21 R$ 4.208,40 0,19% 2.6.2 41.10.080 CPOS/CDHU 01/2026 CRUZETA REFORÇADA EM FERRO GALVANIZADO PARA FIXAÇÃO DE DUAS LUMINÁRIAS un SHOMEI"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 63,12",
+    "valorUnitBdi": "R$ 76,69",
+    "total": "R$ 383,45",
+    "peso": "0,02%",
+    "context": "FERRO GALVANIZADO PARA FIXAÇÃO DE DUAS LUMINÁRIAS un SHOMEI 5 R$ 306,77 R$ 372,72 R$ 1.863,60 0,08% 2.6.3 41.11.440 CPOS/CDHU 01/2026 SUPORTE TUBULAR DE FIXAÇÃO EM POSTE PARA 1 LUMINÁRIA TIPO PÉTALA un SHOMEI"
+  },
+  {
+    "quant": "7",
+    "valorUnit": "R$ 78,57",
+    "valorUnitBdi": "R$ 95,46",
+    "total": "R$ 668,22",
+    "peso": "0,03%",
+    "context": "POSTE PARA 1 LUMINÁRIA TIPO PÉTALA un SHOMEI 5 R$ 63,12 R$ 76,69 R$ 383,45 0,02% 2.6.4 41.11.450 CPOS/CDHU 01/2026 SUPORTE TUBULAR DE FIXAÇÃO EM POSTE PARA 2 LUMINÁRIAS TIPO PÉTALA un SHOMEI"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 448,10",
+    "valorUnitBdi": "R$ 544,44",
+    "total": "R$ 2.722,20",
+    "peso": "0,12%",
+    "context": "POSTE PARA 2 LUMINÁRIAS TIPO PÉTALA un SHOMEI 7 R$ 78,57 R$ 95,46 R$ 668,22 0,03% 2.6.5 41.10.070 CPOS/CDHU 01/2026 SUPORTE TUBULAR DE FIXAÇÃO EM POSTE PARA 4 LUMINÁRIAS TIPO PÉTALA un SHOMEI"
+  },
+  {
+    "quant": "300",
+    "valorUnit": "R$ 5,86",
+    "valorUnitBdi": "R$ 7,12",
+    "total": "R$ 2.136,00",
+    "peso": "0,10%",
+    "context": "un SHOMEI 5 R$ 448,10 R$ 544,44 R$ 2.722,20 0,12% 2.6.6 69.20.070 CPOS/CDHU 01/2026 FITA EM AÇO INOXIDÁVEL PARA POSTE DE 0,50 M X 19 MM, COM FECHO EM AÇO INOXIDÁVEL un FECHOMETAL"
+  },
+  {
+    "quant": "900",
+    "valorUnit": "R$ 16,99",
+    "valorUnitBdi": "R$ 20,64",
+    "total": "R$ 18.576,00",
+    "peso": "0,83%",
+    "context": "MM, COM FECHO EM AÇO INOXIDÁVEL un FECHOMETAL 300 R$ 5,86 R$ 7,12 R$ 2.136,00 0,10% 2.6.7 00000029 Próprio Placa de identificação para luminária pública de aço galvanizado c/ pintura em esmalte sintético, inclusive fixação, s/ instalação UN LICITANTE"
+  },
+  {
+    "quant": "2000",
+    "valorUnit": "R$ 27,59",
+    "valorUnitBdi": "R$ 33,52",
+    "total": "R$ 67.040,00",
+    "peso": "2,99%",
+    "context": "pública de aço galvanizado c/ pintura em esmalte sintético, inclusive fixação, s/ instalação UN LICITANTE 900 R$ 16,99 R$ 20,64 R$ 18.576,00 0,83% 2.6.8 101632 SINAPI 02/2026 RELÉ FOTOELÉTRICO PARA COMANDO DE ILUMINAÇÃO EXTERNA 1000 W - FORNECIMENTO E INSTALAÇÃO. AF_02/2025 un EXATRON"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 8,23",
+    "valorUnitBdi": "R$ 10,00",
+    "total": "R$ 1.000,00",
+    "peso": "0,04%",
+    "context": "R$ 18.576,00 0,83% 2.6.8 101632 SINAPI 02/2026 RELÉ FOTOELÉTRICO PARA COMANDO DE ILUMINAÇÃO EXTERNA 1000 W - FORNECIMENTO E INSTALAÇÃO. AF_02/2025 un EXATRON 2000 R$ 27,59 R$ 33,52 R$ 67.040,00 2,99% 2.6.9 00039380 SINAPI 02/2026 BASE PARA RELE COM SUPORTE METALICO UN EXATRON"
+  },
+  {
+    "quant": "1000",
+    "valorUnit": "R$ 7,96",
+    "valorUnitBdi": "R$ 9,67",
+    "total": "R$ 9.670,00",
+    "peso": "0,43%",
+    "context": "UN EXATRON 100 R$ 8,23 R$ 10,00 R$ 1.000,00 0,04% 3 Eletrodutos, Cabos e Acessórios 1 R$ 191.627,50 R$ 191.627,50 8,55% 3.1 Cabo de Aço Cobreado 1 R$ 154.435,00 R$ 154.435,00 6,89% 3.1.1 - MERCADO CABO DE AÇO COBREADO DE 3x 1,5 MM², ISOLAMENTO 750 V m CORFIO"
+  },
+  {
+    "quant": "1800",
+    "valorUnit": "R$ 11,26",
+    "valorUnitBdi": "R$ 13,68",
+    "total": "R$ 24.624,00",
+    "peso": "1,10%",
+    "context": "R$ 191.627,50 8,55% 3.1 Cabo de Aço Cobreado 1 R$ 154.435,00 R$ 154.435,00 6,89% 3.1.1 - MERCADO CABO DE AÇO COBREADO DE 3x 1,5 MM², ISOLAMENTO 750 V m CORFIO 1000 R$ 7,96 R$ 9,67 R$ 9.670,00 0,43% 3.1.2 - MERCADO CABO DE AÇO COBREADO DE 10 MM², ISOLAMENTO 0,6/1KV m CORFIO"
+  },
+  {
+    "quant": "1300",
+    "valorUnit": "R$ 16,39",
+    "valorUnitBdi": "R$ 19,91",
+    "total": "R$ 25.883,00",
+    "peso": "1,16%",
+    "context": "CABO DE AÇO COBREADO DE 3x 1,5 MM², ISOLAMENTO 750 V m CORFIO 1000 R$ 7,96 R$ 9,67 R$ 9.670,00 0,43% 3.1.2 - MERCADO CABO DE AÇO COBREADO DE 10 MM², ISOLAMENTO 0,6/1KV m CORFIO 1800 R$ 11,26 R$ 13,68 R$ 24.624,00 1,10% 3.1.3 - MERCADO CABO DE AÇO COBREADO DE 16 MM², ISOLAMENTO 0,6/1KV m CORFIO"
+  },
+  {
+    "quant": "600",
+    "valorUnit": "R$ 23,62",
+    "valorUnitBdi": "R$ 28,70",
+    "total": "R$ 17.220,00",
+    "peso": "0,77%",
+    "context": "CABO DE AÇO COBREADO DE 10 MM², ISOLAMENTO 0,6/1KV m CORFIO 1800 R$ 11,26 R$ 13,68 R$ 24.624,00 1,10% 3.1.3 - MERCADO CABO DE AÇO COBREADO DE 16 MM², ISOLAMENTO 0,6/1KV m CORFIO 1300 R$ 16,39 R$ 19,91 R$ 25.883,00 1,16% 3.1.4 - MERCADO CABO DE AÇO COBREADO DE 25 MM², ISOLAMENTO 0,6/1KV m CORFIO"
+  },
+  {
+    "quant": "400",
+    "valorUnit": "R$ 35,74",
+    "valorUnitBdi": "R$ 43,42",
+    "total": "R$ 17.368,00",
+    "peso": "0,78%",
+    "context": "CABO DE AÇO COBREADO DE 16 MM², ISOLAMENTO 0,6/1KV m CORFIO 1300 R$ 16,39 R$ 19,91 R$ 25.883,00 1,16% 3.1.4 - MERCADO CABO DE AÇO COBREADO DE 25 MM², ISOLAMENTO 0,6/1KV m CORFIO 600 R$ 23,62 R$ 28,70 R$ 17.220,00 0,77% 3.1.5 - MERCADO CABO DE AÇO COBREADO DE 35 MM², ISOLAMENTO 0,6/1KV m CORFIO"
+  },
+  {
+    "quant": "1000",
+    "valorUnit": "R$ 43,20",
+    "valorUnitBdi": "R$ 52,49",
+    "total": "R$ 52.490,00",
+    "peso": "2,34%",
+    "context": "CABO DE AÇO COBREADO DE 25 MM², ISOLAMENTO 0,6/1KV m CORFIO 600 R$ 23,62 R$ 28,70 R$ 17.220,00 0,77% 3.1.5 - MERCADO CABO DE AÇO COBREADO DE 35 MM², ISOLAMENTO 0,6/1KV m CORFIO 400 R$ 35,74 R$ 43,42 R$ 17.368,00 0,78% 3.1.6 - MERCADO CABO DE AÇO COBREADO DE 50 MM², ISOLAMENTO 0,6/1KV m CORFIO"
+  },
+  {
+    "quant": "500",
+    "valorUnit": "R$ 11,82",
+    "valorUnitBdi": "R$ 14,36",
+    "total": "R$ 7.180,00",
+    "peso": "0,32%",
+    "context": "CABO DE AÇO COBREADO DE 35 MM², ISOLAMENTO 0,6/1KV m CORFIO 400 R$ 35,74 R$ 43,42 R$ 17.368,00 0,78% 3.1.6 - MERCADO CABO DE AÇO COBREADO DE 50 MM², ISOLAMENTO 0,6/1KV m CORFIO 1000 R$ 43,20 R$ 52,49 R$ 52.490,00 2,34% 3.1.7 - MERCADO CABO DE AÇO COBREADO NU 16 MM² m CORFIO"
+  },
+  {
+    "quant": "400",
+    "valorUnit": "R$ 2,38",
+    "valorUnitBdi": "R$ 2,89",
+    "total": "R$ 1.156,00",
+    "peso": "0,05%",
+    "context": "0,32% 3.2 Cabo de Cobre 1 R$ 13.846,00 R$ 13.846,00 0,62% 3.2.1 39.02.016 CPOS/CDHU 01/2026 CABO DE COBRE DE 2,5 MM², ISOLAMENTO 750 V - ISOLAÇÃO EM PVC 70°C m CORFIO"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 3,85",
+    "valorUnitBdi": "R$ 4,68",
+    "total": "R$ 936,00",
+    "peso": "0,04%",
+    "context": "CORFIO 400 R$ 2,38 R$ 2,89 R$ 1.156,00 0,05% 3.2.2 39.02.020 CPOS/CDHU 01/2026 CABO DE COBRE DE 4 MM², ISOLAMENTO 750 V - ISOLAÇÃO EM PVC 70°C m CORFIO"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 5,28",
+    "valorUnitBdi": "R$ 6,42",
+    "total": "R$ 1.284,00",
+    "peso": "0,06%",
+    "context": "CORFIO 200 R$ 3,85 R$ 4,68 R$ 936,00 0,04% 3.2.3 39.02.030 CPOS/CDHU 01/2026 CABO DE COBRE DE 6 MM², ISOLAMENTO 750 V - ISOLAÇÃO EM PVC 70°C m CORFIO"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 7,92",
+    "valorUnitBdi": "R$ 9,62",
+    "total": "R$ 962,00",
+    "peso": "0,04%",
+    "context": "m CORFIO 200 R$ 5,28 R$ 6,42 R$ 1.284,00 0,06% 3.2.4 39.02.040 CPOS/CDHU 01/2026 CABO DE COBRE DE 10 MM², ISOLAMENTO 750 V - ISOLAÇÃO EM PVC 70°C m CORFIO"
+  },
+  {
+    "quant": "400",
+    "valorUnit": "R$ 9,75",
+    "valorUnitBdi": "R$ 11,85",
+    "total": "R$ 4.740,00",
+    "peso": "0,21%",
+    "context": "m CORFIO 100 R$ 7,92 R$ 9,62 R$ 962,00 0,04% 3.2.5 39.21.060 CPOS/CDHU 01/2026 CABO DE COBRE FLEXÍVEL DE 16 MM², ISOLAMENTO 0,6/1KV - ISOLAÇÃO HEPR 90°C m CORFIO"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 13,91",
+    "valorUnitBdi": "R$ 16,90",
+    "total": "R$ 1.690,00",
+    "peso": "0,08%",
+    "context": "m CORFIO 400 R$ 9,75 R$ 11,85 R$ 4.740,00 0,21% 3.2.6 39.21.070 CPOS/CDHU 01/2026 CABO DE COBRE FLEXÍVEL DE 25 MM², ISOLAMENTO 0,6/1KV - ISOLAÇÃO HEPR 90°C m CORFIO"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 19,97",
+    "valorUnitBdi": "R$ 24,26",
+    "total": "R$ 2.426,00",
+    "peso": "0,11%",
+    "context": "m CORFIO 100 R$ 13,91 R$ 16,90 R$ 1.690,00 0,08% 3.2.7 39.21.080 CPOS/CDHU 01/2026 CABO DE COBRE FLEXÍVEL DE 35 MM², ISOLAMENTO 0,6/1KV - ISOLAÇÃO HEPR 90°C m CORFIO"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 5,37",
+    "valorUnitBdi": "R$ 6,52",
+    "total": "R$ 652,00",
+    "peso": "0,03%",
+    "context": "CORFIO 100 R$ 19,97 R$ 24,26 R$ 2.426,00 0,11% 3.2.8 39.21.231 CPOS/CDHU 01/2026 CABO DE COBRE FLEXÍVEL DE 3 X 2,5 MM², ISOLAMENTO 0,6/1 KV - ISOLAÇÃO HEPR 90°C m CORFIO"
+  },
+  {
+    "quant": "600",
+    "valorUnit": "R$ 3,65",
+    "valorUnitBdi": "R$ 4,44",
+    "total": "R$ 2.664,00",
+    "peso": "0,12%",
+    "context": "100 R$ 5,37 R$ 6,52 R$ 652,00 0,03% 3.4 Eletroduto 1 R$ 8.088,00 R$ 8.088,00 0,36% 3.4.1 38.13.010 CPOS/CDHU 01/2026 ELETRODUTO CORRUGADO EM POLIETILENO DE ALTA DENSIDADE, DN= 30 MM, COM ACESSÓRIOS m ELECON"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 4,35",
+    "valorUnitBdi": "R$ 5,29",
+    "total": "R$ 1.058,00",
+    "peso": "0,05%",
+    "context": "DE ALTA DENSIDADE, DN= 30 MM, COM ACESSÓRIOS m ELECON 600 R$ 3,65 R$ 4,44 R$ 2.664,00 0,12% 3.4.2 38.13.016 CPOS/CDHU 01/2026 ELETRODUTO CORRUGADO EM POLIETILENO DE ALTA DENSIDADE, DN= 40 MM, COM ACESSÓRIOS m ELECON"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 22,18",
+    "valorUnitBdi": "R$ 26,95",
+    "total": "R$ 2.695,00",
+    "peso": "0,12%",
+    "context": "DE ALTA DENSIDADE, DN= 40 MM, COM ACESSÓRIOS m ELECON 200 R$ 4,35 R$ 5,29 R$ 1.058,00 0,05% 3.4.3 38.04.040 CPOS/CDHU 01/2026 ELETRODUTO GALVANIZADO CONFORME NBR13057 - 3/4´ COM ACESSÓRIOS m ELECON"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 27,51",
+    "valorUnitBdi": "R$ 33,42",
+    "total": "R$ 1.671,00",
+    "peso": "0,07%",
+    "context": "- 3/4´ COM ACESSÓRIOS m ELECON 100 R$ 22,18 R$ 26,95 R$ 2.695,00 0,12% 3.4.4 38.04.060 CPOS/CDHU 01/2026 ELETRODUTO GALVANIZADO CONFORME NBR13057 - 1´ COM ACESSÓRIOS m ELECON"
+  },
+  {
+    "quant": "100",
+    "valorUnit": "R$ 18,23",
+    "valorUnitBdi": "R$ 22,15",
+    "total": "R$ 2.215,00",
+    "peso": "0,10%",
+    "context": "R$ 15.258,50 0,68% 3.5.1 42.20.150 CPOS/CDHU 01/2026 SOLDA EXOTÉRMICA CONEXÃO CABO-CABO HORIZONTAL EM T, BITOLA DO CABO DE 16-16MM² A 50-35MM², 70-35MM² E 95- 35MM² un EXOSOLDA"
+  },
+  {
+    "quant": "200",
+    "valorUnit": "R$ 7,63",
+    "valorUnitBdi": "R$ 9,27",
+    "total": "R$ 1.854,00",
+    "peso": "0,08%",
+    "context": "E 95- 35MM² un EXOSOLDA 100 R$ 18,23 R$ 22,15 R$ 2.215,00 0,10% 3.5.2 39.09.020 CPOS/CDHU 01/2026 CONECTOR SPLIT-BOLT PARA CABO DE 25 MM², LATÃO, SIMPLES un INTELLI"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 121,64",
+    "valorUnitBdi": "R$ 147,79",
+    "total": "R$ 7.389,50",
+    "peso": "0,33%",
+    "context": "CPOS/CDHU 01/2026 CONECTOR SPLIT-BOLT PARA CABO DE 25 MM², LATÃO, SIMPLES un INTELLI 200 R$ 7,63 R$ 9,27 R$ 1.854,00 0,08% 3.5.3 42.05.200 CPOS/CDHU 01/2026 HASTE DE ATERRAMENTO DE 5/8\" X 2,4 M un INTELLI"
+  },
+  {
+    "quant": "1000",
+    "valorUnit": "R$ 3,13",
+    "valorUnitBdi": "R$ 3,80",
+    "total": "R$ 3.800,00",
+    "peso": "0,17%",
+    "context": "R$ 121,64 R$ 147,79 R$ 7.389,50 0,33% 3.5.4 101550 SINAPI 02/2026 CONECTOR PERFURANTE, PARA REDES AÉREAS DE DISTRIBUIÇÃO DE ENERGIA ELÉTRICA DE BAIXA TENSÃO - FORNECIMENTO E INSTALAÇÃO. AF_07/2020 UN INTELLI"
+  },
+  {
+    "quant": "15",
+    "valorUnit": "R$ 524,49",
+    "valorUnitBdi": "R$ 637,26",
+    "total": "R$ 9.558,90",
+    "peso": "0,43%",
+    "context": "DE BAIXA TENSÃO - FORNECIMENTO E INSTALAÇÃO. AF_07/2020 UN INTELLI 1000 R$ 3,13 R$ 3,80 R$ 3.800,00 0,17% 4 Quadro de Comando 1 R$ 41.529,95 R$ 41.529,95 1,85% 4.1 00000033 Próprio Porta de proteção para caixa de medição em aço, s/ instalação UN LICITANTE"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 117,22",
+    "valorUnitBdi": "R$ 142,42",
+    "total": "R$ 7.121,00",
+    "peso": "0,32%",
+    "context": "1,85% 4.1 00000033 Próprio Porta de proteção para caixa de medição em aço, s/ instalação UN LICITANTE 15 R$ 524,49 R$ 637,26 R$ 9.558,90 0,43% 4.2 28.05.070 CPOS/CDHU 01/2026 CADEADO DE LATÃO CONFORME TERMO DE REFERÊNCIA, ITEM 5.6.17 un PAPAIZ"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 14,53",
+    "valorUnitBdi": "R$ 17,65",
+    "total": "R$ 88,25",
+    "peso": "0,00%",
+    "context": "un PAPAIZ 50 R$ 117,22 R$ 142,42 R$ 7.121,00 0,32% 4.3 Disjuntores 1 R$ 11.123,30 R$ 11.123,30 0,50% 4.3.1 37.13.600 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, UNIPOLAR 127/220 V, CORRENTE DE 16A un WEG"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 13,24",
+    "valorUnitBdi": "R$ 16,09",
+    "total": "R$ 80,45",
+    "peso": "0,00%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, UNIPOLAR 127/220 V, CORRENTE DE 16A un WEG 5 R$ 14,53 R$ 17,65 R$ 88,25 0,00% 4.3.2 37.13.600 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, UNIPOLAR 127/220 V, CORRENTE DE 20A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 95,71",
+    "valorUnitBdi": "R$ 116,29",
+    "total": "R$ 1.162,90",
+    "peso": "0,05%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, UNIPOLAR 127/220 V, CORRENTE DE 20A un WEG 5 R$ 13,24 R$ 16,09 R$ 80,45 0,00% 4.3.3 37.13.630 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 16A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 95,71",
+    "valorUnitBdi": "R$ 116,29",
+    "total": "R$ 1.162,90",
+    "peso": "0,05%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 16A un WEG 10 R$ 95,71 R$ 116,29 R$ 1.162,90 0,05% 4.3.4 37.13.630 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 20A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 95,71",
+    "valorUnitBdi": "R$ 116,29",
+    "total": "R$ 1.162,90",
+    "peso": "0,05%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 20A un WEG 10 R$ 95,71 R$ 116,29 R$ 1.162,90 0,05% 4.3.5 37.13.630 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 25A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 95,71",
+    "valorUnitBdi": "R$ 116,29",
+    "total": "R$ 1.162,90",
+    "peso": "0,05%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 25A un WEG 10 R$ 95,71 R$ 116,29 R$ 1.162,90 0,05% 4.3.6 37.13.630 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 32A un WEG"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 95,71",
+    "valorUnitBdi": "R$ 116,29",
+    "total": "R$ 581,45",
+    "peso": "0,03%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 32A un WEG 10 R$ 95,71 R$ 116,29 R$ 1.162,90 0,05% 4.3.7 37.13.630 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 40A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 121,10",
+    "valorUnitBdi": "R$ 147,14",
+    "total": "R$ 1.471,40",
+    "peso": "0,07%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 40A un WEG 5 R$ 95,71 R$ 116,29 R$ 581,45 0,03% 4.3.8 37.13.640 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 63A un WEG"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 96,12",
+    "valorUnitBdi": "R$ 116,79",
+    "total": "R$ 583,95",
+    "peso": "0,03%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, BIPOLAR 220/380 V, CORRENTE DE 63A un WEG 10 R$ 121,10 R$ 147,14 R$ 1.471,40 0,07% 4.3.9 37.13.650 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 20A un WEG"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 150,87",
+    "valorUnitBdi": "R$ 183,31",
+    "total": "R$ 1.833,10",
+    "peso": "0,08%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 20A un WEG 5 R$ 96,12 R$ 116,79 R$ 583,95 0,03% 4.3.10 37.13.660 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 63A un WEG"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 150,87",
+    "valorUnitBdi": "R$ 183,31",
+    "total": "R$ 916,55",
+    "peso": "0,04%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 63A un WEG 10 R$ 150,87 R$ 183,31 R$ 1.833,10 0,08% 4.3.11 37.13.660 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 80A un WEG"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 150,87",
+    "valorUnitBdi": "R$ 183,31",
+    "total": "R$ 916,55",
+    "peso": "0,04%",
+    "context": "DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 80A un WEG 5 R$ 150,87 R$ 183,31 R$ 916,55 0,04% 4.3.12 37.13.660 CPOS/CDHU 01/2026 DISJUNTOR TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 100A un WEG"
+  },
+  {
+    "quant": "8",
+    "valorUnit": "R$ 639,63",
+    "valorUnitBdi": "R$ 777,15",
+    "total": "R$ 6.217,20",
+    "peso": "0,28%",
+    "context": "TERMOMAGNÉTICO, TRIPOLAR 220/380 V, CORRENTE DE 100A un WEG 5 R$ 150,87 R$ 183,31 R$ 916,55 0,04% 4.4 Contatores 1 R$ 9.205,40 R$ 9.205,40 0,41% 4.4.1 40.10.110 CPOS/CDHU 01/2026 CONTATOR DE POTÊNCIA 50 A - 2NA+2NF un WEG"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 122,97",
+    "valorUnitBdi": "R$ 149,41",
+    "total": "R$ 2.988,20",
+    "peso": "0,13%",
+    "context": "4.4 Contatores 1 R$ 9.205,40 R$ 9.205,40 0,41% 4.4.1 40.10.110 CPOS/CDHU 01/2026 CONTATOR DE POTÊNCIA 50 A - 2NA+2NF un WEG 8 R$ 639,63 R$ 777,15 R$ 6.217,20 0,28% 4.4.2 40.10.060 CPOS/CDHU 01/2026 CONTATOR DE POTÊNCIA 16 A - 2NA+2NF un WEG"
+  },
+  {
+    "quant": "15",
+    "valorUnit": "R$ 107,25",
+    "valorUnitBdi": "R$ 130,31",
+    "total": "R$ 1.954,65",
+    "peso": "0,09%",
+    "context": "R$ 2.988,20 0,13% 4.5 Outros Componentes 1 R$ 4.521,35 R$ 4.521,35 0,20% 4.5.1 9004048 SIURB 07/2025 RELÉ DE TEMPO ELETRÔNICO CÍCLICO REGULÁVEL - 110/127 V - 48/63 HZ \\(TIMER\\ UN COEL"
+  },
+  {
+    "quant": "30",
+    "valorUnit": "R$ 36,38",
+    "valorUnitBdi": "R$ 44,20",
+    "total": "R$ 1.326,00",
+    "peso": "0,06%",
+    "context": "110/127 V - 48/63 HZ \\(TIMER\\ UN COEL 15 R$ 107,25 R$ 130,31 R$ 1.954,65 0,09% 4.5.2 37.24.031 CPOS/CDHU 01/2026 SUPRESSOR DE SURTO MONOFÁSICO, CORRENTE NOMINAL 4 A 11 KA, IMAX. DE SURTO 12 ATÉ 15 KA un CLAMPER"
+  },
+  {
+    "quant": "5",
+    "valorUnit": "R$ 204,23",
+    "valorUnitBdi": "R$ 248,14",
+    "total": "R$ 1.240,70",
+    "peso": "0,06%",
+    "context": "un CLAMPER 30 R$ 36,38 R$ 44,20 R$ 1.326,00 0,06% 4.5.3 36.03.020 CPOS/CDHU 01/2026 CAIXA DE MEDIÇÃO POLIFÁSICA \\(500 X 600 X 200\\ MM, PADRÃO CONCESSIONÁRIAS un PADRÃO CPFL"
+  },
+  {
+    "quant": "70",
+    "valorUnit": "R$ 178,57",
+    "valorUnitBdi": "R$ 216,96",
+    "total": "R$ 15.187,20",
+    "peso": "0,68%",
+    "context": "1 R$ 161.773,10 R$ 161.773,10 7,22% 5.1.1 41.11.711 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 5000K, POTÊNCIA DE ATÉ 60 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.7 un INSIGHT LED / IL-MIR- 60W-5K"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 383,14",
+    "valorUnitBdi": "R$ 465,51",
+    "total": "R$ 23.275,50",
+    "peso": "1,04%",
+    "context": "70 R$ 178,57 R$ 216,96 R$ 15.187,20 0,68% 5.1.2 41.11.703 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 5000K, POTÊNCIA DE 100 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.6 un INSIGHT LED / IL-MIR- 100W-5K"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 383,14",
+    "valorUnitBdi": "R$ 465,51",
+    "total": "R$ 23.275,50",
+    "peso": "1,04%",
+    "context": "50 R$ 383,14 R$ 465,51 R$ 23.275,50 1,04% 5.1.3 41.11.703 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 5000K, POTÊNCIA DE 120 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.5 un INSIGHT LED / IL-MIR- 115W-5K"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 569,07",
+    "valorUnitBdi": "R$ 691,42",
+    "total": "R$ 13.828,40",
+    "peso": "0,62%",
+    "context": "50 R$ 383,14 R$ 465,51 R$ 23.275,50 1,04% 5.1.4 41.11.707 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 5000K, POTÊNCIA DE 200 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.4 UN INSIGHT LED/IL-VDR- ECO-200W-5K"
+  },
+  {
+    "quant": "30",
+    "valorUnit": "R$ 178,57",
+    "valorUnitBdi": "R$ 216,96",
+    "total": "R$ 6.508,80",
+    "peso": "0,29%",
+    "context": "R$ 691,42 R$ 13.828,40 0,62% 5.1.1 B 41.11.711 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 2700K, POTÊNCIA DE ATÉ 60 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.3 un TECNOWATT / SIGMA S1 60W 2700K"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 383,16",
+    "valorUnitBdi": "R$ 465,54",
+    "total": "R$ 9.310,80",
+    "peso": "0,42%",
+    "context": "R$ 178,57 R$ 216,96 R$ 6.508,80 0,29% 5.1.2 B 41.11.703 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 2700K, POTÊNCIA DE 100 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.2 un TECNOWATT / SIGMA M 100W 2700K"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 383,16",
+    "valorUnitBdi": "R$ 465,54",
+    "total": "R$ 9.310,80",
+    "peso": "0,42%",
+    "context": "R$ 383,16 R$ 465,54 R$ 9.310,80 0,42% 5.1.3 B 41.11.703 CPOS/CDHU 01/2026 LUMINÁRIA PÚBLICA LED RETANGULAR PARA POSTE, TEMPERATURA 2700K, POTÊNCIA DE 120 W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.1 un TECNOWATT/ SIGMA M 120W 48X 2700K"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 276,76",
+    "valorUnitBdi": "R$ 336,26",
+    "total": "R$ 6.725,20",
+    "peso": "0,30%",
+    "context": "W, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.1.1 un TECNOWATT/ SIGMA M 120W 48X 2700K 20 R$ 383,16 R$ 465,54 R$ 9.310,80 0,42% 5.1.5 41.11.060 CPOS/CDHU 01/2026 LUMINÁRIA FECHADA PARA ILUMINAÇÃO PÚBLICA TIPO PÉTALA PEQUENA un OLIVO / LUMINÁRIA TIPO PÉTALA PEQUENA"
+  },
+  {
+    "quant": "10",
+    "valorUnit": "R$ 93,41",
+    "valorUnitBdi": "R$ 113,49",
+    "total": "R$ 1.134,90",
+    "peso": "0,05%",
+    "context": "R$ 336,26 R$ 6.725,20 0,30% 5.1.6 55652 SIURB INFRA 07/2025 LUMINÁRIA DECORATIVA EM VIDRO LEITOSO TIPO GLOBO REPUBLICANO - CONFORME TERMO DE REFERÊNCIA ITEM 5.6.3 Un Fundição Vesuvio / LUMINÁRIA TIPO GLOBO REPUBLICANO"
+  },
+  {
+    "quant": "30",
+    "valorUnit": "R$ 875,98",
+    "valorUnitBdi": "R$ 1.064,32",
+    "total": "R$ 31.929,60",
+    "peso": "1,43%",
+    "context": "LUMINÁRIA TIPO GLOBO REPUBLICANO 10 R$ 93,41 R$ 113,49 R$ 1.134,90 0,05% 5.1.7 - MERCADO LUMINÁRIA PÚBLICA LED ORNAMENTAL PARA POSTE, TEMPERATURA 3000K, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.2 Un SONERES / FOSTERI"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 875,98",
+    "valorUnitBdi": "R$ 1.064,32",
+    "total": "R$ 21.286,40",
+    "peso": "0,95%",
+    "context": "SONERES / FOSTERI 30 R$ 875,98 R$ 1.064,32 R$ 31.929,60 1,43% 5.1.7 B - MERCADO LUMINÁRIA PÚBLICA LED ORNAMENTAL PARA POSTE, TEMPERATURA 5000K, CONFORME TERMO DE REFERÊNCIA ITEM 5.6.2 Un SONERES / FOSTERI"
+  },
+  {
+    "quant": "80",
+    "valorUnit": "R$ 437,18",
+    "valorUnitBdi": "R$ 531,17",
+    "total": "R$ 42.493,60",
+    "peso": "1,90%",
+    "context": "R$ 21.286,40 0,95% 5.2 Projetores/Refletores 1 R$ 204.728,95 R$ 204.728,95 9,14% 5.2.1 - MERCADO LUMINÁRIA REFLETOR LED PARA ILUMINAÇÃO PÚBLICA, 50 W - FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI"
+  },
+  {
+    "quant": "50",
+    "valorUnit": "R$ 555,55",
+    "valorUnitBdi": "R$ 674,99",
+    "total": "R$ 33.749,50",
+    "peso": "1,51%",
+    "context": "E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI 80 R$ 437,18 R$ 531,17 R$ 42.493,60 1,90% 5.2.2 - MERCADO LUMINÁRIA REFLETOR LED PARA ILUMINAÇÃO PÚBLICA, 100 W - FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI"
+  },
+  {
+    "quant": "25",
+    "valorUnit": "R$ 896,60",
+    "valorUnitBdi": "R$ 1.089,37",
+    "total": "R$ 27.234,25",
+    "peso": "1,22%",
+    "context": "FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI 50 R$ 555,55 R$ 674,99 R$ 33.749,50 1,51% 5.2.3 - MERCADO LUMINÁRIA REFLETOR LED PARA ILUMINAÇÃO PÚBLICA, 200 W - FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 1.721,15",
+    "valorUnitBdi": "R$ 2.091,20",
+    "total": "R$ 41.824,00",
+    "peso": "1,87%",
+    "context": "FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI 25 R$ 896,60 R$ 1.089,37 R$ 27.234,25 1,22% 5.2.4 - MERCADO LUMINÁRIA REFLETOR LED PARA ILUMINAÇÃO PÚBLICA, 600 W - FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI"
+  },
+  {
+    "quant": "20",
+    "valorUnit": "R$ 2.445,58",
+    "valorUnitBdi": "R$ 2.971,38",
+    "total": "R$ 59.427,60",
+    "peso": "2,65%",
+    "context": "- FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI 20 R$ 1.721,15 R$ 2.091,20 R$ 41.824,00 1,87% 5.2.5 - MERCADO LUMINÁRIA REFLETOR LED PARA ILUMINAÇÃO PÚBLICA, 1000 W - FORNECIMENTO E INSTALAÇÃO UN BRIGHTLUX / LUMINÁRIA HBMI"
+  }
+]

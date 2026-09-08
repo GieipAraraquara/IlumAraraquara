@@ -634,119 +634,122 @@
 
         <!-- KPI Measurement Cards -->
         <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto">
-            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
-                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de Materiais Medidos</div>
-                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-medicao-itens">---</div>
-                <div class="flex items-center gap-1 mt-2 text-secondary"><span class="material-symbols-outlined text-[16px]">inventory_2</span><span class="font-label-sm text-label-sm">Soma de unidades utilizadas</span></div>
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2-4 xl:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider text-[11px]">Total Materiais</div>
+                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible text-2xl font-bold" id="kpi-medicao-itens">---</div>
+                <div class="flex items-center gap-1 mt-1 text-secondary"><span class="material-symbols-outlined text-[15px]">inventory_2</span><span class="text-[11px]">Unidades medidas</span></div>
             </div>
-            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
-                <div class="font-label-md text-label-md text-purple-900 font-bold mb-1 uppercase tracking-wider">Horas de Eletricista (Praça)</div>
-                <div class="font-headline-lg text-headline-lg text-purple-700 overflow-visible" id="kpi-medicao-horas">---</div>
-                <div class="flex items-center gap-1 mt-2 text-purple-800"><span class="material-symbols-outlined text-[16px]">engineering</span><span class="font-label-sm text-label-sm font-semibold">ELETRICISTA C/ ENCARGOS (H)</span></div>
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2-4 xl:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm">
+                <div class="font-label-md text-label-md text-purple-900 font-bold mb-1 uppercase tracking-wider text-[11px]">Horas Eletricista</div>
+                <div class="font-headline-lg text-headline-lg text-purple-700 overflow-visible text-2xl font-bold" id="kpi-medicao-horas">---</div>
+                <div class="flex items-center gap-1 mt-1 text-purple-800"><span class="material-symbols-outlined text-[15px]">engineering</span><span class="text-[11px] font-semibold">Total horas (H)</span></div>
             </div>
-            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
-                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">OSs Medidas no Período</div>
-                <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible" id="kpi-medicao-oss">---</div>
-                <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">task_alt</span><span class="font-label-sm text-label-sm font-semibold">Ordens com materiais ou sessões</span></div>
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2-4 xl:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider text-[11px]">OSs no Período</div>
+                <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible text-2xl font-bold" id="kpi-medicao-oss">---</div>
+                <div class="flex items-center gap-1 mt-1 text-[#059669]"><span class="material-symbols-outlined text-[15px]">task_alt</span><span class="text-[11px] font-semibold">OSs c/ insumos</span></div>
             </div>
-            <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-sm">
-                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Itens Distintos do Contrato</div>
-                <div class="font-headline-lg text-headline-lg text-on-surface overflow-visible" id="kpi-medicao-tipos">---</div>
-                <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">category</span><span class="font-label-sm text-label-sm">Variedade de insumos</span></div>
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2-4 xl:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-emerald-200 bg-emerald-50/30 p-4 shadow-sm">
+                <div class="font-label-md text-label-md text-emerald-900 font-bold mb-1 uppercase tracking-wider text-[11px]">Total Medido (com BDI)</div>
+                <div class="font-headline-lg text-headline-lg text-emerald-700 overflow-visible text-2xl font-bold font-mono" id="kpi-medicao-valor-bdi">R$ 0,00</div>
+                <div class="flex items-center justify-between gap-1 mt-1 text-emerald-800 text-[11px]">
+                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[15px]">payments</span>Sem BDI:</span>
+                    <span id="kpi-medicao-valor-sem-bdi" class="font-bold font-mono">R$ 0,00</span>
+                </div>
+            </div>
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2-4 xl:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-sm">
+                <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider text-[11px]">Itens Distintos</div>
+                <div class="font-headline-lg text-headline-lg text-on-surface overflow-visible text-2xl font-bold" id="kpi-medicao-tipos">---</div>
+                <div class="flex items-center gap-1 mt-1 text-on-surface-variant"><span class="material-symbols-outlined text-[15px]">category</span><span class="text-[11px]">Insumos distintos</span></div>
             </div>
         </div>
 
         <!-- Monthly Measurement Table & Export Card -->
         <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto">
             <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-xl border border-outline-variant p-5 shadow-sm">
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5 border-b border-outline-variant/60 pb-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 border-b border-outline-variant/60 pb-4">
                     <div>
                         <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface flex items-center gap-2">
                             <span class="material-symbols-outlined text-purple-700">payments</span>
                             Relatório de Medição Mensal para Pagamento
                         </h3>
-                        <p class="font-body-md text-body-md text-on-surface-variant">Consolidação de materiais e horas de equipe acumulados no mês selecionado para prestação de contas</p>
+                        <p class="font-body-md text-body-md text-on-surface-variant">Consolidação de materiais e horas com valores contratuais (Unitário e com BDI) do Pregão 033/2026</p>
                     </div>
-                    <div class="flex items-center gap-3">
-                        <button id="btn-exportar-medicao" onclick="window.relatorioController.exportarMedicaoAtivaCSV()" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer" title="Exportar tabela de medição formatada em CSV">
-                            <span class="material-symbols-outlined text-[18px]">download_for_offline</span>
-                            <span id="txt-btn-exportar-medicao">Exportar Medição (CSV)</span>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <!-- Botões de Alternância de Visão da Medição (Posição Fixa) -->
+                        <div class="flex items-center gap-1.5 bg-surface-container-low p-1 rounded-xl border border-outline-variant/70 shadow-2xs">
+                            <button type="button" id="btn-medicao-view-material" onclick="window.relatorioController.switchMedicaoSubView('material')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-surface-container-lowest text-secondary shadow-xs cursor-pointer whitespace-nowrap">
+                                <span class="material-symbols-outlined text-[16px]">table_chart</span>
+                                <span>Consolidado por Material</span>
+                            </button>
+                            <button type="button" id="btn-medicao-view-protocolo" onclick="window.relatorioController.switchMedicaoSubView('protocolo')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap">
+                                <span class="material-symbols-outlined text-[16px]">view_list</span>
+                                <span>Detalhado por OS</span>
+                            </button>
+                        </div>
+
+                        <button id="btn-exportar-medicao" onclick="window.relatorioController.exportarMedicaoAtivaCSV()" class="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap" title="Exportar tabela de medição formatada em CSV">
+                            <span class="material-symbols-outlined text-[18px]">download</span>
+                            <span id="txt-btn-exportar-medicao">Exportar (CSV)</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- Measurement Filter Controls: Campo Único e Elegante de Mês no Calendário -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-5 items-end">
-                    
-                    <!-- Seletor de Mês da Medição com Botões de Navegação -->
-                    <div class="flex flex-col gap-1.5">
-                        <div class="flex items-center justify-between min-h-[22px]">
+                <!-- Barra de Ferramentas e Filtros da Medição -->
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 bg-surface-container-low/60 p-3 rounded-xl border border-outline-variant/60">
+                    <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+                        <!-- Seletor de Mês de Medição -->
+                        <div class="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/80 rounded-lg p-1 shadow-2xs">
                             <label for="medicao-month-select" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
                                 <span class="material-symbols-outlined text-[16px] text-purple-700">calendar_month</span>
-                                <span>Mês da Medição</span>
+                                <span class="hidden sm:inline">Mês:</span>
                             </label>
                             <span id="medicao-periodo-badge" class="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md whitespace-nowrap">Período: --/--/---- a --/--/----</span>
-                        </div>
-                        <div class="flex items-center gap-1.5">
+                            
                             <button type="button" id="btn-medicao-prev" onclick="window.relatorioController.alterarMesMedicao(-1)" class="h-9 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 rounded-lg border border-outline-variant/80 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-xs" title="Mês Anterior">
                                 <span class="material-symbols-outlined text-[16px]">chevron_left</span>
                             </button>
                             
                             <select id="medicao-month-select" class="h-9 w-full text-xs font-bold border border-outline-variant/80 rounded-lg px-3 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
-                                <!-- Preenchido dinamicamente via JS -->
+                                <!-- Opções geradas dinamicamente pelo RelatorioController.js -->
                             </select>
                             
                             <button type="button" id="btn-medicao-next" onclick="window.relatorioController.alterarMesMedicao(1)" class="h-9 bg-surface-container hover:bg-surface-container-high text-on-surface px-2.5 rounded-lg border border-outline-variant/80 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-xs" title="Mês Seguinte">
                                 <span class="material-symbols-outlined text-[16px]">chevron_right</span>
                             </button>
                         </div>
-                    </div>
 
-                    <!-- Filter Status OS (Concluídas x Todas) -->
-                    <div class="flex flex-col gap-1.5">
-                        <div class="flex items-center justify-between min-h-[22px]">
+                        <!-- Filtro de Status das Ordens de Serviço -->
+                        <div class="flex items-center gap-1 bg-surface-container-lowest border border-outline-variant/80 rounded-lg p-1 shadow-2xs">
                             <label for="medicao-status-select" class="text-xs font-semibold text-on-surface-variant uppercase tracking-wider flex items-center gap-1">
-                                <span class="material-symbols-outlined text-[16px] text-purple-700">filter_alt</span>
-                                <span>Status das OSs</span>
+                                <span class="material-symbols-outlined text-[16px] text-purple-700">filter_list</span>
+                                <span class="hidden sm:inline">Status:</span>
                             </label>
+                            <select id="medicao-status-select" class="h-9 w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-3 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
+                                <option value="concluida" selected>Apenas Concluídas (Oficial)</option>
+                                <option value="all">Todas as Ordens de Serviço</option>
+                            </select>
                         </div>
-                        <select id="medicao-status-select" class="h-9 w-full text-xs font-semibold border border-outline-variant/80 rounded-lg px-3 focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer shadow-xs">
-                            <option value="concluida">Apenas OSs Concluídas (Padrão para Pagamento)</option>
-                            <option value="all">Todas as OSs (Concluídas e em Andamento)</option>
-                        </select>
                     </div>
 
-                    <!-- Info Box: Alinhado na altura dos campos e expansível sem sobrar espaço vertical -->
-                    <div class="flex flex-col justify-end">
-                        <div class="min-h-[36px] py-1.5 text-xs text-on-surface-variant bg-purple-50/80 border border-purple-200/80 px-3 rounded-lg w-full flex items-center gap-2">
-                            <span class="material-symbols-outlined text-purple-700 text-[18px] shrink-0">info</span>
-                            <span class="text-xs text-on-surface-variant">As horas de sessões de praça são agregadas no item <b>ELETRICISTA (H)</b>.</span>
+                    <!-- Filtros específicos para a visão por protocolo -->
+                    <div id="toolbar-medicao-protocolo" class="hidden items-center gap-2">
+                        <!-- Busca rápida textual -->
+                        <div class="relative w-full sm:w-64">
+                            <input type="text" id="medicao-protocolo-search" placeholder="Buscar protocolo, rua, técnico..." class="w-full h-9 pl-8 pr-3 text-xs border border-outline-variant/80 rounded-lg focus:ring-1 focus:ring-purple-600 outline-none bg-surface-container-lowest text-on-surface shadow-xs" />
+                            <span class="material-symbols-outlined text-[16px] text-on-surface-variant absolute left-2.5 top-2.5">search</span>
+                        </div>
+
+                        <!-- Filtro de Tipo: Todos, Viária, Praça -->
+                        <div class="flex items-center bg-surface-container-lowest border border-outline-variant/80 rounded-lg p-0.5 shadow-xs">
+                            <button type="button" id="btn-medicao-tipo-all" onclick="window.relatorioController.setMedicaoProtocoloTipo('all')" class="px-2.5 py-1 text-xs font-bold rounded bg-purple-700 text-white shadow-2xs transition-all">Todos</button>
+                            <button type="button" id="btn-medicao-tipo-viaria" onclick="window.relatorioController.setMedicaoProtocoloTipo('viaria')" class="px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:text-on-surface rounded transition-all">Viária</button>
+                            <button type="button" id="btn-medicao-tipo-praca" onclick="window.relatorioController.setMedicaoProtocoloTipo('praca')" class="px-2.5 py-1 text-xs font-medium text-on-surface-variant hover:text-on-surface rounded transition-all">Praças</button>
                         </div>
                     </div>
                 </div>
 
-                <!-- Sub-Tabs de Visualização da Medição (Por Material x Por Protocolo) -->
-                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4 pt-2 border-t border-outline-variant/40">
-                    <div class="inline-flex p-1 bg-surface-container/70 border border-outline-variant/60 rounded-xl shadow-2xs self-start">
-                        <button type="button" id="btn-medicao-view-material" onclick="window.relatorioController.switchMedicaoSubView('material')" class="px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 bg-surface-container-lowest text-secondary shadow-xs cursor-pointer">
-                            <span class="material-symbols-outlined text-[16px]">inventory_2</span>
-                            <span>Consolidado por Material</span>
-                        </button>
-                        <button type="button" id="btn-medicao-view-protocolo" onclick="window.relatorioController.switchMedicaoSubView('protocolo')" class="px-3.5 py-1.5 rounded-lg text-xs font-medium text-on-surface-variant hover:text-on-surface transition-all flex items-center gap-1.5 cursor-pointer">
-                            <span class="material-symbols-outlined text-[16px]">assignment</span>
-                            <span>Detalhamento por Protocolo (OS)</span>
-                        </button>
-                    </div>
-
-                    <!-- Contador da Visão por Protocolo -->
-                    <div id="toolbar-medicao-protocolo" class="hidden items-center">
-                        <span id="badge-count-protocolos-medicao" class="text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg whitespace-nowrap">
-                            0 OS(s)
-                        </span>
-                    </div>
-                </div>
-
-                <!-- 1. VISÃO CONSOLIDADA POR MATERIAL -->
+                <!-- 1. VISÃO CONSOLIDADA POR MATERIAL (PADRÃO) -->
                 <div id="container-medicao-por-material" class="w-full overflow-x-auto border border-outline-variant/60 rounded-xl">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
@@ -758,23 +761,28 @@
                                         <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="medicao-mat-desc-filter-indicator"></span>
                                     </button>
                                 </th>
-                                <th class="py-3 px-4 text-center w-20 align-middle">Unid.</th>
-                                <th class="py-3 px-4 text-right w-36 align-middle">Qtd. Medida</th>
-                                <th class="py-3 px-4 text-center w-24 align-middle">OSs Aplicadas</th>
+                                <th class="py-3 px-3 text-center w-16 align-middle">Unid.</th>
+                                <th class="py-3 px-3 text-right w-24 align-middle">Qtd. Medida</th>
+                                <th class="py-3 px-3 text-right w-28 align-middle">Unit. (s/ BDI)</th>
+                                <th class="py-3 px-3 text-right w-28 align-middle text-purple-900 font-bold">Unit. (c/ BDI)</th>
+                                <th class="py-3 px-3 text-right w-32 align-middle text-emerald-800 font-bold">Total (c/ BDI)</th>
+                                <th class="py-3 px-3 text-center w-24 align-middle">OSs Aplicadas</th>
                                 <th class="py-3 px-4 align-middle">Origem / Categoria</th>
-                                <th class="py-3 px-4 relative align-middle min-w-[160px]">
+                                <th class="py-3 px-4 relative align-middle min-w-[140px]">
                                     <button type="button" class="inline-flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="medicao-mat-prot-filter-trigger" onclick="window.relatorioController.toggleMedicaoMatProtFilterDropdown(event)" title="Filtrar por Protocolo">
                                         <span class="font-label-md uppercase tracking-wider">Protocolos OSs</span>
                                         <span class="material-symbols-outlined text-[16px]">search</span>
                                         <span class="w-2 h-2 rounded-full bg-secondary hidden" id="medicao-mat-prot-filter-indicator"></span>
                                     </button>
                                 </th>
-                                <th class="py-3 px-4 text-center w-28 align-middle">Ação</th>
                             </tr>
                         </thead>
                         <tbody id="medicao-tbody" class="divide-y divide-outline-variant/40 bg-surface-container-lowest font-data-tabular">
                             <!-- Linhas de materiais e horas injetadas pelo RelatorioController.js -->
                         </tbody>
+                        <tfoot id="medicao-tfoot" class="bg-slate-100/90 border-t-2 border-slate-300 font-bold text-xs">
+                            <!-- Linha totalizadora injetada dinamicamente -->
+                        </tfoot>
                     </table>
                     <div id="medicao-empty-state" class="hidden py-8 text-center text-on-surface-variant/70">
                         <div class="flex flex-col items-center justify-center gap-1.5">
@@ -974,14 +982,26 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-6 divide-x divide-slate-200 shrink-0">
-                    <div class="pr-2 text-center">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Quantidade Total</span>
-                        <span id="info-modal-qtd-total" class="font-mono font-bold text-lg text-purple-700">0</span>
+                <div class="flex items-center gap-4 sm:gap-6 divide-x divide-slate-200 shrink-0 flex-wrap sm:flex-nowrap">
+                    <div class="text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Qtd. Total</span>
+                        <span id="info-modal-qtd-total" class="font-mono font-bold text-base sm:text-lg text-purple-700">0</span>
                     </div>
-                    <div class="pl-6 text-center">
-                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Protocolos Afetados</span>
-                        <span id="info-modal-count-oss" class="font-mono font-bold text-lg text-secondary">0 OS(s)</span>
+                    <div class="pl-4 sm:pl-6 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Unitário (s/ BDI)</span>
+                        <span id="info-modal-unit-sem-bdi" class="font-mono font-bold text-xs sm:text-sm text-slate-700">R$ 0,00</span>
+                    </div>
+                    <div class="pl-4 sm:pl-6 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Unitário (c/ BDI)</span>
+                        <span id="info-modal-unit-com-bdi" class="font-mono font-bold text-xs sm:text-sm text-purple-900">R$ 0,00</span>
+                    </div>
+                    <div class="pl-4 sm:pl-6 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-800 block">Total Medido</span>
+                        <span id="info-modal-total-medido" class="font-mono font-bold text-base sm:text-lg text-emerald-700">R$ 0,00</span>
+                    </div>
+                    <div class="pl-4 sm:pl-6 text-center">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Protocolos</span>
+                        <span id="info-modal-count-oss" class="font-mono font-bold text-base sm:text-lg text-secondary">0 OS(s)</span>
                     </div>
                 </div>
             </div>

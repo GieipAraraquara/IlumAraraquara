@@ -5,6 +5,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Mapa de Ordens de Serviço - OS Manager</title>
     
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="manifest" href="manifest.json?v=2" />
+    <meta name="theme-color" content="#1a73e8" />
+    
     <!-- Mapbox GL JS -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
@@ -619,39 +625,33 @@
                 </button>
             </div>
 
-            <!-- Filtros de Operador, Data e Botões (TODOS NA MESMA LINHA) -->
+            <!-- Filtros de Operador e Data -->
             <div class="mt-3 bg-surface-container-lowest/80 p-3 rounded-lg border border-outline-variant/50 flex-none space-y-2.5">
-                <div class="grid grid-cols-12 gap-1.5 items-end">
-                    <!-- Seleção de Operador (7 cols) -->
-                    <div class="col-span-7">
+                <div class="grid grid-cols-12 gap-2 items-end">
+                    <!-- Seleção de Operador (6 cols) -->
+                    <div class="col-span-6">
                         <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate" title="Operador de Finalização">Operador:</label>
                         <select id="selectOperadorRota" onchange="aoMudarOperadorRota()" class="w-full text-xs font-medium border border-outline-variant rounded-lg p-1.5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer truncate h-[32px]">
                             <option value="">Carregando...</option>
                         </select>
                     </div>
 
-                    <!-- Seleção de Data (3 cols - Curto apenas para DD/MM/YY + Ícone) -->
-                    <div class="col-span-3">
+                    <!-- Seleção de Data com Navegação Anterior/Próximo (6 cols) -->
+                    <div class="col-span-6">
                         <label class="text-[10px] font-bold text-on-surface-variant block mb-1 uppercase tracking-wider truncate cursor-pointer" title="Data de Conclusão">Data:</label>
-                        <div class="relative w-full cursor-pointer" onclick="abrirCalendarioRotaOperador()">
-                            <input type="text" id="inputDataRotaOperadorDisplay" readonly onclick="abrirCalendarioRotaOperador()" class="w-full text-[11px] font-bold border border-outline-variant rounded-lg py-1 px-1 pr-5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer text-center h-[32px]" placeholder="DD/MM/YY" />
-                            <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant text-[14px] pointer-events-none">calendar_today</span>
-                            <input type="date" id="inputDataRotaOperador" onchange="aoAtualizarDataBRInput(); aoMudarOperadorRota()" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" />
+                        <div class="flex items-center gap-1">
+                            <button type="button" onclick="navegarDataRotaOperador(-1)" class="w-7 h-[32px] flex-none rounded-lg border border-outline-variant hover:bg-surface-container-high text-on-surface flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Dia anterior">
+                                <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                            </button>
+                            <div class="relative flex-1 min-w-0 cursor-pointer" onclick="abrirCalendarioRotaOperador()">
+                                <input type="text" id="inputDataRotaOperadorDisplay" readonly onclick="abrirCalendarioRotaOperador()" class="w-full text-[11px] font-bold border border-outline-variant rounded-lg py-1 px-1 pr-5 focus:ring-1 focus:ring-emerald-600 outline-none bg-surface-container-lowest text-on-surface cursor-pointer text-center h-[32px]" placeholder="DD/MM/YY" />
+                                <span class="material-symbols-outlined absolute right-1 top-1/2 -translate-y-1/2 text-on-surface-variant text-[14px] pointer-events-none">calendar_today</span>
+                                <input type="date" id="inputDataRotaOperador" onchange="aoAtualizarDataBRInput(); aoMudarOperadorRota()" class="opacity-0 absolute inset-0 w-full h-full cursor-pointer z-10" />
+                            </div>
+                            <button type="button" onclick="navegarDataRotaOperador(1)" class="w-7 h-[32px] flex-none rounded-lg border border-outline-variant hover:bg-surface-container-high text-on-surface flex items-center justify-center transition-colors shadow-sm cursor-pointer" title="Próximo dia">
+                                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                            </button>
                         </div>
-                    </div>
-
-                    <!-- Botão Exibir (1 col - Somente Ícone) -->
-                    <div class="col-span-1">
-                        <button type="button" onclick="calcularERenderizarRotaOperador()" class="w-full py-1.5 px-0 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-sm transition-all active:scale-95 flex items-center justify-center cursor-pointer h-[32px]" title="Exibir Rota Concluída">
-                            <span class="material-symbols-outlined text-[18px]">map</span>
-                        </button>
-                    </div>
-
-                    <!-- Botão Limpar (1 col - Somente Ícone) -->
-                    <div class="col-span-1">
-                        <button type="button" onclick="limparRotaOperadorAtual()" class="w-full py-1.5 px-0 rounded-lg border border-outline-variant text-on-surface-variant hover:text-error hover:border-error/40 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center h-[32px]" title="Limpar Rota">
-                            <span class="material-symbols-outlined text-[18px]">cleaning_services</span>
-                        </button>
                     </div>
                 </div>
 
@@ -662,6 +662,13 @@
                         <span>Exibir Fluxo Animado ⚡</span>
                     </label>
                 </div>
+            </div>
+
+            <!-- Estado Vazio / Sem OSs na data ou operador -->
+            <div id="containerVazioRotaOperador" class="hidden flex-1 flex flex-col items-center justify-center p-6 text-center text-on-surface-variant bg-surface-container-lowest/40 rounded-lg border border-dashed border-outline-variant/60 my-auto">
+                <span class="material-symbols-outlined text-4xl text-on-surface-variant/40 mb-2">event_busy</span>
+                <p id="msgVazioRotaOperador" class="text-xs font-semibold text-on-surface leading-relaxed max-w-[280px]">Nenhuma OS concluída localizada nesta data.</p>
+                <span class="text-[10px] text-on-surface-variant/70 mt-1">Use as setas acima para navegar entre os dias.</span>
             </div>
 
             <!-- Container de Resultados da Rota do Operador (Preenche todo o espaço vertical restante) -->
@@ -4210,6 +4217,26 @@
         }
     }
 
+    function navegarDataRotaOperador(dias) {
+        const inpDate = document.getElementById('inputDataRotaOperador');
+        if (!inpDate) return;
+
+        let dataBase = new Date();
+        if (inpDate.value) {
+            const [ano, mes, dia] = inpDate.value.split('-').map(Number);
+            dataBase = new Date(ano, mes - 1, dia);
+        }
+
+        dataBase.setDate(dataBase.getDate() + dias);
+        const yyyy = dataBase.getFullYear();
+        const mm = String(dataBase.getMonth() + 1).padStart(2, '0');
+        const dd = String(dataBase.getDate()).padStart(2, '0');
+        inpDate.value = `${yyyy}-${mm}-${dd}`;
+
+        aoAtualizarDataBRInput();
+        aoMudarOperadorRota();
+    }
+
     function extrairOperadorDeTexto(texto) {
         if (!texto || typeof texto !== 'string') return '';
         const match = texto.match(/(?:conclu[íi]do|finalizado|encerrado|executado|reparado)\s+por[:\s]+([^\n\r,.-]+)/i);
@@ -4296,6 +4323,7 @@
                 inpData.value = hoje;
             }
             aoAtualizarDataBRInput();
+            calcularERenderizarRotaOperador();
         } else {
             fecharPainelRotasOperador();
         }
@@ -4304,7 +4332,7 @@
     function fecharPainelRotasOperador() {
         const painel = document.getElementById('painelRotasOperador');
         if (painel) painel.classList.add('hidden');
-        limparCamadasRotaOperador();
+        limparRotaOperadorAtual();
         ajustarPosicaoPainelLateralOS();
     }
 
@@ -4536,8 +4564,16 @@
 
         if (concluidasDoOperador.length === 0) {
             const dtBR = formatarDataBR(dataSelecionadaStr);
-            alert(`Nenhuma OS concluída localizada para ${opSelecionado === 'ALL' ? 'os operadores' : 'o operador ' + opSelecionado} na data ${dtBR}.`);
             limparRotaOperadorAtual();
+            
+            const vazioContainer = document.getElementById('containerVazioRotaOperador');
+            const msgVazio = document.getElementById('msgVazioRotaOperador');
+            if (vazioContainer) {
+                if (msgVazio) {
+                    msgVazio.innerText = `Nenhuma OS concluída localizada para ${opSelecionado === 'ALL' ? 'os operadores' : 'o operador ' + opSelecionado} na data ${dtBR}.`;
+                }
+                vazioContainer.classList.remove('hidden');
+            }
             return;
         }
 
@@ -4996,6 +5032,9 @@
             });
         }
 
+        const containerVazio = document.getElementById('containerVazioRotaOperador');
+        if (containerVazio) containerVazio.classList.add('hidden');
+
         container.classList.remove('hidden');
     }
 
@@ -5004,6 +5043,8 @@
         limparCamadasRotaOperador();
         const container = document.getElementById('containerResultadoRotaOperador');
         if (container) container.classList.add('hidden');
+        const containerVazio = document.getElementById('containerVazioRotaOperador');
+        if (containerVazio) containerVazio.classList.add('hidden');
     }
 
     function limparCamadasRotaOperador() {
