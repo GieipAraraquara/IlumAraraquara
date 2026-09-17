@@ -744,6 +744,22 @@
                     </div>
                 </div>
 
+                <!-- DESCRIÇÃO / RELATÓRIO DO SERVIÇO DA PRAÇA (OBRIGATÓRIO AO ENCERRAR A SESSÃO) -->
+                <div id="blocoDescricaoServicoPraca" class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-3">
+                    <label for="descricaoServicoPraca" class="block text-xs font-semibold uppercase tracking-wider text-slate-600 flex items-center justify-between">
+                        <span class="flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-blue-600 text-[18px]">description</span>
+                            <span>Descrição do Serviço Realizado</span>
+                            <span id="asteriscoDescricaoPraca" class="text-red-500 font-bold hidden">* (Obrigatório)</span>
+                        </span>
+                        <span id="tagObrigatorioDescricaoPraca" class="text-[11px] font-semibold text-slate-400">Opcional no início</span>
+                    </label>
+                    <textarea id="descricaoServicoPraca" 
+                              rows="3" 
+                              placeholder="Descreva detalhadamente o serviço executado nesta sessão de trabalho na praça..." 
+                              class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-emerald-600 focus:border-transparent rounded-lg p-3 text-sm text-slate-900 transition-all resize-none"></textarea>
+                </div>
+
                 <!-- BOTÕES DE AÇÃO DINÂMICOS PARA PRAÇA -->
                 <div class="flex flex-col sm:flex-row gap-3 pt-2">
                     <button type="button" 
@@ -1389,6 +1405,7 @@
         html += '        <option value="Lâmpada apagada">Lâmpada apagada</option>';
         html += '        <option value="Lâmpada intermitente">Lâmpada intermitente</option>';
         html += '        <option value="Lâmpada acesa dia">Lâmpada acesa dia</option>';
+        html += '        <option value="Rede CPFL">Rede CPFL</option>';
         html += '        <option value="Braço quebrado">Braço quebrado</option>';
         html += '        <option value="Outros problemas">Outros problemas</option>';
         html += '        <option value="Nenhum" style="background-color: #d1fae5; color: #065f46; font-weight: bold;" class="bg-emerald-100 text-emerald-800 font-bold">Nenhum</option>';
@@ -1661,17 +1678,36 @@
             return;
           }
 
-          let { data, error } = await client.from('materiais_contrato').select('*');
-          console.log("📋 [MATERIAIS CONTRATO] Resposta do Supabase:", { data, error });
+          // Tenta ler do cache de sessão (TTL de 1 hora) para economizar egress
+          var CACHE_KEY_MAT = 'cache_materiais_contrato_v1';
+          var CACHE_TTL_MS = 60 * 60 * 1000;
+          try {
+            var cachedMatRaw = sessionStorage.getItem(CACHE_KEY_MAT);
+            if (cachedMatRaw) {
+              var parsedMat = JSON.parse(cachedMatRaw);
+              if (parsedMat && (Date.now() - parsedMat.timestamp < CACHE_TTL_MS) && Array.isArray(parsedMat.data) && parsedMat.data.length > 0) {
+                console.log("⚡ [MATERIAIS CONTRATO] Utilizando dados em cache de sessão (sessionStorage).");
+                data = parsedMat.data;
+              }
+            }
+          } catch(eCache) {}
 
-          if (error) {
-            console.error("❌ [MATERIAIS CONTRATO] Erro Supabase ao buscar materiais:", error.message || error, error);
-            usarFallbackMateriais();
-            return;
+          var error = null;
+          if (!data) {
+            var colunasMat = 'id, codigo, "Marca", marca, "Material/Serviço", "Material", "Serviço", descricao, nome, material, "Unidade de Medida", "Unidade", unidade, valor_unitario';
+            var resMat = await client.from('materiais_contrato').select(colunasMat);
+            if (resMat.error && resMat.error.message && resMat.error.message.includes('column')) {
+                resMat = await client.from('materiais_contrato').select('id, codigo, marca, descricao, unidade, valor_unitario');
+            }
+            data = resMat.data;
+            error = resMat.error;
+
+            if (!error && data && Array.isArray(data) && data.length > 0) {
+              try {
+                sessionStorage.setItem(CACHE_KEY_MAT, JSON.stringify({ timestamp: Date.now(), data: data }));
+              } catch(eSave) {}
+            }
           }
-
-          if (data && Array.isArray(data) && data.length > 0) {
-            console.log("✅ [MATERIAIS CONTRATO] Registros encontrados no Supabase:", data.length, "Exemplo 1º item:", data[0]);
 
             opcoesMateriais = data.map(function(row) {
               if (typeof row === 'string') return row;
@@ -2310,12 +2346,13 @@
             }
           }
 
+          var obsFinalTexto = document.getElementById('descricao').value.trim() || null;
           var payloadUpdate = {
             status: "Concluída",
             data_fechamento: new Date().toISOString(),
             operador_finalizacao: nomeOperadorFinalizacao,
             materiais: carrinhoMateriais,
-            descricao: document.getElementById('descricao').value.trim() || null,
+            observacao_final: obsFinalTexto,
             pontos_final: pontosFinalAcumulados,
             status_auditoria: "Pendente",
             texto_auditoria_ocr: ocrGeral
@@ -2327,6 +2364,7 @@
             payloadUpdate.data_abertura = dataAgora.toISOString();
             payloadUpdate.operador = prot;
             payloadUpdate.municipe_nome = "ATENDIMENTO DIRETO";
+            payloadUpdate.descricao = obsFinalTexto;
           }
 
           // Se estiver OFFLINE, salva o envio na fila local para sincronização posterior
@@ -2498,7 +2536,7 @@
                 status: "Concluída",
                 data_fechamento: new Date().toISOString(),
                 materiais: carrinhoMateriais,
-                descricao: document.getElementById('descricao').value.trim() || null,
+                observacao_final: document.getElementById('descricao').value.trim() || null,
                 pontos: arrPontosPayload || [],
                 status_auditoria: "Pendente"
               };
@@ -2518,6 +2556,8 @@
       function limparFormularioTotal() {
         document.getElementById('protocolo').value = '';
         document.getElementById('descricao').value = '';
+        var descServPraca = document.getElementById('descricaoServicoPraca');
+        if (descServPraca) descServPraca.value = '';
         document.getElementById('quantidade').value = 1;
         carrinhoMateriais = [];
         renderizarTabelaMateriais();
@@ -2922,6 +2962,8 @@
         var btnConcluir = document.getElementById('btnConcluirPraca');
         var labelFotoPraca = document.getElementById('labelFotoPraca');
         var btnAnexarFotoPraca = document.getElementById('btnAnexarFotoPraca');
+        var asteriscoDesc = document.getElementById('asteriscoDescricaoPraca');
+        var tagObrigDesc = document.getElementById('tagObrigatorioDescricaoPraca');
 
         if (!btnSessao) return;
         var stLower = (status || '').toLowerCase().trim();
@@ -2936,6 +2978,12 @@
           }
           if (btnAnexarFotoPraca) {
             btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Encerramento</span>';
+          }
+
+          if (asteriscoDesc) asteriscoDesc.classList.remove('hidden');
+          if (tagObrigDesc) {
+            tagObrigDesc.innerText = 'Obrigatório para encerrar';
+            tagObrigDesc.className = 'text-[11px] font-bold text-red-600';
           }
 
           if (btnConcluir) {
@@ -2957,6 +3005,12 @@
             btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Entrada</span>';
           }
 
+          if (asteriscoDesc) asteriscoDesc.classList.add('hidden');
+          if (tagObrigDesc) {
+            tagObrigDesc.innerText = 'Opcional no início';
+            tagObrigDesc.className = 'text-[11px] font-semibold text-slate-400';
+          }
+
           if (btnConcluir) {
             btnConcluir.disabled = false;
             btnConcluir.classList.remove('opacity-50', 'cursor-not-allowed');
@@ -2974,6 +3028,12 @@
           }
           if (btnAnexarFotoPraca) {
             btnAnexarFotoPraca.innerHTML = '<span class="material-symbols-outlined text-[18px]">photo_camera</span> <span>Anexar Foto de Entrada</span>';
+          }
+
+          if (asteriscoDesc) asteriscoDesc.classList.add('hidden');
+          if (tagObrigDesc) {
+            tagObrigDesc.innerText = 'Opcional no início';
+            tagObrigDesc.className = 'text-[11px] font-semibold text-slate-400';
           }
 
           if (btnConcluir) {
@@ -3019,7 +3079,24 @@
           return;
         }
 
+        // Se estiver ENCERRANDO a sessão, a DESCRIÇÃO DO SERVIÇO é OBRIGATÓRIA!
         if (stLower.includes('andamento')) {
+          var inputDesc = document.getElementById('descricaoServicoPraca');
+          var textoDesc = inputDesc ? inputDesc.value.trim() : "";
+          if (!textoDesc) {
+            exibirModalAlertaValidacao(
+              "Descrição do Serviço Obrigatória",
+              "É obrigatório preencher a 'Descrição do Serviço Realizado' para encerrar a sessão de trabalho na praça."
+            );
+            if (inputDesc) {
+              inputDesc.focus();
+              inputDesc.classList.add('ring-2', 'ring-red-500', 'border-red-500');
+              setTimeout(function() {
+                inputDesc.classList.remove('ring-2', 'ring-red-500', 'border-red-500');
+              }, 4000);
+            }
+            return;
+          }
           // Sessão em andamento -> encerra a sessão de trabalho atual e atualiza status para "Iniciado"
           enviarAtualizacaoStatusPraca("Iniciado");
         } else {
@@ -3161,6 +3238,9 @@
             dadosPracaAtual.foto_entrada = fotoEntradaUrl;
           }
 
+          var descServicoPracaEl = document.getElementById('descricaoServicoPraca');
+          var descServicoTexto = descServicoPracaEl ? descServicoPracaEl.value.trim() : "";
+
           if (novoStatus === 'Em Andamento') {
             historicoSessoes.push({
               numero: historicoSessoes.length + 1,
@@ -3175,7 +3255,8 @@
               foto_saida: null,
               coordenada_inicio: coordsGpsPracaAtual || null,
               coordenada_fim: null,
-              materiais: (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : []
+              materiais: (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : [],
+              descricao_servico: descServicoTexto || null
             });
           } else if (novoStatus === 'Iniciado' || statusFinal === 'Concluída') {
             var sessaoAberta = historicoSessoes.find(function(s) { return !s.fim; });
@@ -3183,6 +3264,9 @@
               sessaoAberta.fim = agoraIso;
               sessaoAberta.status = (statusFinal === 'Concluída') ? 'CONCLUÍDA' : 'ENCERRADA';
               sessaoAberta.coordenada_fim = coordsGpsPracaAtual || null;
+              if (descServicoTexto) {
+                sessaoAberta.descricao_servico = descServicoTexto;
+              }
               if (fotoEntradaUrl) {
                 sessaoAberta.foto_saida = fotoEntradaUrl;
               }
@@ -3345,6 +3429,8 @@
           limparFotosAndamentoPraca();
           carrinhoMateriaisPraca = [];
           renderizarTabelaMateriaisPraca();
+          var descPracaReset = document.getElementById('descricaoServicoPraca');
+          if (descPracaReset) descPracaReset.value = "";
 
         } catch(err) {
           if (window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network'))) {
@@ -3356,6 +3442,8 @@
               limparFotosAndamentoPraca();
               carrinhoMateriaisPraca = [];
               renderizarTabelaMateriaisPraca();
+              var descPracaResetOff = document.getElementById('descricaoServicoPraca');
+              if (descPracaResetOff) descPracaResetOff.value = "";
               return;
             } catch(e) {}
           }

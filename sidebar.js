@@ -82,15 +82,17 @@ class AppSidebar extends HTMLElement {
             { id: 'painel-manutentor', label: 'Acompanhamento', icon: 'dashboard', href: 'Painel-Manutentor.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
             { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
+            { id: 'medicao', label: 'Medição & Materiais', icon: 'price_check', href: 'Medicao.html' },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";', mtAuto: true }
         ] : [
             { id: 'painel', label: 'Acompanhamento', icon: 'dashboard', href: 'Painel.html' },
             { id: 'auditoria', label: 'Auditoria', icon: 'fact_check', href: 'Auditoria.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
             { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
+            { id: 'medicao', label: 'Medição & Descontos', icon: 'price_check', href: 'Medicao.html' },
             { id: 'fotos', label: 'Banco de Fotos', icon: 'photo_library', href: 'Fotos.html' },
             { id: 'plaquetas', label: 'Plaquetas', icon: 'pin_drop', href: 'Controle-Plaquetas.html' },
-            { id: 'configuracoes', label: 'Configurações', icon: 'settings', href: '#', mtAuto: true },
+            { id: 'configuracoes', label: 'Configurações', icon: 'settings', href: 'Configuracoes.html', mtAuto: true },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";' }
         ];
 
@@ -457,6 +459,7 @@ function updateSidebarActiveState(targetUrl) {
     else if (lower.includes('plaqueta')) activeId = 'plaquetas';
     else if (lower.includes('mapa')) activeId = 'mapa';
     else if (lower.includes('relat')) activeId = 'relatorios';
+    else if (lower.includes('medicao')) activeId = 'medicao';
     else if (lower.includes('config')) activeId = 'configuracoes';
 
     sidebar.setAttribute('active', activeId);
@@ -469,6 +472,7 @@ function updateSidebarActiveState(targetUrl) {
         const href = a.getAttribute('href') || '';
         const linkClean = href.split('?')[0].toLowerCase();
         const isThisActive = linkClean === lower || 
+                             (activeId === 'medicao' && linkClean.includes('medicao')) ||
                              (activeId === 'relatorios' && linkClean.includes('relat')) ||
                              (activeId === 'painel' && linkClean.includes('painel') && !linkClean.includes('manutentor')) ||
                              (activeId === 'painel-manutentor' && linkClean.includes('manutentor'));
@@ -515,7 +519,15 @@ function syncStylesFromDoc(doc) {
 function reinitPageControllers(targetUrl) {
     const page = targetUrl.split('?')[0].toLowerCase();
 
-    if (page.includes('painel')) {
+    if (page.includes('medicao')) {
+        const Controller = window.MedicaoController || (typeof MedicaoController !== 'undefined' ? MedicaoController : null);
+        if (Controller) {
+            window.medicaoController = new Controller();
+            window.medicaoController.init();
+        } else {
+            console.warn('⚠️ [SPA] MedicaoController não disponível para inicialização.');
+        }
+    } else if (page.includes('painel')) {
         const Controller = window.PainelController || (typeof PainelController !== 'undefined' ? PainelController : null);
         if (Controller) {
             window.painelController = new Controller();
@@ -554,6 +566,12 @@ function reinitPageControllers(targetUrl) {
             window.fotosController.init();
         } else {
             console.warn('⚠️ [SPA] FotosController não disponível para inicialização.');
+        }
+    } else if (page.includes('plaqueta')) {
+        if (typeof window.initControlePlaquetas === 'function') {
+            window.initControlePlaquetas();
+        } else {
+            console.warn('⚠️ [SPA] initControlePlaquetas não disponível para inicialização.');
         }
     }
 }
@@ -734,6 +752,21 @@ window.initScrollToBottomButton = function() {
     const mainContent = document.getElementById('main-content');
     if (!mainContent) return;
 
+    const getTableTargets = () => {
+        const container = document.getElementById('main-content') || document.documentElement;
+        // Identifica tabelas visíveis ou seus cards na página
+        const tables = Array.from(container.querySelectorAll('table[id]')).filter(tbl => {
+            return tbl.offsetWidth > 0 && tbl.offsetHeight > 0 && !tbl.closest('.hidden');
+        });
+        if (tables.length <= 1) return [];
+
+        // Mapeia para os containers dos cards (ou o próprio elemento da tabela)
+        return tables.map(tbl => {
+            const card = tbl.closest('.col-span-12') || tbl.parentElement;
+            return card || tbl;
+        });
+    };
+
     const updateVisibility = () => {
         const container = document.getElementById('main-content') || document.documentElement;
         const scrollTop = container.scrollTop || window.scrollY || 0;
@@ -751,7 +784,7 @@ window.initScrollToBottomButton = function() {
             btn.classList.remove('opacity-0', 'pointer-events-none');
             btn.classList.add('opacity-100', 'pointer-events-auto');
 
-            const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 120);
+            const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 100);
 
             if (isNearBottom) {
                 btn.setAttribute('title', 'Rolar até o topo');
@@ -761,8 +794,10 @@ window.initScrollToBottomButton = function() {
                     icon.className = 'material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:-translate-y-0.5';
                 }
             } else {
-                btn.setAttribute('title', 'Rolar até o fundo');
-                btn.setAttribute('aria-label', 'Rolar até o fundo');
+                const tableTargets = getTableTargets();
+                const titleText = tableTargets.length > 1 ? 'Ir para próxima tabela' : 'Rolar até o fundo';
+                btn.setAttribute('title', titleText);
+                btn.setAttribute('aria-label', titleText);
                 if (icon) {
                     icon.textContent = 'arrow_downward';
                     icon.className = 'material-symbols-outlined text-[24px] transition-transform duration-300 group-hover:translate-y-0.5';
@@ -781,7 +816,7 @@ window.initScrollToBottomButton = function() {
         const scrollHeight = container.scrollHeight || document.documentElement.scrollHeight || 0;
         const clientHeight = container.clientHeight || window.innerHeight || 0;
 
-        const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 120);
+        const isNearBottom = (scrollTop + clientHeight) >= (scrollHeight - 100);
 
         if (isNearBottom) {
             if (target.scrollTo) {
@@ -789,12 +824,44 @@ window.initScrollToBottomButton = function() {
             } else {
                 target.scrollTop = 0;
             }
-        } else {
-            if (target.scrollTo) {
-                target.scrollTo({ top: container.scrollHeight || scrollHeight, behavior: 'smooth' });
-            } else {
-                target.scrollTop = container.scrollHeight || scrollHeight;
+            return;
+        }
+
+        const tableTargets = getTableTargets();
+        if (tableTargets.length > 1) {
+            const containerRect = container.getBoundingClientRect ? container.getBoundingClientRect() : { top: 0 };
+            
+            // Procura a próxima tabela que esteja abaixo da posição de visualização atual
+            let nextTargetPos = null;
+            for (let i = 0; i < tableTargets.length; i++) {
+                const el = tableTargets[i];
+                const rect = el.getBoundingClientRect();
+                const posInContainer = (rect.top - containerRect.top) + scrollTop;
+
+                // Margem de 35px para evitar considerar a tabela atual como "próxima" caso já esteja focada nela
+                if (posInContainer > scrollTop + 35) {
+                    nextTargetPos = posInContainer;
+                    break;
+                }
             }
+
+            if (nextTargetPos !== null) {
+                // Deixa um respiro de 12px acima do título do card da tabela
+                const finalScroll = Math.max(0, nextTargetPos - 12);
+                if (target.scrollTo) {
+                    target.scrollTo({ top: finalScroll, behavior: 'smooth' });
+                } else {
+                    target.scrollTop = finalScroll;
+                }
+                return;
+            }
+        }
+
+        // Fallback: Rola até o final se não houver próximas tabelas ou se estiver na última
+        if (target.scrollTo) {
+            target.scrollTo({ top: container.scrollHeight || scrollHeight, behavior: 'smooth' });
+        } else {
+            target.scrollTop = container.scrollHeight || scrollHeight;
         }
     };
 
@@ -824,10 +891,10 @@ document.addEventListener('click', (e) => {
     const href = link.getAttribute('href');
     if (!href || href === '#' || href.startsWith('javascript:')) return;
 
-    // Se for link para páginas HTML internas do app (Painel.html, Auditoria.html, Mapa.html, Painel-Manutentor.html)
+    // Se for link para páginas HTML internas do app (Painel.html, Auditoria.html, Mapa.html, Painel-Manutentor.html, Medicao.html, etc.)
     if (href.endsWith('.html') || href.includes('.html?')) {
         const cleanHref = href.split('?')[0].toLowerCase();
-        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor') || cleanHref.includes('relat') || cleanHref.includes('foto')) {
+        if (cleanHref.includes('painel') || cleanHref.includes('auditoria') || cleanHref.includes('mapa') || cleanHref.includes('manutentor') || cleanHref.includes('relat') || cleanHref.includes('foto') || cleanHref.includes('medicao') || cleanHref.includes('plaqueta')) {
             e.preventDefault();
             window.navigateSPA(href, true);
         }

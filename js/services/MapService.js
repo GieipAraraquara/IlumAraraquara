@@ -121,6 +121,9 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     if (!item && window.relatorioController && Array.isArray(window.relatorioController.chamadosList)) {
         item = window.relatorioController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
     }
+    if (!item && window.medicaoController && Array.isArray(window.medicaoController.chamadosList)) {
+        item = window.medicaoController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    }
 
     // Fallback search in static DOM table rows if controller list is empty
     if (!item) {

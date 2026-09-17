@@ -128,6 +128,20 @@ class ChamadoModel {
         this.evidencias = data.evidencias || null;
         this.tipoOs = data.tipo_os || (data.praca_nome ? 'Praça' : (data.protocolo && String(data.protocolo).toUpperCase().startsWith('P') ? 'Praça' : 'Viária'));
         this.pracaNome = data.praca_nome || '';
+
+        // Glosas e Penalidades Contratuais (JSONB no Supabase)
+        let glosasArr = data.glosas;
+        if (typeof glosasArr === 'string') {
+            try {
+                glosasArr = JSON.parse(glosasArr);
+            } catch (e) {
+                glosasArr = [];
+            }
+        }
+        this.glosas = Array.isArray(glosasArr) ? glosasArr : [];
+        this.telefoneFixo = cleanVal(data.telefone_fixo);
+        this.telefoneCelular = cleanVal(data.telefone_celular);
+        this.problemasList = Array.isArray(data.problemas) ? data.problemas : (typeof data.problemas === 'string' && (data.problemas.trim().startsWith('[') || data.problemas.trim().startsWith('{')) ? (() => { try { return JSON.parse(data.problemas.trim()); } catch(e) { return null; } })() : null);
         this.fotoEntrada = data.foto_entrada || null;
         this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
@@ -311,7 +325,8 @@ class ChamadoModel {
                     foto_saida: s.foto_saida || null,
                     coordenada_inicio: s.coordenada_inicio || s.coordenada || null,
                     coordenada_fim: s.coordenada_fim || null,
-                    materiais: s.materiais || []
+                    materiais: s.materiais || [],
+                    descricao_servico: s.descricao_servico || s.descricao || s.relatorio_tecnico || s.observacao || null
                 };
             });
         }
@@ -571,7 +586,17 @@ class ChamadoModel {
         // sintetiza 1 registro de fechamento para manter consistência nos modais de detalhes e relatórios.
         if (list.length === 0 && (this.materialUtilizado || this.observacaoFinal || this.dataConclusao || this.normalizedStatus === 'concluida')) {
             const matsParsed = ChamadoModel.parseMaterialsList(this.materialUtilizado);
-            const fotosParsed = this.evidencias ? (Array.isArray(this.evidencias) ? this.evidencias : []) : [];
+            let fotosParsed = this.evidencias ? (Array.isArray(this.evidencias) ? this.evidencias : [this.evidencias]) : [];
+            let pontosParsed = [];
+            if (this.rawPontosFinal) {
+                if (Array.isArray(this.rawPontosFinal)) pontosParsed = this.rawPontosFinal;
+                else if (typeof this.rawPontosFinal === 'string') {
+                    try { pontosParsed = JSON.parse(this.rawPontosFinal); } catch(e) {}
+                }
+            }
+            if (fotosParsed.length === 0 && pontosParsed && pontosParsed.length > 0) {
+                fotosParsed = pontosParsed;
+            }
             return [{
                 id: null,
                 numero: 1,
@@ -584,7 +609,7 @@ class ChamadoModel {
                 textoAuditoriaOCR: this.textoAuditoriaOCR || '',
                 materiais: matsParsed,
                 fotos: fotosParsed,
-                pontos: []
+                pontos: pontosParsed
             }];
         }
 

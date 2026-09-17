@@ -2405,6 +2405,26 @@
           return;
         }
 
+        // Tabela estática (~230 registros, ~78 KB): utiliza cache de 1h em sessionStorage
+        var CACHE_KEY_PRACAS = 'luz_pracas_cache_v1';
+        try {
+          var cachedPracas = sessionStorage.getItem(CACHE_KEY_PRACAS);
+          if (cachedPracas) {
+            var parsedPracas = JSON.parse(cachedPracas);
+            if (Array.isArray(parsedPracas) && parsedPracas.length > 0) {
+              LISTA_PRACAS = parsedPracas;
+              LISTA_PRACAS.forEach(function(p) {
+                p._tokens = extrairTokensPraca(p.nome + " " + (p.endereco || ""));
+              });
+              console.log("⚡ [Cache Hit] LISTA_PRACAS carregada do sessionStorage:", LISTA_PRACAS.length, "praças.");
+              if (mapaPracasInstance) renderizarMarkersMapaPracas();
+              return;
+            }
+          }
+        } catch (eCachePracas) {}
+
+        // Tabela localizacao_pracas possui colunas com barras e maiúsculas vindas de planilhas.
+        // O uso direto de '*' é ultra rápido e consome apenas ~78 KB uma única vez por sessão.
         client.from('localizacao_pracas').select('*')
           .then(function(res) {
             if (res.error) {
@@ -2472,7 +2492,10 @@
               LISTA_PRACAS.forEach(function(p) {
                 p._tokens = extrairTokensPraca(p.nome + " " + (p.endereco || ""));
               });
-              console.log("🌳 [Supabase] LISTA_PRACAS carregada com sucesso:", LISTA_PRACAS.length, "praças.");
+              try {
+                sessionStorage.setItem(CACHE_KEY_PRACAS, JSON.stringify(lista));
+              } catch(eSavePracas) {}
+              console.log("🌳 [Supabase] LISTA_PRACAS carregada e salva em cache:", LISTA_PRACAS.length, "praças.");
               if (mapaPracasInstance) {
                 renderizarMarkersMapaPracas();
               }

@@ -441,8 +441,8 @@
                     </div>
                 </div>
 
-                <!-- BUSCA DE ENDEREÇO PARA NOVA OS (COMPACTO POR PADRÃO, ESTICA AO CLICAR PARA ESCREVER) -->
-                <div id="containerBuscaPingMapa" class="relative transition-all duration-300 border-l border-outline-variant/60 pl-2 ml-1 w-[145px] flex-shrink-0">
+                <!-- BUSCA DE ENDEREÇO PARA NOVA OS (EXCLUSIVO ADMIN: COMPACTO POR PADRÃO, ESTICA AO CLICAR PARA ESCREVER) -->
+                <div id="containerBuscaPingMapa" class="relative transition-all duration-300 border-l border-outline-variant/60 pl-2 ml-1 w-[145px] flex-shrink-0 hidden">
                     <div class="relative flex items-center w-full">
                         <span class="material-symbols-outlined absolute left-1.5 text-[16px] text-blue-600 dark:text-blue-400 pointer-events-none">add_location_alt</span>
                         <input type="text" id="buscaEnderecoPingMapa" placeholder="➕ Nova OS..." oninput="buscarEnderecoParaPingNoMapa(this.value)" onkeydown="if(event.key==='Enter'){ event.preventDefault(); selecionarPrimeiraSugestaoPingMapa(); }" onfocus="expandirBuscaPingMapa(this)" onblur="contrairBuscaPingMapa(this)" autocomplete="off" class="w-full pl-6 pr-6 py-1 text-xs font-medium border border-outline-variant bg-surface-container-lowest rounded-lg outline-none focus:ring-2 focus:ring-secondary text-on-surface shadow-xs transition-all duration-300" />
@@ -1207,6 +1207,14 @@
             currentUserRole = window.AuthGuard.getUserRole(authData.user, authData.profile);
         }
 
+        if (currentUserRole === 'admin') {
+            const containerNovaOS = document.getElementById('containerBuscaPingMapa');
+            if (containerNovaOS) containerNovaOS.classList.remove('hidden');
+        } else {
+            const containerNovaOS = document.getElementById('containerBuscaPingMapa');
+            if (containerNovaOS) containerNovaOS.classList.add('hidden');
+        }
+
         if (currentUserRole === 'manutentor') {
             const btnCanc = document.getElementById('chipStatusCanceladas');
             if (btnCanc) btnCanc.style.display = 'none';
@@ -1450,6 +1458,13 @@
             const st = (os.status || "Aberta").toLowerCase();
             const normSt = (os.normalizedStatus || "").toLowerCase();
             const origSt = (os._originalModel && os._originalModel.normalizedStatus ? os._originalModel.normalizedStatus : "").toLowerCase();
+            
+            // Ordens pendentes de aprovação não são exibidas no mapa
+            const isPendente = st.includes("pend") || normSt === "pendente" || origSt === "pendente";
+            if (isPendente) {
+                return false;
+            }
+
             const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || normSt === "concluida" || origSt === "concluida" || Boolean(os._originalModel && (os._originalModel.dataConclusao || os._originalModel.dataFechamento));
             const isCanc = st.includes("cancel") || normSt === "cancelada" || origSt === "cancelada";
             const isAberta = !isResolv && !isCanc;
@@ -2179,12 +2194,14 @@
                 <div id="alertaSemNumeroPopup" class="hidden text-[10px] font-bold text-amber-400 bg-amber-950/60 p-1.5 rounded-lg border border-amber-600/50 mt-1">⚠️ Informe o número do imóvel no endereço</div>
                 <div class="font-mono text-[10px] text-blue-300">🌐 ${pLat.toFixed(6)}, ${pLng.toFixed(6)}</div>
             </div>
+            ${currentUserRole === 'admin' ? `
             <div class="flex items-center gap-1.5 pt-2 border-t border-slate-800">
                 <button type="button" id="btnAbrirOSPinado" onclick="dispararModalNovaOSComPonto(${pLat}, ${pLng})" class="flex-1 py-2 px-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition-all flex items-center justify-center gap-1 cursor-pointer">
                     <span class="material-symbols-outlined text-[16px]">add_circle</span>
                     <span>Abrir OS Aqui</span>
                 </button>
             </div>
+            ` : ''}
         `;
 
         popupPinadoMapa = new mapboxgl.Popup({ offset: 25, maxWidth: '300px', closeOnClick: false })
@@ -2243,6 +2260,24 @@
     }
 
     function dispararModalNovaOSComPonto(lat, lng, endereco = '') {
+        if (currentUserRole !== 'admin') {
+            if (typeof window.showConfirmModal === 'function') {
+                window.showConfirmModal({
+                    title: 'Acesso Restrito',
+                    message: 'Apenas usuários administradores têm permissão para abrir novas Ordens de Serviço.',
+                    icon: 'lock',
+                    iconBgClass: 'bg-error/10 text-error border border-error/20',
+                    confirmBtnClass: 'bg-secondary text-white',
+                    confirmText: 'Entendido',
+                    showJustification: false,
+                    showCancelBtn: false
+                });
+            } else {
+                alert('Apenas usuários administradores têm permissão para abrir novas Ordens de Serviço.');
+            }
+            return;
+        }
+
         if (endereco && !validarPresencaNumeroEndereco(null, endereco)) {
             if (typeof window.showConfirmModal === 'function') {
                 window.showConfirmModal({

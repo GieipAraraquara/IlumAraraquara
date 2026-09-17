@@ -90,12 +90,9 @@ class RelatorioController {
         this.isManutentorUser = isManutentor;
 
         if (isManutentor) {
-            const btnGeral = document.getElementById('btn-tab-geral');
-            if (btnGeral) {
-                btnGeral.style.setProperty('display', 'none', 'important');
-                btnGeral.classList.add('hidden');
-            }
-            this.switchTab('medicao');
+            console.log('🔄 [RelatorioController] Manutentor detectado em Relatório. Redirecionando para Medicao.html...');
+            window.location.replace('Medicao.html');
+            return;
         }
     }
 
@@ -756,11 +753,37 @@ class RelatorioController {
             targetM = now.getMonth() + 1; // 1..12
         }
 
-        // Início: dia 21 do mês anterior (ex: 21/07 se mês for 08/Agosto)
-        const startDate = new Date(targetY, targetM - 2, 21, 0, 0, 0, 0);
+        // Recuperar parâmetros configuráveis da janela de medição (padrão: 21 a 20)
+        let janelaConfig = { diaInicio: 21, diaFim: 20, mesmoMes: false };
+        try {
+            if (window.MedicaoService && typeof window.MedicaoService.carregarJanelaMedicaoConfig === 'function') {
+                janelaConfig = window.MedicaoService.carregarJanelaMedicaoConfig();
+            } else {
+                const saved = localStorage.getItem('sistema_os_janela_medicao_config');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && parsed.diaInicio && parsed.diaFim) {
+                        janelaConfig = parsed;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('⚠️ [RelatorioController] Falha ao ler janela de medição:', e);
+        }
 
-        // Fim: dia 20 do mês selecionado (ex: 20/08 se mês for 08/Agosto)
-        const endDate = new Date(targetY, targetM - 1, 20, 23, 59, 59, 999);
+        const dInicio = parseInt(janelaConfig.diaInicio, 10) || 21;
+        const dFim = parseInt(janelaConfig.diaFim, 10) || 20;
+        const mesmoMes = Boolean(janelaConfig.mesmoMes);
+
+        let startDate, endDate;
+        if (mesmoMes) {
+            startDate = new Date(targetY, targetM - 1, dInicio, 0, 0, 0, 0);
+            endDate = new Date(targetY, targetM - 1, dFim, 23, 59, 59, 999);
+        } else {
+            // Mês anterior até mês selecionado
+            startDate = new Date(targetY, targetM - 2, dInicio, 0, 0, 0, 0);
+            endDate = new Date(targetY, targetM - 1, dFim, 23, 59, 59, 999);
+        }
 
         const formatBR = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 
@@ -776,7 +799,12 @@ class RelatorioController {
         try {
             const client = window.supabaseClient || (typeof obterSupabaseClient === 'function' ? obterSupabaseClient() : null);
             if (client) {
-                const { data, error } = await client.from('materiais_contrato').select('*');
+                const colunas = 'id, codigo, "Marca", marca, "Material/Serviço", "Material", "Serviço", descricao, nome, material, "Unidade de Medida", "Unidade", unidade, valor_unitario';
+                let resMat = await client.from('materiais_contrato').select(colunas);
+                if (resMat.error && resMat.error.message && resMat.error.message.includes('column')) {
+                    resMat = await client.from('materiais_contrato').select('id, codigo, marca, descricao, unidade, valor_unitario');
+                }
+                const { data, error } = resMat;
                 if (!error && Array.isArray(data) && data.length > 0) {
                     this.materiaisContratoCache = data;
                     try { localStorage.setItem('os_cached_materiais_raw', JSON.stringify(data)); } catch(e){}
@@ -829,14 +857,20 @@ class RelatorioController {
         nomeClean = nomeClean.replace(/^["'\s]+|["'\s]+$/g, '').trim();
         nomeClean = nomeClean.replace(/\s*\((UN|M|H|KG|PC|PÇ|CJ|JG)\)$/i, '').trim();
 
-        // Se for mão de obra de sessão de praça
-        if (nomeClean.toUpperCase().includes('ELETRICISTA')) {
+        const cleanNormUpper = nomeClean.toUpperCase();
+        // Se for exatamente mão de obra de eletricista (ex: "ELETRICISTA COM ENCARGOS COMPLEMENTARES", "HORA DE ELETRICISTA", etc.)
+        // e NÃO for serviço viário padrão ("Serviço de manutenção em iluminação pública viaria... incluindo eletricista...")
+        const isServicoViario = cleanNormUpper.includes('SERVICO') || cleanNormUpper.includes('SERVIÇO') || cleanNormUpper.includes('PONTO DE REPARO') || cleanNormUpper.includes('PONTO DE TROCA');
+        if (cleanNormUpper.includes('ELETRICISTA') && !isServicoViario) {
             let precoUnit = 0;
             let precoBdi = 0;
             if (this.materiaisContratoCache && this.materiaisContratoCache.length > 0) {
                 const rowEl = this.materiaisContratoCache.find(r => {
                     const desc = (r['Material/Serviço'] || r.descricao || r.material || '').toUpperCase();
-                    return desc.includes('ELETRICISTA');
+                    return desc.includes('ELETRICISTA COM ENCARGOS');
+                }) || this.materiaisContratoCache.find(r => {
+                    const desc = (r['Material/Serviço'] || r.descricao || r.material || '').toUpperCase();
+                    return desc.includes('ELETRICISTA') && !desc.includes('SERVIÇO') && !desc.includes('SERVICO');
                 });
                 if (rowEl) {
                     precoUnit = Number(rowEl.valor_unitario) || 0;
@@ -1006,7 +1040,8 @@ class RelatorioController {
             });
 
             // B) SESSÕES DE PRAÇA PÚBLICA -> HORA DE ELETRICISTA (materiais_contrato)
-            const sessoes = item.sessoesList || [];
+            const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
+            const sessoes = isPraca ? (item.sessoesList || []) : [];
             sessoes.forEach(sess => {
                 let durMin = sess.duracao_minutos;
                 if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
@@ -1430,7 +1465,8 @@ class RelatorioController {
             });
 
             // B) SESSÕES DE PRAÇA PÚBLICA -> HORA DE ELETRICISTA
-            const sessoes = item.sessoesList || [];
+            const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
+            const sessoes = isPraca ? (item.sessoesList || []) : [];
             sessoes.forEach(sess => {
                 let durMin = sess.duracao_minutos;
                 if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {

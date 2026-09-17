@@ -23,7 +23,141 @@ class ChamadosRepository {
     clearCache() {
         try {
             sessionStorage.removeItem('chamados_repo_cache_v1');
+            sessionStorage.removeItem('chamados_repo_meta_v1');
         } catch (e) {}
+    }
+
+    /**
+     * Colunas da View vw_todas_ordens_servico (schema real verificado no Supabase)
+     */
+    static get COLUNAS_VIEW() {
+        return [
+            'id', 'protocolo', 'status', 'prioridade', 'telefone_fixo', 'telefone_celular',
+            'quantidade', 'descricao', 'materiais', 'data_abertura', 'data_fechamento',
+            'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
+            'operador', 'status_auditoria', 'data_conclusao_auditoria', 'pontos_inicial',
+            'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
+            'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
+            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas', 'historico_sessoes',
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os'
+        ].join(',');
+    }
+
+    /**
+     * Colunas da Tabela ordens_servico (fallback quando a view não responde)
+     */
+    static get COLUNAS_TABELA_OS() {
+        return [
+            'id', 'protocolo', 'status', 'prioridade', 'telefone_fixo', 'telefone_celular',
+            'quantidade', 'descricao', 'materiais', 'data_abertura', 'data_fechamento',
+            'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
+            'operador', 'status_auditoria', 'data_conclusao_auditoria', 'pontos_inicial',
+            'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
+            'glosas'
+        ].join(',');
+    }
+
+    /**
+     * Mantém compatibilidade com chamadas externas legadas que acessem COLUNAS_LISTA
+     */
+    static get COLUNAS_LISTA() {
+        return ChamadosRepository.COLUNAS_VIEW;
+    }
+
+    /**
+     * Checagem leve de "Heartbeat" (Last-Modified) para evitar download desnecessário de dados.
+     * Retorna os dados em cache se o banco não tiver registros alterados/criados mais recentes.
+     */
+    async verificarHeartbeatCache(client, cacheKeyData, cacheKeyMeta) {
+        try {
+            const cachedDataRaw = sessionStorage.getItem(cacheKeyData);
+            const cachedMetaRaw = sessionStorage.getItem(cacheKeyMeta);
+
+            if (!cachedDataRaw || !cachedMetaRaw) return null;
+
+            const cachedMeta = JSON.parse(cachedMetaRaw);
+            if (!cachedMeta || !cachedMeta.lastTimestamp) return null;
+
+            // Tenta consultar a coluna mais apropriada de ordenação temporal (updated_at ou data_abertura)
+            let hbRes = await client
+                .from(this.viewName)
+                .select('data_abertura')
+                .order('data_abertura', { ascending: false })
+                .limit(1);
+
+            if (hbRes.error || !hbRes.data || hbRes.data.length === 0) {
+                hbRes = await client
+                    .from(this.primaryTable)
+                    .select('data_abertura')
+                    .order('data_abertura', { ascending: false })
+                    .limit(1);
+            }
+
+            if (!hbRes.error && hbRes.data && hbRes.data.length > 0) {
+                const latestDbTimestamp = hbRes.data[0].data_abertura || hbRes.data[0].updated_at || null;
+                if (latestDbTimestamp && latestDbTimestamp === cachedMeta.lastTimestamp) {
+                    console.log(`⚡ [ChamadosRepository Heartbeat Hit] Nenhuma OS nova/alterada detectada. Reutilizando cache local.`);
+                    const parsedData = JSON.parse(cachedDataRaw);
+                    if (Array.isArray(parsedData) && parsedData.length > 0) {
+                        return parsedData;
+                    }
+                }
+            }
+        } catch (errHb) {
+            console.warn('⚠️ [ChamadosRepository] Falha ao verificar heartbeat de cache:', errHb);
+        }
+        return null;
+    }
+
+    /**
+     * Carrega fechamentos_os fatiados em lotes de até 50 protocolos (previne HTTP 414 e drena menos egress)
+     */
+    async carregarFechamentosFatiados(client, dataRows) {
+        if (!dataRows || dataRows.length === 0) return;
+
+        try {
+            // Extrai protocolos únicos preservando case exato do banco
+            const protocolosVisiveis = Array.from(
+                new Set(dataRows.map(r => r.protocolo).filter(p => p !== null && p !== undefined && String(p).trim() !== ''))
+            );
+
+            if (protocolosVisiveis.length === 0) return;
+
+            const CHUNK_SIZE = 50;
+            const chunks = [];
+            for (let i = 0; i < protocolosVisiveis.length; i += CHUNK_SIZE) {
+                chunks.push(protocolosVisiveis.slice(i, i + CHUNK_SIZE));
+            }
+
+            const COLUNAS_FECHAMENTO = 'id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at';
+
+            const promessas = chunks.map(chunk =>
+                client
+                    .from('fechamentos_os')
+                    .select(COLUNAS_FECHAMENTO)
+                    .in('protocolo', chunk)
+                    .order('numero_fechamento', { ascending: true })
+            );
+
+            const resultados = await Promise.all(promessas);
+            const todosFechamentos = resultados.flatMap(res => (!res.error && res.data) ? res.data : []);
+
+            if (todosFechamentos.length > 0) {
+                const fechMap = new Map();
+                todosFechamentos.forEach(f => {
+                    const protKey = String(f.protocolo).trim();
+                    if (!fechMap.has(protKey)) fechMap.set(protKey, []);
+                    fechMap.get(protKey).push(f);
+                });
+
+                dataRows.forEach(row => {
+                    const protKey = row.protocolo ? String(row.protocolo).trim() : null;
+                    row.fechamentos_os = (protKey && fechMap.has(protKey)) ? fechMap.get(protKey) : [];
+                });
+            }
+        } catch (eFech) {
+            console.warn('⚠️ [ChamadosRepository] Falha ao carregar fechamentos_os fatiado:', eFech);
+        }
     }
 
     /**
@@ -32,26 +166,26 @@ class ChamadosRepository {
      */
     async fetchAllChamados(forceRefresh = false) {
         const CACHE_KEY = 'chamados_repo_cache_v1';
+        const CACHE_META_KEY = 'chamados_repo_meta_v1';
         const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
 
+        const client = this.getClient();
+
+        // 1. Verificação de Cache Local com Heartbeat ultraleve
         if (!forceRefresh) {
             try {
-                const cachedRaw = sessionStorage.getItem(CACHE_KEY);
-                if (cachedRaw) {
-                    const parsed = JSON.parse(cachedRaw);
-                    if (parsed && (Date.now() - parsed.timestamp < CACHE_TTL_MS) && Array.isArray(parsed.data) && parsed.data.length > 0) {
-                        console.log(`⚡ [ChamadosRepository] Retornando ${parsed.data.length} registros do cache de sessão (sessionStorage)`);
-                        return parsed.data.map((row) => {
-                            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
-                            if (ModelClass && typeof ModelClass.fromRow === 'function') {
-                                return ModelClass.fromRow(row);
-                            }
-                            if (ModelClass && typeof ModelClass === 'function') {
-                                return new ModelClass(row);
-                            }
-                            return row;
-                        });
-                    }
+                const dadosEmCache = await this.verificarHeartbeatCache(client, CACHE_KEY, CACHE_META_KEY);
+                if (dadosEmCache && dadosEmCache.length > 0) {
+                    return dadosEmCache.map((row) => {
+                        const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+                        if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                            return ModelClass.fromRow(row);
+                        }
+                        if (ModelClass && typeof ModelClass === 'function') {
+                            return new ModelClass(row);
+                        }
+                        return row;
+                    });
                 }
             } catch (errCache) {
                 console.warn('⚠️ [ChamadosRepository] Erro ao ler cache de sessão:', errCache);
@@ -59,19 +193,30 @@ class ChamadosRepository {
         }
 
         try {
-            const client = this.getClient();
+            // Janela temporal padrão: últimos 45 dias ou OSs não concluídas
+            const dataCorte = new Date();
+            dataCorte.setDate(dataCorte.getDate() - 45);
+            const dataCorteIso = dataCorte.toISOString();
 
-            // 1. Tenta consultar a view unificada de 2 tabelas
-            let { data, error } = await client
+            const colunasView = ChamadosRepository.COLUNAS_VIEW;
+            const colunasTabela = ChamadosRepository.COLUNAS_TABELA_OS;
+            const filtroOrTemporal = `data_abertura.gte.${dataCorteIso},status.neq.Concluída,status.neq.Concluida`;
+
+            // 1. Tenta consultar a view unificada com projeção restrita e corte temporal
+            let query = client
                 .from(this.viewName)
-                .select('*')
+                .select(colunasView)
+                .or(filtroOrTemporal)
                 .order('data_abertura', { ascending: true });
 
+            let { data, error } = await query;
+
             if (error || !data || data.length === 0) {
-                // 2. Fallback: consulta direta em ordens_servico
+                // 2. Fallback: consulta direta em ordens_servico (utilizando colunas existentes na tabela)
                 const resPrimary = await client
                     .from(this.primaryTable)
-                    .select('*')
+                    .select(colunasTabela)
+                    .or(filtroOrTemporal)
                     .order('data_abertura', { ascending: true });
 
                 if (!resPrimary.error && resPrimary.data && resPrimary.data.length > 0) {
@@ -80,7 +225,8 @@ class ChamadosRepository {
                     // 3. Fallback legado: consulta em chamados
                     const resLegacy = await client
                         .from(this.legacyTable)
-                        .select('*')
+                        .select(colunasTabela)
+                        .or(filtroOrTemporal)
                         .order('data_abertura', { ascending: true });
                     data = resLegacy.data || [];
                 }
@@ -115,44 +261,81 @@ class ChamadosRepository {
                 }
             }
 
-            // Carrega todos os fechamentos complementares para associar às OSs
-            if (data && data.length > 0) {
+            // Se a view unificada não projetar a coluna glosas (undefined),
+            // consulta ordens_servico e ordens_servico_pracas para enriquecer os registros.
+            if (data && data.length > 0 && data[0].glosas === undefined) {
+                console.warn('⚠️ [ChamadosRepository] A view vw_todas_ordens_servico não possui a coluna glosas. Consultando tabelas diretas para enriquecer...');
                 try {
-                    const { data: fechamentosData, error: fechErr } = await client
-                        .from('fechamentos_os')
-                        .select('*')
-                        .order('numero_fechamento', { ascending: true });
+                    const resGlosasOS = await client
+                        .from(this.primaryTable)
+                        .select('protocolo, id, glosas');
+                    
+                    const mapGlosasByProt = new Map();
+                    const mapGlosasById = new Map();
 
-                    if (!fechErr && fechamentosData && fechamentosData.length > 0) {
-                        const fechMap = new Map();
-                        fechamentosData.forEach(f => {
-                            const protKey = f.protocolo ? String(f.protocolo).toUpperCase().trim() : null;
-                            if (protKey) {
-                                if (!fechMap.has(protKey)) fechMap.set(protKey, []);
-                                fechMap.get(protKey).push(f);
+                    if (resGlosasOS.data && resGlosasOS.data.length > 0) {
+                        resGlosasOS.data.forEach(r => {
+                            if (r.glosas) {
+                                if (r.protocolo) mapGlosasByProt.set(String(r.protocolo).toUpperCase().trim(), r.glosas);
+                                if (r.id) mapGlosasById.set(String(r.id), r.glosas);
                             }
                         });
-
-                        data.forEach(row => {
-                            const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
-                            row.fechamentos_os = (protKey && fechMap.has(protKey)) ? fechMap.get(protKey) : [];
-                        });
                     }
-                } catch(eFech) {
-                    console.warn('⚠️ [ChamadosRepository] Não foi possível carregar fechamentos_os:', eFech);
+
+                    try {
+                        const resGlosasPracas = await client
+                            .from('ordens_servico_pracas')
+                            .select('protocolo, id, glosas');
+                        if (resGlosasPracas.data && resGlosasPracas.data.length > 0) {
+                            resGlosasPracas.data.forEach(r => {
+                                if (r.glosas) {
+                                    if (r.protocolo) mapGlosasByProt.set(String(r.protocolo).toUpperCase().trim(), r.glosas);
+                                    if (r.id) mapGlosasById.set(String(r.id), r.glosas);
+                                }
+                            });
+                        }
+                    } catch(ePracas) {
+                        // ordens_servico_pracas pode não existir ou não ter a coluna ainda
+                    }
+
+                    data.forEach(row => {
+                        const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
+                        const idKey = row.id ? String(row.id) : null;
+                        const g = (protKey && mapGlosasByProt.has(protKey)) 
+                            ? mapGlosasByProt.get(protKey) 
+                            : (idKey && mapGlosasById.has(idKey) ? mapGlosasById.get(idKey) : []);
+                        row.glosas = g || [];
+                    });
+                } catch(eGlosas) {
+                    console.error('⚠️ Erro ao mesclar glosas na view:', eGlosas);
                 }
+            }
+
+            // Carrega fechamentos complementares fatiados em chunks de 50 para associar às OSs
+            if (data && data.length > 0) {
+                await this.carregarFechamentosFatiados(client, data);
             }
 
             console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
 
+            // Persistência em cache com timestamp do registro mais recente para Heartbeat
             if (data && data.length > 0) {
                 try {
-                    sessionStorage.setItem(CACHE_KEY, JSON.stringify({
+                    let maxTimestamp = null;
+                    for (const r of data) {
+                        const ts = r.data_abertura || r.updated_at;
+                        if (ts && (!maxTimestamp || ts > maxTimestamp)) {
+                            maxTimestamp = ts;
+                        }
+                    }
+
+                    sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+                    sessionStorage.setItem(CACHE_META_KEY, JSON.stringify({
                         timestamp: Date.now(),
-                        data: data
+                        lastTimestamp: maxTimestamp
                     }));
                 } catch (eSave) {
-                    console.warn('⚠️ [ChamadosRepository] Não foi possível salvar no sessionStorage:', eSave);
+                    console.warn('⚠️ [ChamadosRepository] QuotaExceededError ou falha ao salvar cache no sessionStorage:', eSave);
                 }
             }
             
@@ -180,10 +363,20 @@ class ChamadosRepository {
         try {
             const client = this.getClient();
 
+            // Janela temporal padrão para auditoria: últimos 45 dias ou OSs não concluídas
+            const dataCorte = new Date();
+            dataCorte.setDate(dataCorte.getDate() - 45);
+            const dataCorteIso = dataCorte.toISOString();
+
+            const colunasView = ChamadosRepository.COLUNAS_VIEW;
+            const colunasTabela = ChamadosRepository.COLUNAS_TABELA_OS;
+            const filtroOrTemporal = `data_abertura.gte.${dataCorteIso},status.neq.Concluída,status.neq.Concluida`;
+
             let data = null;
             const resView = await client
                 .from(this.viewName)
-                .select('*')
+                .select(colunasView)
+                .or(filtroOrTemporal)
                 .order('data_abertura', { ascending: false });
 
             if (!resView.error && resView.data && resView.data.length > 0) {
@@ -191,7 +384,8 @@ class ChamadosRepository {
             } else {
                 const resPrimary = await client
                     .from(this.primaryTable)
-                    .select('*')
+                    .select(colunasTabela)
+                    .or(filtroOrTemporal)
                     .order('data_abertura', { ascending: false });
                 data = resPrimary.data || [];
             }
@@ -200,7 +394,7 @@ class ChamadosRepository {
             try {
                 const { data: auditData, error: auditError } = await client
                     .from('vw_auditoria_chamados')
-                    .select('*');
+                    .select('id, protocolo, status_auditoria, motivo_aprovacao, motivo_pendencia, data_conclusao_auditoria');
 
                 if (!auditError && auditData) {
                     auditData.forEach(row => {
@@ -209,32 +403,56 @@ class ChamadosRepository {
                 }
             } catch (vErr) {}
 
-            // Carrega todos os fechamentos complementares para associar às OSs de Auditoria (fotos, relatórios e materiais)
-            if (data && data.length > 0) {
+            // Se a view unificada não projetar a coluna glosas (undefined),
+            // consulta ordens_servico e ordens_servico_pracas para enriquecer os registros em auditoria.
+            if (data && data.length > 0 && data[0].glosas === undefined) {
                 try {
-                    const { data: fechamentosData, error: fechErr } = await client
-                        .from('fechamentos_os')
-                        .select('*')
-                        .order('numero_fechamento', { ascending: true });
+                    const resGlosasOS = await client
+                        .from(this.primaryTable)
+                        .select('protocolo, id, glosas');
+                    
+                    const mapGlosasByProt = new Map();
+                    const mapGlosasById = new Map();
 
-                    if (!fechErr && fechamentosData && fechamentosData.length > 0) {
-                        const fechMap = new Map();
-                        fechamentosData.forEach(f => {
-                            const protKey = f.protocolo ? String(f.protocolo).toUpperCase().trim() : null;
-                            if (protKey) {
-                                if (!fechMap.has(protKey)) fechMap.set(protKey, []);
-                                fechMap.get(protKey).push(f);
+                    if (resGlosasOS.data && resGlosasOS.data.length > 0) {
+                        resGlosasOS.data.forEach(r => {
+                            if (r.glosas) {
+                                if (r.protocolo) mapGlosasByProt.set(String(r.protocolo).toUpperCase().trim(), r.glosas);
+                                if (r.id) mapGlosasById.set(String(r.id), r.glosas);
                             }
                         });
-
-                        data.forEach(row => {
-                            const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
-                            row.fechamentos_os = (protKey && fechMap.has(protKey)) ? fechMap.get(protKey) : [];
-                        });
                     }
-                } catch(eFech) {
-                    console.warn('⚠️ [ChamadosRepository] Não foi possível carregar fechamentos_os para Auditoria:', eFech);
+
+                    try {
+                        const resGlosasPracas = await client
+                            .from('ordens_servico_pracas')
+                            .select('protocolo, id, glosas');
+                        if (resGlosasPracas.data && resGlosasPracas.data.length > 0) {
+                            resGlosasPracas.data.forEach(r => {
+                                if (r.glosas) {
+                                    if (r.protocolo) mapGlosasByProt.set(String(r.protocolo).toUpperCase().trim(), r.glosas);
+                                    if (r.id) mapGlosasById.set(String(r.id), r.glosas);
+                                }
+                            });
+                        }
+                    } catch(ePracas) {}
+
+                    data.forEach(row => {
+                        const protKey = row.protocolo ? String(row.protocolo).toUpperCase().trim() : null;
+                        const idKey = row.id ? String(row.id) : null;
+                        const g = (protKey && mapGlosasByProt.has(protKey)) 
+                            ? mapGlosasByProt.get(protKey) 
+                            : (idKey && mapGlosasById.has(idKey) ? mapGlosasById.get(idKey) : []);
+                        row.glosas = g || [];
+                    });
+                } catch(eGlosas) {
+                    console.error('⚠️ Erro ao mesclar glosas na auditoria:', eGlosas);
                 }
+            }
+
+            // Carrega fechamentos fatiados em chunks de 50 para as OSs da Auditoria
+            if (data && data.length > 0) {
+                await this.carregarFechamentosFatiados(client, data);
             }
 
             return (data || []).map(row => {
@@ -291,7 +509,7 @@ class ChamadosRepository {
                     .from(tableName)
                     .update(currentPayload)
                     .eq(field, val)
-                    .select();
+                    .select('id, protocolo, status, data_conclusao, data_fechamento');
 
                 // Caso ocorra erro de coluna inexistente no schema do Supabase, remove a coluna e tenta novamente
                 while (res.error && res.error.message && res.error.message.includes("Could not find the")) {
@@ -304,7 +522,7 @@ class ChamadosRepository {
                             .from(tableName)
                             .update(currentPayload)
                             .eq(field, val)
-                            .select();
+                            .select('id, protocolo, status, data_conclusao, data_fechamento');
                     } else {
                         break;
                     }
@@ -477,9 +695,9 @@ class ChamadosRepository {
     }
 
     /**
-     * Updates status_auditoria and data_conclusao_auditoria for a chamado by ID
+     * Updates status_auditoria and data_conclusao_auditoria for a chamado by ID or Protocolo
      */
-    async updateStatusAuditoria(id, newStatusAuditoria) {
+    async updateStatusAuditoria(idOrProtocol, newStatusAuditoria) {
         try {
             const client = this.getClient();
             const isConcluded = newStatusAuditoria === 'Concluída' || newStatusAuditoria === 'Concluida';
@@ -488,38 +706,57 @@ class ChamadosRepository {
                 data_conclusao_auditoria: isConcluded ? new Date().toISOString() : null
             };
 
-            const tablesToTry = [this.primaryTable, this.pracasTable];
+            const strVal = String(idOrProtocol || '').replace(/^#/, '').trim();
+            const isPraca = strVal.toUpperCase().startsWith('P');
+            const isNumeric = /^\d+$/.test(strVal);
+
+            const tablesToTry = isPraca 
+                ? [this.pracasTable, this.primaryTable] 
+                : [this.primaryTable, this.pracasTable];
+
+            const fieldsToTry = isNumeric ? ['id', 'protocolo'] : ['protocolo', 'id'];
+
             let updatedData = null;
 
             for (const tableName of tablesToTry) {
-                let res = await client
-                    .from(tableName)
-                    .update(updatePayload)
-                    .eq('id', id)
-                    .select();
-
-                if (res.data && res.data.length > 0) {
-                    updatedData = res.data;
-                    break;
-                } else if (res.error) {
-                    // Fallback attempt: if column status_auditoria doesn't exist, try updating auditoria_concluida boolean
+                for (const field of fieldsToTry) {
                     try {
-                        const fallbackRes = await client
+                        let res = await client
                             .from(tableName)
-                            .update({ auditoria_concluida: isConcluded })
-                            .eq('id', id)
+                            .update(updatePayload)
+                            .eq(field, isNumeric && field === 'id' ? parseInt(strVal, 10) : strVal)
                             .select();
-                        if (fallbackRes.data && fallbackRes.data.length > 0) {
-                            updatedData = fallbackRes.data;
+
+                        if (res.data && res.data.length > 0) {
+                            updatedData = res.data;
                             break;
+                        } else if (res.error) {
+                            // Fallback: tenta sem data_conclusao_auditoria caso não exista a coluna
+                            try {
+                                const fallbackRes = await client
+                                    .from(tableName)
+                                    .update({ status_auditoria: newStatusAuditoria })
+                                    .eq(field, isNumeric && field === 'id' ? parseInt(strVal, 10) : strVal)
+                                    .select();
+                                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                                    updatedData = fallbackRes.data;
+                                    break;
+                                }
+                            } catch (eFallback) {}
                         }
-                    } catch (fallbackErr) {}
+                    } catch (errField) {
+                        // Ignora erro de sintaxe de tipo (ex: casting de texto para bigint) e tenta o próximo campo
+                    }
                 }
+                if (updatedData && updatedData.length > 0) break;
             }
+
+            // Invalida cache de sessão para garantir sincronia nas próximas leituras
+            this.clearCache();
 
             if (updatedData && updatedData.length > 0 && window.LogsRepository) {
                 const rec = updatedData[0];
-                const prot = rec.protocolo || id;
+                const prot = rec.protocolo || strVal;
                 window.LogsRepository.registrarLog({
                     protocolo: prot,
                     tabelaOrigem: rec.praca_nome ? this.pracasTable : this.primaryTable,
@@ -530,7 +767,7 @@ class ChamadosRepository {
                 }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de auditoria:', err));
             }
 
-            console.log(`✅ [ChamadosRepository] Status de Auditoria da OS ${id} atualizado para "${newStatusAuditoria}".`);
+            console.log(`✅ [ChamadosRepository] Status de Auditoria da OS ${strVal} atualizado para "${newStatusAuditoria}".`);
             return updatedData;
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateStatusAuditoria:', err);
@@ -736,7 +973,7 @@ class ChamadosRepository {
                             .from(tableName)
                             .update(currentPayload)
                             .eq(field, protStr)
-                            .select();
+                            .select('id, protocolo');
 
                         while (res.error && res.error.message && res.error.message.includes("Could not find the")) {
                             const match = res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
@@ -748,7 +985,7 @@ class ChamadosRepository {
                                     .from(tableName)
                                     .update(currentPayload)
                                     .eq(field, protStr)
-                                    .select();
+                                    .select('id, protocolo');
                             } else {
                                 break;
                             }

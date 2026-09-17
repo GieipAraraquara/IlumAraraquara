@@ -230,7 +230,7 @@ window.AuthGuard = {
         try { window.dispatchEvent(new CustomEvent('auth-ready', { detail: authData })); } catch(e) {}
 
         const currentPageName = this.getCurrentPageName(targetUrl);
-        const adminPageNames = ['painel', 'auditoria', 'mapa', 'relatorios', 'configuracoes', 'admin'];
+        const adminPageNames = ['painel', 'auditoria', 'mapa', 'relatorios', 'medicao', 'configuracoes', 'admin'];
         const campoPageNames = ['finalizar', 'finalizaros', 'painel - manutentor', 'painel-manutentor'];
         const aberturaPageNames = ['abrir', 'popup abertura', 'popup_abertura', 'popupabertura'];
         const protectedPageNames = [...adminPageNames, ...campoPageNames, ...aberturaPageNames];
@@ -284,10 +284,10 @@ window.AuthGuard = {
             return null;
         }
 
-        // 5. Validação para Agentes de Manutenção (Manutentor): Acesso a Painel-Manutentor.html, Mapa.html, Finalizar.html e Relatorio.html
-        const manutentorAllowedPages = ['painel-manutentor', 'painel - manutentor', 'mapa', 'finalizar', 'finalizaros', 'relatorio', 'relatorios'];
+        // 5. Validação para Agentes de Manutenção (Manutentor): Acesso a Painel-Manutentor.html, Mapa.html, Finalizar.html, Relatorio.html e Medicao.html
+        const manutentorAllowedPages = ['painel-manutentor', 'painel - manutentor', 'mapa', 'finalizar', 'finalizaros', 'relatorio', 'relatorios', 'medicao'];
         if (isManutentor && isProtectedPage && !manutentorAllowedPages.includes(currentPageName)) {
-            console.warn('⛔ [AuthGuard] Acesso negado: Agentes de Manutenção possuem acesso apenas a Painel Manutentor, Mapa e Finalizar OS. Redirecionando para Painel-Manutentor.html.');
+            console.warn('⛔ [AuthGuard] Acesso negado: Agentes de Manutenção possuem acesso apenas a Painel Manutentor, Mapa, Finalizar OS e Medição. Redirecionando para Painel-Manutentor.html.');
             try { if (document.documentElement) document.documentElement.style.display = 'none'; } catch(e) {}
             window.location.href = 'Painel-Manutentor.html';
             return null;

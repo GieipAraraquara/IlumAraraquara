@@ -22,7 +22,8 @@
     <script src="js/services/ChamadosService.js?v=30"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
-    <script src="js/controllers/PainelController.js?v=33"></script>
+    <script src="js/services/MedicaoService.js?v=2"></script>
+    <script src="js/controllers/PainelController.js?v=35"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -1063,7 +1064,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false, showCancelBtn = true }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1071,6 +1072,7 @@
         const modalTitle = document.getElementById('modal-title');
         const modalMessage = document.getElementById('modal-message');
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+        const modalCancelBtn = modalBox ? modalBox.querySelector('button[onclick="closeConfirmModal()"]') : null;
         const modalJustificationInput = document.getElementById('modal-justification-input');
         const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
 
@@ -1083,6 +1085,14 @@
         if (modalConfirmBtn) {
             modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
             modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        }
+
+        if (modalCancelBtn) {
+            if (showCancelBtn === false) {
+                modalCancelBtn.classList.add('hidden');
+            } else {
+                modalCancelBtn.classList.remove('hidden');
+            }
         }
 
         if (justificationContainer) {
@@ -1809,7 +1819,7 @@
 
         window.activeProtocolPrefix = '';
 
-        function checkRowMatchesFilters(row, currentPrefix) {
+        function checkRowMatchesFilters(row, currentPrefix, isPendentesTable = false) {
             // 1. Date Filter (Col 1)
             if (activeDatePredicate) {
                 const dateStr = row.cells[1]?.textContent.trim() || '';
@@ -1832,8 +1842,8 @@
                 return false;
             }
 
-            // 3. Status Filter
-            if (activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+            // 3. Status Filter (Aplica-se apenas à tabela de Ordens de Serviço Recentes)
+            if (!isPendentesTable && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
                 const statusBadge = row.querySelector('.status-badge');
                 const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
                 if (!activeStatusFilter.includes(rowStatus)) {
@@ -1865,7 +1875,7 @@
             const mainRows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
             let visibleMainCount = 0;
             mainRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix);
+                const showRow = checkRowMatchesFilters(row, currentPrefix, false);
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visibleMainCount++;
             });
@@ -1874,7 +1884,7 @@
             const pendentesRows = document.querySelectorAll('#pendentes-os-table tbody tr:not(#no-pendentes-results)');
             let visiblePendentesCount = 0;
             pendentesRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix);
+                const showRow = checkRowMatchesFilters(row, currentPrefix, true);
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visiblePendentesCount++;
             });

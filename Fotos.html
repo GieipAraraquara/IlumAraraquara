@@ -1955,7 +1955,7 @@
 
         window.activeProtocolPrefix = '';
 
-        function checkRowMatchesFilters(row, currentPrefix) {
+        function checkRowMatchesFilters(row, currentPrefix, isPendentesTable = false) {
             // 1. Date Filter (Col 1)
             if (activeDatePredicate) {
                 const dateStr = row.cells[1]?.textContent.trim() || '';
@@ -1978,8 +1978,8 @@
                 return false;
             }
 
-            // 3. Status Filter
-            if (activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+            // 3. Status Filter (Aplica-se apenas à tabela de Ordens de Serviço Recentes)
+            if (!isPendentesTable && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
                 const statusBadge = row.querySelector('.status-badge');
                 const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
                 if (!activeStatusFilter.includes(rowStatus)) {
@@ -2011,7 +2011,7 @@
             const mainRows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
             let visibleMainCount = 0;
             mainRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix);
+                const showRow = checkRowMatchesFilters(row, currentPrefix, false);
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visibleMainCount++;
             });
@@ -2020,7 +2020,7 @@
             const pendentesRows = document.querySelectorAll('#pendentes-os-table tbody tr:not(#no-pendentes-results)');
             let visiblePendentesCount = 0;
             pendentesRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix);
+                const showRow = checkRowMatchesFilters(row, currentPrefix, true);
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visiblePendentesCount++;
             });

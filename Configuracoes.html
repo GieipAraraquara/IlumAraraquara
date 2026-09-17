@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Configurações do Sistema - Luz Araraquara</title>
+    
+    <!-- Favicon & PWA Icons -->
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <link rel="manifest" href="manifest.json?v=2" />
+    <meta name="theme-color" content="#1a73e8" />
+    
+    <!-- Scripts & Clean Architecture Layers -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="js/config/supabaseClient.js"></script>
+    <script src="js/guards/authGuard.js?v=31"></script>
+    <script src="js/services/ConfiguracoesService.js?v=1"></script>
+    <script src="js/services/MedicaoService.js?v=1"></script>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="sidebar.js"></script>
+    <script src="header.js"></script>
+    
+    <!-- Fonts & Icons -->
+    <link rel="stylesheet" href="fonts/material-symbols.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "background": "#fcf8fa",
+                        "on-primary-fixed": "#131b2e",
+                        "error": "#ba1a1a",
+                        "surface-bright": "#fcf8fa",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "on-surface": "#1b1b1d",
+                        "primary": "#000000",
+                        "outline": "#76777d",
+                        "on-background": "#1b1b1d",
+                        "on-tertiary-container": "#75859d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-tertiary": "#ffffff",
+                        "surface-dim": "#dcd9db",
+                        "primary-container": "#131b2e",
+                        "surface-tint": "#565e74",
+                        "on-secondary": "#ffffff",
+                        "inverse-surface": "#303032",
+                        "on-error": "#ffffff",
+                        "secondary-container": "#316bf3",
+                        "inverse-on-surface": "#f3f0f2",
+                        "surface-container-high": "#eae7e9",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "surface-container": "#f0edef",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "surface": "#fcf8fa",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "outline-variant": "#c6c6cd",
+                        "surface-container-highest": "#e4e2e4",
+                        "tertiary-fixed": "#d3e4fe",
+                        "primary-fixed": "#dae2fd",
+                        "on-secondary-fixed-variant": "#003ea8",
+                        "on-secondary-fixed": "#00174b",
+                        "on-primary-container": "#7c839b",
+                        "secondary-fixed": "#dbe1ff",
+                        "on-secondary-container": "#fefcff",
+                        "surface-variant": "#e4e2e4",
+                        "error-container": "#ffdad6",
+                        "secondary-fixed-dim": "#b4c5ff",
+                        "inverse-primary": "#bec6e0",
+                        "tertiary-container": "#0b1c30",
+                        "on-primary": "#ffffff",
+                        "surface-container-low": "#f6f3f5",
+                        "on-surface-variant": "#45464d",
+                        "secondary": "#0051d5",
+                        "tertiary": "#000000"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "max-width-content": "1440px",
+                        "container-padding": "24px",
+                        "sidebar-width": "260px",
+                        "card-gap": "20px",
+                        "gutter": "16px"
+                    },
+                    "fontFamily": {
+                        "headline-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-md": ["Inter"],
+                        "data-tabular": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "label-sm": ["Inter"],
+                        "headline-sm": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
+                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
+                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
+                    },
+                    "animation": {
+                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
+                    },
+                    "keyframes": {
+                        "fadeInUp": {
+                            "0%": { opacity: "0", transform: "translateY(20px)" },
+                            "100%": { opacity: "1", transform: "translateY(0)" }
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        html, body {
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+        }
+        #main-content {
+            overflow-x: hidden !important;
+        }
+        /* Sidebar collapse mechanics idêntico ao Painel e Auditoria */
+        .sidebar-collapsed #sidebar { width: 80px; }
+        .sidebar-collapsed #top-header { width: calc(100% - 80px); left: 80px; margin-left: 0; }
+        .sidebar-collapsed #main-content { margin-left: 80px; width: calc(100% - 80px); }
+        .sidebar-collapsed .sidebar-text { display: none; }
+        .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
+        .sidebar-collapsed .sidebar-profile-info { display: none; }
+
+        .tab-btn.active {
+            color: #0051d5;
+            border-bottom: 2px solid #0051d5;
+            background-color: rgba(0, 81, 213, 0.04);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased min-h-screen sidebar-collapsed">
+
+    <!-- Componente Menu Lateral -->
+    <app-sidebar active="configuracoes"></app-sidebar>
+
+    <!-- Componente Cabeçalho Superior -->
+    <app-header placeholder="Buscar configurações..."></app-header>
+
+    <!-- Conteúdo Principal com espaçamentos sincronizados com o header e sidebar -->
+    <main class="ml-[260px] mt-16 p-container-padding min-h-[calc(100vh-64px)] w-[calc(100%-260px)] transition-all duration-300 relative z-0 pb-28 box-border" id="main-content">
+        
+        <div class="max-w-6xl mx-auto w-full">
+            <!-- Header da Página -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <div class="flex items-center gap-2 text-on-surface-variant text-sm mb-1">
+                        <span class="material-symbols-outlined text-sm">settings</span>
+                        <span>Administração</span>
+                        <span>/</span>
+                        <span class="text-on-surface font-medium">Configurações Gerais</span>
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight text-on-surface">Configurações & Diretrizes</h1>
+                    <p class="text-on-surface-variant text-sm mt-1">Defina os parâmetros contratuais de SLA, prazos de atendimento, regras operacionais e alertas do sistema.</p>
+                </div>
+
+                <!-- Botões de Ação Principais -->
+                <div class="flex items-center gap-3 w-full sm:w-auto">
+                    <button type="button" onclick="restaurarPadroes()" class="flex-1 sm:flex-initial px-4 py-2.5 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface font-semibold text-sm hover:bg-surface-container-high transition flex items-center justify-center gap-2 shadow-sm cursor-pointer">
+                        <span class="material-symbols-outlined text-lg">restart_alt</span>
+                        Restaurar Padrões
+                    </button>
+                    <button type="button" id="btn-salvar" onclick="salvarConfiguracoesForm()" class="flex-1 sm:flex-initial px-5 py-2.5 rounded-xl bg-secondary text-white font-semibold text-sm hover:bg-blue-700 transition flex items-center justify-center gap-2 shadow-sm cursor-pointer active:scale-95">
+                        <span class="material-symbols-outlined text-lg" id="icon-salvar">save</span>
+                        <span id="label-salvar">Salvar Alterações</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Alerta Informativo -->
+            <div id="aviso-sql" class="hidden mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-amber-900 flex items-start gap-3">
+                <span class="material-symbols-outlined text-amber-600 mt-0.5">info</span>
+                <div class="text-sm">
+                    <strong class="font-semibold">Tabela Supabase:</strong> 
+                    Caso ainda não tenha executado o script no Supabase, execute o arquivo <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono font-bold">supabase_configuracoes.sql</code> no SQL Editor.
+                </div>
+            </div>
+
+            <!-- Abas de Navegação -->
+            <div class="flex border-b border-outline-variant overflow-x-auto gap-2 mb-6">
+                <button class="tab-btn active px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('sla', this)">
+                    <span class="material-symbols-outlined text-lg">schedule</span>
+                    SLA & Prazos
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('regras', this)">
+                    <span class="material-symbols-outlined text-lg">verified</span>
+                    Regras Operacionais & Vistoria
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('medicao', this)">
+                    <span class="material-symbols-outlined text-lg">receipt_long</span>
+                    Medição & Regras TR
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('contrato', this)">
+                    <span class="material-symbols-outlined text-lg">domain</span>
+                    Contrato & Município
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('notificacoes', this)">
+                    <span class="material-symbols-outlined text-lg">notifications_active</span>
+                    Alertas & Notificações
+                </button>
+            </div>
+
+            <!-- Formulário Geral -->
+            <form id="form-configuracoes" onsubmit="event.preventDefault(); salvarConfiguracoesForm();">
+                
+                <!-- ABA 1: SLA & PRAZOS -->
+                <section id="tab-sla" class="tab-content space-y-6">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">timer</span>
+                            Prazos Máximos de Resolução por Prioridade
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Determina a régua de SLA utilizada para apuração de metas contratuais e relatórios de medição.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Baixa Prioridade</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Ex: melhorias, vistorias preventivas</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" id="prazo_baixa_prioridade_dias" name="prazo_baixa_prioridade_dias" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">dias</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Prioridade Normal</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Padrão da maioria das solicitações</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" id="prazo_normal_dias" name="prazo_normal_dias" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">dias</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Alta Prioridade</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Avenidas principais ou praças</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" id="prazo_alta_prioridade_dias" name="prazo_alta_prioridade_dias" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">dias</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-200">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-amber-800 mb-1">Urgência Crítica</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Vias de fluxo intenso apagadas</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" id="prazo_urgente_horas" name="prazo_urgente_horas" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">horas</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-red-50/50 p-4 rounded-xl border border-red-200">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-red-800 mb-1">Emergência / Risco à Vida</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Poste abalroado, fio rompido</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" id="prazo_emergencia_horas" name="prazo_emergencia_horas" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">horas</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Cálculo de Prazo</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Critério de contagem do SLA</span>
+                                <select id="tipo_contagem_prazo" name="tipo_contagem_prazo" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium focus:border-secondary focus:ring-1 focus:ring-secondary">
+                                    <option value="corridos">Dias Corridos (contínuo)</option>
+                                    <option value="uteis">Dias Úteis (exclui fins de semana)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-amber-600">notification_important</span>
+                            Gatilhos de Alerta Preventivo de SLA
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Configure com quanta antecedência o sistema alerta sobre risco de vencimento.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-4 rounded-xl border border-outline-variant/40 bg-surface-container-low">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Alerta Amarelo (Atenção)</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Dias de antecedência para aviso de prazo</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="0" id="alerta_vencimento_dias" name="alerta_vencimento_dias" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">dias antes</span>
+                                </div>
+                            </div>
+
+                            <div class="p-4 rounded-xl border border-outline-variant/40 bg-surface-container-low">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Alerta Crítico (Horas Finais)</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Horas antes do vencimento definitivo</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="0" id="alerta_critico_horas" name="alerta_critico_horas" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">horas antes</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA 2: REGRAS OPERACIONAIS -->
+                <section id="tab-regras" class="tab-content space-y-6 hidden">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">fact_check</span>
+                            Obrigatoriedade e Validação em Campo
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Exigências que a equipe de manutenção deve cumprir para liquidar uma Ordem de Serviço.</p>
+
+                        <div class="space-y-4 divide-y divide-outline-variant/30">
+                            <div class="flex items-center justify-between pt-4 first:pt-0">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Exigir Foto "Antes" (Defeito)</span>
+                                    <span class="text-xs text-on-surface-variant">Obrigatório anexar imagem da luminária apagada ou defeito antes do reparo.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="exigir_foto_antes" name="exigir_foto_antes" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Exigir Foto "Depois" (Reparado)</span>
+                                    <span class="text-xs text-on-surface-variant">Obrigatório anexar imagem da luminária acesa para conferência.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="exigir_foto_depois" name="exigir_foto_depois" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Exigir Geolocalização (GPS) na Conclusão</span>
+                                    <span class="text-xs text-on-surface-variant">Coleta as coordenadas exatas do técnico na finalização da OS.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="exigir_geolocalizacao_conclusao" name="exigir_geolocalizacao_conclusao" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Permitir Conclusão sem Plaqueta</span>
+                                    <span class="text-xs text-on-surface-variant">Se desmarcado, a baixa exige código de plaqueta válido cadastrado.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="permitir_conclusao_sem_plaqueta" name="permitir_conclusao_sem_plaqueta" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">gavel</span>
+                            Auditoria & Prazos de Contestação
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Regras para a fiscalização registrar apontamentos antes do fechamento contábil.</p>
+
+                        <div class="max-w-md">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Prazo de Contestação de Medição</label>
+                            <span class="text-xs text-on-surface-variant block mb-3">Dias úteis para a fiscalização auditar</span>
+                            <div class="flex items-center gap-2">
+                                <input type="number" min="0" id="prazo_tolerancia_contestacao_dias" name="prazo_tolerancia_contestacao_dias" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold" required />
+                                <span class="text-xs font-medium text-on-surface-variant">dias</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA MEDIÇÃO: JANELA DE MEDIÇÃO & REGRAS TR -->
+                <section id="tab-medicao" class="tab-content space-y-6 hidden">
+                    <!-- Configuração da Janela Mensal de Medição -->
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-secondary">date_range</span>
+                                    Janela Mensal de Medição Contratual
+                                </h2>
+                                <p class="text-xs text-on-surface-variant">Define os dias de corte utilizados tanto na tela de Medição quanto no Relatório de Medição do sistema.</p>
+                            </div>
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+                                <span class="material-symbols-outlined text-sm">sync</span> Compartilhado (Medição & Relatório)
+                            </span>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Dia Inicial do Período</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Padrão contratual: dia 21</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" max="31" id="janela_dia_inicio" name="janela_dia_inicio" value="21" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">de cada mês</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Dia Final do Período</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Padrão contratual: dia 20</span>
+                                <div class="flex items-center gap-2">
+                                    <input type="number" min="1" max="31" id="janela_dia_fim" name="janela_dia_fim" value="20" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" required />
+                                    <span class="text-xs font-medium text-on-surface-variant">de cada mês</span>
+                                </div>
+                            </div>
+
+                            <div class="bg-surface-container-low p-4 rounded-xl border border-outline-variant/40">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1">Corte do Período</label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Mês anterior ou mesmo mês?</span>
+                                <select id="janela_mesmo_mes" name="janela_mesmo_mes" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-medium focus:border-secondary focus:ring-1 focus:ring-secondary">
+                                    <option value="false">Mês Anterior ao Selecionado (ex: 21/07 a 20/08)</option>
+                                    <option value="true">Dentro do Mesmo Mês (ex: 01 a 31 do mês)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Prévia Visual do Período -->
+                        <div class="mt-4 p-3.5 bg-neutral-50 rounded-xl border border-dashed border-outline-variant flex items-center justify-between text-xs text-on-surface-variant">
+                            <div class="flex items-center gap-2">
+                                <span class="material-symbols-outlined text-secondary text-base">info</span>
+                                <span>Exemplo com a competência atual:</span>
+                                <strong id="janela-previa-texto" class="text-on-surface font-semibold">21/07/2026 a 20/08/2026</strong>
+                            </div>
+                            <span class="text-emerald-700 font-medium flex items-center gap-1">
+                                <span class="material-symbols-outlined text-sm">check_circle</span> Sincronizado automaticamente
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Card Informativo sobre Regras de Glosa / TR -->
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <h3 class="text-base font-bold text-on-surface mb-1 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-amber-600">tune</span>
+                                    Regras e Parâmetros de Glosa (TR - rev03)
+                                </h3>
+                                <p class="text-xs text-on-surface-variant">Ajuste os percentuais e limites de penalidades por atraso (Item 7.1.4), plaqueta ausente (Item 7.6.3), fotos inadequadas e check-in diretamente na tela especializada de Medição.</p>
+                            </div>
+                            <a href="Medicao.html" class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant text-on-surface font-semibold text-xs transition shadow-sm whitespace-nowrap">
+                                <span class="material-symbols-outlined text-base text-secondary">open_in_new</span>
+                                Abrir Tela de Medição
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA 3: CONTRATO & MUNICÍPIO -->
+                <section id="tab-contrato" class="tab-content space-y-6 hidden">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">apartment</span>
+                            Identificação do Contrato Público
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Dados emitidos em cabeçalhos de ordens de serviço, relatórios e auditorias.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Município / Cidade</label>
+                                <input type="text" id="municipio_nome" name="municipio_nome" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3.5 py-2.5 text-sm font-medium focus:border-secondary" required />
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Órgão / Secretaria Contratante</label>
+                                <input type="text" id="orgao_contratante" name="orgao_contratante" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3.5 py-2.5 text-sm font-medium focus:border-secondary" />
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Número do Contrato / Concessão</label>
+                                <input type="text" id="numero_contrato" name="numero_contrato" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3.5 py-2.5 text-sm font-medium focus:border-secondary" />
+                            </div>
+
+                            <div>
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">Empresa / Consórcio Executor</label>
+                                <input type="text" id="empresa_executora" name="empresa_executora" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3.5 py-2.5 text-sm font-medium focus:border-secondary" />
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA 4: ALERTAS & NOTIFICAÇÕES -->
+                <section id="tab-notificacoes" class="tab-content space-y-6 hidden">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                            <span class="material-symbols-outlined text-secondary">outgoing_mail</span>
+                            Comunicação & Notificações Automáticas
+                        </h2>
+                        <p class="text-xs text-on-surface-variant mb-6">Configure o envio de alertas operacionais e resumos do sistema.</p>
+
+                        <div class="mb-6">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1.5">E-mails Administrativos (separados por vírgula)</label>
+                            <input type="text" id="email_notificacoes" name="email_notificacoes" placeholder="gestor@prefeitura.sp.gov.br, fiscal@empresa.com" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3.5 py-2.5 text-sm font-medium focus:border-secondary" />
+                            <span class="text-xs text-on-surface-variant mt-1 block">Destinatários que receberão resumos de SLA e urgências.</span>
+                        </div>
+
+                        <div class="space-y-4 divide-y divide-outline-variant/30">
+                            <div class="flex items-center justify-between pt-4 first:pt-0">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Notificar Abertura de Nova OS</span>
+                                    <span class="text-xs text-on-surface-variant">Dispara alerta quando um chamado é registrado.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="notificar_abertura_os" name="notificar_abertura_os" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Alertar Imediatamente OS em Atraso</span>
+                                    <span class="text-xs text-on-surface-variant">Gera alerta no painel quando qualquer OS ultrapassa o SLA estipulado.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="notificar_os_atrasada" name="notificar_os_atrasada" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-4">
+                                <div>
+                                    <span class="text-sm font-semibold text-on-surface block">Disparar Relatório Mensal Consolidado</span>
+                                    <span class="text-xs text-on-surface-variant">Prepara fechamento de metas no 1º dia útil de cada mês.</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="notificar_relatorio_mensal" name="notificar_relatorio_mensal" class="sr-only peer">
+                                    <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </form>
+        </div>
+
+    </main>
+
+    <!-- Toast de Notificação -->
+    <div id="toast-notificacao" class="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 transform translate-y-24 opacity-0 transition-all duration-300">
+        <span class="material-symbols-outlined text-emerald-400" id="toast-icon">check_circle</span>
+        <span class="text-sm font-medium" id="toast-msg">Configurações salvas com sucesso!</span>
+    </div>
+
+    <script>
+        function trocarAba(abaId, btnElement) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+            const target = document.getElementById('tab-' + abaId);
+            if (target) target.classList.remove('hidden');
+            if (btnElement) btnElement.classList.add('active');
+        }
+
+        function mostrarToast(mensagem, sucesso = true) {
+            const toast = document.getElementById('toast-notificacao');
+            const toastMsg = document.getElementById('toast-msg');
+            const toastIcon = document.getElementById('toast-icon');
+
+            toastMsg.textContent = mensagem;
+            toastIcon.textContent = sucesso ? 'check_circle' : 'error';
+            toastIcon.className = sucesso ? 'material-symbols-outlined text-emerald-400' : 'material-symbols-outlined text-red-400';
+
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3500);
+        }
+
+        function atualizarPreviaJanela() {
+            const dInicio = parseInt(document.getElementById('janela_dia_inicio')?.value, 10) || 21;
+            const dFim = parseInt(document.getElementById('janela_dia_fim')?.value, 10) || 20;
+            const mesmoMes = document.getElementById('janela_mesmo_mes')?.value === 'true';
+
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = now.getMonth() + 1;
+
+            let startD, endD;
+            if (mesmoMes) {
+                startD = new Date(y, m - 1, dInicio);
+                endD = new Date(y, m - 1, dFim);
+            } else {
+                startD = new Date(y, m - 2, dInicio);
+                endD = new Date(y, m - 1, dFim);
+            }
+
+            const formatBR = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+            const elPrevia = document.getElementById('janela-previa-texto');
+            if (elPrevia) {
+                elPrevia.textContent = `${formatBR(startD)} a ${formatBR(endD)}`;
+            }
+        }
+
+        function popularFormulario(dados) {
+            if (!dados) return;
+
+            const campos = [
+                'prazo_baixa_prioridade_dias', 'prazo_normal_dias', 'prazo_alta_prioridade_dias',
+                'prazo_urgente_horas', 'prazo_emergencia_horas', 'tipo_contagem_prazo',
+                'alerta_vencimento_dias', 'alerta_critico_horas', 'prazo_tolerancia_contestacao_dias',
+                'municipio_nome', 'orgao_contratante', 'numero_contrato', 'empresa_executora',
+                'email_notificacoes'
+            ];
+
+            campos.forEach(campo => {
+                const input = document.getElementById(campo);
+                if (input && dados[campo] !== undefined && dados[campo] !== null) {
+                    input.value = dados[campo];
+                }
+            });
+
+            const checkboxes = [
+                'exigir_foto_antes', 'exigir_foto_depois', 'exigir_geolocalizacao_conclusao',
+                'permitir_conclusao_sem_plaqueta', 'notificar_abertura_os', 'notificar_os_atrasada',
+                'notificar_relatorio_mensal'
+            ];
+
+            checkboxes.forEach(chk => {
+                const input = document.getElementById(chk);
+                if (input) {
+                    input.checked = Boolean(dados[chk]);
+                }
+            });
+
+            // Carregar Janela de Medição
+            try {
+                let janelaConfig = { diaInicio: 21, diaFim: 20, mesmoMes: false };
+                if (window.MedicaoService && typeof window.MedicaoService.carregarJanelaMedicaoConfig === 'function') {
+                    janelaConfig = window.MedicaoService.carregarJanelaMedicaoConfig();
+                } else {
+                    const saved = localStorage.getItem('sistema_os_janela_medicao_config');
+                    if (saved) janelaConfig = JSON.parse(saved);
+                }
+
+                if (document.getElementById('janela_dia_inicio')) {
+                    document.getElementById('janela_dia_inicio').value = janelaConfig.diaInicio || 21;
+                }
+                if (document.getElementById('janela_dia_fim')) {
+                    document.getElementById('janela_dia_fim').value = janelaConfig.diaFim || 20;
+                }
+                if (document.getElementById('janela_mesmo_mes')) {
+                    document.getElementById('janela_mesmo_mes').value = janelaConfig.mesmoMes ? 'true' : 'false';
+                }
+                atualizarPreviaJanela();
+            } catch (e) {
+                console.warn('Erro ao carregar janela de medição no form:', e);
+            }
+        }
+
+        function coletarDadosFormulario() {
+            return {
+                prazo_baixa_prioridade_dias: parseInt(document.getElementById('prazo_baixa_prioridade_dias').value) || 15,
+                prazo_normal_dias: parseInt(document.getElementById('prazo_normal_dias').value) || 7,
+                prazo_alta_prioridade_dias: parseInt(document.getElementById('prazo_alta_prioridade_dias').value) || 3,
+                prazo_urgente_horas: parseInt(document.getElementById('prazo_urgente_horas').value) || 24,
+                prazo_emergencia_horas: parseInt(document.getElementById('prazo_emergencia_horas').value) || 6,
+                tipo_contagem_prazo: document.getElementById('tipo_contagem_prazo').value || 'corridos',
+                alerta_vencimento_dias: parseInt(document.getElementById('alerta_vencimento_dias').value) || 2,
+                alerta_critico_horas: parseInt(document.getElementById('alerta_critico_horas').value) || 12,
+                prazo_tolerancia_contestacao_dias: parseInt(document.getElementById('prazo_tolerancia_contestacao_dias').value) || 5,
+                municipio_nome: document.getElementById('municipio_nome').value || 'Araraquara',
+                orgao_contratante: document.getElementById('orgao_contratante').value || '',
+                numero_contrato: document.getElementById('numero_contrato').value || '',
+                empresa_executora: document.getElementById('empresa_executora').value || '',
+                email_notificacoes: document.getElementById('email_notificacoes').value || '',
+                exigir_foto_antes: document.getElementById('exigir_foto_antes').checked,
+                exigir_foto_depois: document.getElementById('exigir_foto_depois').checked,
+                exigir_geolocalizacao_conclusao: document.getElementById('exigir_geolocalizacao_conclusao').checked,
+                permitir_conclusao_sem_plaqueta: document.getElementById('permitir_conclusao_sem_plaqueta').checked,
+                notificar_abertura_os: document.getElementById('notificar_abertura_os').checked,
+                notificar_os_atrasada: document.getElementById('notificar_os_atrasada').checked,
+                notificar_relatorio_mensal: document.getElementById('notificar_relatorio_mensal').checked
+            };
+        }
+
+        async function salvarConfiguracoesForm() {
+            const btn = document.getElementById('btn-salvar');
+            const icon = document.getElementById('icon-salvar');
+            const label = document.getElementById('label-salvar');
+
+            try {
+                btn.disabled = true;
+                icon.textContent = 'progress_activity';
+                icon.classList.add('animate-spin');
+                label.textContent = 'Salvando...';
+
+                // 1. Salvar configurações de janela de medição
+                const novaJanela = {
+                    diaInicio: parseInt(document.getElementById('janela_dia_inicio')?.value, 10) || 21,
+                    diaFim: parseInt(document.getElementById('janela_dia_fim')?.value, 10) || 20,
+                    mesmoMes: document.getElementById('janela_mesmo_mes')?.value === 'true'
+                };
+
+                if (window.MedicaoService && typeof window.MedicaoService.salvarJanelaMedicaoConfig === 'function') {
+                    window.MedicaoService.salvarJanelaMedicaoConfig(novaJanela);
+                } else {
+                    localStorage.setItem('sistema_os_janela_medicao_config', JSON.stringify(novaJanela));
+                    window.dispatchEvent(new CustomEvent('janela-medicao-atualizada', { detail: novaJanela }));
+                }
+
+                // 2. Salvar parâmetros contratuais gerais
+                const dados = coletarDadosFormulario();
+                await window.ConfiguracoesService.salvarConfiguracoes(dados);
+
+                mostrarToast('Configurações salvas com sucesso!', true);
+                document.getElementById('aviso-sql').classList.add('hidden');
+            } catch (err) {
+                console.error('Erro ao salvar:', err);
+                mostrarToast('Erro ao salvar no banco. Verifique o console ou execute o SQL.', false);
+                document.getElementById('aviso-sql').classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                icon.textContent = 'save';
+                icon.classList.remove('animate-spin');
+                label.textContent = 'Salvar Alterações';
+            }
+        }
+
+        function restaurarPadroes() {
+            if (confirm('Deseja restaurar as configurações para os valores padrões?')) {
+                popularFormulario(window.ConfiguracoesService.defaultValues);
+                if (document.getElementById('janela_dia_inicio')) document.getElementById('janela_dia_inicio').value = 21;
+                if (document.getElementById('janela_dia_fim')) document.getElementById('janela_dia_fim').value = 20;
+                if (document.getElementById('janela_mesmo_mes')) document.getElementById('janela_mesmo_mes').value = 'false';
+                atualizarPreviaJanela();
+                mostrarToast('Valores padrões carregados. Clique em Salvar para persistir.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Event listeners para atualizar a prévia visual
+            ['janela_dia_inicio', 'janela_dia_fim', 'janela_mesmo_mes'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.addEventListener('input', atualizarPreviaJanela);
+                    el.addEventListener('change', atualizarPreviaJanela);
+                }
+            });
+
+            try {
+                if (window.AuthGuard && typeof window.AuthGuard.requireAuth === 'function') {
+                    await window.AuthGuard.requireAuth();
+                }
+                const configs = await window.ConfiguracoesService.obterConfiguracoes();
+                popularFormulario(configs);
+            } catch (e) {
+                console.warn('Iniciando com padrões:', e);
+                popularFormulario(window.ConfiguracoesService.defaultValues);
+            }
+        });
+    </script>
+</body>
+</html>

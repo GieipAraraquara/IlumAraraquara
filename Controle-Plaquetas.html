@@ -835,11 +835,20 @@
         let mapboxMarkerInstance = null;
         let timeoutDebounceBusca = null;
 
-        // Executar inicialização quando DOM e Supabase estiverem prontos
-        document.addEventListener('DOMContentLoaded', () => {
+        // Função de inicialização exportada para SPA e carregamento direto
+        window.initControlePlaquetas = function() {
             initEvents();
             carregarPlaquetas(1);
-        });
+        };
+
+        // Executar inicialização quando DOM e Supabase estiverem prontos
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                window.initControlePlaquetas();
+            });
+        } else {
+            window.initControlePlaquetas();
+        }
 
         function initEvents() {
             const inputBusca = document.getElementById('input-busca-plaqueta');
@@ -1166,7 +1175,9 @@
             }
 
             try {
-                let query = client.from('localizacao_plaquetas').select('*', { count: 'exact' });
+                // Projeção cirúrgica de colunas existentes na tabela localizacao_plaquetas
+                const COLUNAS_PLAQUETAS = 'identificacao, "Latitude", "Longitude", "QTD. Lum.", "Observação", "Empresa", "Quando foi colocado?"';
+                let query = client.from('localizacao_plaquetas').select(COLUNAS_PLAQUETAS, { count: 'exact' });
 
                 // Filtro de busca textual (suporta busca por múltiplas plaquetas ex: C0012 C0013)
                 if (buscaTexto.trim()) {

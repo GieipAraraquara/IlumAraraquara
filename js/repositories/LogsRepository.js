@@ -150,6 +150,22 @@
                 return [];
             }
         }
+
+        /**
+         * Alias para registrarLog
+         */
+        async inserirLog(params) {
+            if (!params) return null;
+            return this.registrarLog({
+                protocolo: params.protocolo,
+                tabelaOrigem: params.tabelaOrigem || params.tabela_origem || 'ordens_servico',
+                tipoAcao: params.tipoAcao || params.tipo_acao || 'AUDITORIA',
+                descricao: params.descricao || '',
+                dadosAnteriores: params.dadosAnteriores || params.dados_anteriores || null,
+                dadosNovos: params.dadosNovos || params.dados_novos || null,
+                origemTela: params.origemTela || params.origem_tela || 'Painel'
+            });
+        }
     }
 
     window.LogsRepository = new LogsRepository();

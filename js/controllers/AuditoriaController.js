@@ -847,27 +847,45 @@ class AuditoriaController {
     }
 
     /**
-     * Persists 'Concluída' audit status for specific OS ID
+     * Persists 'Concluída' audit status for specific OS ID or Protocol
      */
-    async concluirAuditoria(id) {
-        const item = this.chamadosList.find(c => String(c.id) === String(id));
+    async concluirAuditoria(idOrProtocol) {
+        if (!idOrProtocol) return null;
+        const cleanVal = String(idOrProtocol).replace(/^#/, '').trim().toUpperCase();
+        const item = this.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanVal || cid === cleanVal;
+        });
+
         if (item) {
             item.statusAuditoria = 'Concluída';
             item.dataConclusaoAuditoria = new Date();
         }
-        return await this.service.changeAuditoriaStatus(id, 'Concluída');
+
+        const targetId = (item && item.id) ? item.id : idOrProtocol;
+        return await this.service.changeAuditoriaStatus(targetId, 'Concluída');
     }
 
     /**
-     * Reverts audit status to 'Pendente' for specific OS ID
+     * Reverts audit status to 'Pendente' for specific OS ID or Protocol
      */
-    async desfazerAuditoria(id) {
-        const item = this.chamadosList.find(c => String(c.id) === String(id));
+    async desfazerAuditoria(idOrProtocol) {
+        if (!idOrProtocol) return null;
+        const cleanVal = String(idOrProtocol).replace(/^#/, '').trim().toUpperCase();
+        const item = this.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanVal || cid === cleanVal;
+        });
+
         if (item) {
             item.statusAuditoria = 'Pendente';
             item.dataConclusaoAuditoria = null;
         }
-        return await this.service.changeAuditoriaStatus(id, 'Pendente');
+
+        const targetId = (item && item.id) ? item.id : idOrProtocol;
+        return await this.service.changeAuditoriaStatus(targetId, 'Pendente');
     }
 
     /**
@@ -914,6 +932,21 @@ class AuditoriaController {
                         .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
                         .maybeSingle();
                     if (resLeg && resLeg.data) row = resLeg.data;
+                }
+
+                if (row) {
+                    try {
+                        const { data: fechRows } = await client
+                            .from('fechamentos_os')
+                            .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                            .or(`protocolo.ilike.${cleanId},os_id.eq.${cleanId}`)
+                            .order('numero_fechamento', { ascending: true });
+                        if (fechRows && fechRows.length > 0) {
+                            row.fechamentos_os = fechRows;
+                        }
+                    } catch (eFechSingle) {
+                        console.warn('⚠️ Erro ao carregar fechamentos_os da OS individual na auditoria:', eFechSingle);
+                    }
                 }
 
                 if (row && window.ChamadoModel) {
@@ -1161,6 +1194,43 @@ class AuditoriaController {
                             </div>
                         </div>
                     `;
+                } else if (
+                    (hasNovos && log.dados_novos && (log.dados_novos.percentual !== undefined || log.dados_novos.regraId !== undefined || log.dados_novos.artigoTR !== undefined)) ||
+                    (hasAnteriores && log.dados_anteriores && (log.dados_anteriores.percentual !== undefined || log.dados_anteriores.regraId !== undefined || log.dados_anteriores.artigoTR !== undefined))
+                ) {
+                    const g = log.dados_novos || log.dados_anteriores || {};
+                    const isRemocao = !log.dados_novos && Boolean(log.dados_anteriores);
+                    const isAnistia = Boolean(g.anistiado);
+                    const perc = Number(g.percentual) || 0;
+                    const nomeGlosa = g.nome || g.regra || 'Glosa Administrativa';
+                    const artTR = g.artigoTR ? `(${g.artigoTR})` : '';
+
+                    diffHtml = `
+                        <div class="mt-2 p-2.5 rounded-xl ${isRemocao ? 'bg-slate-50 border border-slate-200' : (isAnistia ? 'bg-emerald-50/60 border border-emerald-200/80' : 'bg-rose-50/60 border border-rose-200/80')} space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                                    <span class="material-symbols-outlined text-[15px] ${isRemocao ? 'text-slate-500' : (isAnistia ? 'text-emerald-600' : 'text-rose-600')}">
+                                        ${isRemocao ? 'delete' : (isAnistia ? 'verified' : 'gavel')}
+                                    </span>
+                                    <span>${nomeGlosa}</span>
+                                    ${artTR ? `<span class="text-[10px] text-slate-500 font-normal">${artTR}</span>` : ''}
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isRemocao ? 'bg-slate-200 text-slate-700 line-through' : (isAnistia ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800 border border-rose-200')}">
+                                    ${isAnistia ? `Anistiada (-${perc}%)` : (isRemocao ? `Removida (-${perc}%)` : `-${perc}%`)}
+                                </span>
+                            </div>
+                            ${g.motivo ? `
+                                <div class="text-[11px] text-slate-600 bg-white/80 p-1.5 rounded-lg border border-slate-200/60">
+                                    <b>Motivo:</b> ${g.motivo}
+                                </div>
+                            ` : ''}
+                            ${g.justificativa_anistia ? `
+                                <div class="text-[10.5px] text-emerald-800 bg-emerald-100/50 p-1.5 rounded-lg border border-emerald-200">
+                                    <b>Justificativa da Anistia:</b> ${g.justificativa_anistia}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
                 } else if (hasAnteriores || hasNovos) {
                     const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
                     const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
@@ -1337,6 +1407,7 @@ class AuditoriaController {
                     <span>Solicitante & Atendimento</span>
                 </div>
                 <div><b class="text-on-surface-variant font-medium">Munícipe:</b> <span class="font-medium text-on-surface">${item.municipeNome || 'Não informado'}</span></div>
+                ${(item.telefoneCelular || item.telefoneFixo || item.rawRow?.telefone_celular || item.rawRow?.telefone_fixo) ? `<div><b class="text-on-surface-variant font-medium">Telefone/Contato:</b> <span class="font-medium text-on-surface">${[item.telefoneCelular || item.rawRow?.telefone_celular, item.telefoneFixo || item.rawRow?.telefone_fixo].filter(Boolean).join(' / ')}</span></div>` : ''}
                 <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante || 'Não informado'}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
@@ -1464,6 +1535,130 @@ class AuditoriaController {
                 </div>
             </div>`;
         })()}
+
+        <!-- Seção Especial: Detalhes da Praça Pública & Problemas Relatados (Exclusivo para Protocolos 'P') -->
+        ${isPracaOS ? (() => {
+            const pracaNome = item.pracaNome || item.rawRow?.praca_nome || 'Praça Pública / Área de Lazer';
+            const enderecoPraca = item.endereco || item.rawRow?.endereco || 'Endereço não informado';
+            const coordPraca = item.coordenadaInicial || item.coordenada || item.rawRow?.coordenada || '';
+            const coordReparoPraca = item.coordenadaReparo || item.rawRow?.coordenada_reparo || '';
+            
+            // Tratamento detalhado da lista de problemas relatados
+            let problemasArray = [];
+            if (item.problemasList && Array.isArray(item.problemasList)) {
+                problemasArray = item.problemasList;
+            } else if (item.rawRow?.problemas) {
+                const rawProb = item.rawRow.problemas;
+                if (Array.isArray(rawProb)) problemasArray = rawProb;
+                else if (typeof rawProb === 'string' && (rawProb.trim().startsWith('[') || rawProb.trim().startsWith('{'))) {
+                    try { problemasArray = JSON.parse(rawProb.trim()); } catch(e) {}
+                }
+            }
+
+            // Fallback se não for array de objetos: utiliza problemaInicial
+            const fallbackProbText = item.problemaInicial || item.problema || (item.rawRow && (item.rawRow.problema_inicial || item.rawRow.problema)) || '';
+
+            // Links de Navegação Maps / Waze
+            let lat = null, lng = null;
+            const coordAlvo = coordReparoPraca || coordPraca;
+            if (coordAlvo) {
+                const parts = String(coordAlvo).split(',').map(s => s.trim());
+                if (parts.length >= 2) {
+                    const pLat = parseFloat(parts[0]);
+                    const pLng = parseFloat(parts[1]);
+                    if (!isNaN(pLat) && !isNaN(pLng)) { lat = pLat; lng = pLng; }
+                }
+            }
+            let gmaps = '#', waze = '#';
+            if (lat !== null && lng !== null) {
+                gmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+            } else if (enderecoPraca && !enderecoPraca.toLowerCase().includes('não informado')) {
+                const enc = encodeURIComponent(enderecoPraca + (enderecoPraca.toLowerCase().includes('araraquara') ? '' : ', Araraquara - SP'));
+                gmaps = `https://www.google.com/maps/search/?api=1&query=${enc}`;
+                waze = `https://waze.com/ul?q=${enc}&navigate=yes`;
+            }
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2.5">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5 text-emerald-800 font-bold">
+                        <span class="material-symbols-outlined text-[18px] text-emerald-600">park</span>
+                        <span>Identificação & Problemas Relatados da Praça</span>
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                        Praça Pública
+                    </span>
+                </div>
+
+                <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2.5">
+                    <!-- Nome da Praça & Problemas Principais -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Logradouro / Espaço</span>
+                            <span class="text-sm font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
+                                <span class="material-symbols-outlined text-[16px] text-emerald-600">location_city</span>
+                                ${pracaNome}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Bloco de Problemas Relatados -->
+                    <div class="space-y-1.5">
+                        <span class="text-[10.5px] font-bold text-slate-700 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-amber-600">report_problem</span>
+                            Problemas Relatados na Abertura:
+                        </span>
+                        
+                        <div class="flex flex-wrap gap-1.5 pt-0.5">
+                            ${(Array.isArray(problemasArray) && problemasArray.length > 0) ? problemasArray.map(p => {
+                                const probNome = (typeof p === 'object' && p !== null) ? (p.problema || p.descricao || p.tipo || p.nome || 'Problema não especificado') : String(p);
+                                const probQtd = (typeof p === 'object' && p !== null) ? (p.quantidade || p.qtd) : null;
+                                return `
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-950 border border-amber-200 shadow-2xs">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                    <span>${probNome}</span>
+                                    ${probQtd ? `<span class="bg-amber-200/80 text-amber-900 text-[10px] font-bold px-1.5 py-0.2 rounded-full">Qtd: ${probQtd}</span>` : ''}
+                                </span>
+                                `;
+                            }).join('') : `
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-950 border border-amber-200 shadow-2xs">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                    <span>${fallbackProbText || 'Nenhum problema detalhado'}</span>
+                                </span>
+                            `}
+                        </div>
+                    </div>
+
+                    <!-- Localização & Coordenadas -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
+                        <div class="space-y-1">
+                            <div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-800">${enderecoPraca}</span></div>
+                            ${coordReparoPraca ? `<div><b class="text-slate-600">Coordenada Reparo:</b> <span class="font-mono text-emerald-800 text-[11px]">${coordReparoPraca}</span></div>` : ''}
+                        </div>
+
+                        ${(gmaps !== '#' || waze !== '#') ? `
+                        <div class="flex flex-col justify-end items-start md:items-end gap-1 pt-1 md:pt-0">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Navegação GPS:</span>
+                            <div class="flex items-center gap-1.5">
+                                <a href="${gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[13px] text-blue-600">map</span>
+                                    <span>Google Maps</span>
+                                    <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                </a>
+                                <a href="${waze}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[13px] text-cyan-600">navigation</span>
+                                    <span>Waze</span>
+                                    <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                </a>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        })() : ''}
 
         <!-- Seção 3: Pontos de Manutenção (Exclusivo para Protocolos Viários 'I') -->
         ${!isPracaOS ? `
@@ -1650,6 +1845,15 @@ class AuditoriaController {
                                 <div><b class="text-slate-500 font-medium">Fim:</b> ${dataFim}</div>
                             </div>
                             ${durStr ? `<div class="text-blue-700 font-bold text-[11px] pt-0.5">⏱️ Duração: ${durStr}</div>` : ''}
+                            ${s.descricao_servico ? `
+                            <div class="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-950 space-y-0.5">
+                                <b class="text-emerald-800 flex items-center gap-1 font-bold text-[10px]">
+                                    <span class="material-symbols-outlined text-[13px] text-emerald-700">description</span>
+                                    Descrição do Serviço:
+                                </b>
+                                <p class="whitespace-pre-line text-[10.5px] leading-tight font-medium text-slate-800">${s.descricao_servico}</p>
+                            </div>
+                            ` : ''}
                             ${(s.coordenada_inicio || s.coordenada_fim) ? `
                             <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
                                 ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
@@ -1726,8 +1930,9 @@ class AuditoriaController {
         </div>
         ` : ''}
 
-        <!-- Seção 3: Histórico de Fechamentos (Com Subseções de Materiais & Fotos para Cada Fechamento) -->
+        <!-- Seção 3: Histórico de Fechamentos (Exclusivo para Protocolos Viários 'I') -->
         ${(() => {
+            if (isPracaOS) return '';
             const fechList = item.fechamentosList || [];
             if (!fechList || fechList.length === 0) return '';
 
@@ -1825,6 +2030,81 @@ class AuditoriaController {
             </div>
             `;
         })()}
+
+        <!-- Seção 4: Glosas & Penalidades Contratuais (Supabase JSONB) -->
+        <div class="p-3.5 bg-rose-50/40 border border-rose-200/80 rounded-xl space-y-3 text-xs">
+            <div class="font-bold text-rose-950 text-xs border-b border-rose-200/60 pb-1.5 flex items-center justify-between">
+                <span class="flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[18px] text-rose-600">gavel</span>
+                    <span>Glosas & Penalidades Contratuais (${(item.glosas || []).length})</span>
+                </span>
+                <button type="button" onclick="window.auditoriaController.abrirModalAplicarGlosa('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer">
+                    <span class="material-symbols-outlined text-[13px]">add</span>
+                    <span>Aplicar Glosa</span>
+                </button>
+            </div>
+
+            <div id="containerListaGlosasOSAuditoria" class="space-y-2">
+                ${(() => {
+                    const glosas = item.glosas || [];
+                    if (glosas.length === 0) {
+                        return `
+                        <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface-variant italic text-[11px] flex items-center justify-between">
+                            <span>Nenhuma glosa ou penalidade aplicada a este protocolo.</span>
+                            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">verified</span> 100% Conforme
+                            </span>
+                        </div>
+                        `;
+                    }
+
+                    return glosas.map((g, gIdx) => {
+                        const isAnistiada = Boolean(g.anistiado);
+                        const perc = Number(g.percentual) || 0;
+                        const badgePerc = isAnistiada 
+                            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through">-${perc}% (Anistiada)</span>`
+                            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">-${perc}% Glosa</span>`;
+
+                        const dtStr = g.data_aplicacao ? new Date(g.data_aplicacao).toLocaleString('pt-BR') : '';
+
+                        return `
+                        <div class="p-2.5 rounded-xl bg-surface-container-lowest border ${isAnistiada ? 'border-slate-200 opacity-75' : 'border-rose-200 shadow-2xs'} space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-800 text-[11.5px]">${g.nome || g.regra || 'Glosa Administrativa'}</span>
+                                    ${g.artigoTR ? `<span class="text-[10px] text-slate-500 font-medium">(${g.artigoTR})</span>` : ''}
+                                </div>
+                                <div>${badgePerc}</div>
+                            </div>
+
+                            <div class="text-[11px] text-slate-600 leading-relaxed bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+                                <div><b>Motivo:</b> ${g.motivo || 'Motivo não informado.'}</div>
+                                ${isAnistiada && g.justificativa_anistia ? `<div class="text-emerald-800 mt-1"><b>Justificativa da Anistia:</b> ${g.justificativa_anistia}</div>` : ''}
+                            </div>
+
+                            <div class="flex items-center justify-between pt-1 text-[10px] text-slate-500 border-t border-slate-100">
+                                <span>👤 <b>Aplicado por:</b> ${g.aplicado_por || 'Administrador'} ${dtStr ? `• ${dtStr}` : ''}</span>
+                                <div class="flex items-center gap-1.5">
+                                    ${!isAnistiada ? `
+                                        <button type="button" onclick="window.auditoriaController.alternarAnistiaGlosa('${item.protocolo || item.id}', ${gIdx}, true)" class="px-2 py-0.5 rounded font-semibold text-emerald-700 hover:bg-emerald-50 border border-emerald-300 transition-colors" title="Relevar/Anistiar glosa no cálculo de medição">
+                                            Anistiar
+                                        </button>
+                                    ` : `
+                                        <button type="button" onclick="window.auditoriaController.alternarAnistiaGlosa('${item.protocolo || item.id}', ${gIdx}, false)" class="px-2 py-0.5 rounded font-semibold text-amber-700 hover:bg-amber-50 border border-amber-300 transition-colors" title="Reativar desconto da glosa">
+                                            Reativar Glosa
+                                        </button>
+                                    `}
+                                    <button type="button" onclick="window.auditoriaController.removerGlosaOS('${item.protocolo || item.id}', ${gIdx})" class="px-1.5 py-0.5 rounded font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors" title="Excluir esta glosa">
+                                        <span class="material-symbols-outlined text-[13px] align-middle">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        `;
+                    }).join('');
+                })()}
+            </div>
+        </div>
 
         <!-- Seção 5: Linha do Tempo de Auditoria & Logs -->
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
@@ -2390,6 +2670,402 @@ class AuditoriaController {
             </div>
         `;
         document.body.appendChild(m);
+    }
+
+    /**
+     * Abre o modal ou diálogo para aplicação de glosa contratual no protocolo selecionado
+     */
+    async abrirModalAplicarGlosa(protocoloOrId) {
+        const item = (this.chamadosList || window.chamadosListCache || []).find(o => 
+            String(o.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
+            String(o.id || '') === String(protocoloOrId)
+        );
+        if (!item) {
+            this.exibirModalErroHTML('Não Encontrada', 'Ordem de serviço não encontrada para aplicação de glosa.');
+            return;
+        }
+
+        let modal = document.getElementById('modalAplicarGlosaAdmin');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalAplicarGlosaAdmin';
+            modal.className = 'fixed inset-0 z-[70000] hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm';
+            modal.innerHTML = `
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden text-on-surface">
+                    <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant bg-surface-container-low">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-rose-600 text-[22px]">gavel</span>
+                            <h3 class="font-bold text-sm text-slate-800" id="modalGlosaTitulo">Aplicar Glosa Contratual</h3>
+                        </div>
+                        <button type="button" onclick="document.getElementById('modalAplicarGlosaAdmin').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+                            <span class="material-symbols-outlined text-xl">close</span>
+                        </button>
+                    </div>
+                    <form id="formAplicarGlosaAdmin" class="p-5 space-y-4 text-xs" onsubmit="event.preventDefault(); (window.auditoriaController || window.painelController).confirmarAplicacaoGlosa();">
+                        <input type="hidden" id="glosa_form_protocolo" value="" />
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Regra / Infração Contratual:</label>
+                            <select id="glosa_form_regra" class="w-full text-xs border border-outline-variant rounded-lg p-2.5 bg-surface-container-lowest text-on-surface focus:ring-1 focus:ring-secondary outline-none" onchange="(window.auditoriaController || window.painelController).onSelectRegraGlosa(this.value)">
+                                <option value="sem_plaqueta" data-art="Item 7.6.3" data-perc="20">Ausência / Ilegibilidade de Plaqueta (-20%) - Item 7.6.3</option>
+                                <option value="foto_inadequada" data-art="Item 8.3.1.1" data-perc="20">Foto sem Derredores / Detalhes Incompletos (-20%) - Item 8.3.1.1</option>
+                                <option value="foto_ausente_incompleta" data-art="Item 8.3.1.3" data-perc="100">Falta de Registro Fotográfico Antes/Depois (-100%) - Item 8.3.1.3</option>
+                                <option value="falta_checkin_checkout" data-art="Item 8.4.3" data-perc="15">Descumprimento Check-in/Check-out no App (-15%) - Item 8.4.3</option>
+                                <option value="atraso_execucao" data-art="Item 7.1.4" data-perc="10">Atraso na Execução (10% por dia útil) - Item 7.1.4</option>
+                                <option value="personalizada" data-art="Administrativo" data-perc="0">Outra Glosa / Penalidade Personalizada</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="font-bold text-slate-700 block mb-1">Artigo / Referência TR:</label>
+                                <input type="text" id="glosa_form_artigo" value="Item 7.6.3" class="w-full text-xs border border-outline-variant rounded-lg p-2 bg-surface-container-lowest" required />
+                            </div>
+                            <div>
+                                <label class="font-bold text-slate-700 block mb-1">% Glosa (Desconto):</label>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" step="0.5" min="1" max="100" id="glosa_form_perc" value="20" class="w-full text-xs font-bold border border-outline-variant rounded-lg p-2 bg-surface-container-lowest" required />
+                                    <span class="font-bold text-slate-500">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Motivo / Descrição da Não Conformidade:</label>
+                            <textarea id="glosa_form_motivo" rows="3" class="w-full text-xs border border-outline-variant rounded-lg p-2 bg-surface-container-lowest text-on-surface focus:ring-1 focus:ring-secondary outline-none" placeholder="Informe detalhadamente o motivo da penalidade ou evidência encontrada..." required></textarea>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                            <button type="button" onclick="document.getElementById('modalAplicarGlosaAdmin').classList.add('hidden')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit" id="btnConfirmarGlosaAdmin" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-2xs transition-colors flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px]">gavel</span>
+                                <span>Salvar e Aplicar Glosa</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const inpProt = document.getElementById('glosa_form_protocolo');
+        const titModal = document.getElementById('modalGlosaTitulo');
+        if (inpProt) inpProt.value = item.protocolo || item.id;
+        if (titModal) titModal.innerText = `Aplicar Glosa no Protocolo #${item.protocolo || item.id}`;
+
+        const selRegra = document.getElementById('glosa_form_regra');
+        if (selRegra) {
+            selRegra.selectedIndex = 0;
+            this.onSelectRegraGlosa(selRegra.value);
+        }
+        const txtMotivo = document.getElementById('glosa_form_motivo');
+        if (txtMotivo) txtMotivo.value = '';
+
+        modal.classList.remove('hidden');
+    }
+
+    onSelectRegraGlosa(val) {
+        const sel = document.getElementById('glosa_form_regra');
+        const opt = sel ? sel.options[sel.selectedIndex] : null;
+        const inpArt = document.getElementById('glosa_form_artigo');
+        const inpPerc = document.getElementById('glosa_form_perc');
+
+        if (opt && inpArt && inpPerc) {
+            inpArt.value = opt.getAttribute('data-art') || '';
+            inpPerc.value = opt.getAttribute('data-perc') || '10';
+        }
+    }
+
+    async confirmarAplicacaoGlosa() {
+        const prot = document.getElementById('glosa_form_protocolo')?.value;
+        const selRegra = document.getElementById('glosa_form_regra');
+        const optRegra = selRegra ? selRegra.options[selRegra.selectedIndex] : null;
+        const art = document.getElementById('glosa_form_artigo')?.value || '';
+        const perc = parseFloat(document.getElementById('glosa_form_perc')?.value) || 0;
+        const motivo = document.getElementById('glosa_form_motivo')?.value?.trim() || '';
+
+        if (!prot || perc <= 0 || !motivo) {
+            this.exibirModalErroHTML('Campos Obrigatórios', 'Por favor, preencha todos os campos obrigatórios da glosa corretamente.');
+            return;
+        }
+
+        const btn = document.getElementById('btnConfirmarGlosaAdmin');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span> Salvando...';
+        }
+
+        try {
+            const list = (this.chamadosList || window.chamadosListCache || []);
+            const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+            const glosasAtuais = (item && Array.isArray(item.glosas)) ? [...item.glosas] : [];
+
+            let aplicador = 'Administrador';
+            if (window.LogsRepository) {
+                const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                const info = await logsRepo.getCurrentUserInfo();
+                if (info && (info.nome || info.email)) aplicador = info.nome || info.email;
+            }
+
+            const novaGlosa = {
+                id: (selRegra?.value || 'glosa') + '_' + Date.now(),
+                regraId: selRegra?.value || 'personalizada',
+                nome: optRegra ? optRegra.text.split(' - ')[0] : 'Glosa Administrativa',
+                artigoTR: art,
+                percentual: perc,
+                motivo: motivo,
+                anistiado: false,
+                justificativa_anistia: '',
+                aplicado_por: aplicador,
+                data_aplicacao: new Date().toISOString(),
+                origem: 'ADMIN'
+            };
+
+            glosasAtuais.push(novaGlosa);
+
+            await this.salvarGlosasNoBanco(prot, glosasAtuais);
+
+            if (item) item.glosas = glosasAtuais;
+
+            if (window.LogsRepository) {
+                const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                if (typeof logFn === 'function') {
+                    await logFn.call(logsRepo, {
+                        protocolo: prot,
+                        tipoAcao: 'AUDITORIA',
+                        tipo_acao: 'AUDITORIA',
+                        descricao: `Glosa Contratual aplicada (${novaGlosa.nome} -${perc}%): ${motivo}`,
+                        dadosNovos: novaGlosa,
+                        dados_novos: novaGlosa,
+                        origemTela: 'Auditoria'
+                    });
+                }
+            }
+
+            document.getElementById('modalAplicarGlosaAdmin')?.classList.add('hidden');
+
+            await this.abrirDetalhesOSModal(prot);
+
+            this.exibirModalSucessoHTML(
+                'Glosa Aplicada com Sucesso',
+                `A glosa de <strong class="text-rose-700 font-bold">-${perc}%</strong> foi aplicada e registrada com sucesso ao protocolo <strong class="text-slate-900 font-bold">#${prot}</strong>.`
+            );
+        } catch (err) {
+            console.error('❌ Erro ao salvar glosa:', err);
+            this.exibirModalErroHTML(
+                'Erro ao Salvar Glosa',
+                `Ocorreu um erro ao salvar a glosa no banco de dados: ${err.message || err}`
+            );
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">gavel</span> <span>Salvar e Aplicar Glosa</span>';
+            }
+        }
+    }
+
+    async alternarAnistiaGlosa(prot, glosaIndex, anistiar = true) {
+        const list = (this.chamadosList || window.chamadosListCache || []);
+        const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+        if (!item || !item.glosas || !item.glosas[glosaIndex]) return;
+
+        const glosa = item.glosas[glosaIndex];
+
+        const executarAlteracao = async (justificativa = '') => {
+            const glosas = [...item.glosas];
+            glosas[glosaIndex].anistiado = anistiar;
+            glosas[glosaIndex].justificativa_anistia = justificativa;
+            glosas[glosaIndex].data_anistia = new Date().toISOString();
+
+            try {
+                await this.salvarGlosasNoBanco(prot, glosas);
+                item.glosas = glosas;
+
+                if (window.LogsRepository) {
+                    const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                    const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                    if (typeof logFn === 'function') {
+                        await logFn.call(logsRepo, {
+                            protocolo: prot,
+                            tipoAcao: 'AUDITORIA',
+                            tipo_acao: 'AUDITORIA',
+                            descricao: anistiar ? `Glosa anistiada pelo fiscal: ${justificativa || 'Sem justificativa'}` : `Glosa reativada pelo fiscal`,
+                            dadosNovos: glosas[glosaIndex],
+                            dados_novos: glosas[glosaIndex],
+                            origemTela: 'Auditoria'
+                        });
+                    }
+                }
+
+                await this.abrirDetalhesOSModal(prot);
+
+                this.exibirModalSucessoHTML(
+                    anistiar ? 'Glosa Anistiada' : 'Glosa Reativada',
+                    anistiar 
+                        ? `A glosa <strong>${glosa.nome || 'selecionada'}</strong> foi relevada/anistiada com sucesso para o protocolo <strong>#${prot}</strong>.`
+                        : `A glosa <strong>${glosa.nome || 'selecionada'}</strong> foi reativada para o protocolo <strong>#${prot}</strong>.`
+                );
+            } catch (err) {
+                this.exibirModalErroHTML('Erro na Operação', 'Erro ao atualizar status da glosa: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: anistiar ? 'Anistiar / Relevar Glosa' : 'Reativar Glosa',
+                message: anistiar 
+                    ? `Deseja anistiar a glosa <strong class="text-slate-900">${glosa.nome || 'selecionada'} (-${glosa.percentual || 0}%)</strong> do protocolo <strong>#${prot}</strong>?`
+                    : `Deseja reativar o desconto de <strong class="text-rose-700">-${glosa.percentual || 0}%</strong> desta glosa?`,
+                icon: anistiar ? 'verified' : 'gavel',
+                iconBgClass: anistiar ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                confirmBtnClass: anistiar ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold' : 'bg-amber-600 hover:bg-amber-700 text-white font-bold',
+                confirmText: anistiar ? 'Anistiar Glosa' : 'Reativar Glosa',
+                showJustification: anistiar,
+                requireJustification: false,
+                onConfirm: (just) => executarAlteracao(just)
+            });
+        } else {
+            executarAlteracao('');
+        }
+    }
+
+    async removerGlosaOS(prot, glosaIndex) {
+        const list = (this.chamadosList || window.chamadosListCache || []);
+        const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+        if (!item || !item.glosas || !item.glosas[glosaIndex]) return;
+
+        const removida = item.glosas[glosaIndex];
+
+        const executarRemocao = async () => {
+            const glosas = item.glosas.filter((_, idx) => idx !== glosaIndex);
+
+            try {
+                await this.salvarGlosasNoBanco(prot, glosas);
+                item.glosas = glosas;
+
+                if (window.LogsRepository) {
+                    const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                    const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                    if (typeof logFn === 'function') {
+                        await logFn.call(logsRepo, {
+                            protocolo: prot,
+                            tipoAcao: 'AUDITORIA',
+                            tipo_acao: 'AUDITORIA',
+                            descricao: `Glosa removida (${removida.nome || removida.regra}): ${removida.motivo || ''}`,
+                            dadosAnteriores: removida,
+                            dados_anteriores: removida,
+                            origemTela: 'Auditoria'
+                        });
+                    }
+                }
+
+                await this.abrirDetalhesOSModal(prot);
+
+                this.exibirModalSucessoHTML(
+                    'Glosa Removida',
+                    `A glosa <strong>${removida.nome || 'selecionada'}</strong> foi excluída do protocolo <strong>#${prot}</strong>.`
+                );
+            } catch (err) {
+                this.exibirModalErroHTML('Erro ao Excluir', 'Erro ao excluir glosa: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: 'Excluir Glosa',
+                message: `Deseja realmente remover permanentemente a glosa <strong class="text-rose-700">${removida.nome || 'selecionada'} (-${removida.percentual || 0}%)</strong> do protocolo <strong>#${prot}</strong>?`,
+                icon: 'delete',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white font-bold',
+                confirmText: 'Excluir Glosa',
+                showJustification: false,
+                onConfirm: () => executarRemocao()
+            });
+        } else {
+            executarRemocao();
+        }
+    }
+
+    async salvarGlosasNoBanco(prot, glosasList) {
+        if (!window.supabaseClient) {
+            console.warn('⚠️ Supabase client indisponível, alteração apenas local');
+            return;
+        }
+
+        const client = window.supabaseClient;
+        const cleanProt = String(prot || '').replace(/^#/, '').trim();
+
+        const isNumericId = /^\d+$/.test(cleanProt);
+        const filterClause = isNumericId
+            ? `protocolo.eq.${cleanProt},protocolo.ilike.${cleanProt},id.eq.${cleanProt}`
+            : `protocolo.eq.${cleanProt},protocolo.ilike.${cleanProt}`;
+
+        // 1. Tenta atualizar em ordens_servico por protocolo ou ID
+        let res = await client
+            .from('ordens_servico')
+            .update({ glosas: glosasList })
+            .or(filterClause)
+            .select();
+
+        let updated = res.data && res.data.length > 0;
+
+        // 2. Se não atualizou nada, tenta em ordens_servico_pracas
+        if (!updated) {
+            let resPracas = await client
+                .from('ordens_servico_pracas')
+                .update({ glosas: glosasList })
+                .or(filterClause)
+                .select();
+            if (resPracas.data && resPracas.data.length > 0) {
+                updated = true;
+            }
+        }
+
+        // 3. Se ainda não atualizou, tenta em chamados legado
+        if (!updated) {
+            let resLeg = await client
+                .from('chamados')
+                .update({ glosas: glosasList })
+                .or(filterClause)
+                .select();
+            if (resLeg.data && resLeg.data.length > 0) {
+                updated = true;
+            }
+        }
+
+        // 4. Limpa e atualiza cache em sessionStorage para garantir consistência
+        try {
+            if (window.ChamadosRepository) {
+                const repo = typeof window.ChamadosRepository === 'function' ? new window.ChamadosRepository() : window.ChamadosRepository;
+                if (typeof repo.clearCache === 'function') repo.clearCache();
+            } else {
+                sessionStorage.removeItem('chamados_repo_cache_v1');
+            }
+        } catch (eCache) {
+            console.warn('⚠️ Erro ao invalidar cache repo:', eCache);
+        }
+
+        // Atualiza no cache de sessionStorage se ainda existir
+        try {
+            const cachedRaw = sessionStorage.getItem('chamados_repo_cache_v1');
+            if (cachedRaw) {
+                const parsed = JSON.parse(cachedRaw);
+                if (parsed && Array.isArray(parsed.data)) {
+                    const rowMatch = parsed.data.find(r => 
+                        String(r.protocolo || '').toUpperCase() === cleanProt.toUpperCase() ||
+                        String(r.id || '') === cleanProt
+                    );
+                    if (rowMatch) {
+                        rowMatch.glosas = glosasList;
+                        sessionStorage.setItem('chamados_repo_cache_v1', JSON.stringify(parsed));
+                    }
+                }
+            }
+        } catch(eUpCache) {}
+
+        if (res.error && !updated) {
+            console.error('❌ Erro no update do Supabase:', res.error);
+            throw new Error(res.error.message || 'Erro ao persistir glosas no banco.');
+        }
     }
 }
 

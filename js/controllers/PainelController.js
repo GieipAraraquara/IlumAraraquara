@@ -13,6 +13,7 @@ class PainelController {
             problem: ['all'],
             status: ['all']
         };
+        this.medicaoService = window.MedicaoService ? new window.MedicaoService() : null;
     }
 
     /**
@@ -153,8 +154,10 @@ class PainelController {
 
         const filteredList = this.service.filterChamados(this.chamadosList, this.activeFilters);
 
-        // Separate pending items matching current filters
-        const pendentesList = filteredList.filter(item => item.normalizedStatus === 'pendente');
+        // Separate pending items matching current filters (ignoring the status filter of the main table)
+        const pendentesFilters = { ...this.activeFilters, status: ['all'] };
+        const pendentesFilteredList = this.service.filterChamados(this.chamadosList, pendentesFilters);
+        const pendentesList = pendentesFilteredList.filter(item => item.normalizedStatus === 'pendente');
 
         // Check if system has any pending approval records
         const hasAnyPendingInSystem = (this.chamadosList || []).some(item => item.normalizedStatus === 'pendente');
@@ -839,6 +842,21 @@ class PainelController {
                     if (resLeg && resLeg.data) row = resLeg.data;
                 }
 
+                if (row) {
+                    try {
+                        const { data: fechRows } = await client
+                            .from('fechamentos_os')
+                            .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                            .or(`protocolo.ilike.${cleanId},os_id.eq.${cleanId}`)
+                            .order('numero_fechamento', { ascending: true });
+                        if (fechRows && fechRows.length > 0) {
+                            row.fechamentos_os = fechRows;
+                        }
+                    } catch (eFechSingle) {
+                        console.warn('⚠️ Erro ao carregar fechamentos_os da OS individual:', eFechSingle);
+                    }
+                }
+
                 if (row && window.ChamadoModel) {
                     const ModelClass = window.ChamadoModel;
                     item = (typeof ModelClass.fromRow === 'function') ? ModelClass.fromRow(row) : new ModelClass(row);
@@ -1086,6 +1104,43 @@ class PainelController {
                             </div>
                         </div>
                     `;
+                } else if (
+                    (hasNovos && log.dados_novos && (log.dados_novos.percentual !== undefined || log.dados_novos.regraId !== undefined || log.dados_novos.artigoTR !== undefined)) ||
+                    (hasAnteriores && log.dados_anteriores && (log.dados_anteriores.percentual !== undefined || log.dados_anteriores.regraId !== undefined || log.dados_anteriores.artigoTR !== undefined))
+                ) {
+                    const g = log.dados_novos || log.dados_anteriores || {};
+                    const isRemocao = !log.dados_novos && Boolean(log.dados_anteriores);
+                    const isAnistia = Boolean(g.anistiado);
+                    const perc = Number(g.percentual) || 0;
+                    const nomeGlosa = g.nome || g.regra || 'Glosa Administrativa';
+                    const artTR = g.artigoTR ? `(${g.artigoTR})` : '';
+
+                    diffHtml = `
+                        <div class="mt-2 p-2.5 rounded-xl ${isRemocao ? 'bg-slate-50 border border-slate-200' : (isAnistia ? 'bg-emerald-50/60 border border-emerald-200/80' : 'bg-rose-50/60 border border-rose-200/80')} space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                                    <span class="material-symbols-outlined text-[15px] ${isRemocao ? 'text-slate-500' : (isAnistia ? 'text-emerald-600' : 'text-rose-600')}">
+                                        ${isRemocao ? 'delete' : (isAnistia ? 'verified' : 'gavel')}
+                                    </span>
+                                    <span>${nomeGlosa}</span>
+                                    ${artTR ? `<span class="text-[10px] text-slate-500 font-normal">${artTR}</span>` : ''}
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isRemocao ? 'bg-slate-200 text-slate-700 line-through' : (isAnistia ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800 border border-rose-200')}">
+                                    ${isAnistia ? `Anistiada (-${perc}%)` : (isRemocao ? `Removida (-${perc}%)` : `-${perc}%`)}
+                                </span>
+                            </div>
+                            ${g.motivo ? `
+                                <div class="text-[11px] text-slate-600 bg-white/80 p-1.5 rounded-lg border border-slate-200/60">
+                                    <b>Motivo:</b> ${g.motivo}
+                                </div>
+                            ` : ''}
+                            ${g.justificativa_anistia ? `
+                                <div class="text-[10.5px] text-emerald-800 bg-emerald-100/50 p-1.5 rounded-lg border border-emerald-200">
+                                    <b>Justificativa da Anistia:</b> ${g.justificativa_anistia}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
                 } else if (hasAnteriores || hasNovos) {
                     const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
                     const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
@@ -1244,6 +1299,7 @@ class PainelController {
                     <span>Solicitante & Atendimento</span>
                 </div>
                 <div><b class="text-on-surface-variant font-medium">Munícipe:</b> <span class="font-medium text-on-surface">${item.municipeNome || 'Não informado'}</span></div>
+                ${(item.telefoneCelular || item.telefoneFixo || item.rawRow?.telefone_celular || item.rawRow?.telefone_fixo) ? `<div><b class="text-on-surface-variant font-medium">Telefone/Contato:</b> <span class="font-medium text-on-surface">${[item.telefoneCelular || item.rawRow?.telefone_celular, item.telefoneFixo || item.rawRow?.telefone_fixo].filter(Boolean).join(' / ')}</span></div>` : ''}
                 <div><b class="text-on-surface-variant font-medium">CPF Solicitante:</b> <span class="font-medium text-on-surface">${item.maskedCpfSolicitante || 'Não informado'}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
@@ -1351,6 +1407,130 @@ class PainelController {
                 </div>
             </div>`;
         })()}
+
+        <!-- Seção Especial: Detalhes da Praça Pública & Problemas Relatados (Exclusivo para Protocolos 'P') -->
+        ${isPracaOS ? (() => {
+            const pracaNome = item.pracaNome || item.rawRow?.praca_nome || 'Praça Pública / Área de Lazer';
+            const enderecoPraca = item.endereco || item.rawRow?.endereco || 'Endereço não informado';
+            const coordPraca = item.coordenadaInicial || item.coordenada || item.rawRow?.coordenada || '';
+            const coordReparoPraca = item.coordenadaReparo || item.rawRow?.coordenada_reparo || '';
+            
+            // Tratamento detalhado da lista de problemas relatados
+            let problemasArray = [];
+            if (item.problemasList && Array.isArray(item.problemasList)) {
+                problemasArray = item.problemasList;
+            } else if (item.rawRow?.problemas) {
+                const rawProb = item.rawRow.problemas;
+                if (Array.isArray(rawProb)) problemasArray = rawProb;
+                else if (typeof rawProb === 'string' && (rawProb.trim().startsWith('[') || rawProb.trim().startsWith('{'))) {
+                    try { problemasArray = JSON.parse(rawProb.trim()); } catch(e) {}
+                }
+            }
+
+            // Fallback se não for array de objetos: utiliza problemaInicial
+            const fallbackProbText = item.problemaInicial || item.problema || (item.rawRow && (item.rawRow.problema_inicial || item.rawRow.problema)) || '';
+
+            // Links de Navegação Maps / Waze
+            let lat = null, lng = null;
+            const coordAlvo = coordReparoPraca || coordPraca;
+            if (coordAlvo) {
+                const parts = String(coordAlvo).split(',').map(s => s.trim());
+                if (parts.length >= 2) {
+                    const pLat = parseFloat(parts[0]);
+                    const pLng = parseFloat(parts[1]);
+                    if (!isNaN(pLat) && !isNaN(pLng)) { lat = pLat; lng = pLng; }
+                }
+            }
+            let gmaps = '#', waze = '#';
+            if (lat !== null && lng !== null) {
+                gmaps = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+                waze = `https://waze.com/ul?ll=${lat},${lng}&navigate=yes`;
+            } else if (enderecoPraca && !enderecoPraca.toLowerCase().includes('não informado')) {
+                const enc = encodeURIComponent(enderecoPraca + (enderecoPraca.toLowerCase().includes('araraquara') ? '' : ', Araraquara - SP'));
+                gmaps = `https://www.google.com/maps/search/?api=1&query=${enc}`;
+                waze = `https://waze.com/ul?q=${enc}&navigate=yes`;
+            }
+
+            return `
+            <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2.5">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5 text-emerald-800 font-bold">
+                        <span class="material-symbols-outlined text-[18px] text-emerald-600">park</span>
+                        <span>Identificação & Problemas Relatados da Praça</span>
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shadow-2xs">
+                        Praça Pública
+                    </span>
+                </div>
+
+                <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2.5">
+                    <!-- Nome da Praça & Problemas Principais -->
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                        <div>
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Logradouro / Espaço</span>
+                            <span class="text-sm font-bold text-slate-900 flex items-center gap-1.5 mt-0.5">
+                                <span class="material-symbols-outlined text-[16px] text-emerald-600">location_city</span>
+                                ${pracaNome}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Bloco de Problemas Relatados -->
+                    <div class="space-y-1.5">
+                        <span class="text-[10.5px] font-bold text-slate-700 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-amber-600">report_problem</span>
+                            Problemas Relatados na Abertura:
+                        </span>
+                        
+                        <div class="flex flex-wrap gap-1.5 pt-0.5">
+                            ${(Array.isArray(problemasArray) && problemasArray.length > 0) ? problemasArray.map(p => {
+                                const probNome = (typeof p === 'object' && p !== null) ? (p.problema || p.descricao || p.tipo || p.nome || 'Problema não especificado') : String(p);
+                                const probQtd = (typeof p === 'object' && p !== null) ? (p.quantidade || p.qtd) : null;
+                                return `
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-950 border border-amber-200 shadow-2xs">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                    <span>${probNome}</span>
+                                    ${probQtd ? `<span class="bg-amber-200/80 text-amber-900 text-[10px] font-bold px-1.5 py-0.2 rounded-full">Qtd: ${probQtd}</span>` : ''}
+                                </span>
+                                `;
+                            }).join('') : `
+                                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-950 border border-amber-200 shadow-2xs">
+                                    <span class="w-2 h-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+                                    <span>${fallbackProbText || 'Nenhum problema detalhado'}</span>
+                                </span>
+                            `}
+                        </div>
+                    </div>
+
+                    <!-- Localização & Coordenadas -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2 pt-1 border-t border-slate-100 text-xs">
+                        <div class="space-y-1">
+                            <div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-800">${enderecoPraca}</span></div>
+                            ${coordReparoPraca ? `<div><b class="text-slate-600">Coordenada Reparo:</b> <span class="font-mono text-emerald-800 text-[11px]">${coordReparoPraca}</span></div>` : ''}
+                        </div>
+
+                        ${(gmaps !== '#' || waze !== '#') ? `
+                        <div class="flex flex-col justify-end items-start md:items-end gap-1 pt-1 md:pt-0">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Navegação GPS:</span>
+                            <div class="flex items-center gap-1.5">
+                                <a href="${gmaps}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[13px] text-blue-600">map</span>
+                                    <span>Google Maps</span>
+                                    <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                </a>
+                                <a href="${waze}" target="_blank" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 active:scale-95 transition-all shadow-2xs cursor-pointer">
+                                    <span class="material-symbols-outlined text-[13px] text-cyan-600">navigation</span>
+                                    <span>Waze</span>
+                                    <span class="material-symbols-outlined text-[9px] opacity-70">open_in_new</span>
+                                </a>
+                            </div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+            `;
+        })() : ''}
 
         <!-- Seção 3: Pontos de Manutenção (Exclusivo para Protocolos Viários 'I') -->
         ${!isPracaOS ? `
@@ -1537,6 +1717,15 @@ class PainelController {
                                 <div><b class="text-slate-500 font-medium">Fim:</b> ${dataFim}</div>
                             </div>
                             ${durStr ? `<div class="text-blue-700 font-bold text-[11px] pt-0.5">⏱️ Duração: ${durStr}</div>` : ''}
+                            ${s.descricao_servico ? `
+                            <div class="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200/80 text-[11px] text-emerald-950 space-y-0.5">
+                                <b class="text-emerald-800 flex items-center gap-1 font-bold text-[10px]">
+                                    <span class="material-symbols-outlined text-[13px] text-emerald-700">description</span>
+                                    Descrição do Serviço:
+                                </b>
+                                <p class="whitespace-pre-line text-[10.5px] leading-tight font-medium text-slate-800">${s.descricao_servico}</p>
+                            </div>
+                            ` : ''}
                             ${(s.coordenada_inicio || s.coordenada_fim) ? `
                             <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
                                 ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
@@ -1615,8 +1804,9 @@ class PainelController {
 
 
 
-        <!-- Seção 3: Histórico de Fechamentos (Com Subseções de Materiais & Fotos para Cada Fechamento) -->
+        <!-- Seção 3: Histórico de Fechamentos (Exclusivo para Protocolos Viários 'I') -->
         ${(() => {
+            if (isPracaOS) return '';
             const fechList = item.fechamentosList || [];
             if (!fechList || fechList.length === 0) return '';
 
@@ -1715,6 +1905,146 @@ class PainelController {
             `;
         })()}
 
+        <!-- Seção 4: Glosas & Penalidades Contratuais (Automáticas do TR e Administrativas) -->
+        ${(() => {
+            // Avalia infrações automáticas via MedicaoService se disponível
+            let infracoesTR = [];
+            const medService = this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
+            if (medService && typeof medService.avaliarInfracoesOS === 'function') {
+                try {
+                    const avaliadas = medService.avaliarInfracoesOS(item) || [];
+                    // Filtra apenas as automáticas (atraso_execucao, sem_plaqueta, etc.)
+                    infracoesTR = avaliadas.filter(inf => !inf.isManualAdmin && inf.regraId !== 'personalizada');
+                } catch (errInf) {
+                    console.warn('⚠️ [PainelController] Falha ao avaliar regras do TR:', errInf);
+                }
+            }
+
+            const glosasManuais = item.glosas || [];
+            const totalGlosasGeral = infracoesTR.length + glosasManuais.length;
+
+            return `
+            <div class="p-3.5 bg-rose-50/40 border border-rose-200/80 rounded-xl space-y-3 text-xs">
+                <div class="font-bold text-rose-950 text-xs border-b border-rose-200/60 pb-1.5 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px] text-rose-600">gavel</span>
+                        <span>Glosas & Penalidades Contratuais (${totalGlosasGeral})</span>
+                    </span>
+                    ${!isManutentorUser ? `
+                    <button type="button" onclick="window.painelController.abrirModalAplicarGlosa('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer">
+                        <span class="material-symbols-outlined text-[13px]">add</span>
+                        <span>Aplicar Glosa</span>
+                    </button>
+                    ` : ''}
+                </div>
+
+                <div id="containerListaGlosasOS" class="space-y-2">
+                    ${totalGlosasGeral === 0 ? `
+                        <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface-variant italic text-[11px] flex items-center justify-between">
+                            <span>Nenhuma glosa ou penalidade aplicável a este protocolo.</span>
+                            <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">verified</span> 100% Conforme
+                            </span>
+                        </div>
+                    ` : ''}
+
+                    <!-- 1. Glosas Automáticas Calculadas do Termo de Referência (TR) -->
+                    ${infracoesTR.map((inf) => {
+                        const isAnistiada = Boolean(inf.anistiado);
+                        const perc = Number(inf.percentualGlosa) || 0;
+                        const badgePerc = isAnistiada 
+                            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through">-${perc}% (Anistiada)</span>`
+                            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">-${perc}% TR</span>`;
+
+                        return `
+                        <div class="p-2.5 rounded-xl bg-surface-container-lowest border ${isAnistiada ? 'border-slate-200 opacity-75' : 'border-amber-200 shadow-2xs'} space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-800 text-[11.5px]">${inf.nome || 'Regra TR'}</span>
+                                    <span class="text-[9.5px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide bg-blue-100 text-blue-800 border border-blue-200">Automática TR</span>
+                                    ${inf.artigoTR ? `<span class="text-[10px] text-slate-500 font-medium">(${inf.artigoTR})</span>` : ''}
+                                </div>
+                                <div>${badgePerc}</div>
+                            </div>
+
+                            <div class="text-[11px] text-slate-600 leading-relaxed bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+                                <div><b>Detalhamento:</b> ${inf.detalhe || 'Infração identificada pelas regras do contrato.'}</div>
+                                ${isAnistiada && inf.justificativa ? `<div class="text-emerald-800 mt-1"><b>Justificativa da Anistia:</b> ${inf.justificativa}</div>` : ''}
+                            </div>
+
+                            <div class="flex items-center justify-between pt-1 text-[10px] text-slate-500 border-t border-slate-100">
+                                <span>⚙️ <b>Avaliado automaticamente pelo sistema com base no TR</b></span>
+                                ${!isManutentorUser ? `
+                                <div class="flex items-center gap-1.5">
+                                    ${!isAnistiada ? `
+                                        <button type="button" onclick="window.painelController.alternarAnistiaGlosaAutomatica('${item.protocolo || item.id}', '${inf.regraId}', true, ${perc})" class="px-2 py-0.5 rounded font-semibold text-emerald-700 hover:bg-emerald-50 border border-emerald-300 transition-colors" title="Relevar/Anistiar glosa automática no cálculo de medição">
+                                            Anistiar
+                                        </button>
+                                    ` : `
+                                        <button type="button" onclick="window.painelController.alternarAnistiaGlosaAutomatica('${item.protocolo || item.id}', '${inf.regraId}', false, ${perc})" class="px-2 py-0.5 rounded font-semibold text-amber-700 hover:bg-amber-50 border border-amber-300 transition-colors" title="Reativar desconto da glosa automática">
+                                            Reativar Glosa
+                                        </button>
+                                    `}
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+
+                    <!-- 2. Glosas Administrativas / Manuais -->
+                    ${glosasManuais.map((g, gIdx) => {
+                        const isAnistiada = Boolean(g.anistiado);
+                        const perc = Number(g.percentual) || 0;
+                        const badgePerc = isAnistiada 
+                            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700 line-through">-${perc}% (Anistiada)</span>`
+                            : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-300">-${perc}% Glosa</span>`;
+
+                        const dtStr = g.data_aplicacao ? new Date(g.data_aplicacao).toLocaleString('pt-BR') : '';
+
+                        return `
+                        <div class="p-2.5 rounded-xl bg-surface-container-lowest border ${isAnistiada ? 'border-slate-200 opacity-75' : 'border-rose-200 shadow-2xs'} space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-slate-800 text-[11.5px]">${g.nome || g.regra || 'Glosa Administrativa'}</span>
+                                    <span class="text-[9.5px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide bg-purple-100 text-purple-800 border border-purple-200">Manual</span>
+                                    ${g.artigoTR ? `<span class="text-[10px] text-slate-500 font-medium">(${g.artigoTR})</span>` : ''}
+                                </div>
+                                <div>${badgePerc}</div>
+                            </div>
+
+                            <div class="text-[11px] text-slate-600 leading-relaxed bg-slate-50/60 p-2 rounded-lg border border-slate-100">
+                                <div><b>Motivo:</b> ${g.motivo || 'Motivo não informado.'}</div>
+                                ${isAnistiada && g.justificativa_anistia ? `<div class="text-emerald-800 mt-1"><b>Justificativa da Anistia:</b> ${g.justificativa_anistia}</div>` : ''}
+                            </div>
+
+                            <div class="flex items-center justify-between pt-1 text-[10px] text-slate-500 border-t border-slate-100">
+                                <span>👤 <b>Aplicado por:</b> ${g.aplicado_por || 'Administrador'} ${dtStr ? `• ${dtStr}` : ''}</span>
+                                ${!isManutentorUser ? `
+                                <div class="flex items-center gap-1.5">
+                                    ${!isAnistiada ? `
+                                        <button type="button" onclick="window.painelController.alternarAnistiaGlosa('${item.protocolo || item.id}', ${gIdx}, true)" class="px-2 py-0.5 rounded font-semibold text-emerald-700 hover:bg-emerald-50 border border-emerald-300 transition-colors" title="Relevar/Anistiar glosa no cálculo de medição">
+                                            Anistiar
+                                        </button>
+                                    ` : `
+                                        <button type="button" onclick="window.painelController.alternarAnistiaGlosa('${item.protocolo || item.id}', ${gIdx}, false)" class="px-2 py-0.5 rounded font-semibold text-amber-700 hover:bg-amber-50 border border-amber-300 transition-colors" title="Reativar desconto da glosa">
+                                            Reativar Glosa
+                                        </button>
+                                    `}
+                                    <button type="button" onclick="window.painelController.removerGlosaOS('${item.protocolo || item.id}', ${gIdx})" class="px-1.5 py-0.5 rounded font-semibold text-rose-600 hover:bg-rose-50 border border-rose-200 transition-colors" title="Excluir esta glosa">
+                                        <span class="material-symbols-outlined text-[13px] align-middle">delete</span>
+                                    </button>
+                                </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+            `;
+        })()}
+
         <!-- Seção 5: Linha do Tempo de Auditoria & Logs -->
         <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
@@ -1733,31 +2063,1130 @@ class PainelController {
         `;
     }
 
+    /**
+     * Abre o modal interativo para alteração da lista de materiais da OS por Administrador no Painel
+     * Organizado por Fechamento, integrado ao catálogo Supabase (materiais_contrato), 
+     * com autocompletar e atualização em tempo real dos cards e tabelas.
+     */
     async abrirModalEdicaoMateriais(protocoloOrId) {
-        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function' && (!this.chamadosList || this.chamadosList.length === 0)) {
             return await window.auditoriaController.abrirModalEdicaoMateriais(protocoloOrId);
         }
         const item = (this.chamadosList || window.chamadosListCache || []).find(o => 
             String(o.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
             String(o.id || '') === String(protocoloOrId)
         );
+
         if (!item) {
             alert('Ordem de serviço não encontrada para edição de materiais.');
             return;
         }
-        const repo = new window.ChamadosRepository();
-        const matTextoAtual = typeof item.materialUtilizado === 'string' ? item.materialUtilizado : JSON.stringify(item.materialUtilizado || '');
-        const novoMat = prompt('Editar Lista de Materiais da OS #' + (item.protocolo || item.id) + ':', matTextoAtual);
-        if (novoMat !== null) {
-            await repo.updateMaterial(item.protocolo || item.id, novoMat);
-            item.materialUtilizado = novoMat;
-            this.abrirDetalhesOSModal(item.protocolo || item.id);
-            if (typeof this.loadData === 'function') this.loadData();
+
+        // Validação de Perfil Administrativo
+        let isAdmin = false;
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (r === 'admin') isAdmin = true;
+            }
+            if (!isAdmin && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+            }
+            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                isAdmin = true;
+            }
+        } catch(e) {}
+
+        if (!isAdmin) {
+            alert('Acesso restrito: Apenas usuários com perfil de Administrador podem editar a lista de materiais.');
+            return;
         }
+
+        // 1. Carrega catálogo oficial de materiais do Supabase (materiais_contrato)
+        const catalogList = await (async () => {
+            if (window.opcoesMateriaisContrato && window.opcoesMateriaisContrato.length > 0) {
+                return window.opcoesMateriaisContrato;
+            }
+            const cache = localStorage.getItem('os_cached_materiais');
+            if (cache) {
+                try {
+                    const parsed = JSON.parse(cache);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        window.opcoesMateriaisContrato = parsed;
+                        return parsed;
+                    }
+                } catch(e) {}
+            }
+            try {
+                const client = window.supabaseClient || (typeof window.obterSupabaseClient === 'function' ? window.obterSupabaseClient() : null);
+                if (client) {
+                    const { data } = await client.from('materiais_contrato').select('*');
+                    if (data && Array.isArray(data) && data.length > 0) {
+                        window.opcoesMateriaisContrato = data.map(row => {
+                            if (typeof row === 'string') return row;
+                            var marca = (row["Marca"] || row.marca || row.fabricante || "").trim();
+                            var desc = (row["Material/Serviço"] || row["Material"] || row.descricao || row.nome || "").trim();
+                            var unidade = (row["Unidade de Medida"] || row["Unidade"] || row.unidade || "").trim();
+                            var valFinal = (marca && desc && !desc.toLowerCase().startsWith(marca.toLowerCase())) ? `${marca} - ${desc}` : (desc || JSON.stringify(row));
+                            if (unidade && !valFinal.includes('(')) valFinal += ` (${unidade})`;
+                            return valFinal.trim();
+                        }).filter(Boolean).sort();
+                        localStorage.setItem('os_cached_materiais', JSON.stringify(window.opcoesMateriaisContrato));
+                        return window.opcoesMateriaisContrato;
+                    }
+                }
+            } catch(e) {
+                console.warn('⚠️ [PainelController] Erro ao carregar materiais_contrato:', e);
+            }
+            return null;
+        })();
+
+        if (!catalogList || !Array.isArray(catalogList) || catalogList.length === 0) {
+            alert('⚠️ Conexão indisponível ou catálogo de materiais do Supabase (materiais_contrato) inacessível.\n\nPor razões de segurança e consistência dos dados, a edição de materiais exige conexão com o banco de dados.');
+            return;
+        }
+
+        // Monta o estado dos Fechamentos (ou Geral se não houver fechamentos)
+        const fechamentosList = item.fechamentosList || [];
+        let fechamentosState = [];
+
+        if (fechamentosList.length > 0) {
+            fechamentosState = fechamentosList.map((f, idx) => {
+                const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : (Array.isArray(f.materiais) ? f.materiais : [f.materiais]);
+                const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || '');
+                return {
+                    id: f.id,
+                    numero: f.numero || f.numero_fechamento || (idx + 1),
+                    operador: f.operador || 'Técnico Responsável',
+                    dataStr: dataStr,
+                    materiais: [...mats]
+                };
+            });
+        } else {
+            const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(item.materialUtilizado) : [];
+            fechamentosState = [{
+                id: null,
+                numero: 1,
+                operador: item.operador || 'Abertura / Geral',
+                dataStr: item.dataConclusaoStr || 'Atendimento Geral',
+                materiais: [...mats]
+            }];
+        }
+
+        // Remove modal existente se houver
+        let modalEl = document.getElementById('modalEditarMateriaisAdmin');
+        if (modalEl) modalEl.remove();
+
+        // Cria o elemento modal com z-index elevado
+        modalEl = document.createElement('div');
+        modalEl.id = 'modalEditarMateriaisAdmin';
+        modalEl.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-3 sm:p-5 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        modalEl.style.zIndex = '999999';
+
+        // Renderiza o corpo do modal
+        const renderModalContent = () => {
+            modalEl.innerHTML = `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-outline-variant/60 bg-slate-50 flex justify-between items-center flex-shrink-0">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[22px]">inventory_2</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-base text-on-surface">Editar Materiais da OS</h3>
+                            <p class="text-xs text-on-surface-variant font-medium">Protocolo: <span class="text-indigo-600 font-bold">#${item.protocolo || item.id}</span></p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('modalEditarMateriaisAdmin').remove()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Body (Scrollable) -->
+                <div class="p-5 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+                    ${fechamentosState.map((fState, fIdx) => `
+                    <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div class="flex items-center gap-2 font-bold text-slate-800 text-xs sm:text-sm">
+                                <span class="material-symbols-outlined text-[18px] text-amber-600">task_alt</span>
+                                <span>${fechamentosList.length > 0 ? `Fechamento #${fState.numero}` : 'Materiais Utilizados da OS'}</span>
+                            </div>
+                            <span class="text-[10.5px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+                                👤 ${fState.operador} ${fState.dataStr ? `• 📅 ${fState.dataStr}` : ''}
+                            </span>
+                        </div>
+
+                        <!-- Formulário de Adição com Autocompletar -->
+                        <div class="flex flex-col sm:flex-row gap-2.5 items-end pt-1">
+                            <div class="flex-1 w-full relative custom-combobox">
+                                <label for="inputMat_${fIdx}" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">
+                                    Material do Catálogo Supabase
+                                </label>
+                                <input type="text" 
+                                       id="inputMat_${fIdx}" 
+                                       placeholder="Buscar material no catálogo..." 
+                                       autocomplete="off"
+                                       oninput="window.filtrarMateriaisAdmin(${fIdx})"
+                                       onclick="window.mostrarMateriaisAdmin(${fIdx})"
+                                       onfocus="window.mostrarMateriaisAdmin(${fIdx})"
+                                       class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-lg px-3 py-2 text-xs font-medium text-slate-900 transition-all" />
+                                
+                                <!-- Dropdown Autocompletar -->
+                                <div id="dropdownMat_${fIdx}" class="hidden max-h-48 overflow-y-auto bg-white border border-slate-300 rounded-xl shadow-2xl absolute z-50 left-0 right-0 top-full mt-1 border-t border-indigo-100 divide-y divide-slate-100"></div>
+                            </div>
+
+                            <div class="w-full sm:w-24">
+                                <label for="inputQtd_${fIdx}" class="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1">Qtd</label>
+                                <input type="number" 
+                                       id="inputQtd_${fIdx}" 
+                                       min="0.1" 
+                                       step="0.1" 
+                                       value="1" 
+                                       class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent rounded-lg px-3 py-2 text-xs font-bold text-slate-900 transition-all text-center" />
+                            </div>
+
+                            <button type="button" 
+                                    onclick="window.adicionarMaterialModalAdmin(${fIdx})" 
+                                    class="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                                <span class="material-symbols-outlined text-[16px]">add</span>
+                                <span>Adicionar</span>
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Materiais Adicionados -->
+                        <div class="overflow-x-auto border border-slate-200 rounded-xl mt-2">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-100 text-slate-600 font-semibold uppercase border-b border-slate-200">
+                                    <tr>
+                                        <th class="py-2 px-3 w-16 text-center">Qtd</th>
+                                        <th class="py-2 px-3">Material / Item</th>
+                                        <th class="py-2 px-3 w-16 text-center">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    ${fState.materiais.length > 0 ? fState.materiais.map((matItem, mIdx) => {
+                                        let displayQtd = '1';
+                                        let displayNome = '';
+                                        if (typeof matItem === 'string') {
+                                            displayNome = matItem;
+                                            const matchQtd = matItem.match(/\(x?(\d+(\.\d+)?)\)$/i);
+                                            if (matchQtd) {
+                                                displayQtd = matchQtd[1];
+                                                displayNome = matItem.replace(/\(x?\d+(\.\d+)?\)$/i, '').trim();
+                                            }
+                                        } else if (matItem && typeof matItem === 'object') {
+                                            displayNome = String(matItem.nome || matItem.descricao || matItem.material || '').trim();
+                                            displayQtd = String(matItem.qtd || matItem.quantidade || 1);
+                                        } else if (matItem !== null && matItem !== undefined) {
+                                            displayNome = String(matItem).trim();
+                                        }
+
+                                        return `
+                                        <tr class="hover:bg-slate-50/80 transition-colors">
+                                            <td class="py-2 px-3 font-bold text-slate-800 text-center">
+                                                <span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200 text-[11px] font-bold inline-block">${displayQtd}</span>
+                                            </td>
+                                            <td class="py-2 px-3 font-medium text-slate-800 text-[11.5px]">${displayNome}</td>
+                                            <td class="py-2 px-3 text-center">
+                                                <button type="button" 
+                                                        onclick="window.removerMaterialModalAdmin(${fIdx}, ${mIdx})" 
+                                                        class="p-1 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer" 
+                                                        title="Remover Material">
+                                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                        `;
+                                    }).join('') : `
+                                        <tr>
+                                            <td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium italic text-[11px]">
+                                                Nenhum material cadastrado para este fechamento.
+                                            </td>
+                                        </tr>
+                                    `}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    `).join('')}
+
+                </div>
+
+                <!-- Footer -->
+                <div class="px-5 py-3.5 border-t border-outline-variant/60 bg-slate-50 flex justify-end items-center gap-3 flex-shrink-0">
+                    <button type="button" onclick="document.getElementById('modalEditarMateriaisAdmin').remove()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btnSalvarMateriaisAdmin" onclick="window.salvarMateriaisAdmin('${item.protocolo || item.id}')" class="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 transition-all rounded-xl shadow-md cursor-pointer flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">save</span>
+                        <span>Salvar Materiais</span>
+                    </button>
+                </div>
+            </div>
+            `;
+        };
+
+        // Handlers globais dinâmicos para a sessão atual do modal
+        window.mostrarMateriaisAdmin = (fIdx) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const val = inp ? inp.value.trim() : '';
+            window.filtrarMateriaisAdmin(fIdx, val);
+        };
+
+        window.filtrarMateriaisAdmin = (fIdx, forcedVal) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const drop = document.getElementById(`dropdownMat_${fIdx}`);
+            if (!inp || !drop) return;
+
+            inp.classList.remove('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+            inp.classList.add('border-slate-300', 'bg-slate-50');
+
+            const val = (forcedVal !== undefined ? forcedVal : inp.value).trim().toLowerCase();
+            const catalog = window.opcoesMateriaisContrato || [];
+
+            const filtered = val 
+                ? catalog.filter(m => m.toLowerCase().includes(val))
+                : catalog;
+
+            if (filtered.length === 0) {
+                drop.innerHTML = `<div class="p-3 text-xs text-rose-600 font-semibold italic text-center">Nenhum material correspondente no catálogo.</div>`;
+                drop.style.display = 'block';
+                return;
+            }
+
+            drop.innerHTML = filtered.slice(0, 60).map(mat => {
+                let htmlContent = mat;
+                const matchUnidade = mat.match(/\s*\(([^)]+)\)$/);
+                let unidadeHTML = "";
+                let baseStr = mat;
+                if (matchUnidade) {
+                    unidadeHTML = ` <b class="font-bold text-blue-600">(${matchUnidade[1]})</b>`;
+                    baseStr = mat.replace(/\s*\(([^)]+)\)$/, '');
+                }
+                const partes = baseStr.split(" - ");
+                if (partes.length >= 2) {
+                    htmlContent = `<b class="font-bold text-slate-900">${partes[0].trim()}</b> - ${partes.slice(1).join(" - ").trim()}${unidadeHTML}`;
+                } else {
+                    htmlContent = baseStr + unidadeHTML;
+                }
+
+                return `<div class="px-3.5 py-2 text-xs text-slate-800 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer transition-colors" onclick="window.selecionarMaterialDropdownAdmin(${fIdx}, '${mat.replace(/'/g, "\\'")}')">${htmlContent}</div>`;
+            }).join('');
+
+            drop.style.display = 'block';
+        };
+
+        window.selecionarMaterialDropdownAdmin = (fIdx, matNome) => {
+            const inp = document.getElementById(`inputMat_${fIdx}`);
+            const drop = document.getElementById(`dropdownMat_${fIdx}`);
+            if (inp) {
+                inp.value = matNome;
+                inp.classList.remove('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inp.classList.add('border-slate-300', 'bg-slate-50');
+            }
+            if (drop) drop.style.display = 'none';
+        };
+
+        window.selecionarPresetModalAdmin = (fIdx, matNome) => {
+            window.selecionarMaterialDropdownAdmin(fIdx, matNome);
+        };
+
+        window.adicionarMaterialModalAdmin = (fIdx) => {
+            const inpMat = document.getElementById(`inputMat_${fIdx}`);
+            const inpQtd = document.getElementById(`inputQtd_${fIdx}`);
+            if (!inpMat) return;
+
+            const rawVal = inpMat.value.trim();
+            const qtd = inpQtd ? parseFloat(inpQtd.value) || 1 : 1;
+
+            if (!rawVal) {
+                inpMat.classList.add('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inpMat.focus();
+                window.mostrarMateriaisAdmin(fIdx);
+                return;
+            }
+
+            // Trava estrita contra o catálogo do Supabase
+            const catalog = window.opcoesMateriaisContrato || [];
+            const matchedCatalogItem = catalog.find(c => c.trim().toLowerCase() === rawVal.toLowerCase());
+
+            if (!matchedCatalogItem) {
+                inpMat.classList.add('border-red-500', 'bg-red-50', 'text-red-900', 'ring-2', 'ring-red-500');
+                inpMat.focus();
+                window.mostrarMateriaisAdmin(fIdx);
+                return;
+            }
+
+            const itemFormatted = (qtd > 1 || qtd < 1) ? `${matchedCatalogItem} (x${qtd})` : matchedCatalogItem;
+            fechamentosState[fIdx].materiais.push(itemFormatted);
+
+            renderModalContent();
+        };
+
+        window.removerMaterialModalAdmin = (fIdx, mIdx) => {
+            if (fechamentosState[fIdx] && fechamentosState[fIdx].materiais) {
+                fechamentosState[fIdx].materiais.splice(mIdx, 1);
+                renderModalContent();
+            }
+        };
+
+        // Event listener para fechar dropdowns ao clicar fora
+        const fecharDropdownsOnClickOutside = (e) => {
+            if (!e.target.closest('.custom-combobox')) {
+                fechamentosState.forEach((_, fIdx) => {
+                    const drop = document.getElementById(`dropdownMat_${fIdx}`);
+                    if (drop) drop.style.display = 'none';
+                });
+            }
+        };
+        document.removeEventListener('click', fecharDropdownsOnClickOutside);
+        document.addEventListener('click', fecharDropdownsOnClickOutside);
+
+        window.salvarMateriaisAdmin = async (prot) => {
+            const btn = document.getElementById('btnSalvarMateriaisAdmin');
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span><span>Salvando no banco...</span>`;
+            }
+
+            try {
+                let todosMateriaisConsolidados = [];
+
+                for (const fState of fechamentosState) {
+                    await this.service.updateMaterial(prot, fState.materiais, fState.id, fState.numero);
+                    todosMateriaisConsolidados = todosMateriaisConsolidados.concat(fState.materiais);
+                }
+
+                // Armazena JSON array para evitar que vírgulas no nome do material quebrem o item
+                const matConsolidadoStr = JSON.stringify(todosMateriaisConsolidados);
+
+                // Função auxiliar para atualizar as referências do item nos objetos em memória
+                const updateItemRef = (targetObj) => {
+                    if (!targetObj) return;
+                    targetObj.materialUtilizado = matConsolidadoStr;
+                    targetObj.material_utilizado = matConsolidadoStr;
+                    if (targetObj.materiais !== undefined) targetObj.materiais = matConsolidadoStr;
+
+                    fechamentosState.forEach((fState, idx) => {
+                        if (targetObj.fechamentosList && targetObj.fechamentosList[idx]) {
+                            targetObj.fechamentosList[idx].materiais = [...fState.materiais];
+                        }
+                        if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
+                            targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
+                        }
+                    });
+                };
+
+                updateItemRef(item);
+
+                // Atualiza o item em todas as listas de cache ativas
+                [this.chamadosList, window.chamadosListCache, window.dadosOSsAbertasCache].forEach(arr => {
+                    if (Array.isArray(arr)) {
+                        arr.filter(o => o && (String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "") === String(prot)))
+                           .forEach(o => updateItemRef(o));
+                    }
+                });
+
+                document.removeEventListener('click', fecharDropdownsOnClickOutside);
+
+                const mEdit = document.getElementById('modalEditarMateriaisAdmin');
+                if (mEdit) mEdit.remove();
+
+                // Re-renderiza o conteúdo do modal de detalhes da OS em tempo real
+                const container = document.getElementById('detalheModalConteudo');
+                if (container) {
+                    container.innerHTML = this.buildDetalhesOSModalHtml(item);
+                }
+
+                // Recarrega o histórico de logs no modal com um pequeno delay para propagação no banco
+                setTimeout(async () => {
+                    await this.carregarLogsNoModal(prot);
+                }, 200);
+
+                if (typeof this.renderTable === 'function') this.renderTable();
+                if (typeof this.renderOSTable === 'function') this.renderOSTable();
+
+                this.exibirModalSucessoHTML(
+                    'Materiais Salvos',
+                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados no Supabase com sucesso!`
+                );
+            } catch(err) {
+                console.error('Erro ao salvar materiais:', err);
+                this.exibirModalErroHTML(
+                    'Erro ao Salvar',
+                    'Ocorreu uma falha ao salvar a lista de materiais no Supabase. Tente novamente.'
+                );
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = `<span class="material-symbols-outlined text-[16px]">save</span><span>Salvar Materiais</span>`;
+                }
+            }
+        };
+
+        renderModalContent();
+        document.body.appendChild(modalEl);
+    }
+    /**
+     * Abre o modal ou diálogo para aplicação de glosa contratual no protocolo selecionado
+     */
+    async abrirModalAplicarGlosa(protocoloOrId) {
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            if (role === 'manutentor') {
+                this.exibirModalErroHTML('Acesso Restrito', 'Apenas administradores possuem permissão para aplicar ou gerenciar glosas contratuais.');
+                return;
+            }
+        }
+        const item = (this.chamadosList || window.chamadosListCache || []).find(o => 
+            String(o.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
+            String(o.id || '') === String(protocoloOrId)
+        );
+        if (!item) {
+            this.exibirModalErroHTML('Não Encontrada', 'Ordem de serviço não encontrada para aplicação de glosa.');
+            return;
+        }
+
+        // Se existir o modal no DOM, exibe-o; caso contrário cria dinamicamente
+        let modal = document.getElementById('modalAplicarGlosaAdmin');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'modalAplicarGlosaAdmin';
+            modal.className = 'fixed inset-0 z-[70000] hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm';
+            modal.innerHTML = `
+                <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden text-on-surface">
+                    <div class="flex items-center justify-between px-5 py-4 border-b border-outline-variant bg-surface-container-low">
+                        <div class="flex items-center gap-2">
+                            <span class="material-symbols-outlined text-rose-600 text-[22px]">gavel</span>
+                            <h3 class="font-bold text-sm text-slate-800" id="modalGlosaTitulo">Aplicar Glosa Contratual</h3>
+                        </div>
+                        <button type="button" onclick="document.getElementById('modalAplicarGlosaAdmin').classList.add('hidden')" class="text-slate-400 hover:text-slate-700 p-1 rounded-lg">
+                            <span class="material-symbols-outlined text-xl">close</span>
+                        </button>
+                    </div>
+                    <form id="formAplicarGlosaAdmin" class="p-5 space-y-4 text-xs" onsubmit="event.preventDefault(); window.painelController.confirmarAplicacaoGlosa();">
+                        <input type="hidden" id="glosa_form_protocolo" value="" />
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Regra / Infração Contratual:</label>
+                            <select id="glosa_form_regra" class="w-full text-xs border border-outline-variant rounded-lg p-2.5 bg-surface-container-lowest text-on-surface focus:ring-1 focus:ring-secondary outline-none" onchange="window.painelController.onSelectRegraGlosa(this.value)">
+                                <option value="sem_plaqueta" data-art="Item 7.6.3" data-perc="20">Ausência / Ilegibilidade de Plaqueta (-20%) - Item 7.6.3</option>
+                                <option value="foto_inadequada" data-art="Item 8.3.1.1" data-perc="20">Foto sem Derredores / Detalhes Incompletos (-20%) - Item 8.3.1.1</option>
+                                <option value="foto_ausente_incompleta" data-art="Item 8.3.1.3" data-perc="100">Falta de Registro Fotográfico Antes/Depois (-100%) - Item 8.3.1.3</option>
+                                <option value="falta_checkin_checkout" data-art="Item 8.4.3" data-perc="15">Descumprimento Check-in/Check-out no App (-15%) - Item 8.4.3</option>
+                                <option value="atraso_execucao" data-art="Item 7.1.4" data-perc="10">Atraso na Execução (10% por dia útil) - Item 7.1.4</option>
+                                <option value="personalizada" data-art="Administrativo" data-perc="0">Outra Glosa / Penalidade Personalizada</option>
+                            </select>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="font-bold text-slate-700 block mb-1">Artigo / Referência TR:</label>
+                                <input type="text" id="glosa_form_artigo" value="Item 7.6.3" class="w-full text-xs border border-outline-variant rounded-lg p-2 bg-surface-container-lowest" required />
+                            </div>
+                            <div>
+                                <label class="font-bold text-slate-700 block mb-1">% Glosa (Desconto):</label>
+                                <div class="flex items-center gap-1">
+                                    <input type="number" step="0.5" min="1" max="100" id="glosa_form_perc" value="20" class="w-full text-xs font-bold border border-outline-variant rounded-lg p-2 bg-surface-container-lowest" required />
+                                    <span class="font-bold text-slate-500">%</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-700 block mb-1">Motivo / Descrição da Não Conformidade:</label>
+                            <textarea id="glosa_form_motivo" rows="3" class="w-full text-xs border border-outline-variant rounded-lg p-2 bg-surface-container-lowest text-on-surface focus:ring-1 focus:ring-secondary outline-none" placeholder="Informe detalhadamente o motivo da penalidade ou evidência encontrada..." required></textarea>
+                        </div>
+                        <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                            <button type="button" onclick="document.getElementById('modalAplicarGlosaAdmin').classList.add('hidden')" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+                                Cancelar
+                            </button>
+                            <button type="submit" id="btnConfirmarGlosaAdmin" class="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 shadow-2xs transition-colors flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px]">gavel</span>
+                                <span>Salvar e Aplicar Glosa</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const inpProt = document.getElementById('glosa_form_protocolo');
+        const titModal = document.getElementById('modalGlosaTitulo');
+        if (inpProt) inpProt.value = item.protocolo || item.id;
+        if (titModal) titModal.innerText = `Aplicar Glosa no Protocolo #${item.protocolo || item.id}`;
+
+        // Reset fields
+        const selRegra = document.getElementById('glosa_form_regra');
+        if (selRegra) {
+            selRegra.selectedIndex = 0;
+            this.onSelectRegraGlosa(selRegra.value);
+        }
+        const txtMotivo = document.getElementById('glosa_form_motivo');
+        if (txtMotivo) txtMotivo.value = '';
+
+        modal.classList.remove('hidden');
+    }
+
+    onSelectRegraGlosa(val) {
+        const sel = document.getElementById('glosa_form_regra');
+        const opt = sel ? sel.options[sel.selectedIndex] : null;
+        const inpArt = document.getElementById('glosa_form_artigo');
+        const inpPerc = document.getElementById('glosa_form_perc');
+
+        if (opt && inpArt && inpPerc) {
+            inpArt.value = opt.getAttribute('data-art') || '';
+            inpPerc.value = opt.getAttribute('data-perc') || '10';
+        }
+    }
+
+    async confirmarAplicacaoGlosa() {
+        const prot = document.getElementById('glosa_form_protocolo')?.value;
+        const selRegra = document.getElementById('glosa_form_regra');
+        const optRegra = selRegra ? selRegra.options[selRegra.selectedIndex] : null;
+        const art = document.getElementById('glosa_form_artigo')?.value || '';
+        const perc = parseFloat(document.getElementById('glosa_form_perc')?.value) || 0;
+        const motivo = document.getElementById('glosa_form_motivo')?.value?.trim() || '';
+
+        if (!prot || perc <= 0 || !motivo) {
+            this.exibirModalErroHTML('Campos Obrigatórios', 'Por favor, preencha todos os campos obrigatórios da glosa corretamente.');
+            return;
+        }
+
+        const btn = document.getElementById('btnConfirmarGlosaAdmin');
+        if (btn) {
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">sync</span> Salvando...';
+        }
+
+        try {
+            const list = (this.chamadosList || window.chamadosListCache || []);
+            const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+            const glosasAtuais = (item && Array.isArray(item.glosas)) ? [...item.glosas] : [];
+
+            // Obter usuário da sessão
+            let aplicador = 'Administrador';
+            if (window.LogsRepository) {
+                const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                const info = await logsRepo.getCurrentUserInfo();
+                if (info && (info.nome || info.email)) aplicador = info.nome || info.email;
+            }
+
+            const novaGlosa = {
+                id: (selRegra?.value || 'glosa') + '_' + Date.now(),
+                regraId: selRegra?.value || 'personalizada',
+                nome: optRegra ? optRegra.text.split(' - ')[0] : 'Glosa Administrativa',
+                artigoTR: art,
+                percentual: perc,
+                motivo: motivo,
+                anistiado: false,
+                justificativa_anistia: '',
+                aplicado_por: aplicador,
+                data_aplicacao: new Date().toISOString(),
+                origem: 'ADMIN'
+            };
+
+            glosasAtuais.push(novaGlosa);
+
+            // Persistir no Supabase
+            await this.salvarGlosasNoBanco(prot, glosasAtuais);
+
+            // Atualizar modelo em memória
+            if (item) item.glosas = glosasAtuais;
+
+            // Registrar Log de Auditoria
+            if (window.LogsRepository) {
+                const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                if (typeof logFn === 'function') {
+                    await logFn.call(logsRepo, {
+                        protocolo: prot,
+                        tipoAcao: 'AUDITORIA',
+                        tipo_acao: 'AUDITORIA',
+                        descricao: `Glosa Contratual aplicada (${novaGlosa.nome} -${perc}%): ${motivo}`,
+                        dadosNovos: novaGlosa,
+                        dados_novos: novaGlosa,
+                        origemTela: 'Painel'
+                    });
+                }
+            }
+
+            document.getElementById('modalAplicarGlosaAdmin')?.classList.add('hidden');
+
+            // Atualiza o modal de detalhes aberto
+            await this.abrirDetalhesOSModal(prot);
+
+            this.exibirModalSucessoHTML(
+                'Glosa Aplicada com Sucesso',
+                `A glosa de <strong class="text-rose-700 font-bold">-${perc}%</strong> foi aplicada e registrada com sucesso ao protocolo <strong class="text-slate-900 font-bold">#${prot}</strong>.`
+            );
+        } catch (err) {
+            console.error('❌ Erro ao salvar glosa:', err);
+            this.exibirModalErroHTML(
+                'Erro ao Salvar Glosa',
+                `Ocorreu um erro ao salvar a glosa no banco de dados: ${err.message || err}`
+            );
+        } finally {
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">gavel</span> <span>Salvar e Aplicar Glosa</span>';
+            }
+        }
+    }
+
+    async alternarAnistiaGlosa(prot, glosaIndex, anistiar = true) {
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            if (role === 'manutentor') {
+                this.exibirModalErroHTML('Acesso Restrito', 'Apenas administradores possuem permissão para anistiar ou reativar glosas.');
+                return;
+            }
+        }
+        const list = (this.chamadosList || window.chamadosListCache || []);
+        const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+        if (!item || !item.glosas || !item.glosas[glosaIndex]) return;
+
+        const glosa = item.glosas[glosaIndex];
+
+        const executarAlteracao = async (justificativa = '') => {
+            const glosas = [...item.glosas];
+            glosas[glosaIndex].anistiado = anistiar;
+            glosas[glosaIndex].justificativa_anistia = justificativa;
+            glosas[glosaIndex].data_anistia = new Date().toISOString();
+
+            try {
+                await this.salvarGlosasNoBanco(prot, glosas);
+                item.glosas = glosas;
+
+                if (window.LogsRepository) {
+                    const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                    const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                    if (typeof logFn === 'function') {
+                        await logFn.call(logsRepo, {
+                            protocolo: prot,
+                            tipoAcao: 'AUDITORIA',
+                            tipo_acao: 'AUDITORIA',
+                            descricao: anistiar ? `Glosa anistiada pelo fiscal: ${justificativa || 'Sem justificativa'}` : `Glosa reativada pelo fiscal`,
+                            dadosNovos: glosas[glosaIndex],
+                            dados_novos: glosas[glosaIndex],
+                            origemTela: 'Painel'
+                        });
+                    }
+                }
+
+                await this.abrirDetalhesOSModal(prot);
+
+                // Notifica a tela de Medição para recalcular imediatamente
+                window.dispatchEvent(new CustomEvent('glosa-anistia-atualizada', { detail: { protocolo: prot } }));
+                if (window.medicaoController && typeof window.medicaoController.processarECalcular === 'function') {
+                    if (window.medicaoController.medicaoService) {
+                        window.medicaoController.medicaoService.overrides = window.medicaoController.medicaoService.carregarOverrides();
+                    }
+                    window.medicaoController.processarECalcular();
+                    if (typeof window.medicaoController.renderMedicaoMensal === 'function') {
+                        window.medicaoController.renderMedicaoMensal();
+                    }
+                }
+
+                this.exibirModalSucessoHTML(
+                    anistiar ? 'Glosa Anistiada' : 'Glosa Reativada',
+                    anistiar 
+                        ? `A glosa <strong>${glosa.nome || 'selecionada'}</strong> foi relevada/anistiada com sucesso para o protocolo <strong>#${prot}</strong>.`
+                        : `A glosa <strong>${glosa.nome || 'selecionada'}</strong> foi reativada para o protocolo <strong>#${prot}</strong>.`
+                );
+            } catch (err) {
+                this.exibirModalErroHTML('Erro na Operação', 'Erro ao atualizar status da glosa: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: anistiar ? 'Anistiar / Relevar Glosa' : 'Reativar Glosa',
+                message: anistiar 
+                    ? `Deseja anistiar a glosa <strong class="text-slate-900">${glosa.nome || 'selecionada'} (-${glosa.percentual || 0}%)</strong> do protocolo <strong>#${prot}</strong>?`
+                    : `Deseja reativar o desconto de <strong class="text-rose-700">-${glosa.percentual || 0}%</strong> desta glosa?`,
+                icon: anistiar ? 'verified' : 'gavel',
+                iconBgClass: anistiar ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                confirmBtnClass: anistiar ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold' : 'bg-amber-600 hover:bg-amber-700 text-white font-bold',
+                confirmText: anistiar ? 'Anistiar Glosa' : 'Reativar Glosa',
+                showJustification: anistiar,
+                requireJustification: false,
+                onConfirm: (just) => executarAlteracao(just)
+            });
+        } else {
+            executarAlteracao('');
+        }
+    }
+
+    async alternarAnistiaGlosaAutomatica(prot, regraId, anistiar = true, perc = 0) {
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            if (role === 'manutentor') {
+                this.exibirModalErroHTML('Acesso Restrito', 'Apenas administradores possuem permissão para anistiar ou reativar glosas.');
+                return;
+            }
+        }
+        const medService = this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
+        if (!medService) {
+            this.exibirModalErroHTML('Serviço Indisponível', 'MedicaoService não está carregado.');
+            return;
+        }
+
+        const nomeRegra = regraId === 'atraso_execucao' ? 'Atraso na Conclusão da OS' : (regraId === 'sem_plaqueta' ? 'Ausência/Avaria de Plaqueta' : regraId);
+
+        const executarAlteracaoAutomatica = async (justificativa = '') => {
+            try {
+                // 1. Salva override no MedicaoService (localStorage e memória)
+                medService.salvarOverrideOS(prot, regraId, !anistiar, justificativa);
+
+                // 2. Se a OS tiver glosa persistida em ordens_servico no Supabase com o mesmo id, sincroniza também
+                const list = (this.chamadosList || window.chamadosListCache || []);
+                const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+                if (item && Array.isArray(item.glosas) && item.glosas.length > 0) {
+                    const gIdx = item.glosas.findIndex(g => g.id === regraId || g.regraId === regraId);
+                    if (gIdx >= 0) {
+                        item.glosas[gIdx].anistiado = anistiar;
+                        item.glosas[gIdx].justificativa_anistia = justificativa;
+                        item.glosas[gIdx].data_anistia = new Date().toISOString();
+                        await this.salvarGlosasNoBanco(prot, item.glosas);
+                    }
+                }
+
+                // 3. Registra log de auditoria
+                if (window.LogsRepository) {
+                    const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                    const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                    if (typeof logFn === 'function') {
+                        await logFn.call(logsRepo, {
+                            protocolo: prot,
+                            tipoAcao: 'AUDITORIA',
+                            tipo_acao: 'AUDITORIA',
+                            descricao: anistiar 
+                                ? `Glosa Automática TR (${nomeRegra}) anistiada pelo fiscal: ${justificativa || 'Sem justificativa'}` 
+                                : `Glosa Automática TR (${nomeRegra}) reativada pelo fiscal`,
+                            dadosNovos: { regraId, perc, anistiado: anistiar, justificativa },
+                            dados_novos: { regraId, perc, anistiado: anistiar, justificativa },
+                            origemTela: 'Painel'
+                        });
+                    }
+                }
+
+                // 4. Re-renderiza o modal de detalhes
+                await this.abrirDetalhesOSModal(prot);
+
+                // Notifica a tela de Medição para recalcular imediatamente
+                window.dispatchEvent(new CustomEvent('glosa-anistia-atualizada', { detail: { protocolo: prot, regraId, anistiar } }));
+                if (window.medicaoController && typeof window.medicaoController.processarECalcular === 'function') {
+                    if (window.medicaoController.medicaoService) {
+                        window.medicaoController.medicaoService.overrides = window.medicaoController.medicaoService.carregarOverrides();
+                    }
+                    window.medicaoController.processarECalcular();
+                    if (typeof window.medicaoController.renderMedicaoMensal === 'function') {
+                        window.medicaoController.renderMedicaoMensal();
+                    }
+                }
+
+                this.exibirModalSucessoHTML(
+                    anistiar ? 'Glosa TR Anistiada' : 'Glosa TR Reativada',
+                    anistiar 
+                        ? `A glosa automática do TR (<strong>${nomeRegra}</strong> -${perc}%) foi relevada/anistiada com sucesso para o protocolo <strong>#${prot}</strong>.`
+                        : `A glosa automática do TR (<strong>${nomeRegra}</strong> -${perc}%) foi reativada com sucesso para o protocolo <strong>#${prot}</strong>.`
+                );
+            } catch (err) {
+                this.exibirModalErroHTML('Erro na Operação', 'Erro ao atualizar status da regra do TR: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: anistiar ? 'Anistiar Glosa Automática do TR' : 'Reativar Glosa do TR',
+                message: anistiar 
+                    ? `Deseja anistiar a infração do TR <strong class="text-slate-900">${nomeRegra} (-${perc}%)</strong> para o protocolo <strong>#${prot}</strong>?`
+                    : `Deseja reativar a penalidade de <strong class="text-amber-700">-${perc}%</strong> desta infração do TR?`,
+                icon: anistiar ? 'verified' : 'gavel',
+                iconBgClass: anistiar ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                confirmBtnClass: anistiar ? 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold' : 'bg-amber-600 hover:bg-amber-700 text-white font-bold',
+                confirmText: anistiar ? 'Anistiar Glosa TR' : 'Reativar Glosa TR',
+                showJustification: anistiar,
+                requireJustification: false,
+                onConfirm: (just) => executarAlteracaoAutomatica(just)
+            });
+        } else {
+            executarAlteracaoAutomatica('');
+        }
+    }
+
+    async removerGlosaOS(prot, glosaIndex) {
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            if (role === 'manutentor') {
+                this.exibirModalErroHTML('Acesso Restrito', 'Apenas administradores possuem permissão para excluir glosas.');
+                return;
+            }
+        }
+        const list = (this.chamadosList || window.chamadosListCache || []);
+        const item = list.find(o => String(o.protocolo || '').toUpperCase() === String(prot).toUpperCase() || String(o.id || '') === String(prot));
+        if (!item || !item.glosas || !item.glosas[glosaIndex]) return;
+
+        const removida = item.glosas[glosaIndex];
+
+        const executarRemocao = async () => {
+            const glosas = item.glosas.filter((_, idx) => idx !== glosaIndex);
+
+            try {
+                await this.salvarGlosasNoBanco(prot, glosas);
+                item.glosas = glosas;
+
+                if (window.LogsRepository) {
+                    const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+                    const logFn = logsRepo.registrarLog || logsRepo.inserirLog;
+                    if (typeof logFn === 'function') {
+                        await logFn.call(logsRepo, {
+                            protocolo: prot,
+                            tipoAcao: 'AUDITORIA',
+                            tipo_acao: 'AUDITORIA',
+                            descricao: `Glosa removida (${removida.nome || removida.regra}): ${removida.motivo || ''}`,
+                            dadosAnteriores: removida,
+                            dados_anteriores: removida,
+                            origemTela: 'Painel'
+                        });
+                    }
+                }
+
+                await this.abrirDetalhesOSModal(prot);
+
+                // Notifica a tela de Medição para recalcular imediatamente
+                window.dispatchEvent(new CustomEvent('glosa-anistia-atualizada', { detail: { protocolo: prot } }));
+                if (window.medicaoController && typeof window.medicaoController.processarECalcular === 'function') {
+                    if (window.medicaoController.medicaoService) {
+                        window.medicaoController.medicaoService.overrides = window.medicaoController.medicaoService.carregarOverrides();
+                    }
+                    window.medicaoController.processarECalcular();
+                    if (typeof window.medicaoController.renderMedicaoMensal === 'function') {
+                        window.medicaoController.renderMedicaoMensal();
+                    }
+                }
+
+                this.exibirModalSucessoHTML(
+                    'Glosa Removida',
+                    `A glosa <strong>${removida.nome || 'selecionada'}</strong> foi excluída do protocolo <strong>#${prot}</strong>.`
+                );
+            } catch (err) {
+                this.exibirModalErroHTML('Erro ao Excluir', 'Erro ao excluir glosa: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: 'Excluir Glosa',
+                message: `Deseja realmente remover permanentemente a glosa <strong class="text-rose-700">${removida.nome || 'selecionada'} (-${removida.percentual || 0}%)</strong> do protocolo <strong>#${prot}</strong>?`,
+                icon: 'delete',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white font-bold',
+                confirmText: 'Excluir Glosa',
+                showJustification: false,
+                onConfirm: () => executarRemocao()
+            });
+        } else {
+            executarRemocao();
+        }
+    }
+
+    async salvarGlosasNoBanco(prot, glosasList) {
+        if (!window.supabaseClient) {
+            console.warn('⚠️ Supabase client indisponível, alteração apenas local');
+            return;
+        }
+
+        const client = window.supabaseClient;
+        const cleanProt = String(prot || '').replace(/^#/, '').trim();
+
+        const isNumericId = /^\d+$/.test(cleanProt);
+        const filterClause = isNumericId
+            ? `protocolo.eq.${cleanProt},protocolo.ilike.${cleanProt},id.eq.${cleanProt}`
+            : `protocolo.eq.${cleanProt},protocolo.ilike.${cleanProt}`;
+
+        // 1. Tenta atualizar em ordens_servico por protocolo ou ID
+        let res = await client
+            .from('ordens_servico')
+            .update({ glosas: glosasList })
+            .or(filterClause)
+            .select();
+
+        let updated = res.data && res.data.length > 0;
+
+        // 2. Se não atualizou nada ou deu erro de tabela, tenta em ordens_servico_pracas
+        if (!updated) {
+            let resPracas = await client
+                .from('ordens_servico_pracas')
+                .update({ glosas: glosasList })
+                .or(filterClause)
+                .select();
+            if (resPracas.data && resPracas.data.length > 0) {
+                updated = true;
+            } else if (resPracas.error && !res.error) {
+                // mantém erro anterior se houver
+            }
+        }
+
+        // 3. Se ainda não atualizou, tenta em chamados legado
+        if (!updated) {
+            let resLeg = await client
+                .from('chamados')
+                .update({ glosas: glosasList })
+                .or(filterClause)
+                .select();
+            if (resLeg.data && resLeg.data.length > 0) {
+                updated = true;
+            }
+        }
+
+        // 4. Limpa e atualiza cache em sessionStorage para garantir consistência
+        try {
+            if (window.ChamadosRepository) {
+                const repo = typeof window.ChamadosRepository === 'function' ? new window.ChamadosRepository() : window.ChamadosRepository;
+                if (typeof repo.clearCache === 'function') repo.clearCache();
+            } else {
+                sessionStorage.removeItem('chamados_repo_cache_v1');
+            }
+        } catch (eCache) {
+            console.warn('⚠️ Erro ao invalidar cache repo:', eCache);
+        }
+
+        // Atualiza no cache de sessionStorage se ainda existir
+        try {
+            const cachedRaw = sessionStorage.getItem('chamados_repo_cache_v1');
+            if (cachedRaw) {
+                const parsed = JSON.parse(cachedRaw);
+                if (parsed && Array.isArray(parsed.data)) {
+                    const rowMatch = parsed.data.find(r => 
+                        String(r.protocolo || '').toUpperCase() === cleanProt.toUpperCase() ||
+                        String(r.id || '') === cleanProt
+                    );
+                    if (rowMatch) {
+                        rowMatch.glosas = glosasList;
+                        sessionStorage.setItem('chamados_repo_cache_v1', JSON.stringify(parsed));
+                    }
+                }
+            }
+        } catch(eUpCache) {}
+
+        if (res.error && !updated) {
+            console.error('❌ Erro no update do Supabase:', res.error);
+            throw new Error(res.error.message || 'Erro ao persistir glosas no banco.');
+        }
+    }
+
+    /**
+     * Exibe modal padrão de confirmação/sucesso em HTML sem utilizar alert nativo do navegador
+     */
+    exibirModalSucessoHTML(titulo, mensagem) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: titulo,
+                message: mensagem,
+                icon: 'check_circle',
+                iconBgClass: 'bg-emerald-100 text-emerald-700',
+                confirmBtnClass: 'bg-emerald-600 hover:bg-emerald-700 text-white font-bold',
+                confirmText: 'Entendido',
+                showJustification: false,
+                showCancelBtn: false,
+                onConfirm: () => {}
+            });
+            return;
+        }
+
+        let m = document.getElementById('modalSucessoPainelHTML');
+        if (m) m.remove();
+        m = document.createElement('div');
+        m.id = 'modalSucessoPainelHTML';
+        m.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        m.style.zIndex = '999999';
+        m.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+                <div class="w-12 h-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto flex-shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">check_circle</span>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-base text-slate-900">${titulo}</h3>
+                    <p class="text-xs font-medium text-slate-600 leading-relaxed">${mensagem}</p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" onclick="document.getElementById('modalSucessoPainelHTML').remove()" class="w-full py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer">
+                        Entendido
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
+    }
+
+    exibirModalErroHTML(titulo, mensagem) {
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: titulo,
+                message: mensagem,
+                icon: 'error',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white font-bold',
+                confirmText: 'Fechar',
+                showJustification: false,
+                showCancelBtn: false,
+                onConfirm: () => {}
+            });
+            return;
+        }
+
+        let m = document.getElementById('modalErroPainelHTML');
+        if (m) m.remove();
+        m = document.createElement('div');
+        m.id = 'modalErroPainelHTML';
+        m.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-900/75 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        m.style.zIndex = '999999';
+        m.innerHTML = `
+            <div class="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4 text-center">
+                <div class="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto flex-shrink-0">
+                    <span class="material-symbols-outlined text-[28px]">error</span>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="font-bold text-base text-slate-900">${titulo}</h3>
+                    <p class="text-xs font-medium text-slate-600 leading-relaxed">${mensagem}</p>
+                </div>
+                <div class="pt-2">
+                    <button type="button" onclick="document.getElementById('modalErroPainelHTML').remove()" class="w-full py-2 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer">
+                        Fechar
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(m);
     }
 }
 
-// Global helpers for row click details modal
+// Global helpers for row click details modal & material editing
+window.editarMateriaisAdmin = function(id) {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+            return window.auditoriaController.abrirModalEdicaoMateriais(id);
+        }
+        if (window.painelController && typeof window.painelController.abrirModalEdicaoMateriais === 'function') {
+            return window.painelController.abrirModalEdicaoMateriais(id);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirModalEdicaoMateriais === 'function') {
+            return window.painelController.abrirModalEdicaoMateriais(id);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalEdicaoMateriais === 'function') {
+            return window.auditoriaController.abrirModalEdicaoMateriais(id);
+        }
+    }
+    alert('Funcionalidade de edição de materiais indisponível no momento.');
+};
+
 window.abrirDetalhesOSModal = function(id) {
     const path = (window.location.pathname || '').toLowerCase();
     const sidebar = document.querySelector('app-sidebar');
