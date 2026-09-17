@@ -1909,7 +1909,7 @@ class PainelController {
         ${(() => {
             // Avalia infrações automáticas via MedicaoService se disponível
             let infracoesTR = [];
-            const medService = this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
+            const medService = (window.medicaoController && window.medicaoController.medicaoService) || this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
             if (medService && typeof medService.avaliarInfracoesOS === 'function') {
                 try {
                     const avaliadas = medService.avaliarInfracoesOS(item) || [];
@@ -2825,7 +2825,7 @@ class PainelController {
                 return;
             }
         }
-        const medService = this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
+        const medService = (window.medicaoController && window.medicaoController.medicaoService) || this.medicaoService || (window.MedicaoService ? new window.MedicaoService() : null);
         if (!medService) {
             this.exibirModalErroHTML('Serviço Indisponível', 'MedicaoService não está carregado.');
             return;

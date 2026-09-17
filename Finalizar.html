@@ -1681,6 +1681,7 @@
           // Tenta ler do cache de sessão (TTL de 1 hora) para economizar egress
           var CACHE_KEY_MAT = 'cache_materiais_contrato_v1';
           var CACHE_TTL_MS = 60 * 60 * 1000;
+          var data = null;
           try {
             var cachedMatRaw = sessionStorage.getItem(CACHE_KEY_MAT);
             if (cachedMatRaw) {
@@ -1709,6 +1710,7 @@
             }
           }
 
+          if (!error && data && Array.isArray(data) && data.length > 0) {
             opcoesMateriais = data.map(function(row) {
               if (typeof row === 'string') return row;
               
@@ -2476,17 +2478,12 @@
 
                   if (resPlaq && resPlaq.data) {
                     await client.from('localizacao_plaquetas').update({
-                      latitude: pLat,
-                      longitude: pLng,
                       Latitude: pLat,
-                      Longitude: pLng,
-                      updated_at: new Date().toISOString()
+                      Longitude: pLng
                     }).ilike('identificacao', plaqUpper);
                   } else {
                     await client.from('localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
-                      latitude: pLat,
-                      longitude: pLng,
                       Latitude: pLat,
                       Longitude: pLng,
                       "QTD. Lum.": 1,

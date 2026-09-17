@@ -87,6 +87,9 @@
             if (!window.painelController && window.PainelController) {
                 window.painelController = new window.PainelController();
             }
+            if (window.painelController) {
+                window.painelController.medicaoService = this.medicaoService;
+            }
 
             this.popularSeletorMeses();
             this.setupEventListeners();
@@ -269,6 +272,7 @@
                 window.chamadosListCache = this.chamadosList;
                 if (window.painelController) {
                     window.painelController.chamadosList = this.chamadosList;
+                    window.painelController.medicaoService = this.medicaoService;
                 }
 
                 this.popularSeletorOperadores();

@@ -81,7 +81,6 @@ class AppSidebar extends HTMLElement {
         const menuItems = isRestrictedMode ? [
             { id: 'painel-manutentor', label: 'Acompanhamento', icon: 'dashboard', href: 'Painel-Manutentor.html' },
             { id: 'mapa', label: 'Mapa de OS', icon: 'map', href: 'Mapa.html' },
-            { id: 'relatorios', label: 'Relatórios', icon: 'bar_chart', href: 'Relatorio.html' },
             { id: 'medicao', label: 'Medição & Materiais', icon: 'price_check', href: 'Medicao.html' },
             { id: 'sair', label: 'Sair', icon: 'logout', href: 'javascript:if(window.AuthGuard)window.AuthGuard.logout();else window.location.href="Login.html";', mtAuto: true }
         ] : [

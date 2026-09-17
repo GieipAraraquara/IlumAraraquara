@@ -284,8 +284,8 @@ window.AuthGuard = {
             return null;
         }
 
-        // 5. Validação para Agentes de Manutenção (Manutentor): Acesso a Painel-Manutentor.html, Mapa.html, Finalizar.html, Relatorio.html e Medicao.html
-        const manutentorAllowedPages = ['painel-manutentor', 'painel - manutentor', 'mapa', 'finalizar', 'finalizaros', 'relatorio', 'relatorios', 'medicao'];
+        // 5. Validação para Agentes de Manutenção (Manutentor): Acesso a Painel-Manutentor.html, Mapa.html, Finalizar.html e Medicao.html
+        const manutentorAllowedPages = ['painel-manutentor', 'painel - manutentor', 'mapa', 'finalizar', 'finalizaros', 'medicao'];
         if (isManutentor && isProtectedPage && !manutentorAllowedPages.includes(currentPageName)) {
             console.warn('⛔ [AuthGuard] Acesso negado: Agentes de Manutenção possuem acesso apenas a Painel Manutentor, Mapa, Finalizar OS e Medição. Redirecionando para Painel-Manutentor.html.');
             try { if (document.documentElement) document.documentElement.style.display = 'none'; } catch(e) {}
