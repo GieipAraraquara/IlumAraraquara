@@ -2301,13 +2301,17 @@
                       try {
                         var nomeFoto = cdnService.gerarNomePadraoFoto(protFinal, plaq, estagio, proximoNum);
                         var cdnUrl = await cdnService.uploadImage(rawFoto, 'viaria_fotos', nomeFoto);
-                        evidenciasUrls[estagio] = cdnUrl;
+                        if (cdnUrl && (cdnUrl.startsWith('http://') || cdnUrl.startsWith('https://'))) {
+                          evidenciasUrls[estagio] = cdnUrl;
+                        } else {
+                          throw new Error(`Serviço de mídia não retornou URL válida: ${cdnUrl}`);
+                        }
                       } catch (uploadErr) {
-                        console.warn(`⚠️ Erro ao enviar foto do Ponto ${i + 1} para Cloudinary:`, uploadErr);
-                        evidenciasUrls[estagio] = rawFoto;
+                        console.error(`❌ Erro ao enviar foto do Ponto ${i + 1} (${estagio}) para Cloudinary:`, uploadErr);
+                        throw new Error(`Falha no upload da foto do Ponto ${i + 1} (${estagio}). Não é permitido salvar imagens Base64 no banco de dados. Verifique a conexão com a internet e tente novamente.`);
                       }
                     } else {
-                      evidenciasUrls[estagio] = rawFoto;
+                      throw new Error(`Serviço de upload de imagens (Cloudinary) não está disponível. Impossível salvar a OS sem enviar as fotos para a nuvem.`);
                     }
                   }
                 }
@@ -3181,13 +3185,18 @@
                 try {
                   var tipoFotoTag = (novoStatus === 'Em Andamento') ? 'FOTO ENTRADA' : 'FOTO SAIDA';
                   var nomeFotoPraca = cdnServicePraca.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', tipoFotoTag);
-                  fotoEntradaUrl = await cdnServicePraca.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
+                  var cdnUrlPraca = await cdnServicePraca.uploadImage(fotoEntradaPracaBase64, 'praca_fotos', nomeFotoPraca);
+                  if (cdnUrlPraca && (cdnUrlPraca.startsWith('http://') || cdnUrlPraca.startsWith('https://'))) {
+                    fotoEntradaUrl = cdnUrlPraca;
+                  } else {
+                    throw new Error(`Upload da foto de entrada não retornou URL válida.`);
+                  }
                 } catch (uploadErr) {
-                  console.warn('⚠️ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
-                  fotoEntradaUrl = fotoEntradaPracaBase64;
+                  console.error('❌ Erro ao enviar foto da praça para Cloudinary:', uploadErr);
+                  throw new Error(`Falha no envio da foto da praça (${uploadErr.message || uploadErr}). Não é permitido salvar Base64 no banco de dados.`);
                 }
               } else {
-                fotoEntradaUrl = fotoEntradaPracaBase64;
+                throw new Error(`Serviço de upload de imagens não disponível para envio da foto da praça.`);
               }
             }
           }
@@ -3204,13 +3213,17 @@
                 try {
                   var nomeFotoAndamento = cdnServicePracaAnd.gerarNomePadraoFoto(dadosPracaAtual.protocolo, 'PRACA', 'ANDAMENTO_' + (iAnd + 1));
                   var urlUp = await cdnServicePracaAnd.uploadImage(fBase64, 'praca_fotos', nomeFotoAndamento);
-                  urlsAndamento.push(urlUp || fBase64);
+                  if (urlUp && (urlUp.startsWith('http://') || urlUp.startsWith('https://'))) {
+                    urlsAndamento.push(urlUp);
+                  } else {
+                    throw new Error(`Foto de andamento #${iAnd + 1} não retornou URL válida.`);
+                  }
                 } catch (uploadErrAnd) {
-                  console.warn('⚠️ Erro ao enviar foto do andamento para Cloudinary:', uploadErrAnd);
-                  urlsAndamento.push(fBase64);
+                  console.error('❌ Erro ao enviar foto do andamento para Cloudinary:', uploadErrAnd);
+                  throw new Error(`Falha ao subir foto de andamento #${iAnd + 1}. Base64 não permitido no banco.`);
                 }
               } else {
-                urlsAndamento.push(fBase64);
+                throw new Error(`Serviço de fotos indisponível para fotos de andamento.`);
               }
             }
           }

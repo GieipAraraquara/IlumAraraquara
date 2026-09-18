@@ -28,18 +28,21 @@ class ChamadosRepository {
     }
 
     /**
-     * Colunas da View vw_todas_ordens_servico (schema real verificado no Supabase)
+     * Colunas da View vw_todas_ordens_servico para a listagem principal do grid.
+     * REMOVIDAS colunas pesadas com Base64/detalhes volumosos (pontos_final com fotos, texto_auditoria_ocr, historico_sessoes, materiais)
+     * para cortar o consumo de PostgREST Egress em até 95%. Detalhes pesados são obtidos sob demanda via fetchById().
+     * pontos_inicial é mantido pois é um JSON leve de abertura essencial para exibição dos pontos/endereços no grid.
      */
     static get COLUNAS_VIEW() {
         return [
             'id', 'protocolo', 'status', 'prioridade', 'telefone_fixo', 'telefone_celular',
-            'quantidade', 'descricao', 'materiais', 'data_abertura', 'data_fechamento',
+            'quantidade', 'descricao', 'data_abertura', 'data_fechamento',
             'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
-            'operador', 'status_auditoria', 'data_conclusao_auditoria', 'pontos_inicial',
-            'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
+            'operador', 'status_auditoria', 'data_conclusao_auditoria',
+            'motivo_aprovacao', 'operador_finalizacao',
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
-            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas', 'historico_sessoes',
-            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os'
+            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial'
         ].join(',');
     }
 
@@ -49,11 +52,29 @@ class ChamadosRepository {
     static get COLUNAS_TABELA_OS() {
         return [
             'id', 'protocolo', 'status', 'prioridade', 'telefone_fixo', 'telefone_celular',
+            'quantidade', 'descricao', 'data_abertura', 'data_fechamento',
+            'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
+            'operador', 'status_auditoria', 'data_conclusao_auditoria',
+            'motivo_aprovacao', 'operador_finalizacao',
+            'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
+            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial'
+        ].join(',');
+    }
+
+    /**
+     * Colunas completas para busca individual sob demanda (fetchById)
+     */
+    static get COLUNAS_COMPLETAS_DETALHE() {
+        return [
+            'id', 'protocolo', 'status', 'prioridade', 'telefone_fixo', 'telefone_celular',
             'quantidade', 'descricao', 'materiais', 'data_abertura', 'data_fechamento',
             'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
             'operador', 'status_auditoria', 'data_conclusao_auditoria', 'pontos_inicial',
             'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
-            'glosas'
+            'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
+            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas', 'historico_sessoes',
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os'
         ].join(',');
     }
 
@@ -165,8 +186,8 @@ class ChamadosRepository {
      * falling back to ordens_servico or chamados. Supports sessionStorage caching with TTL.
      */
     async fetchAllChamados(forceRefresh = false) {
-        const CACHE_KEY = 'chamados_repo_cache_v1';
-        const CACHE_META_KEY = 'chamados_repo_meta_v1';
+        const CACHE_KEY = 'chamados_repo_cache_v2';
+        const CACHE_META_KEY = 'chamados_repo_meta_v2';
         const CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutos
 
         const client = this.getClient();
@@ -311,10 +332,8 @@ class ChamadosRepository {
                 }
             }
 
-            // Carrega fechamentos complementares fatiados em chunks de 50 para associar às OSs
-            if (data && data.length > 0) {
-                await this.carregarFechamentosFatiados(client, data);
-            }
+            // Fechamentos complementares agora são carregados sob demanda via fetchById ao abrir detalhes da OS,
+            // poupando egress massivo na listagem geral do grid.
 
             console.log(`📦 [ChamadosRepository] Retornados ${data?.length || 0} registros do Supabase:`, data);
 
@@ -352,6 +371,108 @@ class ChamadosRepository {
             });
         } catch (err) {
             console.warn('⚠️ [ChamadosRepository] Falha ao consultar Supabase, utilizando dados de contingência local.', err);
+            return null;
+        }
+    }
+
+    /**
+     * Busca cirúrgica de uma única OS sob demanda com todas as colunas de detalhe
+     * (pontos_final, pontos_inicial, materiais, historico_sessoes, texto_auditoria_ocr e fechamentos_os).
+     * Usada estritamente ao abrir o modal de detalhes para poupar PostgREST Egress na listagem geral.
+     * @param {string|number} idOrProtocol
+     * @returns {Promise<ChamadoModel|null>}
+     */
+    async fetchById(idOrProtocol) {
+        if (!idOrProtocol) return null;
+        const cleanId = String(idOrProtocol || '').replace(/^#/, '').trim();
+        const client = this.getClient();
+        const colunasDet = ChamadosRepository.COLUNAS_COMPLETAS_DETALHE;
+
+        try {
+            let row = null;
+
+            const isNumeric = /^\d+$/.test(cleanId);
+            const mainFilter = isNumeric ? `protocolo.ilike.${cleanId},id.eq.${cleanId}` : `protocolo.ilike.${cleanId}`;
+
+            // 1. Tenta buscar na view unificada completa
+            try {
+                const resView = await client
+                    .from(this.viewName)
+                    .select(colunasDet)
+                    .or(mainFilter)
+                    .maybeSingle();
+
+                if (!resView.error && resView.data) {
+                    row = resView.data;
+                }
+            } catch(eView) {}
+
+            // 2. Fallback: tabela ordens_servico
+            if (!row) {
+                const resOS = await client
+                    .from(this.primaryTable)
+                    .select('*')
+                    .or(mainFilter)
+                    .maybeSingle();
+                if (!resOS.error && resOS.data) {
+                    row = resOS.data;
+                }
+            }
+
+            // 3. Fallback: tabela ordens_servico_pracas
+            if (!row) {
+                const resPraca = await client
+                    .from(this.pracasTable)
+                    .select('*')
+                    .or(mainFilter)
+                    .maybeSingle();
+                if (!resPraca.error && resPraca.data) {
+                    row = resPraca.data;
+                }
+            }
+
+            // 4. Fallback legado: chamados
+            if (!row) {
+                const resLeg = await client
+                    .from(this.legacyTable)
+                    .select('*')
+                    .or(mainFilter)
+                    .maybeSingle();
+                if (!resLeg.error && resLeg.data) {
+                    row = resLeg.data;
+                }
+            }
+
+            if (!row) return null;
+
+            // 5. Carrega fechamentos_os associados a esta OS individualmente
+            try {
+                const protAlvo = row.protocolo || cleanId;
+                const rowIdNumeric = row.id && !isNaN(Number(row.id)) ? row.id : (isNumeric ? cleanId : null);
+                const fechFilter = rowIdNumeric ? `protocolo.ilike.${protAlvo},os_id.eq.${rowIdNumeric}` : `protocolo.ilike.${protAlvo}`;
+                const { data: fechRows } = await client
+                    .from('fechamentos_os')
+                    .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                    .or(fechFilter)
+                    .order('numero_fechamento', { ascending: true });
+
+                if (fechRows && fechRows.length > 0) {
+                    row.fechamentos_os = fechRows;
+                }
+            } catch(eFech) {
+                console.warn('⚠️ [ChamadosRepository] Falha ao enriquecer fechamentos_os no fetchById:', eFech);
+            }
+
+            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+            if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                return ModelClass.fromRow(row);
+            }
+            if (ModelClass && typeof ModelClass === 'function') {
+                return new ModelClass(row);
+            }
+            return row;
+        } catch(err) {
+            console.error('❌ [ChamadosRepository] Erro no fetchById:', err);
             return null;
         }
     }

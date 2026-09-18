@@ -906,57 +906,43 @@ class AuditoriaController {
             return p === upperClean || cid === upperClean;
         });
 
-        // Se não encontrar na memória local, consulta o Supabase sob demanda
-        if (!item && window.supabaseClient) {
+        // Como a listagem do grid não traz colunas pesadas (pontos_final, evidencias base64, materiais, etc.)
+        // para economizar Egress, sempre enriquecemos a OS com fetchById sob demanda se ela não tiver sido enriquecida ainda:
+        if (window.supabaseClient && window.ChamadosRepository) {
             try {
-                const client = window.supabaseClient;
-                let { data: row } = await client
-                    .from('ordens_servico')
-                    .select('*')
-                    .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
-                    .maybeSingle();
+                const repo = new window.ChamadosRepository();
+                const needsEnrich = !item || !item._isEnriched || !item.rawPontosFinal || (Array.isArray(item.rawPontosFinal) && item.rawPontosFinal.length === 0);
+                if (needsEnrich) {
+                    const fullRow = await repo.fetchById(cleanId);
+                    if (fullRow) {
+                        const ModelClass = window.ChamadoModel;
+                        const fullItem = (fullRow instanceof ModelClass) ? fullRow : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fullRow) : (ModelClass ? new ModelClass(fullRow) : fullRow));
+                        fullItem._isEnriched = true;
+                        item = fullItem;
 
-                if (!row) {
-                    const resPraca = await client
-                        .from('ordens_servico_pracas')
-                        .select('*')
-                        .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
-                        .maybeSingle();
-                    if (resPraca && resPraca.data) row = resPraca.data;
-                }
-
-                if (!row) {
-                    const resLeg = await client
-                        .from('chamados')
-                        .select('*')
-                        .or(`protocolo.ilike.${cleanId},id.eq.${cleanId}`)
-                        .maybeSingle();
-                    if (resLeg && resLeg.data) row = resLeg.data;
-                }
-
-                if (row) {
-                    try {
-                        const { data: fechRows } = await client
-                            .from('fechamentos_os')
-                            .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
-                            .or(`protocolo.ilike.${cleanId},os_id.eq.${cleanId}`)
-                            .order('numero_fechamento', { ascending: true });
-                        if (fechRows && fechRows.length > 0) {
-                            row.fechamentos_os = fechRows;
+                        // Atualiza as referências nas listas em memória mantendo os getters do protótipo
+                        if (this.chamadosList && Array.isArray(this.chamadosList)) {
+                            const idx = this.chamadosList.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperClean || cid === upperClean;
+                            });
+                            if (idx >= 0) this.chamadosList[idx] = fullItem;
+                            else this.chamadosList.push(fullItem);
                         }
-                    } catch (eFechSingle) {
-                        console.warn('⚠️ Erro ao carregar fechamentos_os da OS individual na auditoria:', eFechSingle);
+                        if (window.chamadosListCache && Array.isArray(window.chamadosListCache)) {
+                            const idx = window.chamadosListCache.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperClean || cid === upperClean;
+                            });
+                            if (idx >= 0) window.chamadosListCache[idx] = fullItem;
+                            else window.chamadosListCache.push(fullItem);
+                        }
                     }
                 }
-
-                if (row && window.ChamadoModel) {
-                    const ModelClass = window.ChamadoModel;
-                    item = (typeof ModelClass.fromRow === 'function') ? ModelClass.fromRow(row) : new ModelClass(row);
-                    if (this.chamadosList) this.chamadosList.push(item);
-                    if (window.chamadosListCache) window.chamadosListCache.push(item);
-                }
             } catch (errRemoto) {
-                console.warn('⚠️ [AuditoriaController] Erro ao buscar OS remota sob demanda:', errRemoto);
+                console.warn('⚠️ [AuditoriaController] Erro ao buscar detalhes da OS sob demanda via fetchById:', errRemoto);
             }
         }
         
@@ -2026,6 +2012,41 @@ class AuditoriaController {
                         </div>
                         `;
                     }).join('')}
+                </div>
+            </div>
+            `;
+        })()}
+
+        <!-- Seção Especial: Galeria Completa de Evidências Fotográficas (Todas as fotos da OS) -->
+        ${(() => {
+            const fotosGeral = item.fotosEvidencias || [];
+            if (!fotosGeral || fotosGeral.length === 0) return '';
+
+            return `
+            <div class="p-3.5 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2.5 text-xs">
+                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
+                    <span class="flex items-center gap-1.5 text-slate-800 font-bold">
+                        <span class="material-symbols-outlined text-[18px] text-blue-600">collections</span>
+                        <span>Galeria de Evidências Fotográficas (${fotosGeral.length})</span>
+                    </span>
+                    <button type="button" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', 0)" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer">
+                        <span class="material-symbols-outlined text-[13px]">fullscreen</span>
+                        <span>Ver em Tela Cheia</span>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-1">
+                    ${fotosGeral.map((fotoObj, fIdx) => `
+                        <div class="relative group rounded-lg overflow-hidden border border-slate-200 cursor-pointer shadow-2xs hover:shadow-md transition-all aspect-video bg-slate-900" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', ${fIdx})">
+                            <img src="${fotoObj.thumbnailUrl || fotoObj.url}" alt="${fotoObj.titulo || 'Evidência'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
+                                <span class="text-[9.5px] font-semibold text-white truncate drop-shadow">${fotoObj.titulo || 'Evidência'}</span>
+                            </div>
+                            <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
+                                <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
             `;

@@ -93,7 +93,20 @@ window.PushNotificationService = {
                     if (session && session.user) {
                         userEmail = session.user.email || userEmail;
                         userId = session.user.id;
-                        const { data: prof } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                        
+                        let prof = window.AuthGuard?._cachedAuthData?.profile || null;
+                        if (!prof) {
+                            const cachedStr = sessionStorage.getItem('authguard_profile_' + session.user.id);
+                            if (cachedStr) {
+                                try { prof = JSON.parse(cachedStr); } catch(e) {}
+                            }
+                        }
+
+                        if (!prof) {
+                            const { data: profRemote } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                            if (profRemote) prof = profRemote;
+                        }
+
                         if (prof) {
                             const candidateRole = prof.role || prof.cargo || prof.categoria || prof.tipo;
                             if (candidateRole && candidateRole.toLowerCase().includes('admin')) {
@@ -174,7 +187,17 @@ window.PushNotificationService = {
             try {
                 const { data: { session } } = await window.supabaseClient.auth.getSession();
                 if (session && session.user) {
-                    const { data: prof } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                    let prof = window.AuthGuard?._cachedAuthData?.profile || null;
+                    if (!prof) {
+                        const cachedStr = sessionStorage.getItem('authguard_profile_' + session.user.id);
+                        if (cachedStr) {
+                            try { prof = JSON.parse(cachedStr); } catch(e) {}
+                        }
+                    }
+                    if (!prof) {
+                        const { data: profRemote } = await window.supabaseClient.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+                        if (profRemote) prof = profRemote;
+                    }
                     if (prof) {
                         role = prof.role || prof.cargo || prof.categoria || prof.tipo;
                     }

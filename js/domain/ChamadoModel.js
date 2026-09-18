@@ -44,7 +44,7 @@ class ChamadoModel {
         const ptsInicial = parseArrayJson(data.pontos_inicial) || parseArrayJson(data.pontos);
         const ptsFinal = parseArrayJson(data.pontos_final) || (String(data.status || '').toLowerCase().includes('conclu') ? parseArrayJson(data.pontos) : null);
 
-        let endExtraido = data.endereco || '';
+        let endExtraido = data.endereco || data.praca_nome || '';
         let plaqExtraida = data.plaqueta_inicial || data.plaqueta || '';
         let coordExtraida = data.coordenada_inicial || data.coordenada || '';
 
@@ -56,6 +56,12 @@ class ChamadoModel {
             
             if (!plaqExtraida) plaqExtraida = p0Ini.plaqueta || p0Ini.plaqueta_inicial || '';
             if (!coordExtraida) coordExtraida = p0Ini.coordenada || p0Ini.coordenada_inicial || (p0Ini.lat && p0Ini.lng ? `${p0Ini.lat}, ${p0Ini.lng}` : '');
+        }
+
+        // Fallback: se não houver endereço inicial mas houver endereço nos pontos finais
+        if (!endExtraido && ptsFinal && ptsFinal.length > 0) {
+            const listaEnderecosFin = ptsFinal.map(p => p.endereco || p.local || '').filter(Boolean);
+            if (listaEnderecosFin.length > 0) endExtraido = listaEnderecosFin.join('\n');
         }
 
         let plaqFinExtraida = data.plaqueta_final || '';
@@ -582,9 +588,16 @@ class ChamadoModel {
         });
 
         // Se não houver registros na tabela fechamentos_os (ex: OSs de fechamento único ou legadas),
-        // mas a OS tiver materiais, observação de fechamento ou data de conclusão/status concluído,
+        // mas a OS tiver materiais, observação de fechamento, data de conclusão, status concluído ou dados em rawPontosFinal,
         // sintetiza 1 registro de fechamento para manter consistência nos modais de detalhes e relatórios.
-        if (list.length === 0 && (this.materialUtilizado || this.observacaoFinal || this.dataConclusao || this.normalizedStatus === 'concluida')) {
+        const hasFinalPointsData = Boolean(
+            this.rawPontosFinal ||
+            (this.rawPontos && String(this.rawStatus || this.status || '').toLowerCase().includes('conclu')) ||
+            this.plaquetaFinal ||
+            this.coordenadaReparo
+        );
+
+        if (list.length === 0 && (this.materialUtilizado || this.observacaoFinal || this.dataConclusao || this.normalizedStatus === 'concluida' || hasFinalPointsData)) {
             const matsParsed = ChamadoModel.parseMaterialsList(this.materialUtilizado);
             let fotosParsed = this.evidencias ? (Array.isArray(this.evidencias) ? this.evidencias : [this.evidencias]) : [];
             let pontosParsed = [];
@@ -592,6 +605,11 @@ class ChamadoModel {
                 if (Array.isArray(this.rawPontosFinal)) pontosParsed = this.rawPontosFinal;
                 else if (typeof this.rawPontosFinal === 'string') {
                     try { pontosParsed = JSON.parse(this.rawPontosFinal); } catch(e) {}
+                }
+            } else if (this.rawPontos && String(this.rawStatus || this.status || '').toLowerCase().includes('conclu')) {
+                if (Array.isArray(this.rawPontos)) pontosParsed = this.rawPontos;
+                else if (typeof this.rawPontos === 'string') {
+                    try { pontosParsed = JSON.parse(this.rawPontos); } catch(e) {}
                 }
             }
             if (fotosParsed.length === 0 && pontosParsed && pontosParsed.length > 0) {
@@ -601,7 +619,7 @@ class ChamadoModel {
                 id: null,
                 numero: 1,
                 pontoReferencia: 'Fechamento #1',
-                operador: this.operador || 'Técnico Responsável',
+                operador: this.operadorFinalizacao || this.operador || 'Técnico Responsável',
                 data_fechamento: this.dataConclusao || null,
                 dataFechamento: this.dataConclusao || null,
                 dataFechamentoStr: this.dataConclusao ? this.dataConclusao.toLocaleString('pt-BR') : '',
@@ -1364,105 +1382,6 @@ class ChamadoModel {
     }
 
     /**
-     * Extrai e descompacta todas as fotos/evidências de um fechamento (f)
-     * Trata arrays de strings, JSON stringificado e objetos estruturados (ex: evidencias {foto_antes, foto_durante, foto_depois})
-     */
-    static parseClosurePhotos(f) {
-        if (!f) return [];
-        const result = [];
-        const seenUrls = new Set();
-
-        const addPhoto = (rawUrl, defaultTitle) => {
-            if (!rawUrl) return;
-            const url = String(rawUrl).trim();
-            if (!url || url === '#' || !url.startsWith('http')) return;
-            if (seenUrls.has(url)) return;
-            seenUrls.add(url);
-            result.push({
-                url: url,
-                titulo: defaultTitle || 'Evidência de Fechamento'
-            });
-        };
-
-        const numFech = f.numero || f.numero_fechamento || '';
-        const prefix = numFech ? `Fechamento #${numFech}` : 'Fechamento';
-
-        // 1. Inspeciona f.fotos, f.fotosEvidencias, f.evidencias
-        let rawFotos = f.fotos || f.fotosEvidencias || f.evidencias || f.fotos_evidencias;
-        if (typeof rawFotos === 'string') {
-            try { rawFotos = JSON.parse(rawFotos); } catch(e) { rawFotos = [rawFotos]; }
-        }
-
-        if (Array.isArray(rawFotos)) {
-            rawFotos.forEach((item, idx) => {
-                if (typeof item === 'string') {
-                    addPhoto(item, `${prefix} - Foto ${idx + 1}`);
-                } else if (item && typeof item === 'object') {
-                    // Trata objeto de evidências por estágios (foto_antes, foto_durante, foto_depois)
-                    const evs = item.evidencias || item.fotosEstagios || item.estagios;
-                    if (evs && typeof evs === 'object') {
-                        const pNum = item.ponto || item.pontoIndex || (idx + 1);
-                        const estagioMap = {
-                            foto_antes: 'Antes',
-                            foto_durante: 'Durante',
-                            foto_depois: 'Depois',
-                            antes: 'Antes',
-                            durante: 'Durante',
-                            depois: 'Depois'
-                        };
-                        for (let key in evs) {
-                            const u = evs[key];
-                            if (u) {
-                                const lblEst = estagioMap[key.toLowerCase()] || (key.replace(/foto_/gi, '').replace(/_/g, ' '));
-                                addPhoto(u, `Ponto #${pNum} — ${lblEst}`);
-                            }
-                        }
-                    }
-
-                    // Trata foto individual (url, link, foto, foto_url)
-                    const directUrl = item.url || item.link || item.foto || item.foto_url;
-                    if (directUrl) {
-                        const tit = item.titulo || item.estagio || (item.ponto ? `Foto Ponto #${item.ponto}` : `${prefix} - Foto ${idx + 1}`);
-                        addPhoto(directUrl, tit);
-                    }
-                }
-            });
-        }
-
-        // 2. Inspeciona f.pontos se ainda não encontrou fotos suficientes ou complementares
-        if (f.pontos && Array.isArray(f.pontos)) {
-            f.pontos.forEach((p, idx) => {
-                if (!p) return;
-                const pNum = p.ponto || p.numero || (idx + 1);
-                const evs = p.evidencias || p.fotosEstagios || p.estagios;
-                if (evs && typeof evs === 'object') {
-                    const estagioMap = {
-                        foto_antes: 'Antes',
-                        foto_durante: 'Durante',
-                        foto_depois: 'Depois',
-                        antes: 'Antes',
-                        durante: 'Durante',
-                        depois: 'Depois'
-                    };
-                    for (let key in evs) {
-                        const u = evs[key];
-                        if (u) {
-                            const lblEst = estagioMap[key.toLowerCase()] || (key.replace(/foto_/gi, '').replace(/_/g, ' '));
-                            addPhoto(u, `Ponto #${pNum} — ${lblEst}`);
-                        }
-                    }
-                }
-                const pUrl = p.url || p.foto || p.foto_url;
-                if (pUrl) {
-                    addPhoto(pUrl, `Foto Ponto #${pNum}`);
-                }
-            });
-        }
-
-        return result;
-    }
-
-    /**
      * Retorna a lista parseada de materiais utilizados acumulada do campo principal, dos pontos individuais (pontos_inicial/pontos_final/pontos), dos fechamentos_os e das sessões
      */
     get materialsList() {
@@ -1865,21 +1784,44 @@ class ChamadoModel {
                     const parts = [];
                     const rawEnd = p.enderecoInicial || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
                     const end = (rawEnd && ChamadoModel.isValidLocationText(rawEnd)) ? rawEnd : null;
-                    const plq = p.plaquetaInicial;
-                    const coord = p.coordenadaInicial;
+                    const plq = p.plaquetaInicial || this.plaquetaInicial;
+                    const coord = p.coordenadaInicial || this.coordenadaInicial || this.coordenada;
                     if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
                     if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') parts.push(`Plaqueta: ${plq}`);
-                    if (coord && coord !== 'Sem coordenadas') parts.push(`Coord: ${coord}`);
+                    if (coord && coord !== 'Sem coordenadas' && coord !== 'Não informada') {
+                        const cClean = String(coord).replace(/^coord:\s*/i, '').trim();
+                        parts.push(`Coord: ${cClean}`);
+                    }
                     return parts.length > 0 ? parts.join(' | ') : null;
                 }).filter(Boolean);
 
                 if (formatted.length > 0) return formatted;
             }
 
+            // Fallback 1: endereço direto em this.endereco
             if (ChamadoModel.isValidLocationText(this.endereco)) {
                 const cleanAddress = ChamadoModel.formatLocationText(this.endereco);
                 const lines = cleanAddress.split(/\r?\n/).map(l => l.trim()).filter(l => ChamadoModel.isValidLocationText(l));
                 if (lines.length > 0) return lines;
+            }
+
+            // Fallback 2: praça
+            if (this.pracaNome && ChamadoModel.isValidLocationText(this.pracaNome)) {
+                return [ChamadoModel.formatLocationText(this.pracaNome)];
+            }
+
+            // Fallback 3: plaqueta ou coordenada no nível raiz da OS
+            const rootParts = [];
+            if (this.plaquetaInicial && this.plaquetaInicial !== 'Não informada' && this.plaquetaInicial !== '---' && this.plaquetaInicial !== 'null') {
+                rootParts.push(`Plaqueta: ${this.plaquetaInicial}`);
+            }
+            const rootCoord = this.coordenadaInicial || this.coordenada;
+            if (rootCoord && rootCoord !== 'Sem coordenadas' && rootCoord !== 'Não informada') {
+                const cClean = String(rootCoord).replace(/^coord:\s*/i, '').trim();
+                rootParts.push(`Coord: ${cClean}`);
+            }
+            if (rootParts.length > 0) {
+                return [rootParts.join(' | ')];
             }
 
             return ['Ponto não informado'];
@@ -1898,23 +1840,47 @@ class ChamadoModel {
             if (list && list.length > 0) {
                 const formatted = list.map(p => {
                     const parts = [];
-                    const rawEnd = p.enderecoFinal || p.enderecoInicial;
+                    const rawEnd = p.enderecoFinal || p.enderecoInicial || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
                     const end = (rawEnd && ChamadoModel.isValidLocationText(rawEnd)) ? rawEnd : null;
-                    const plq = p.plaquetaFinal || p.plaquetaInicial;
-                    const coord = p.coordenadaFinal || p.coordenadaInicial;
+                    const plq = p.plaquetaFinal || p.plaquetaInicial || this.plaquetaFinal || this.plaquetaInicial;
+                    const coord = p.coordenadaFinal || p.coordenadaInicial || this.coordenadaReparo || this.coordenadaInicial || this.coordenada;
                     if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
                     if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') parts.push(`Plaqueta: ${plq}`);
-                    if (coord && coord !== 'Sem coordenadas') parts.push(`Coord: ${coord}`);
+                    if (coord && coord !== 'Sem coordenadas' && coord !== 'Não informada') {
+                        const cClean = String(coord).replace(/^coord:\s*/i, '').trim();
+                        parts.push(`Coord: ${cClean}`);
+                    }
                     return parts.length > 0 ? parts.join(' | ') : null;
                 }).filter(Boolean);
 
                 if (formatted.length > 0) return formatted;
             }
 
+            // Fallback 1: endereço direto em this.endereco
             if (ChamadoModel.isValidLocationText(this.endereco)) {
                 const cleanAddress = ChamadoModel.formatLocationText(this.endereco);
                 const lines = cleanAddress.split(/\r?\n/).map(l => l.trim()).filter(l => ChamadoModel.isValidLocationText(l));
                 if (lines.length > 0) return lines;
+            }
+
+            // Fallback 2: praça
+            if (this.pracaNome && ChamadoModel.isValidLocationText(this.pracaNome)) {
+                return [ChamadoModel.formatLocationText(this.pracaNome)];
+            }
+
+            // Fallback 3: plaqueta ou coordenada no nível raiz da OS
+            const rootParts = [];
+            const rootPlq = this.plaquetaFinal || this.plaquetaInicial;
+            if (rootPlq && rootPlq !== 'Não informada' && rootPlq !== '---' && rootPlq !== 'null') {
+                rootParts.push(`Plaqueta: ${rootPlq}`);
+            }
+            const rootCoord = this.coordenadaReparo || this.coordenadaInicial || this.coordenada;
+            if (rootCoord && rootCoord !== 'Sem coordenadas' && rootCoord !== 'Não informada') {
+                const cClean = String(rootCoord).replace(/^coord:\s*/i, '').trim();
+                rootParts.push(`Coord: ${cClean}`);
+            }
+            if (rootParts.length > 0) {
+                return [rootParts.join(' | ')];
             }
 
             return ['Ponto não informado'];
@@ -2110,12 +2076,15 @@ class ChamadoModel {
         const addPhoto = (rawUrl, defaultTitle) => {
             if (!rawUrl || typeof rawUrl !== 'string') return;
             const url = rawUrl.trim();
-            if (!url || url.length < 5) return;
-            const key = `${defaultTitle || 'Evidencia'}::${url}`;
-            if (seenUrls.has(key)) return;
-            seenUrls.add(key);
+            if (!url || url.length < 5 || url === '#' || url.toLowerCase() === 'null') return;
+            if (seenUrls.has(url)) return;
+            seenUrls.add(url);
+            const urlOtimizada = ChamadoModel.otimizarUrlCloudinary(url, { width: 1200, quality: 'auto' });
+            const thumbUrl = ChamadoModel.otimizarUrlCloudinary(url, { width: 350, quality: 'auto' });
             list.push({
-                url: url,
+                url: urlOtimizada,
+                thumbnailUrl: thumbUrl,
+                urlOriginal: url,
                 titulo: defaultTitle || `Foto Fechamento #${fechNum}`
             });
         };

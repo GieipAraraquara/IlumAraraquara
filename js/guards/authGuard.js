@@ -142,6 +142,22 @@ window.AuthGuard = {
      * @returns {Promise<{user: Object, profile: Object}>}
      */
     async requireAuth(targetUrl = null) {
+        if (this._pendingAuthPromise) {
+            return this._pendingAuthPromise;
+        }
+
+        this._pendingAuthPromise = (async () => {
+            try {
+                return await this._executeRequireAuth(targetUrl);
+            } finally {
+                this._pendingAuthPromise = null;
+            }
+        })();
+
+        return this._pendingAuthPromise;
+    },
+
+    async _executeRequireAuth(targetUrl = null) {
         let authData = null;
 
         // 1. Verifica se há sessão ativa no Supabase Auth em primeiro lugar
@@ -150,32 +166,44 @@ window.AuthGuard = {
 
             if (session && !error) {
                 let profile = null;
-                try {
-                    // Busca por ID
-                    let { data, error: profileErr } = await window.supabaseClient
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', session.user.id)
-                        .maybeSingle();
+                const cacheProfileKey = 'authguard_profile_' + session.user.id;
+                const cachedProfileStr = sessionStorage.getItem(cacheProfileKey);
 
-                    console.log('🔍 [AuthGuard DEBUG] Busca profile por ID:', { id: session.user.id, data, profileErr });
+                if (cachedProfileStr) {
+                    try {
+                        profile = JSON.parse(cachedProfileStr);
+                    } catch (e) {}
+                }
 
-                    // Fallback: se não encontrar por ID, busca por e-mail
-                    if ((profileErr || !data) && session.user.email) {
-                        const { data: dataEmail, error: emailErr } = await window.supabaseClient
+                if (!profile) {
+                    try {
+                        // Busca por ID
+                        let { data, error: profileErr } = await window.supabaseClient
                             .from('profiles')
                             .select('*')
-                            .eq('email', session.user.email)
+                            .eq('id', session.user.id)
                             .maybeSingle();
-                        console.log('🔍 [AuthGuard DEBUG] Busca profile por Email:', { email: session.user.email, dataEmail, emailErr });
-                        if (dataEmail) data = dataEmail;
-                    }
 
-                    if (data) {
-                        profile = data;
+                        console.log('🔍 [AuthGuard DEBUG] Busca profile por ID:', { id: session.user.id, data, profileErr });
+
+                        // Fallback: se não encontrar por ID, busca por e-mail
+                        if ((profileErr || !data) && session.user.email) {
+                            const { data: dataEmail, error: emailErr } = await window.supabaseClient
+                                .from('profiles')
+                                .select('*')
+                                .eq('email', session.user.email)
+                                .maybeSingle();
+                            console.log('🔍 [AuthGuard DEBUG] Busca profile por Email:', { email: session.user.email, dataEmail, emailErr });
+                            if (dataEmail) data = dataEmail;
+                        }
+
+                        if (data) {
+                            profile = data;
+                            sessionStorage.setItem(cacheProfileKey, JSON.stringify(profile));
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ [AuthGuard DEBUG] Não foi possível carregar o perfil:', e);
                     }
-                } catch (e) {
-                    console.warn('⚠️ [AuthGuard DEBUG] Não foi possível carregar o perfil:', e);
                 }
 
                 this.initAuthStateListener();
