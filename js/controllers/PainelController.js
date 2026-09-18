@@ -1317,17 +1317,19 @@ class PainelController {
                             </button>` : '')}
                         ` : ''}
 
+                        ${(isAdminUser || isManutentorUser) ? `
+                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                                <span>Editar Materiais</span>
+                            </button>
+                        ` : ''}
+
                         ${isAdminUser ? `
                             ${isPendente ? `
                             <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">check</span>
                                 <span>Aprovar OS</span>
                             </button>` : ''}
-
-                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
-                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
-                                <span>Editar Materiais</span>
-                            </button>
 
                             ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                                 !isJaUrgente ? `
@@ -2103,24 +2105,30 @@ class PainelController {
             return;
         }
 
-        // Validação de Perfil Administrativo
-        let isAdmin = false;
+        // Validação de Perfil Administrativo / Manutentor
+        let isAuthorized = false;
         try {
             if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
                 const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
-                if (r === 'admin') isAdmin = true;
+                if (r === 'admin' || r === 'manutentor') isAuthorized = true;
             }
-            if (!isAdmin && window.usuarioLogadoSupabase) {
+            if (!isAuthorized && window.usuarioLogadoSupabase) {
                 const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor') || r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isAuthorized = true;
             }
-            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
-                isAdmin = true;
+            if (!isAuthorized) {
+                const r = String(localStorage.getItem('user_role') || '').toLowerCase();
+                if (r.includes('admin') || r.includes('manutentor')) {
+                    isAuthorized = true;
+                }
+            }
+            if (!isAuthorized && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
+                isAuthorized = true;
             }
         } catch(e) {}
 
-        if (!isAdmin) {
-            alert('Acesso restrito: Apenas usuários com perfil de Administrador podem editar a lista de materiais.');
+        if (!isAuthorized) {
+            alert('Acesso restrito: Apenas administradores e manutentores podem editar a lista de materiais.');
             return;
         }
 
