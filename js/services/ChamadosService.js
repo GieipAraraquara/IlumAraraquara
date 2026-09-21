@@ -9,8 +9,8 @@ class ChamadosService {
     /**
      * Loads list of Chamados, falling back to mock dataset if needed
      */
-    async getChamadosList() {
-        const remoteChamados = await this.repository.fetchAllChamados();
+    async getChamadosList(forceRefresh = false) {
+        const remoteChamados = await this.repository.fetchAllChamados(forceRefresh);
         if (remoteChamados && remoteChamados.length > 0) {
             return remoteChamados;
         }

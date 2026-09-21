@@ -577,7 +577,21 @@ class ChamadoModel {
      * Retorna a lista tratada e ordenada de fechamentos da OS (tabela fechamentos_os)
      */
     get fechamentosList() {
-        let list = [...(Array.isArray(this.fechamentosRaw) ? this.fechamentosRaw : (typeof this.fechamentosRaw === 'string' ? (JSON.parse(this.fechamentosRaw || '[]')) : []))];
+        let rawList = [...(Array.isArray(this.fechamentosRaw) ? this.fechamentosRaw : (typeof this.fechamentosRaw === 'string' ? (JSON.parse(this.fechamentosRaw || '[]')) : []))];
+
+        // Garante que os fechamentos pertençam estritamente a este protocolo (evita contaminação cruzada por os_id)
+        const myProt = String(this.protocolo || '').trim().toUpperCase();
+        let list = rawList;
+        if (myProt) {
+            const filtered = rawList.filter(f => {
+                if (!f) return false;
+                const fProt = String(f.protocolo || '').trim().toUpperCase();
+                return !fProt || fProt === myProt;
+            });
+            if (filtered.length > 0) {
+                list = filtered;
+            }
+        }
 
         // Ordena cronologicamente por data_fechamento / id
         list.sort((a, b) => {

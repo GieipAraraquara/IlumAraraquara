@@ -24,6 +24,8 @@ class ChamadosRepository {
         try {
             sessionStorage.removeItem('chamados_repo_cache_v1');
             sessionStorage.removeItem('chamados_repo_meta_v1');
+            sessionStorage.removeItem('chamados_repo_cache_v2');
+            sessionStorage.removeItem('chamados_repo_meta_v2');
         } catch (e) {}
     }
 
@@ -448,13 +450,30 @@ class ChamadosRepository {
             // 5. Carrega fechamentos_os associados a esta OS individualmente
             try {
                 const protAlvo = row.protocolo || cleanId;
-                const rowIdNumeric = row.id && !isNaN(Number(row.id)) ? row.id : (isNumeric ? cleanId : null);
-                const fechFilter = rowIdNumeric ? `protocolo.ilike.${protAlvo},os_id.eq.${rowIdNumeric}` : `protocolo.ilike.${protAlvo}`;
-                const { data: fechRows } = await client
-                    .from('fechamentos_os')
-                    .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
-                    .or(fechFilter)
-                    .order('numero_fechamento', { ascending: true });
+                // Busca prioritariamente por protocolo para evitar colisões de IDs numéricos entre tabelas diferentes
+                let fechRows = null;
+                if (protAlvo) {
+                    const resProt = await client
+                        .from('fechamentos_os')
+                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                        .ilike('protocolo', protAlvo)
+                        .order('numero_fechamento', { ascending: true });
+                    if (!resProt.error && resProt.data && resProt.data.length > 0) {
+                        fechRows = resProt.data;
+                    }
+                }
+
+                // Se não encontrou por protocolo e tivermos id numérico, tenta por os_id
+                if (!fechRows && row.id && !isNaN(Number(row.id))) {
+                    const resId = await client
+                        .from('fechamentos_os')
+                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                        .eq('os_id', row.id)
+                        .order('numero_fechamento', { ascending: true });
+                    if (!resId.error && resId.data && resId.data.length > 0) {
+                        fechRows = resId.data;
+                    }
+                }
 
                 if (fechRows && fechRows.length > 0) {
                     row.fechamentos_os = fechRows;
@@ -614,36 +633,50 @@ class ChamadosRepository {
                 const nowIso = new Date().toISOString();
                 updatePayload.data_conclusao = nowIso;
                 updatePayload.data_fechamento = nowIso;
-            } else if (newStatus === 'Aberta' || newStatus === 'Pendente') {
+            } else if (newStatus === 'Aberta') {
+                updatePayload.data_conclusao = null;
+                updatePayload.data_fechamento = null;
+                updatePayload.motivo_aprovacao = null;
+            } else if (newStatus === 'Pendente') {
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;
             }
 
             const executeUpdate = async (tableName, field, val, payload) => {
                 let currentPayload = { ...payload };
+                const isPracas = (tableName === this.pracasTable);
+                
                 // A tabela ordens_servico_pracas não possui a coluna data_conclusao
-                if (tableName === this.pracasTable) {
+                if (isPracas) {
                     delete currentPayload.data_conclusao;
                 }
+
+                // Definir colunas de retorno de acordo com a tabela
+                const selectColumns = isPracas 
+                    ? 'id, protocolo, status, data_fechamento' 
+                    : 'id, protocolo, status, data_conclusao, data_fechamento';
 
                 let res = await client
                     .from(tableName)
                     .update(currentPayload)
                     .eq(field, val)
-                    .select('id, protocolo, status, data_conclusao, data_fechamento');
+                    .select(selectColumns);
 
                 // Caso ocorra erro de coluna inexistente no schema do Supabase, remove a coluna e tenta novamente
-                while (res.error && res.error.message && res.error.message.includes("Could not find the")) {
-                    const match = res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
-                    if (match && match[1]) {
-                        const missingCol = match[1];
+                while (res.error && res.error.message && (res.error.message.includes("Could not find the") || res.error.message.includes("does not exist"))) {
+                    const match = res.error.message.match(/column ['"]?([a-zA-Z0-9_]+)\.([a-zA-Z0-9_]+)['"]? does not exist/i) ||
+                                  res.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i) ||
+                                  res.error.message.match(/column ['"]?([a-zA-Z0-9_]+)['"]? does not exist/i);
+                    const missingCol = match ? (match[2] || match[1]) : null;
+
+                    if (missingCol) {
                         console.warn(`⚠️ [ChamadosRepository] Coluna '${missingCol}' não existe na tabela '${tableName}'. Tentando novamente sem ela...`);
                         delete currentPayload[missingCol];
                         res = await client
                             .from(tableName)
                             .update(currentPayload)
                             .eq(field, val)
-                            .select('id, protocolo, status, data_conclusao, data_fechamento');
+                            .select('id, protocolo, status');
                     } else {
                         break;
                     }

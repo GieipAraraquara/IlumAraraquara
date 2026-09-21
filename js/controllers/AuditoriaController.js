@@ -2017,40 +2017,7 @@ class AuditoriaController {
             `;
         })()}
 
-        <!-- Seção Especial: Galeria Completa de Evidências Fotográficas (Todas as fotos da OS) -->
-        ${(() => {
-            const fotosGeral = item.fotosEvidencias || [];
-            if (!fotosGeral || fotosGeral.length === 0) return '';
 
-            return `
-            <div class="p-3.5 bg-surface-container-low border border-outline-variant/50 rounded-xl space-y-2.5 text-xs">
-                <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
-                    <span class="flex items-center gap-1.5 text-slate-800 font-bold">
-                        <span class="material-symbols-outlined text-[18px] text-blue-600">collections</span>
-                        <span>Galeria de Evidências Fotográficas (${fotosGeral.length})</span>
-                    </span>
-                    <button type="button" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', 0)" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer">
-                        <span class="material-symbols-outlined text-[13px]">fullscreen</span>
-                        <span>Ver em Tela Cheia</span>
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 pt-1">
-                    ${fotosGeral.map((fotoObj, fIdx) => `
-                        <div class="relative group rounded-lg overflow-hidden border border-slate-200 cursor-pointer shadow-2xs hover:shadow-md transition-all aspect-video bg-slate-900" onclick="window.abrirGaleriaFotosModal('${item.protocolo}', ${fIdx})">
-                            <img src="${fotoObj.thumbnailUrl || fotoObj.url}" alt="${fotoObj.titulo || 'Evidência'}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-                            <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-1.5">
-                                <span class="text-[9.5px] font-semibold text-white truncate drop-shadow">${fotoObj.titulo || 'Evidência'}</span>
-                            </div>
-                            <div class="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 text-white rounded p-0.5">
-                                <span class="material-symbols-outlined text-[12px]">open_in_new</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-            `;
-        })()}
 
         <!-- Seção 4: Glosas & Penalidades Contratuais (Supabase JSONB) -->
         <div class="p-3.5 bg-rose-50/40 border border-rose-200/80 rounded-xl space-y-3 text-xs">
@@ -2547,12 +2514,29 @@ class AuditoriaController {
                     if (!targetObj) return;
                     targetObj.materialUtilizado = matConsolidadoStr;
                     targetObj.material_utilizado = matConsolidadoStr;
-                    if (targetObj.materiais !== undefined) targetObj.materiais = matConsolidadoStr;
+                    if (targetObj.rawRow) {
+                        targetObj.rawRow.materiais = matConsolidadoStr;
+                        targetObj.rawRow.material_utilizado = matConsolidadoStr;
+                    }
+
+                    // Se não for instância de ChamadoModel com getter, atribui com segurança
+                    try {
+                        const desc = Object.getOwnPropertyDescriptor(targetObj, 'materiais') || Object.getOwnPropertyDescriptor(Object.getPrototypeOf(targetObj) || {}, 'materiais');
+                        if (!desc || desc.set) {
+                            targetObj.materiais = matConsolidadoStr;
+                        }
+                    } catch (eMat) {}
+
+                    // Atualiza fechamentos_os bruto e fechamentosRaw
+                    if (targetObj.fechamentosRaw && Array.isArray(targetObj.fechamentosRaw)) {
+                        fechamentosState.forEach((fState, idx) => {
+                            if (targetObj.fechamentosRaw[idx]) {
+                                targetObj.fechamentosRaw[idx].materiais = [...fState.materiais];
+                            }
+                        });
+                    }
 
                     fechamentosState.forEach((fState, idx) => {
-                        if (targetObj.fechamentosList && targetObj.fechamentosList[idx]) {
-                            targetObj.fechamentosList[idx].materiais = [...fState.materiais];
-                        }
                         if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
                             targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
                         }
@@ -2591,7 +2575,7 @@ class AuditoriaController {
 
                 this.exibirModalSucessoHTML(
                     'Materiais Salvos',
-                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados no Supabase com sucesso!`
+                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados com sucesso!`
                 );
             } catch(err) {
                 console.error('Erro ao salvar materiais:', err);

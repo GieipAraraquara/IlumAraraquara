@@ -5123,28 +5123,111 @@
     var galeriaFotosAtualList = [];
     var galeriaFotosIndexAtual = 0;
 
-    window.abrirModalDetalhesPrincipal = function(protocolo) {
+    window.abrirModalDetalhesPrincipal = async function(protocolo) {
         if (popupDuplicadosAtual) {
             popupDuplicadosAtual.remove();
             popupDuplicadosAtual = null;
         }
 
-        let item = (window.chamadosListCache || []).find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+        const upperProt = String(protocolo || '').replace(/^#/, '').trim().toUpperCase();
+
+        let item = (window.chamadosListCache || []).find(o => {
+            const p = String(o.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const id = String(o.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === upperProt || id === upperProt;
+        });
 
         if (!item && dadosOSsAbertasCache) {
-            const rawObj = dadosOSsAbertasCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
+            const rawObj = dadosOSsAbertasCache.find(o => {
+                const p = String(o.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const id = String(o.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === upperProt || id === upperProt;
+            });
             if (rawObj) {
                 item = rawObj._originalModel || rawObj;
             }
         }
+
+        // Abre o modal imediatamente exibindo esqueleto / dados preliminares
+        const modal = document.getElementById('modalDetalhesOSAuditoria');
+        const box = document.getElementById('modalDetalhesOSBox');
+        if (modal && box) {
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                box.classList.remove('scale-95', 'opacity-0');
+                box.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        const elProt = document.getElementById('detalheModalProtocolo');
+        if (elProt) elProt.innerText = `Protocolo #${protocolo}`;
         
-        if (!item) return;
+        const container = document.getElementById('detalheModalConteudo');
+        if (container && (!item || !item._isEnriched)) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-16 text-slate-500 space-y-3">
+                    <span class="material-symbols-outlined text-3xl animate-spin text-primary">progress_activity</span>
+                    <span class="text-xs font-semibold">Carregando detalhes e fotos da OS #${protocolo}...</span>
+                </div>
+            `;
+        }
+
+        // Enriquecimento sob demanda para carregar pontos_final, fotos e fechamentos_os
+        if (window.supabaseClient && window.ChamadosRepository) {
+            try {
+                const repo = new window.ChamadosRepository();
+                const needsEnrich = !item || !item._isEnriched || !item.rawPontosFinal || (Array.isArray(item.rawPontosFinal) && item.rawPontosFinal.length === 0);
+                if (needsEnrich) {
+                    const fullRow = await repo.fetchById(upperProt);
+                    if (fullRow) {
+                        const ModelClass = window.ChamadoModel;
+                        const fullItem = (fullRow instanceof ModelClass) ? fullRow : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fullRow) : (ModelClass ? new ModelClass(fullRow) : fullRow));
+                        fullItem._isEnriched = true;
+                        item = fullItem;
+
+                        // Atualiza caches para manter sincronizado no Mapa
+                        if (window.chamadosListCache && Array.isArray(window.chamadosListCache)) {
+                            const idx = window.chamadosListCache.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperProt || cid === upperProt;
+                            });
+                            if (idx >= 0) window.chamadosListCache[idx] = fullItem;
+                            else window.chamadosListCache.push(fullItem);
+                        }
+
+                        if (typeof dadosOSsAbertasCache !== 'undefined' && Array.isArray(dadosOSsAbertasCache)) {
+                            const idx = dadosOSsAbertasCache.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperProt || cid === upperProt;
+                            });
+                            if (idx >= 0) {
+                                dadosOSsAbertasCache[idx]._originalModel = fullItem;
+                            }
+                        }
+                    }
+                }
+            } catch (errRemoto) {
+                console.warn('⚠️ [Mapa.html] Erro ao buscar detalhes da OS sob demanda via fetchById:', errRemoto);
+            }
+        }
+        
+        if (!item) {
+            if (container) {
+                container.innerHTML = `
+                    <div class="p-8 text-center text-rose-600 text-xs font-semibold">
+                        Não foi possível carregar os detalhes do protocolo #${protocolo}.
+                    </div>
+                `;
+            }
+            return;
+        }
 
         if (!(item instanceof window.ChamadoModel) && window.ChamadoModel) {
             item = new window.ChamadoModel(item);
         }
 
-        const elProt = document.getElementById('detalheModalProtocolo');
         if (elProt) elProt.innerText = `Protocolo #${item.protocolo}`;
         
         const elSub = document.getElementById('detalheModalDataSub');
@@ -5174,23 +5257,12 @@
             elAuditBadge.classList.add('hidden');
         }
 
-        const container = document.getElementById('detalheModalConteudo');
         if (container) {
             container.innerHTML = construirHtmlModalDetalhesPrincipal(item);
             const ctrl = window.painelController || (window.PainelController ? new window.PainelController() : null);
             if (ctrl && typeof ctrl.carregarLogsNoModal === 'function') {
                 ctrl.carregarLogsNoModal(item.protocolo);
             }
-        }
-
-        const modal = document.getElementById('modalDetalhesOSAuditoria');
-        const box = document.getElementById('modalDetalhesOSBox');
-        if (modal && box) {
-            modal.classList.remove('hidden');
-            setTimeout(() => {
-                box.classList.remove('scale-95', 'opacity-0');
-                box.classList.add('scale-100', 'opacity-100');
-            }, 10);
         }
     };
 
@@ -5214,15 +5286,35 @@
     };
 
     window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
-        let os = (dadosOSsAbertasCache || []).find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
-        if (!os && window.chamadosListCache) {
-            os = window.chamadosListCache.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo).toUpperCase() || String(o.id || "").toUpperCase() === String(protocolo).toUpperCase());
-        }
-        if (!os) return;
+        let fotosList = [];
+        let tituloOS = '';
 
-        const fotosList = (typeof obterFotosEvidenciasOS === 'function')
-            ? obterFotosEvidenciasOS(os)
-            : (os.fotosEvidencias && os.fotosEvidencias.length > 0 ? os.fotosEvidencias : (os.fotos || []));
+        // Suporte para quando 'protocolo' é passado diretamente como um array de fotos: [{url, titulo}]
+        if (Array.isArray(protocolo)) {
+            fotosList = protocolo;
+            tituloOS = 'Evidências';
+        } else {
+            const upperProt = String(protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            let os = (dadosOSsAbertasCache || []).find(o => {
+                const p = String(o.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const id = String(o.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === upperProt || id === upperProt;
+            });
+            if (!os && window.chamadosListCache) {
+                os = window.chamadosListCache.find(o => {
+                    const p = String(o.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                    const id = String(o.id || '').replace(/^#/, '').trim().toUpperCase();
+                    return p === upperProt || id === upperProt;
+                });
+            }
+            if (os) {
+                if (os._originalModel) os = os._originalModel;
+                fotosList = (typeof obterFotosEvidenciasOS === 'function')
+                    ? obterFotosEvidenciasOS(os)
+                    : (os.fotosEvidencias && os.fotosEvidencias.length > 0 ? os.fotosEvidencias : (os.fotos || []));
+                tituloOS = `OS #${os.protocolo || protocolo}`;
+            }
+        }
 
         if (!fotosList || fotosList.length === 0) return;
 
@@ -5231,7 +5323,7 @@
 
         const modal = document.getElementById('modalGaleriaFotosCloudinary');
         const elProt = document.getElementById('galeriaModalProtocolo');
-        if (elProt) elProt.innerText = `Fotos da OS #${os.protocolo || protocolo}`;
+        if (elProt) elProt.innerText = `Fotos da ${tituloOS}`;
 
         atualizarModalGaleriaVisualizacao();
 
