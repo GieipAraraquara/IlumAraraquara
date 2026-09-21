@@ -2276,6 +2276,11 @@
                 badgePeriodo.textContent = `Período: ${medicaoData.periodLabelBR}`;
             }
 
+            const elMedicaoPeriodoBadge = document.getElementById('medicao-periodo-badge');
+            if (elMedicaoPeriodoBadge && medicaoData.periodLabelBR) {
+                elMedicaoPeriodoBadge.textContent = `Período: ${medicaoData.periodLabelBR}`;
+            }
+
             const elTotalItens = document.getElementById('kpi-medicao-itens');
             const elTotalHoras = document.getElementById('kpi-medicao-horas');
             const elTotalOSs = document.getElementById('kpi-medicao-oss');
