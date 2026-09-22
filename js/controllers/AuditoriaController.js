@@ -80,7 +80,15 @@ class AuditoriaController {
         let activeTarget = null;
 
         const showTooltip = (target) => {
-            const explicacao = target.getAttribute('data-audit-explicacao');
+            let explicacao = target.getAttribute('data-audit-explicacao');
+            const b64 = target.getAttribute('data-audit-html-b64');
+            if (b64) {
+                try {
+                    explicacao = decodeURIComponent(escape(atob(b64)));
+                } catch(e) {
+                    try { explicacao = atob(b64); } catch(e2) {}
+                }
+            }
             if (!explicacao) return;
 
             const customTitle = target.getAttribute('data-audit-title') || 'Aponta SIM quando:';
@@ -102,9 +110,9 @@ class AuditoriaController {
             const rect = target.getBoundingClientRect();
             const popoverRect = popover.getBoundingClientRect();
 
-            let top = rect.top - popoverRect.height - 10;
+            let top = rect.top - popoverRect.height - 8;
             if (top < 10) {
-                top = rect.bottom + 10;
+                top = rect.bottom + 8;
             }
 
             let left = rect.left + (rect.width / 2) - (popoverRect.width / 2);
@@ -129,7 +137,7 @@ class AuditoriaController {
         };
 
         document.addEventListener('mouseover', (e) => {
-            const card = e.target.closest('[data-audit-explicacao]');
+            const card = e.target.closest('[data-audit-explicacao], [data-audit-html-b64]');
             if (card) {
                 showTooltip(card);
             } else if (activeTarget) {
@@ -138,7 +146,7 @@ class AuditoriaController {
         });
 
         document.addEventListener('mouseout', (e) => {
-            const card = e.target.closest('[data-audit-explicacao]');
+            const card = e.target.closest('[data-audit-explicacao], [data-audit-html-b64]');
             if (card && e.relatedTarget && !card.contains(e.relatedTarget)) {
                 hideTooltip();
             }
@@ -268,17 +276,25 @@ class AuditoriaController {
     /**
      * Renders main Audit Table rows (Filtered strictly for Concluded OSs with at least one 'S' divergence)
      */
-    renderOSTable(auditList = []) {
+    renderOSTable(auditList = null) {
         const tbody = document.querySelector('#os-table tbody');
         if (!tbody) return;
 
+        const listToUse = (Array.isArray(auditList) && auditList.length > 0) 
+            ? auditList 
+            : (this.auditDivergentList || (this.concludedList ? this.concludedList.filter(item => item.hasDivergence) : []));
+
         // Filter strictly for items that have at least one 'S' divergence flag
-        const divergentOnly = auditList.filter(item => item.hasDivergence);
+        const divergentOnly = listToUse.filter(item => item.hasDivergence);
+
+        const activeCount = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) ? window.activeAuditCols.length : 10;
+        const isAuditColsHidden = document.getElementById('os-table')?.classList.contains('hide-audit-cols') || activeCount === 0;
+        const colspanVal = (4 + activeCount).toString();
 
         // Keep empty state row
         const emptyRowHtml = `
             <tr id="no-audit-results" class="${divergentOnly.length === 0 ? '' : 'hidden'}">
-                <td colspan="14" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                <td colspan="${colspanVal}" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                         <span class="text-xs">Nenhuma ordem de serviço com divergência (S) encontrada para auditoria.</span>
@@ -290,6 +306,11 @@ class AuditoriaController {
 
         const rowsHtml = divergentOnly.map(item => this.createAuditRowHtml(item)).join('');
         tbody.innerHTML = emptyRowHtml + rowsHtml;
+
+        // Se a função de visibilidade de colunas estiver carregada, reaplica para ocultar as desmarcadas
+        if (typeof window.applyAuditColsVisibility === 'function') {
+            window.applyAuditColsVisibility();
+        }
     }
 
     /**
@@ -461,10 +482,21 @@ class AuditoriaController {
             const label = rule ? rule.label : 'Critério Disparado';
             const safeLabel = label ? label.replace(/"/g, '&quot;') : '';
             const summaryHtml = getDivergenceSummaryHtml(ruleIdx);
-            const safeSummary = summaryHtml ? summaryHtml.replace(/"/g, '&quot;') : (rule ? rule.explicacao.replace(/"/g, '&quot;') : '');
+            
+            let b64Attr = '';
+            let safeSummary = '';
+            if (summaryHtml) {
+                try {
+                    b64Attr = `data-audit-html-b64="${btoa(unescape(encodeURIComponent(summaryHtml)))}"`;
+                } catch(e) {
+                    safeSummary = summaryHtml.replace(/"/g, '&quot;');
+                }
+            } else if (rule && rule.explicacao) {
+                safeSummary = rule.explicacao.replace(/"/g, '&quot;');
+            }
             const combinedTitle = titleAttr ? `${titleAttr} | Critério: ${label}` : `Critério: ${label}`;
 
-            return `<span class="audit-badge audit-s cursor-help" ${safeSummary ? `data-audit-explicacao="${safeSummary}" data-audit-title="Critério: ${safeLabel}"` : ''} title="${combinedTitle}">${isTrue ? 'S' : 'N'}</span>`;
+            return `<span class="audit-badge audit-s cursor-help" ${b64Attr ? b64Attr : (safeSummary ? `data-audit-explicacao="${safeSummary}"` : '')} data-audit-title="Critério: ${safeLabel}" title="${combinedTitle}" onclick="event.stopPropagation()">S</span>`;
         };
 
         const isCompleted = item.isAuditoriaConcluida;
@@ -475,16 +507,16 @@ class AuditoriaController {
                 <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
                 
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaDivergente, 0)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaDivergente, 1)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isQuantidadeDivergente, 2)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isDistanciaAcima100m, 3, distTitle)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isOutraPlaquetaProxima, 4)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPlaquetaProblematica, 5)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isPrecisaAnexarFoto, 6)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isAnexoFaltante, 7)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isMaterialDivergente, 8)}</td>
-                <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20">${renderBadge(item.isProblemaExterno, 9)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="0">${renderBadge(item.isProblemaDivergente, 0)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="1">${renderBadge(item.isPlaquetaDivergente, 1)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="2">${renderBadge(item.isQuantidadeDivergente, 2)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="3">${renderBadge(item.isDistanciaAcima100m, 3, distTitle)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="4">${renderBadge(item.isOutraPlaquetaProxima, 4)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="5">${renderBadge(item.isPlaquetaProblematica, 5)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="6">${renderBadge(item.isPrecisaAnexarFoto, 6)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="7">${renderBadge(item.isAnexoFaltante, 7)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="8">${renderBadge(item.isMaterialDivergente, 8)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="9">${renderBadge(item.isProblemaExterno, 9)}</td>
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">
@@ -509,12 +541,16 @@ class AuditoriaController {
     /**
      * Renders Completed Services Table for Praças ('P')
      */
-    renderPracaTable(auditList = []) {
+    renderPracaTable(auditList = null) {
         const tbody = document.querySelector('#praca-services-table tbody');
         if (!tbody) return;
 
+        const listToUse = (Array.isArray(auditList) && auditList.length > 0)
+            ? auditList
+            : (this.pracaServicesList || []);
+
         const emptyRowHtml = `
-            <tr id="no-praca-results" class="${auditList.length === 0 ? '' : 'hidden'}">
+            <tr id="no-praca-results" class="${listToUse.length === 0 ? '' : 'hidden'}">
                 <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
@@ -525,25 +561,29 @@ class AuditoriaController {
             </tr>
         `;
 
-        const rowsHtml = auditList.map(item => this.createCompletedRowHtml(item, true)).join('');
+        const rowsHtml = listToUse.map(item => this.createCompletedRowHtml(item, true)).join('');
         tbody.innerHTML = emptyRowHtml + rowsHtml;
 
         // Update count badge
         const badge = document.getElementById('praca-badge-count');
         if (badge) {
-            badge.textContent = `${auditList.length} Registros`;
+            badge.textContent = `${listToUse.length} Registros`;
         }
     }
 
     /**
      * Renders Completed Services Table rows using Finalization/Conclusao data
      */
-    renderCompletedTable(auditList = []) {
+    renderCompletedTable(auditList = null) {
         const tbody = document.querySelector('#completed-services-table tbody');
         if (!tbody) return;
 
+        const listToUse = (Array.isArray(auditList) && auditList.length > 0)
+            ? auditList
+            : (this.viariaConcludedList || []);
+
         const emptyRowHtml = `
-            <tr id="no-completed-results" class="${auditList.length === 0 ? '' : 'hidden'}">
+            <tr id="no-completed-results" class="${listToUse.length === 0 ? '' : 'hidden'}">
                 <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
@@ -554,25 +594,29 @@ class AuditoriaController {
             </tr>
         `;
 
-        const rowsHtml = auditList.map(item => this.createCompletedRowHtml(item, false)).join('');
+        const rowsHtml = listToUse.map(item => this.createCompletedRowHtml(item, false)).join('');
         tbody.innerHTML = emptyRowHtml + rowsHtml;
 
         // Update count badge
         const badge = document.querySelector('#completed-services-table')?.closest('.col-span-12')?.querySelector('.px-2\\.5');
         if (badge) {
-            badge.textContent = `${auditList.length} Registros`;
+            badge.textContent = `${listToUse.length} Registros`;
         }
     }
 
     /**
      * Renders Demandas Emergenciais Table (Atendimento Direto)
      */
-    renderEmergenciaTable(auditList = []) {
+    renderEmergenciaTable(auditList = null) {
         const tbody = document.querySelector('#emergencia-services-table tbody');
         if (!tbody) return;
 
+        const listToUse = (Array.isArray(auditList) && auditList.length > 0)
+            ? auditList
+            : (this.emergenciaServicesList || []);
+
         const emptyRowHtml = `
-            <tr id="no-emergencia-results" class="${auditList.length === 0 ? '' : 'hidden'}">
+            <tr id="no-emergencia-results" class="${listToUse.length === 0 ? '' : 'hidden'}">
                 <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-amber-500/60">electric_bolt</span>
@@ -582,13 +626,13 @@ class AuditoriaController {
             </tr>
         `;
 
-        const rowsHtml = auditList.map(item => this.createEmergenciaRowHtml(item)).join('');
+        const rowsHtml = listToUse.map(item => this.createEmergenciaRowHtml(item)).join('');
         tbody.innerHTML = emptyRowHtml + rowsHtml;
 
         // Update count badge
         const badge = document.getElementById('emergencia-badge-count');
         if (badge) {
-            badge.textContent = `${auditList.length} Registros`;
+            badge.textContent = `${listToUse.length} Registros`;
         }
     }
 
@@ -1800,8 +1844,11 @@ class AuditoriaController {
                 ${item.sessoesList.map(s => {
                     const st = (s.status || '').toUpperCase();
                     const isEmAndamento = st.includes('ANDAMENTO');
-                    const badgeBg = isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
-                    const iconStr = isEmAndamento ? 'play_arrow' : 'task_alt';
+                    const isDesconsiderada = Boolean(s.desconsiderada);
+                    const badgeBg = isDesconsiderada 
+                        ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                        : (isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300');
+                    const iconStr = isDesconsiderada ? 'block' : (isEmAndamento ? 'play_arrow' : 'task_alt');
                     const dataInc = s.inicioStr || 'Início registrado';
                     const dataFim = s.fimStr || (isEmAndamento ? 'Em andamento...' : 'Concluída');
                     const durStr = s.duracao_minutos ? (s.duracao_minutos >= 60 ? `${Math.floor(s.duracao_minutos/60)}h ${s.duracao_minutos%60}min (${s.duracao_minutos} min)` : `${s.duracao_minutos} min`) : '';
@@ -1812,14 +1859,38 @@ class AuditoriaController {
                     const fSaiIdx = fotoSai && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoSai) : -1;
 
                     return `
-                    <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 flex flex-col justify-between space-y-2 shadow-2xs">
-                        <div class="flex items-center justify-between gap-1 border-b border-slate-100 pb-1.5">
-                            <span class="font-bold text-[12px] text-slate-800 flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-[16px] text-blue-600">${iconStr}</span>
+                    <div class="p-3 rounded-xl ${isDesconsiderada ? 'bg-slate-100/70 border border-dashed border-rose-300 opacity-80' : 'bg-surface-container-lowest border border-outline-variant/40 shadow-2xs'} flex flex-col justify-between space-y-2">
+                        <div class="flex items-center justify-between gap-1 border-b ${isDesconsiderada ? 'border-rose-200' : 'border-slate-100'} pb-1.5 flex-wrap">
+                            <span class="font-bold text-[12px] ${isDesconsiderada ? 'text-slate-500 line-through' : 'text-slate-800'} flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] ${isDesconsiderada ? 'text-rose-500' : 'text-blue-600'}">${iconStr}</span>
                                 Sessão #${s.numero || 1}
                             </span>
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">${s.status || 'REGISTRADA'}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">
+                                    ${isDesconsiderada ? 'DESCONSIDERADA' : (s.status || 'REGISTRADA')}
+                                </span>
+                                ${(isAdminUser || isManutentorUser) ? `
+                                    ${isDesconsiderada ? `
+                                    <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar esta sessão para cálculos de medição">
+                                        <span class="material-symbols-outlined text-[12px]">undo</span>
+                                        <span>Reconsiderar</span>
+                                    </button>
+                                    ` : `
+                                    <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar esta sessão dos cálculos de medição">
+                                        <span class="material-symbols-outlined text-[12px]">block</span>
+                                        <span>Desconsiderar</span>
+                                    </button>
+                                    `}
+                                ` : ''}
+                            </div>
                         </div>
+                        
+                        ${isDesconsiderada ? `
+                        <div class="p-1.5 rounded-lg bg-rose-50/80 border border-rose-200 text-[10px] text-rose-900 flex items-center gap-1 font-medium">
+                            <span class="material-symbols-outlined text-[13px] text-rose-600 shrink-0">info</span>
+                            <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                        </div>
+                        ` : ''}
                         
                         <div class="text-[11px] text-slate-600 space-y-1">
                             <div class="flex items-center justify-between">
@@ -2546,12 +2617,17 @@ class AuditoriaController {
                 updateItemRef(item);
 
                 // Atualiza o item em todas as listas de cache ativas no controlador
-                [this.chamadosList, this.pracasChamadosList, this.completedChamadosList, window.chamadosListCache].forEach(arr => {
+                [this.chamadosList, this.concludedList, this.pracaServicesList, this.viariaConcludedList, this.emergenciaServicesList, this.auditDivergentList, window.chamadosListCache].forEach(arr => {
                     if (Array.isArray(arr)) {
                         arr.filter(o => o && (String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "") === String(prot)))
                            .forEach(o => updateItemRef(o));
                     }
                 });
+
+                // Atualiza a lista de divergentes da auditoria com base no estado atualizado
+                if (Array.isArray(this.concludedList)) {
+                    this.auditDivergentList = this.concludedList.filter(o => o && o.hasDivergence);
+                }
 
                 document.removeEventListener('click', fecharDropdownsOnClickOutside);
 
@@ -2569,9 +2645,21 @@ class AuditoriaController {
                     await this.carregarLogsNoModal(prot);
                 }, 200);
 
-                if (typeof this.renderOSTable === 'function') this.renderOSTable();
-                if (typeof this.renderPracaTable === 'function') this.renderPracaTable();
-                if (typeof this.renderCompletedTable === 'function') this.renderCompletedTable();
+                if (typeof this.renderOSTable === 'function') this.renderOSTable(this.auditDivergentList);
+                if (typeof this.renderPracaTable === 'function') this.renderPracaTable(this.pracaServicesList);
+                if (typeof this.renderCompletedTable === 'function') this.renderCompletedTable(this.viariaConcludedList);
+                if (typeof this.renderEmergenciaTable === 'function') this.renderEmergenciaTable(this.emergenciaServicesList);
+
+                // Re-aplica os filtros ativos nas tabelas
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+                if (typeof window.applyPracaServicesFilters === 'function') {
+                    window.applyPracaServicesFilters();
+                }
+                if (typeof window.applyCompletedServicesFilters === 'function') {
+                    window.applyCompletedServicesFilters();
+                }
 
                 this.exibirModalSucessoHTML(
                     'Materiais Salvos',
@@ -3128,10 +3216,122 @@ window.abrirDetalhesOSModal = function(id) {
     }
 };
 
+// Se PainelController.js não tiver sido carregado na tela de Auditoria, garante alternarDesconsiderarSessao disponível
+if (typeof window.alternarDesconsiderarSessao !== 'function') {
+    window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsiderar) {
+        const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
+        let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+        const protocol = item ? (item.protocolo || osId) : osId;
+
+        const tituloConfirma = desconsiderar ? 'Desconsiderar Sessão' : 'Reconsiderar Sessão';
+        const msgConfirma = desconsiderar 
+            ? `Deseja realmente desconsiderar a <strong class="text-on-surface font-bold">Sessão #${numeroSessao}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ela deixará de somar horas de eletricista e materiais na medição.`
+            : `Deseja restabelecer a <strong class="text-on-surface font-bold">Sessão #${numeroSessao}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ela voltará a ser computada normalmente na medição.`;
+
+        const executarAcao = async (motivoJustificativa = '') => {
+            try {
+                const service = new window.ChamadosService();
+                await service.alternarDesconsiderarSessao(protocol, numeroSessao, desconsiderar, motivoJustificativa, 'Auditoria');
+
+                const repo = new window.ChamadosRepository();
+                const freshRow = await repo.fetchById(protocol);
+
+                let updatedItem = null;
+                if (freshRow) {
+                    const ModelClass = window.ChamadoModel;
+                    updatedItem = (freshRow instanceof ModelClass) 
+                        ? freshRow 
+                        : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(freshRow) : (ModelClass ? new ModelClass(freshRow) : freshRow));
+                    updatedItem._isEnriched = true;
+                }
+
+                const updateInMemory = (targetList) => {
+                    if (!Array.isArray(targetList)) return;
+                    const idx = targetList.findIndex(o => o && (String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(protocol)));
+                    if (idx >= 0 && updatedItem) {
+                        targetList[idx] = updatedItem;
+                    }
+                };
+
+                [
+                    window.chamadosListCache,
+                    window.dadosOSsAbertasCache,
+                    window.auditoriaController?.chamadosList,
+                    window.auditoriaController?.concludedList,
+                    window.auditoriaController?.pracaServicesList,
+                    window.painelController?.chamadosList
+                ].forEach(l => updateInMemory(l));
+
+                const finalItem = updatedItem || item;
+
+                const container = document.getElementById('detalheModalConteudo');
+                if (container && finalItem) {
+                    const ctrl = window.auditoriaController || window.painelController;
+                    if (ctrl && typeof ctrl.buildDetalhesOSModalHtml === 'function') {
+                        container.innerHTML = ctrl.buildDetalhesOSModalHtml(finalItem);
+                    }
+                }
+
+                const msgSucesso = `Sessão #${numeroSessao} ${desconsiderar ? 'desconsiderada' : 'reconsiderada'} com sucesso!`;
+                if (window.auditoriaController && typeof window.auditoriaController.showSuccessToast === 'function') {
+                    window.auditoriaController.showSuccessToast(msgSucesso);
+                } else if (window.painelController && typeof window.painelController.showSuccessToast === 'function') {
+                    window.painelController.showSuccessToast(msgSucesso);
+                } else {
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-5 right-5 z-[99999] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 border border-slate-700 animate-bounce';
+                    toast.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span><span>${msgSucesso}</span>`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
+                }
+            } catch (err) {
+                console.error('❌ Erro ao alternar status da sessão em Auditoria:', err);
+                alert('Erro ao atualizar sessão: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: tituloConfirma,
+                message: msgConfirma,
+                icon: desconsiderar ? 'block' : 'undo',
+                iconBgClass: desconsiderar ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+                confirmBtnClass: desconsiderar ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                confirmText: desconsiderar ? 'Sim, Desconsiderar' : 'Sim, Reconsiderar',
+                showJustification: Boolean(desconsiderar),
+                requireJustification: Boolean(desconsiderar),
+                onConfirm: (justification) => executarAcao(justification)
+            });
+        } else {
+            if (confirm(`${tituloConfirma}\n\n${desconsiderar ? `Deseja desconsiderar a Sessão #${numeroSessao}?` : `Deseja reconsiderar a Sessão #${numeroSessao}?`}`)) {
+                let motivo = '';
+                if (desconsiderar) {
+                    motivo = prompt('Informe a justificativa (Obrigatória):');
+                    if (!motivo || !motivo.trim()) {
+                        alert('A justificativa é obrigatória para desconsiderar a sessão.');
+                        return;
+                    }
+                }
+                executarAcao(motivo);
+            }
+        }
+    };
+}
+
 // Instantiate controller globally
 window.AuditoriaController = AuditoriaController;
 })();
-document.addEventListener('DOMContentLoaded', () => {
-    window.auditoriaController = new AuditoriaController();
+
+function bootAuditoriaController() {
+    if (!window.auditoriaController) {
+        window.auditoriaController = new window.AuditoriaController();
+    }
     window.auditoriaController.init();
-});
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootAuditoriaController);
+} else {
+    bootAuditoriaController();
+}
+

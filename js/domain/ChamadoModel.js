@@ -319,6 +319,10 @@ class ChamadoModel {
                 return {
                     numero: s.numero || (idx + 1),
                     status: st || (s.fim ? 'ENCERRADA' : 'EM ANDAMENTO'),
+                    desconsiderada: Boolean(s.desconsiderada),
+                    motivo_desconsideracao: s.motivo_desconsideracao || null,
+                    desconsiderada_em: s.desconsiderada_em || null,
+                    desconsiderada_por: s.desconsiderada_por || null,
                     inicio: s.inicio || null,
                     inicioStr: inicioFormatted,
                     fim: s.fim || null,
@@ -413,8 +417,9 @@ class ChamadoModel {
      */
     get tempoTotalFormatado() {
         let totalMin = this.tempoTotalMinutos;
-        if ((totalMin === null || totalMin === undefined || isNaN(totalMin)) && this.sessoesList.length > 0) {
-            totalMin = this.sessoesList.reduce((acc, s) => acc + (s.duracao_minutos || 0), 0);
+        const validSessoes = (this.sessoesList || []).filter(s => !s.desconsiderada);
+        if ((totalMin === null || totalMin === undefined || isNaN(totalMin)) && validSessoes.length > 0) {
+            totalMin = validSessoes.reduce((acc, s) => acc + (s.duracao_minutos || 0), 0);
         }
         if (totalMin === null || totalMin === undefined || isNaN(totalMin) || totalMin <= 0) {
             return null;
@@ -1421,6 +1426,7 @@ class ChamadoModel {
         // Agrega materiais de cada sessão (sessoesList)
         if (this.sessoesList && this.sessoesList.length > 0) {
             this.sessoesList.forEach(s => {
+                if (s.desconsiderada) return;
                 if (s.materiais && Array.isArray(s.materiais)) {
                     s.materiais.forEach(m => {
                         if (!m) return;

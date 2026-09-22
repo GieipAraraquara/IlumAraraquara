@@ -45,7 +45,7 @@ class ChamadosRepository {
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
             'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
-            'materiais', 'historico_sessoes'
+            'materiais', 'historico_sessoes', 'pontos_final'
         ].join(',');
     }
 
@@ -62,7 +62,7 @@ class ChamadosRepository {
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
             'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
-            'materiais', 'historico_sessoes'
+            'materiais', 'historico_sessoes', 'pontos_final'
         ].join(',');
     }
 
@@ -154,7 +154,7 @@ class ChamadosRepository {
                 chunks.push(protocolosVisiveis.slice(i, i + CHUNK_SIZE));
             }
 
-            const COLUNAS_FECHAMENTO = 'id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at';
+            const COLUNAS_FECHAMENTO = 'id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, created_at';
 
             const promessas = chunks.map(chunk =>
                 client
@@ -536,7 +536,7 @@ class ChamadosRepository {
             try {
                 const { data: auditData, error: auditError } = await client
                     .from('vw_auditoria_chamados')
-                    .select('id, protocolo, status_auditoria, motivo_aprovacao, motivo_pendencia, data_conclusao_auditoria');
+                    .select('id, protocolo, status_auditoria, problema_divergente, plaqueta_divergente, quantidade_divergente, distancia, distancia_acima_100m, outra_plaqueta_proxima, outro_reparo_no_mes, precisa_anexar_foto, material_divergente, problema_externo, usuario_finalizacao');
 
                 if (!auditError && auditData) {
                     auditData.forEach(row => {
@@ -1179,6 +1179,92 @@ class ChamadosRepository {
             return updatedData || true;
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateMaterial:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Atualiza o array de historico_sessoes de uma praça e recalcula o tempo_total_minutos
+     * @param {string|number} protocoloOrId
+     * @param {Array} novoHistoricoSessoes
+     * @param {Object} [metaLog] - Informações para auditoria { numeroSessao, desconsiderar, motivo, usuario }
+     */
+    async updateHistoricoSessoes(protocoloOrId, novoHistoricoSessoes, metaLog = {}) {
+        try {
+            const client = this.getClient();
+            const protStr = String(protocoloOrId || '').trim();
+            const isNumeric = /^\d+$/.test(protStr);
+
+            const sessoesArr = Array.isArray(novoHistoricoSessoes) ? novoHistoricoSessoes : [];
+
+            // Recalcula tempo total somando apenas sessões não desconsideradas
+            const novoTempoMinutos = sessoesArr.reduce((acc, s) => {
+                if (s.desconsiderada) return acc;
+                let dur = s.duracao_minutos;
+                if ((dur === null || dur === undefined || isNaN(dur)) && s.inicio && s.fim) {
+                    const dtInc = new Date(s.inicio);
+                    const dtFim = new Date(s.fim);
+                    if (!isNaN(dtInc.getTime()) && !isNaN(dtFim.getTime())) {
+                        dur = Math.max(1, Math.round((dtFim.getTime() - dtInc.getTime()) / 60000));
+                    }
+                }
+                return acc + (dur || 0);
+            }, 0);
+
+            const updatePayload = {
+                historico_sessoes: sessoesArr,
+                tempo_total_minutos: novoTempoMinutos
+            };
+
+            const isPraca = protStr.toUpperCase().startsWith('P');
+            const tablesToTry = isPraca
+                ? [this.pracasTable, this.primaryTable]
+                : [this.primaryTable, this.pracasTable];
+
+            let updated = false;
+
+            for (const tableName of tablesToTry) {
+                const fieldsToTry = isNumeric ? ['id', 'protocolo'] : ['protocolo'];
+                for (const field of fieldsToTry) {
+                    try {
+                        let res = await client
+                            .from(tableName)
+                            .update(updatePayload)
+                            .eq(field, protStr)
+                            .select('id, protocolo');
+
+                        if (!res.error && res.data && res.data.length > 0) {
+                            updated = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`⚠️ [ChamadosRepository] Falha ao atualizar sessões na tabela ${tableName} (${field}):`, e);
+                    }
+                }
+                if (updated) break;
+            }
+
+            // Registra log de auditoria
+            if (window.LogsRepository) {
+                const acaoDesc = metaLog.desconsiderar 
+                    ? `Sessão #${metaLog.numeroSessao} desconsiderada dos cálculos de medição`
+                    : `Sessão #${metaLog.numeroSessao} reconsiderada para cálculos de medição`;
+
+                window.LogsRepository.registrarLog({
+                    protocolo: protStr,
+                    tabelaOrigem: 'ordens_servico_pracas',
+                    tipoAcao: metaLog.desconsiderar ? 'DESCONSIDERAR_SESSAO' : 'RECONSIDERAR_SESSAO',
+                    descricao: acaoDesc + (metaLog.motivo ? ` (Motivo: ${metaLog.motivo})` : ''),
+                    dadosAnteriores: null,
+                    dadosNovos: { historico_sessoes: sessoesArr, tempo_total_minutos: novoTempoMinutos },
+                    origemTela: metaLog.origemTela || 'Painel'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de sessão:', err));
+            }
+
+            console.log(`✅ [ChamadosRepository] Sessões da OS ${protStr} atualizadas com sucesso. Novo tempo total: ${novoTempoMinutos} min.`);
+            return { success: true, tempoTotalMinutos: novoTempoMinutos, sessoes: sessoesArr };
+        } catch (err) {
+            console.error('❌ [ChamadosRepository] Exceção em updateHistoricoSessoes:', err);
             throw err;
         }
     }

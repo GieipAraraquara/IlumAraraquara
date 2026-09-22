@@ -1696,8 +1696,11 @@ class PainelController {
                 ${item.sessoesList.map(s => {
                     const st = (s.status || '').toUpperCase();
                     const isEmAndamento = st.includes('ANDAMENTO');
-                    const badgeBg = isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300';
-                    const iconStr = isEmAndamento ? 'play_arrow' : 'task_alt';
+                    const isDesconsiderada = Boolean(s.desconsiderada);
+                    const badgeBg = isDesconsiderada 
+                        ? 'bg-rose-100 text-rose-800 border-rose-300' 
+                        : (isEmAndamento ? 'bg-amber-100 text-amber-800 border-amber-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300');
+                    const iconStr = isDesconsiderada ? 'block' : (isEmAndamento ? 'play_arrow' : 'task_alt');
                     const dataInc = s.inicioStr || 'Início registrado';
                     const dataFim = s.fimStr || (isEmAndamento ? 'Em andamento...' : 'Concluída');
                     const durStr = s.duracao_minutos ? (s.duracao_minutos >= 60 ? `${Math.floor(s.duracao_minutos/60)}h ${s.duracao_minutos%60}min (${s.duracao_minutos} min)` : `${s.duracao_minutos} min`) : '';
@@ -1708,14 +1711,38 @@ class PainelController {
                     const fSaiIdx = fotoSai && item.fotosEvidencias ? item.fotosEvidencias.findIndex(f => f.url === fotoSai) : -1;
 
                     return `
-                    <div class="p-3 rounded-xl bg-surface-container-lowest border border-outline-variant/40 flex flex-col justify-between space-y-2 shadow-2xs">
-                        <div class="flex items-center justify-between gap-1 border-b border-slate-100 pb-1.5">
-                            <span class="font-bold text-[12px] text-slate-800 flex items-center gap-1.5">
-                                <span class="material-symbols-outlined text-[16px] text-blue-600">${iconStr}</span>
+                    <div class="p-3 rounded-xl ${isDesconsiderada ? 'bg-slate-100/70 border border-dashed border-rose-300 opacity-80' : 'bg-surface-container-lowest border border-outline-variant/40 shadow-2xs'} flex flex-col justify-between space-y-2">
+                        <div class="flex items-center justify-between gap-1 border-b ${isDesconsiderada ? 'border-rose-200' : 'border-slate-100'} pb-1.5 flex-wrap">
+                            <span class="font-bold text-[12px] ${isDesconsiderada ? 'text-slate-500 line-through' : 'text-slate-800'} flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] ${isDesconsiderada ? 'text-rose-500' : 'text-blue-600'}">${iconStr}</span>
                                 Sessão #${s.numero || 1}
                             </span>
-                            <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">${s.status || 'REGISTRADA'}</span>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">
+                                    ${isDesconsiderada ? 'DESCONSIDERADA' : (s.status || 'REGISTRADA')}
+                                </span>
+                                ${(isAdminUser || isManutentorUser) ? `
+                                    ${isDesconsiderada ? `
+                                    <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar esta sessão para cálculos de medição">
+                                        <span class="material-symbols-outlined text-[12px]">undo</span>
+                                        <span>Reconsiderar</span>
+                                    </button>
+                                    ` : `
+                                    <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar esta sessão dos cálculos de medição">
+                                        <span class="material-symbols-outlined text-[12px]">block</span>
+                                        <span>Desconsiderar</span>
+                                    </button>
+                                    `}
+                                ` : ''}
+                            </div>
                         </div>
+                        
+                        ${isDesconsiderada ? `
+                        <div class="p-1.5 rounded-lg bg-rose-50/80 border border-rose-200 text-[10px] text-rose-900 flex items-center gap-1 font-medium">
+                            <span class="material-symbols-outlined text-[13px] text-rose-600 shrink-0">info</span>
+                            <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                        </div>
+                        ` : ''}
                         
                         <div class="text-[11px] text-slate-600 space-y-1">
                             <div class="flex items-center justify-between">
@@ -3591,6 +3618,133 @@ document.addEventListener('click', (e) => {
         dropdown.classList.add('hidden');
     }
 });
+
+// Global helper para desconsiderar ou reconsiderar uma sessão de trabalho de praça
+window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsiderar) {
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+    const protocol = item ? (item.protocolo || osId) : osId;
+
+    const tituloConfirma = desconsiderar ? 'Desconsiderar Sessão' : 'Reconsiderar Sessão';
+    const msgConfirma = desconsiderar 
+        ? `Deseja realmente desconsiderar a <strong class="text-on-surface font-bold">Sessão #${numeroSessao}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ela deixará de somar horas de eletricista e materiais na medição.`
+        : `Deseja restabelecer a <strong class="text-on-surface font-bold">Sessão #${numeroSessao}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ela voltará a ser computada normalmente na medição.`;
+
+    const executarAcao = async (motivoJustificativa = '') => {
+        try {
+            const service = new window.ChamadosService();
+            const path = (window.location.pathname || '').toLowerCase();
+            const origemTela = path.includes('auditoria') ? 'Auditoria' : 'Painel';
+
+            await service.alternarDesconsiderarSessao(protocol, numeroSessao, desconsiderar, motivoJustificativa, origemTela);
+
+            // Recarrega a OS atualizada diretamente via fetchById para garantir o modelo enriquecido completo
+            const repo = new window.ChamadosRepository();
+            const freshRow = await repo.fetchById(protocol);
+
+            let updatedItem = null;
+            if (freshRow) {
+                const ModelClass = window.ChamadoModel;
+                updatedItem = (freshRow instanceof ModelClass) 
+                    ? freshRow 
+                    : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(freshRow) : (ModelClass ? new ModelClass(freshRow) : freshRow));
+                updatedItem._isEnriched = true;
+            }
+
+            // Atualiza o item em todas as referências e listas em memória
+            const updateInMemory = (targetList) => {
+                if (!Array.isArray(targetList)) return;
+                const idx = targetList.findIndex(o => o && (String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(protocol)));
+                if (idx >= 0) {
+                    if (updatedItem) {
+                        targetList[idx] = updatedItem;
+                    } else {
+                        const obj = targetList[idx];
+                        let sessoes = obj.historicoSessoes || obj.historico_sessoes;
+                        if (typeof sessoes === 'string') {
+                            try { sessoes = JSON.parse(sessoes); } catch(e) {}
+                        }
+                        if (Array.isArray(sessoes)) {
+                            sessoes.forEach(s => {
+                                if (parseInt(s.numero, 10) === parseInt(numeroSessao, 10)) {
+                                    s.desconsiderada = Boolean(desconsiderar);
+                                    s.desconsiderada_em = desconsiderar ? new Date().toISOString() : null;
+                                    s.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
+                                }
+                            });
+                            obj.historicoSessoes = sessoes;
+                            obj.historico_sessoes = sessoes;
+                        }
+                    }
+                }
+            };
+
+            [
+                window.chamadosListCache,
+                window.dadosOSsAbertasCache,
+                window.painelController?.chamadosList,
+                window.auditoriaController?.chamadosList,
+                window.auditoriaController?.concludedList,
+                window.auditoriaController?.pracaServicesList
+            ].forEach(l => updateInMemory(l));
+
+            const finalItem = updatedItem || item;
+
+            // Re-renderiza o modal de detalhes ativo instantaneamente
+            const container = document.getElementById('detalheModalConteudo');
+            if (container && finalItem) {
+                const isAuditoria = path.includes('auditoria') || !!document.getElementById('tabelaChamadosAuditoria');
+                const ctrl = (isAuditoria && window.auditoriaController) ? window.auditoriaController : (window.painelController || window.auditoriaController);
+                if (ctrl && typeof ctrl.buildDetalhesOSModalHtml === 'function') {
+                    container.innerHTML = ctrl.buildDetalhesOSModalHtml(finalItem);
+                }
+            }
+
+            // Notificação visual de sucesso
+            const msgSucesso = `Sessão #${numeroSessao} ${desconsiderar ? 'desconsiderada' : 'reconsiderada'} com sucesso!`;
+            if (window.painelController && typeof window.painelController.showSuccessToast === 'function') {
+                window.painelController.showSuccessToast(msgSucesso);
+            } else if (window.auditoriaController && typeof window.auditoriaController.showSuccessToast === 'function') {
+                window.auditoriaController.showSuccessToast(msgSucesso);
+            } else {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-5 right-5 z-[99999] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 border border-slate-700 animate-bounce';
+                toast.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span><span>${msgSucesso}</span>`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        } catch (err) {
+            console.error('❌ Erro ao alternar status da sessão:', err);
+            alert('Erro ao atualizar sessão: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: tituloConfirma,
+            message: msgConfirma,
+            icon: desconsiderar ? 'block' : 'undo',
+            iconBgClass: desconsiderar ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: desconsiderar ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: desconsiderar ? 'Sim, Desconsiderar' : 'Sim, Reconsiderar',
+            showJustification: Boolean(desconsiderar),
+            requireJustification: Boolean(desconsiderar), // Justificativa obrigatória ao desconsiderar
+            onConfirm: (justification) => executarAcao(justification)
+        });
+    } else {
+        if (confirm(`${tituloConfirma}\n\n${desconsiderar ? `Deseja desconsiderar a Sessão #${numeroSessao}?` : `Deseja reconsiderar a Sessão #${numeroSessao}?`}`)) {
+            let motivo = '';
+            if (desconsiderar) {
+                motivo = prompt('Informe a justificativa (Obrigatória):');
+                if (!motivo || !motivo.trim()) {
+                    alert('A justificativa é obrigatória para desconsiderar a sessão.');
+                    return;
+                }
+            }
+            executarAcao(motivo);
+        }
+    }
+};
 
 // Instantiate global controller when window loads with Auth Guard protection
 document.addEventListener('DOMContentLoaded', async () => {

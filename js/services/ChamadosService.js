@@ -162,6 +162,66 @@ class ChamadosService {
     }
 
     /**
+     * Busca uma OS por ID ou Protocolo via repositório
+     */
+    async getChamadoById(protocoloOrId) {
+        return await this.repository.fetchById(protocoloOrId);
+    }
+
+    /**
+     * Alterna a marcação de 'desconsiderada' para uma sessão de praça e salva no banco
+     * @param {string|number} protocoloOrId
+     * @param {number} numeroSessao
+     * @param {boolean} desconsiderar
+     * @param {string} [motivo='']
+     * @param {string} [origemTela='Painel']
+     */
+    async alternarDesconsiderarSessao(protocoloOrId, numeroSessao, desconsiderar, motivo = '', origemTela = 'Painel') {
+        const chamado = await this.getChamadoById(protocoloOrId);
+        if (!chamado) throw new Error('OS não encontrada');
+
+        let rawSessoes = chamado.historicoSessoes || chamado.historico_sessoes || [];
+        if (typeof rawSessoes === 'string') {
+            try { rawSessoes = JSON.parse(rawSessoes); } catch(e) { rawSessoes = []; }
+        }
+        if (!Array.isArray(rawSessoes)) {
+            rawSessoes = Object.values(rawSessoes || {});
+        }
+
+        const usuarioAtual = localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+        const numTarget = parseInt(numeroSessao, 10);
+
+        let encontrada = false;
+        const sessoesAtualizadas = rawSessoes.map((s, idx) => {
+            const currentNum = parseInt(s.numero || (idx + 1), 10);
+            if (currentNum === numTarget) {
+                encontrada = true;
+                return {
+                    ...s,
+                    numero: currentNum,
+                    desconsiderada: Boolean(desconsiderar),
+                    desconsiderada_em: desconsiderar ? new Date().toISOString() : null,
+                    desconsiderada_por: desconsiderar ? usuarioAtual : null,
+                    motivo_desconsideracao: desconsiderar ? (motivo || null) : null
+                };
+            }
+            return s;
+        });
+
+        if (!encontrada) {
+            throw new Error(`Sessão #${numeroSessao} não foi localizada no histórico.`);
+        }
+
+        return await this.repository.updateHistoricoSessoes(protocoloOrId, sessoesAtualizadas, {
+            numeroSessao: numTarget,
+            desconsiderar: Boolean(desconsiderar),
+            motivo: motivo,
+            usuario: usuarioAtual,
+            origemTela: origemTela
+        });
+    }
+
+    /**
      * Loads list of Chamados for Auditoria, including vw_auditoria_chamados view metrics
      */
     async getAuditoriaChamadosList() {

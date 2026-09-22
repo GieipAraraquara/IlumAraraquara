@@ -252,9 +252,17 @@
             await this.alterarMes(delta);
         }
 
-        async carregarDados() {
+        async carregarDados(forceRefresh = false) {
             this.exibirLoading(true);
             try {
+                // Se for forceRefresh, limpa caches em memória e sessão
+                if (forceRefresh) {
+                    window.chamadosListCache = null;
+                    if (this.chamadosService && this.chamadosService.repository && typeof this.chamadosService.repository.clearCache === 'function') {
+                        this.chamadosService.repository.clearCache();
+                    }
+                }
+
                 // Carrega configurações do período antes do cálculo
                 if (this.medicaoService && typeof this.medicaoService.carregarConfiguracoesPeriodo === 'function') {
                     await this.medicaoService.carregarConfiguracoesPeriodo(this.filtroMesAno);
@@ -263,7 +271,7 @@
                 await this.carregarMateriaisContrato();
 
                 if (this.chamadosService) {
-                    this.chamadosList = await this.chamadosService.getChamadosList();
+                    this.chamadosList = await this.chamadosService.getChamadosList(forceRefresh);
                 } else if (window.chamadosListCache) {
                     this.chamadosList = window.chamadosListCache;
                 }
@@ -410,12 +418,11 @@
                 resultado.totalGlosasGeral = novoTotalGlosas;
                 resultado.totalLiquidoGeral = novoTotalLiquido;
 
-                // Reincidência na falta de reuniões semanais (Item 8.7.2): Multa de 15% sobre o valor total da medição mensal
+                // Armazena valor representativo da multa do Item 8.7.2 (15%) para exibição nos banners informativos
                 if (resultado.infoReunioes && resultado.infoReunioes.temReincidencia) {
-                    const multaReincidencia = novoTotalBruto * 0.15;
-                    resultado.valorMultaReincidenciaMensal = multaReincidencia;
-                    resultado.totalGlosasGeral += multaReincidencia;
-                    resultado.totalLiquidoGeral = Math.max(0, resultado.totalLiquidoGeral - multaReincidencia);
+                    resultado.valorMultaReincidenciaMensal = novoTotalBruto * 0.15;
+                } else {
+                    resultado.valorMultaReincidenciaMensal = 0;
                 }
 
                 resultado.totalOSsGlosadas = novoTotalOSsGlosadas;
@@ -1451,7 +1458,6 @@
 
         atualizarBadgeReunioesSemanais() {
             const badge = document.getElementById('badge-reunioes-faltosas');
-            if (!badge) return;
 
             let mesAno = this.filtroMesAno;
             if (!mesAno) {
@@ -1463,14 +1469,24 @@
                 this.medicaoService.carregarReunioesSemanais();
             }
 
+            const infoReunioes = (this.medicaoService && typeof this.medicaoService.calcularGlosasReuniaoSemanal === 'function')
+                ? this.medicaoService.calcularGlosasReuniaoSemanal(this.chamadosList || [], mesAno)
+                : null;
+
             const semanas = (this.medicaoService && this.medicaoService.reunioesSemanais && this.medicaoService.reunioesSemanais[mesAno]) || [];
             const faltas = semanas.filter(s => s.status === 'nao_realizada').length;
+            const temReincidencia = Boolean(infoReunioes && infoReunioes.temReincidencia);
 
-            if (faltas > 0) {
-                badge.textContent = `${faltas} falta${faltas > 1 ? 's' : ''}`;
-                badge.classList.remove('hidden');
-            } else {
-                badge.classList.add('hidden');
+            if (badge) {
+                if (faltas > 0) {
+                    badge.textContent = `${faltas} falta${faltas > 1 ? 's' : ''}${temReincidencia ? ' (Reincidência -15%)' : ''}`;
+                    badge.className = temReincidencia
+                        ? 'px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-200 text-rose-900 border border-rose-400 animate-pulse'
+                        : 'px-1.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 border border-rose-200';
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
             }
         }
 
@@ -2067,6 +2083,7 @@
             const glosaPorOS = {};
             const infoReunioes = this.medicaoService ? this.medicaoService.calcularGlosasReuniaoSemanal(this.chamadosList || [], selectedMonth) : {};
             const protocolosGlosadosPorReuniao = (infoReunioes && infoReunioes.protocolosGlosadosPorReuniao) || {};
+            const temReincidenciaReunioes = Boolean(infoReunioes && infoReunioes.temReincidencia);
 
             listToMeasure.forEach(item => {
                 const prot = item.protocolo || 'OS-SEM-PROT';
@@ -2084,6 +2101,14 @@
                         const isAnistiado = this.medicaoService.overrides[prot]?.['reuniao_semanal_8_7']?.ignorarGlosa;
                         if (!isAnistiado) {
                             perc += (Number(protocolosGlosadosPorReuniao[prot].percentualGlosa) || 10.0);
+                        }
+                    }
+
+                    // Multa de Reincidência de Reuniões Semanais (Item 8.7.2) - 15% sobre as OSs do mês
+                    if (temReincidenciaReunioes) {
+                        const isAnistiadoReinc = this.medicaoService.overrides[prot]?.['reuniao_reincidencia_8_7_2']?.ignorarGlosa;
+                        if (!isAnistiadoReinc) {
+                            perc += 15.0;
                         }
                     }
 
@@ -2189,6 +2214,7 @@
                 const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
                 const sessoes = isPraca ? (item.sessoesList || []) : [];
                 sessoes.forEach(sess => {
+                    if (sess.desconsiderada) return;
                     let durMin = sess.duracao_minutos;
                     if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
                         const dtInc = new Date(sess.inicio);
@@ -2237,12 +2263,10 @@
             totalValorSemBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalSemBdi || 0), 0);
             totalValorComBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalComBdi || 0), 0);
             totalValorGlosa = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalGlosa || 0), 0);
-            
-            // Multa de Reincidência de Reuniões Semanais (Item 8.7.2): 15% s/ total da medição
+            // Multa de Reincidência de Reuniões Semanais (Item 8.7.2): representativa de 15% s/ total da medição
             let valorMultaReincidenciaMensal = 0;
             if (infoReunioes && infoReunioes.temReincidencia) {
                 valorMultaReincidenciaMensal = totalValorComBdi * 0.15;
-                totalValorGlosa += valorMultaReincidenciaMensal;
             }
 
             totalValorLiquido = Math.max(0, totalValorComBdi - totalValorGlosa);
@@ -2588,6 +2612,7 @@
             const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
             const sessoes = isPraca ? (item.sessoesList || []) : [];
             sessoes.forEach(sess => {
+                if (sess.desconsiderada) return;
                 let durMin = sess.duracao_minutos;
                 if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
                     const dtInc = new Date(sess.inicio);
@@ -3481,8 +3506,11 @@
                                 return mItem;
                             });
 
-                            if (alterouFech && this.chamadosService) {
-                                await this.chamadosService.updateMaterial(chamado.protocolo, novosMats, fech.id, fech.numero);
+                            if (alterouFech) {
+                                fech.materiais = novosMats;
+                                if (this.chamadosService) {
+                                    await this.chamadosService.updateMaterial(chamado.protocolo, novosMats, fech.id, fech.numero);
+                                }
                             }
                         }
                     } else {
@@ -3509,8 +3537,12 @@
                             return mItem;
                         });
 
-                        if (alterouOS && this.chamadosService) {
-                            await this.chamadosService.updateMaterial(chamado.protocolo, novosMats);
+                        if (alterouOS) {
+                            chamado.materiais = novosMats;
+                            chamado.materialUtilizado = novosMats.map(m => (m.qtd && m.qtd > 1 ? `${m.nome} (x${m.qtd})` : m.nome)).join(' | ');
+                            if (this.chamadosService) {
+                                await this.chamadosService.updateMaterial(chamado.protocolo, novosMats);
+                            }
                         }
                     }
 
@@ -3532,7 +3564,7 @@
                 alert(`✅ Substituição em lote realizada com sucesso em ${sucessos} protocolo(s)!`);
                 this.fecharModalDetalhesMedicao();
 
-                await this.carregarDados();
+                await this.carregarDados(true);
             } catch (err) {
                 console.error('❌ [MedicaoController] Erro ao executar substituição em lote:', err);
                 alert('⚠️ Ocorreu uma falha ao processar algumas alterações. Verifique o console para detalhes.');

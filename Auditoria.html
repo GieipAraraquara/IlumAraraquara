@@ -15,14 +15,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=43"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=31"></script>
+    <script src="js/domain/ChamadoModel.js?v=44"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=37"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=30"></script>
+    <script src="js/services/ChamadosService.js?v=31"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=48"></script>
+    <script src="js/controllers/AuditoriaController.js?v=54"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -345,6 +345,16 @@
             color: #94a3b8;
             border: 1px solid rgba(203, 213, 225, 0.4);
         }
+
+        /* Ocultação de Colunas de Auditoria (Individual e Geral) */
+        #os-table.hide-audit-cols th.col-audit,
+        #os-table.hide-audit-cols td.col-audit {
+            display: none !important;
+        }
+        #os-table th.col-audit.audit-col-hidden,
+        #os-table td.col-audit.audit-col-hidden {
+            display: none !important;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
@@ -442,8 +452,41 @@
         <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Tabela de Auditoria de OS</h3>
-                <div class="flex gap-3 items-center">
-                    <button class="text-secondary font-label-md text-label-md hover:underline transition-colors active:scale-95">Ver Tudo</button>
+                <div class="flex gap-2 items-center">
+                    <div class="relative inline-block text-left">
+                        <button type="button" id="audit-cols-dropdown-trigger" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 active:scale-95" title="Selecionar quais colunas de auditoria exibir e filtrar">
+                            <span class="material-symbols-outlined text-[16px] text-secondary">view_column</span>
+                            <span id="audit-cols-btn-label">Colunas (10/10)</span>
+                            <span class="material-symbols-outlined text-[14px] text-on-surface-variant/60">expand_more</span>
+                        </button>
+                        
+                        <div class="absolute right-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-lg shadow-xl z-[100] p-3.5 animate-fade-in-up hidden text-xs select-none" id="audit-cols-dropdown">
+                            <div class="flex items-center justify-between border-b border-outline-variant/40 pb-2 mb-2">
+                                <span class="font-bold text-on-surface text-xs uppercase tracking-wider flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary">tune</span>
+                                    <span>Colunas de Auditoria</span>
+                                </span>
+                                <span id="audit-cols-active-count" class="text-[10.5px] px-2 py-0.5 rounded-full font-bold bg-secondary/10 text-secondary border border-secondary/20">10 ativas</span>
+                            </div>
+
+                            <div class="flex gap-2 mb-2.5">
+                                <button type="button" onclick="window.toggleAllAuditColsDropdown(true)" class="flex-1 py-1 px-2 rounded text-[11px] font-semibold border border-outline-variant/50 bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/30 transition-all text-center cursor-pointer">
+                                    Marcar Todas
+                                </button>
+                                <button type="button" onclick="window.toggleAllAuditColsDropdown(false)" class="flex-1 py-1 px-2 rounded text-[11px] font-semibold border border-outline-variant/50 bg-surface-container-high hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 transition-all text-center cursor-pointer">
+                                    Desmarcar Todas
+                                </button>
+                            </div>
+
+                            <div class="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1" id="audit-cols-checkboxes-container">
+                                <!-- Preenchido dinamicamente via JS com as 10 colunas -->
+                            </div>
+
+                            <div class="border-t border-outline-variant/40 pt-2 mt-2.5 flex items-center justify-between text-[10.5px] text-on-surface-variant/70">
+                                <span>Linhas filtram pelas colunas com "S"</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
@@ -540,7 +583,7 @@
                             </th>
 
                             <!-- Audit Column 1 -->
-                            <th class="th-vertical tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="3" title="Aponta SIM quando: O problema encontrada é diferente do problema da abertura do protocolo.">
+                            <th class="th-vertical col-audit tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="3" data-audit-col="0" title="Aponta SIM quando: O problema encontrada é diferente do problema da abertura do protocolo.">
                                 <div class="vertical-header-text">
                                     <div>Problema</div>
                                     <div>Divergente?</div>
@@ -553,7 +596,7 @@
                             </th>
 
                             <!-- Audit Column 2 -->
-                            <th class="th-vertical tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="4" title="Aponta SIM quando: A plaqueta que foi indicada na abertura do processo, não foi citada na finalização.">
+                            <th class="th-vertical col-audit tooltip-left border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="4" data-audit-col="1" title="Aponta SIM quando: A plaqueta que foi indicada na abertura do processo, não foi citada na finalização.">
                                 <div class="vertical-header-text">
                                     <div>Plaqueta</div>
                                     <div>Divergente?</div>
@@ -566,7 +609,7 @@
                             </th>
 
                             <!-- Audit Column 3 -->
-                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="5" title="Aponta SIM quando: A quantidade de pontos da abertura do protocolo é diferente da quantidade de finalização.">
+                            <th class="th-vertical col-audit border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="5" data-audit-col="2" title="Aponta SIM quando: A quantidade de pontos da abertura do protocolo é diferente da quantidade de finalização.">
                                 <div class="vertical-header-text">
                                     <div>Quantidade</div>
                                     <div>Divergente?</div>
@@ -579,7 +622,7 @@
                             </th>
 
                             <!-- Audit Column 4 -->
-                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="6" title="Aponta SIM quando: A coordenada de abertura da ordem de serviço tem uma distância superior a 100m da coordenada do serviço realizado">
+                            <th class="th-vertical col-audit border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="6" data-audit-col="3" title="Aponta SIM quando: A coordenada de abertura da ordem de serviço tem uma distância superior a 100m da coordenada do serviço realizado">
                                 <div class="vertical-header-text">
                                     <div>Distância</div>
                                     <div>acima 100m?</div>
@@ -592,7 +635,7 @@
                             </th>
 
                             <!-- Audit Column 5 -->
-                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="7" title="Aponta SIM quando: Uma nova plaqueta é cadastrada no banco de dados, e existe outra plaqueta cadastrada em menos de 20m">
+                            <th class="th-vertical col-audit border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="7" data-audit-col="4" title="Aponta SIM quando: Uma nova plaqueta é cadastrada no banco de dados, e existe outra plaqueta cadastrada em menos de 20m">
                                 <div class="vertical-header-text">
                                     <div>Outra plaqueta</div>
                                     <div>próxima?</div>
@@ -605,7 +648,7 @@
                             </th>
 
                             <!-- Audit Column 6 -->
-                            <th class="th-vertical border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="8" title="Aponta SIM quando: A plaqueta está duplicada na base de dados">
+                            <th class="th-vertical col-audit border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="8" data-audit-col="5" title="Aponta SIM quando: A plaqueta está duplicada na base de dados">
                                 <div class="vertical-header-text">
                                     <div>Plaqueta</div>
                                     <div>Problemática?</div>
@@ -618,7 +661,7 @@
                             </th>
 
                             <!-- Audit Column 7 -->
-                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="9" title="Aponta SIM quando: A imagem anexa da plaqueta tem um texto divergente da plaqueta informada na finalização. Veja o texto identificado pela IA na nota da célula.">
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="9" data-audit-col="6" title="Aponta SIM quando: A imagem anexa da plaqueta tem um texto divergente da plaqueta informada na finalização. Veja o texto identificado pela IA na nota da célula.">
                                 <div class="vertical-header-text">
                                     <div>Anexo Plaqueta</div>
                                     <div>Divergente?</div>
@@ -631,7 +674,7 @@
                             </th>
 
                             <!-- Audit Column 8 -->
-                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="10" title="Aponta SIM quando: Algum dos 3 anexos não foram enviados">
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="10" data-audit-col="7" title="Aponta SIM quando: Algum dos 3 anexos não foram enviados">
                                 <div class="vertical-header-text">
                                     <div>Anexo</div>
                                     <div>Faltante?</div>
@@ -644,7 +687,7 @@
                             </th>
 
                             <!-- Audit Column 9 -->
-                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="11" title="Aponta SIM quando: Foi solicita mais que um serviço de manutenção no material.">
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="11" data-audit-col="8" title="Aponta SIM quando: Foi solicita mais que um serviço de manutenção no material.">
                                 <div class="vertical-header-text">
                                     <div>Material</div>
                                     <div>Divergente?</div>
@@ -657,7 +700,7 @@
                             </th>
 
                             <!-- Audit Column 10 -->
-                            <th class="th-vertical tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="12" title="Aponta SIM quando: O problema selecionado pela empresa prestadora de serviço necessita de intervenção da CPFL.">
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="12" data-audit-col="9" title="Aponta SIM quando: O problema selecionado pela empresa prestadora de serviço necessita de intervenção da CPFL.">
                                 <div class="vertical-header-text">
                                     <div>Problema</div>
                                     <div>Externo?</div>
@@ -710,160 +753,12 @@
                     </thead>
                     <tbody class="font-data-tabular text-data-tabular text-on-surface">
                         <!-- Empty Filter State Row -->
-                        <tr id="no-audit-results" class="hidden">
+                        <tr id="no-audit-results">
                             <td colspan="14" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                                 <div class="flex flex-col items-center justify-center gap-1.5">
-                                    <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
-                                    <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
-                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                    <span class="material-symbols-outlined text-[24px] text-secondary animate-spin">progress_activity</span>
+                                    <span class="text-xs text-on-surface-variant">Carregando ordens de serviço para auditoria...</span>
                                 </div>
-                            </td>
-                        </tr>
-                        
-                        <!-- Row 1 -->
-                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-003" onclick="window.abrirDetalhesOSModal('OS-2023-003')">
-                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-003</td>
-                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">09/08</td>
-                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
-                                <button onclick="window.abrirMapaPonto('OS-2023-003', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                    <span class="font-medium truncate group-hover/loc:underline" title="C0045 - Av. Principal">C0045 - Av. Principal</span>
-                                </button>
-                            </td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
-                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
-                            </td>
-                        </tr>
-                        
-                        <!-- Row 2 -->
-                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-002" onclick="window.abrirDetalhesOSModal('OS-2023-002')">
-                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-002</td>
-                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">06/08</td>
-                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
-                                <button onclick="window.abrirMapaPonto('OS-2023-002', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                    <span class="font-medium truncate group-hover/loc:underline" title="Rua das Flores, 123">Rua das Flores, 123</span>
-                                </button>
-                            </td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
-                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
-                            </td>
-                        </tr>
-                        
-                        <!-- Row 3 -->
-                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="IP1SBV0270726" onclick="window.abrirDetalhesOSModal('IP1SBV0270726')">
-                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">IP1SBV0270726</td>
-                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">12/10</td>
-                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
-                                <button onclick="window.abrirMapaPonto('IP1SBV0270726', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                    <span class="font-medium truncate group-hover/loc:underline" title="C0011 - Praça Central">C0011 - Praça Central</span>
-                                </button>
-                            </td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
-                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
-                            </td>
-                        </tr>
-
-                        <!-- Row 4 (Multi-Ponto) -->
-                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-004" onclick="window.abrirDetalhesOSModal('OS-2023-004')">
-                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-004</td>
-                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">10/08</td>
-                            <td class="py-3 px-4 align-middle">
-                                <div class="flex flex-col gap-1 w-full text-left">
-                                    <div class="flex items-center gap-1 min-w-0 w-full">
-                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir no mapa Mapbox">
-                                            <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                            <span class="font-medium truncate group-hover/loc:underline" title="C0010 - Av. Brasil, 500">C0010 - Av. Brasil, 500</span>
-                                        </button>
-                                        <button class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10.5px] font-bold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all flex-shrink-0 cursor-pointer border border-secondary/20" onclick="toggleInlinePoints(this, 3, event)" title="Expandir/Recolher pontos">
-                                            <span class="btn-text">+3</span>
-                                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
-                                        </button>
-                                    </div>
-                                    <div class="extra-points hidden flex-col gap-1 pt-1 border-t border-outline-variant/30 text-on-surface-variant font-normal text-xs transition-all w-full">
-                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 1, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                            <span class="font-medium truncate group-hover/loc:underline" title="C0011 - Av. Brasil, 520">C0011 - Av. Brasil, 520</span>
-                                        </button>
-                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 2, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                            <span class="font-medium truncate group-hover/loc:underline" title="C0012 - Av. Brasil, 580">C0012 - Av. Brasil, 580</span>
-                                        </button>
-                                        <button onclick="window.abrirMapaPonto('OS-2023-004', 3, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                            <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                            <span class="font-medium truncate group-hover/loc:underline" title="C0013 - Rua das Palmeiras, 12">C0013 - Rua das Palmeiras, 12</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
-                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
-                            </td>
-                        </tr>
-
-                        <!-- Row 5 -->
-                        <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="OS-2023-001">
-                            <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle">OS-2023-001</td>
-                            <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">05/08</td>
-                            <td class="py-3 px-4 whitespace-nowrap truncate align-middle">
-                                <button onclick="window.abrirMapaPonto('OS-2023-001', 0, event)" class="inline-flex items-center gap-1 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                    <span class="material-symbols-outlined text-[16px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                    <span class="font-medium truncate group-hover/loc:underline" title="Rua São José, 45">Rua São José, 45</span>
-                                </button>
-                            </td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-s">S</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-1 text-center align-middle border-l border-outline-variant/20"><span class="audit-badge audit-n">N</span></td>
-                            <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
-                                <div class="flex items-center justify-center gap-1 action-buttons"></div>
                             </td>
                         </tr>
                     </tbody>
@@ -2554,7 +2449,153 @@
 
         // Inicializa botões de ação de auditoria com base nos indicadores S/N
         updateAuditActionButtons();
+
+        // Inicializa estado de visibilidade das colunas de auditoria e dropdown
+        initAuditColumnsManager();
     });
+
+    // Controle Avançado de Seleção e Visibilidade das Colunas de Auditoria
+    const AUDIT_COLS_DEFS = [
+        { index: 0, colIndex: 3, label: 'Problema Divergente', short: 'Problema Divergente' },
+        { index: 1, colIndex: 4, label: 'Plaqueta Divergente', short: 'Plaqueta Divergente' },
+        { index: 2, colIndex: 5, label: 'Quantidade Divergente', short: 'Quantidade Divergente' },
+        { index: 3, colIndex: 6, label: 'Distância acima 100m?', short: 'Distância > 100m' },
+        { index: 4, colIndex: 7, label: 'Outra plaqueta próxima?', short: 'Plaqueta Próxima' },
+        { index: 5, colIndex: 8, label: 'Plaqueta Problemática?', short: 'Plaqueta Problemática' },
+        { index: 6, colIndex: 9, label: 'Anexo Plaqueta Divergente?', short: 'Anexo Plaqueta Div.' },
+        { index: 7, colIndex: 10, label: 'Anexo Faltante?', short: 'Anexo Faltante' },
+        { index: 8, colIndex: 11, label: 'Material Divergente?', short: 'Material Divergente' },
+        { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' }
+    ];
+
+    // Estado global de índices de colunas ativas (0..9)
+    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+    function renderAuditColsCheckboxes() {
+        const container = document.getElementById('audit-cols-checkboxes-container');
+        if (!container) return;
+
+        container.innerHTML = AUDIT_COLS_DEFS.map(col => {
+            const isChecked = window.activeAuditCols.includes(col.index);
+            return `
+                <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-on-surface font-medium">
+                    <input type="checkbox" 
+                           class="audit-col-checkbox rounded text-secondary focus:ring-secondary cursor-pointer" 
+                           value="${col.index}" 
+                           ${isChecked ? 'checked' : ''} 
+                           onchange="window.handleAuditColCheckboxChange(this)">
+                    <span class="flex-1 truncate">${col.short}</span>
+                </label>
+            `;
+        }).join('');
+
+        updateAuditColsUIIndicators();
+    }
+
+    function updateAuditColsUIIndicators() {
+        const count = window.activeAuditCols.length;
+        const total = AUDIT_COLS_DEFS.length;
+
+        const btnLabel = document.getElementById('audit-cols-btn-label');
+        if (btnLabel) {
+            btnLabel.textContent = `Colunas (${count}/${total})`;
+        }
+
+        const badgeCount = document.getElementById('audit-cols-active-count');
+        if (badgeCount) {
+            badgeCount.textContent = `${count} ativa${count !== 1 ? 's' : ''}`;
+            if (count === 0) {
+                badgeCount.className = 'text-[10.5px] px-2 py-0.5 rounded-full font-bold bg-rose-50 text-rose-600 border border-rose-200';
+            } else {
+                badgeCount.className = 'text-[10.5px] px-2 py-0.5 rounded-full font-bold bg-secondary/10 text-secondary border border-secondary/20';
+            }
+        }
+    }
+
+    window.handleAuditColCheckboxChange = function(checkbox) {
+        const idx = parseInt(checkbox.value, 10);
+        if (checkbox.checked) {
+            if (!window.activeAuditCols.includes(idx)) {
+                window.activeAuditCols.push(idx);
+                window.activeAuditCols.sort((a, b) => a - b);
+            }
+        } else {
+            window.activeAuditCols = window.activeAuditCols.filter(i => i !== idx);
+        }
+
+        saveAndApplyAuditCols();
+    };
+
+    window.toggleAllAuditColsDropdown = function(enableAll) {
+        if (enableAll) {
+            window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        } else {
+            window.activeAuditCols = [];
+        }
+
+        const checkboxes = document.querySelectorAll('.audit-col-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = enableAll;
+        });
+
+        saveAndApplyAuditCols();
+    };
+
+    function saveAndApplyAuditCols() {
+        try {
+            localStorage.setItem('active_audit_cols', JSON.stringify(window.activeAuditCols));
+        } catch(e) {}
+
+        applyAuditColsVisibility();
+        updateAuditColsUIIndicators();
+
+        // Re-aplica filtros combinados para recalcular as linhas que possuem "S" nas colunas ativas
+        if (typeof window.applyCombinedFilters === 'function') {
+            window.applyCombinedFilters();
+        }
+    }
+
+    window.applyAuditColsVisibility = function() {
+        const table = document.getElementById('os-table');
+        if (!table) return;
+
+        const count = window.activeAuditCols.length;
+        const total = AUDIT_COLS_DEFS.length;
+
+        // Se nenhuma coluna estiver ativa, pode ativar classe geral hide-audit-cols
+        table.classList.toggle('hide-audit-cols', count === 0);
+
+        // Para cada uma das 10 colunas de auditoria, adiciona ou remove audit-col-hidden
+        AUDIT_COLS_DEFS.forEach(col => {
+            const isVisible = window.activeAuditCols.includes(col.index);
+            const cells = table.querySelectorAll(`th[data-audit-col="${col.index}"], td[data-audit-col="${col.index}"]`);
+            cells.forEach(cell => {
+                cell.classList.toggle('audit-col-hidden', !isVisible);
+            });
+        });
+
+        // Atualiza colspan do empty state
+        const noResultsCell = document.querySelector('#no-audit-results td');
+        if (noResultsCell) {
+            const visibleColsCount = 4 + count; // 4 colunas base (Protocolo, Data, Ponto, Ações) + colunas ativas
+            noResultsCell.setAttribute('colspan', visibleColsCount.toString());
+        }
+    }
+
+    function initAuditColumnsManager() {
+        try {
+            const saved = localStorage.getItem('active_audit_cols');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed)) {
+                    window.activeAuditCols = parsed.filter(n => typeof n === 'number' && n >= 0 && n <= 9);
+                }
+            }
+        } catch(e) {}
+
+        renderAuditColsCheckboxes();
+        applyAuditColsVisibility();
+    }
 </script>
 
 <script>
@@ -2573,6 +2614,10 @@
         let compMaterialSearchQuery = '';
 
         const searchInput = document.getElementById('search-input');
+
+        // Audit Columns Dropdown Elements
+        const auditColsTrigger = document.getElementById('audit-cols-dropdown-trigger');
+        const auditColsDropdown = document.getElementById('audit-cols-dropdown');
 
         // Date Filter Elements
         const dateTrigger = document.getElementById('date-filter-trigger');
@@ -2688,6 +2733,7 @@
 
         function initFilterPortals() {
             [
+                auditColsDropdown,
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
@@ -2702,6 +2748,7 @@
 
         function closeAllFilterDropdowns() {
             [
+                auditColsDropdown,
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
@@ -2772,6 +2819,10 @@
 
         // Close dropdowns on outside click
         document.addEventListener('click', (e) => {
+            if (auditColsDropdown && !auditColsDropdown.contains(e.target) && !auditColsTrigger?.contains(e.target)) {
+                auditColsDropdown.classList.add('hidden');
+                auditColsDropdown.style.display = 'none';
+            }
             if (dateDropdown && !dateDropdown.contains(e.target) && !dateTrigger?.contains(e.target)) {
                 dateDropdown.classList.add('hidden');
                 dateDropdown.style.display = 'none';
@@ -2866,6 +2917,11 @@
         });
 
         // Toggle dropdowns with floating positioning
+        auditColsTrigger?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openFloatingDropdown(auditColsTrigger, auditColsDropdown, true);
+        });
+
         dateTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(dateTrigger, dateDropdown, false);
@@ -3151,10 +3207,26 @@
             rows.forEach(row => {
                 let showRow = true;
 
-                // 0. Divergence Filter: Must have at least one 'S' audit badge
-                const hasSBadge = row.querySelectorAll('.audit-badge.audit-s').length > 0;
-                if (!hasSBadge) {
+                // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS
+                const activeColIndices = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) 
+                    ? window.activeAuditCols 
+                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+
+                if (activeColIndices.length === 0) {
+                    // Se o usuário desmarcou todas as colunas de auditoria, nenhuma linha com critério de auditoria deve passar
                     showRow = false;
+                } else {
+                    let hasSInActiveCols = false;
+                    for (const colIdx of activeColIndices) {
+                        const cell = row.querySelector(`td[data-audit-col="${colIdx}"]`);
+                        if (cell && cell.querySelector('.audit-badge.audit-s')) {
+                            hasSInActiveCols = true;
+                            break;
+                        }
+                    }
+                    if (!hasSInActiveCols) {
+                        showRow = false;
+                    }
                 }
 
                 // 1. Date Filter

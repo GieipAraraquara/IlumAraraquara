@@ -229,6 +229,42 @@
         }
         .marker-historico-text { color: #ffffff; font-size: 10px; font-weight: bold; line-height: 1; display: flex; align-items: center; justify-content: center; }
 
+        /* Praça (OS em Praça Pública) - Badge Geométrico com Ícone de Árvore */
+        .marker-praca-badge {
+            width: 22px;
+            height: 22px;
+            box-sizing: border-box;
+            border: 2px solid #ffffff;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+            cursor: pointer;
+            z-index: 8;
+            pointer-events: auto;
+            user-select: none;
+            transition: box-shadow 0.15s ease, filter 0.15s ease;
+        }
+        .marker-praca-badge:hover {
+            filter: brightness(1.15);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.55);
+            z-index: 30;
+        }
+        .marker-praca-badge svg {
+            width: 14px;
+            height: 14px;
+            fill: #ffffff;
+            pointer-events: none;
+            transition: transform 0.15s ease;
+        }
+        .marker-praca-badge:hover svg {
+            transform: scale(1.2);
+        }
+        .marker-praca-urgente {
+            animation: pulseHaloDuplicado 1.8s infinite;
+        }
+
         /* Modal fullscreen for map */
         .modal-fullscreen-map {
             position: fixed !important;
@@ -467,6 +503,7 @@
 
                 <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Tipo:</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Normal</span>
+                <span class="flex items-center gap-1 font-bold text-emerald-700 dark:text-emerald-400" title="OS de Praça (protocolo P)"><span class="w-3.5 h-3.5 rounded-[4px] bg-emerald-600 border border-white flex items-center justify-center text-white"><svg viewBox="0 0 24 24" class="w-2.5 h-2.5 fill-white"><path d="M17 12h2L12 2 5.05 12H7l-3.9 6h6.9v4h4v-4h6.9L17 12z"/></svg></span> Praça</span>
                 <span class="flex items-center gap-1 font-bold text-on-surface"><span class="w-3 h-3 bg-slate-600 rounded-[2px] rotate-45 flex items-center justify-center text-[7px] text-white"><span class="-rotate-45">⚡</span></span> Urgente</span>
                 <span class="flex items-center gap-1 font-bold text-amber-600" title="2 ou mais OSs Abertas concorrentes"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
                 <span class="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400" title="1 OS Aberta + histórico anterior no local"><span class="w-3.5 h-3.5 rounded-full bg-amber-600 border border-white flex items-center justify-center text-[8px] text-white">📁</span> Reincidente</span>
@@ -1808,6 +1845,11 @@
                     const stLower = (os.status || "Aberta").toLowerCase();
                     const isResolvida = (stLower.includes('conclu') || stLower.includes('resolv') || stLower.includes('fechad'));
                     const isCancelada = stLower.includes('cancel');
+                    const isPraca = (os.protocolo && String(os.protocolo).trim().toUpperCase().startsWith('P'))
+                        || (os.tipo && String(os.tipo).toLowerCase().includes('pra'))
+                        || (os.categoria && String(os.categoria).toLowerCase().includes('pra'))
+                        || Boolean(os.praca || os.nomePraca)
+                        || (pt.plaqueta && String(pt.plaqueta).trim().toUpperCase().startsWith('P'));
 
                     if (isCancelada) {
                         const elCanc = document.createElement('div');
@@ -1819,6 +1861,16 @@
                         marker = new mapboxgl.Marker({ element: elCanc })
                             .setLngLat([pt.lng, pt.lat])
                             .addTo(mapOSsInstance);
+                    } else if (isResolvida && isPraca) {
+                        const elPracaResolv = document.createElement('div');
+                        elPracaResolv.className = 'marker-praca-badge';
+                        elPracaResolv.title = `OS de Praça #${os.protocolo} (Concluída)`;
+                        elPracaResolv.style.backgroundColor = 'rgba(26, 115, 232, 0.85)';
+                        elPracaResolv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 12h2L12 2 5.05 12H7l-3.9 6h6.9v4h4v-4h6.9L17 12z"/></svg>`;
+
+                        marker = new mapboxgl.Marker({ element: elPracaResolv })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
                     } else if (isResolvida) {
                         const elResolv = document.createElement('div');
                         elResolv.className = 'marker-resolvida-circle';
@@ -1827,6 +1879,17 @@
                         elResolv.innerHTML = '✓';
 
                         marker = new mapboxgl.Marker({ element: elResolv })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    } else if (isPraca) {
+                        const elPraca = document.createElement('div');
+                        const isUrg = os.prioridade === "Urgente";
+                        elPraca.className = `marker-praca-badge ${isUrg ? 'marker-praca-urgente' : ''}`;
+                        elPraca.title = `OS de Praça #${os.protocolo}${isUrg ? " (URGENTE)" : ""}`;
+                        elPraca.style.backgroundColor = corMarker;
+                        elPraca.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 12h2L12 2 5.05 12H7l-3.9 6h6.9v4h4v-4h6.9L17 12z"/></svg>`;
+
+                        marker = new mapboxgl.Marker({ element: elPraca })
                             .setLngLat([pt.lng, pt.lat])
                             .addTo(mapOSsInstance);
                     } else if (os.prioridade === "Urgente") {
@@ -2487,11 +2550,18 @@
 
             const cardBorderClass = "border border-slate-200 dark:border-slate-700/80";
 
+            const isPracaOS = (os.protocolo && String(os.protocolo).trim().toUpperCase().startsWith('P'))
+                || (os.tipo && String(os.tipo).toLowerCase().includes('pra'))
+                || (os.categoria && String(os.categoria).toLowerCase().includes('pra'))
+                || Boolean(os.praca || os.nomePraca);
+            const pracaBadgeHeader = isPracaOS ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold rounded-md border border-emerald-300 dark:border-emerald-800" title="OS de Praça"><span class="material-symbols-outlined text-[12px] leading-none">park</span> Praça</span>` : '';
+
             htmlCards += `
             <div class="card-ponto-duplicado ${cardWidthClass} flex-shrink-0 bg-white dark:bg-slate-900 ${cardBorderClass} rounded-2xl p-3.5 shadow-md hover:border-blue-500 transition-all flex flex-col justify-between space-y-2 overflow-hidden">
                 <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2 gap-2">
                     <div class="flex items-center gap-1.5 min-w-0">
                         <span class="font-bold text-sm text-blue-600 dark:text-blue-400 truncate">#${os.protocolo}</span>
+                        ${pracaBadgeHeader}
                     </div>
                     ${badgeAging}
                 </div>

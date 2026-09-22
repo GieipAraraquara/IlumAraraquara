@@ -1043,6 +1043,7 @@ class RelatorioController {
             const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
             const sessoes = isPraca ? (item.sessoesList || []) : [];
             sessoes.forEach(sess => {
+                if (sess.desconsiderada) return;
                 let durMin = sess.duracao_minutos;
                 if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
                     const dtInc = new Date(sess.inicio);
@@ -1468,6 +1469,7 @@ class RelatorioController {
             const isPraca = Boolean(item.isPraca || (prot.startsWith('P') && !prot.startsWith('IP')));
             const sessoes = isPraca ? (item.sessoesList || []) : [];
             sessoes.forEach(sess => {
+                if (sess.desconsiderada) return;
                 let durMin = sess.duracao_minutos;
                 if ((durMin === null || durMin === undefined || isNaN(durMin)) && sess.inicio && sess.fim) {
                     const dtInc = new Date(sess.inicio);

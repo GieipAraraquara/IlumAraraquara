@@ -416,20 +416,22 @@
             const salvas = (this.reunioesSemanais && this.reunioesSemanais[mesAnoStr]) || [];
 
             const semanas = [];
+            // Ajusta o início para a Segunda-feira da semana civil correspondente ao startDate
             let currStart = new Date(startDate.getTime());
-            let semanaNum = 1;
+            currStart.setHours(0, 0, 0, 0);
+            const dayOfWeek = currStart.getDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+            const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+            currStart.setDate(currStart.getDate() + diffToMonday);
 
+            let semanaNum = 1;
             const formatSemAno = (d) => `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
 
+            // Continua gerando blocos completos de Segunda a Domingo enquanto cobrir o período de medição
             while (currStart.getTime() <= endDate.getTime()) {
                 let currEnd = new Date(currStart.getTime());
-                // Avança 6 dias (bloco de 7 dias da semana)
+                // Segunda + 6 dias = Domingo
                 currEnd.setDate(currEnd.getDate() + 6);
                 currEnd.setHours(23, 59, 59, 999);
-
-                if (currEnd.getTime() > endDate.getTime()) {
-                    currEnd = new Date(endDate.getTime());
-                }
 
                 const semId = `sem_${semanaNum}_${currStart.getFullYear()}_${currStart.getMonth() + 1}_${currStart.getDate()}`;
                 const salvaExistente = salvas.find(s => s.id === semId || s.semanaNumero === semanaNum);
@@ -448,7 +450,7 @@
                     dataReuniao: salvaExistente ? (salvaExistente.dataReuniao || '') : ''
                 });
 
-                // Próximo início = dia seguinte ao currEnd
+                // Próxima semana: próxima Segunda-feira
                 currStart = new Date(currEnd.getTime());
                 currStart.setDate(currStart.getDate() + 1);
                 currStart.setHours(0, 0, 0, 0);
@@ -779,13 +781,14 @@
             // Cálculo de Glosas de Reunião Semanal do Engenheiro (Item 8.7 do TR)
             const infoReunioes = this.calcularGlosasReuniaoSemanal(chamados, mesAnoStr);
             const protocolosGlosadosPorReuniao = infoReunioes.protocolosGlosadosPorReuniao || {};
+            const temReincidenciaReuniao = Boolean(infoReunioes.temReincidencia);
 
             ossConcluidas.forEach(os => {
                 const valores = this.obterValorBaseOS(os);
                 const infracoes = this.avaliarInfracoesOS(os);
+                const prot = os.protocolo || 'OS';
 
                 // Aplica glosa de reunião semanal (Item 8.7.1) caso a OS tenha sido executada na semana anterior à falta
-                const prot = os.protocolo || 'OS';
                 if (protocolosGlosadosPorReuniao[prot]) {
                     const isAnistiado = this.overrides[prot]?.['reuniao_semanal_8_7']?.ignorarGlosa;
                     infracoes.push({
@@ -796,6 +799,20 @@
                         anistiado: Boolean(isAnistiado),
                         justificativa: this.overrides[prot]?.['reuniao_semanal_8_7']?.justificativa || '',
                         detalhe: protocolosGlosadosPorReuniao[prot].detalhe
+                    });
+                }
+
+                // Aplica multa de reincidência de reuniões (Item 8.7.2): 15% sobre as OSs do mês de competência
+                if (temReincidenciaReuniao) {
+                    const isAnistiadoReinc = this.overrides[prot]?.['reuniao_reincidencia_8_7_2']?.ignorarGlosa;
+                    infracoes.push({
+                        regraId: 'reuniao_reincidencia_8_7_2',
+                        nome: 'Reincidência de Reuniões Semanais (Item 8.7.2)',
+                        artigoTR: 'Item 8.7.2',
+                        percentualGlosa: 15.0,
+                        anistiado: Boolean(isAnistiadoReinc),
+                        justificativa: this.overrides[prot]?.['reuniao_reincidencia_8_7_2']?.justificativa || '',
+                        detalhe: 'Multa de 15% por reincidência de faltas em reuniões semanais (2 semanas consecutivas ou 3 no mês - TR rev03, Item 8.7.2).'
                     });
                 }
 
@@ -837,13 +854,8 @@
                 });
             });
 
-            // Reincidência na falta de reuniões semanais (Item 8.7.2): Multa de 15% sobre o valor total da medição mensal
-            let valorMultaReincidenciaMensal = 0;
-            if (infoReunioes.temReincidencia) {
-                valorMultaReincidenciaMensal = totalBrutoGeral * 0.15;
-                totalGlosasGeral += valorMultaReincidenciaMensal;
-                totalLiquidoGeral = Math.max(0, totalLiquidoGeral - valorMultaReincidenciaMensal);
-            }
+            // Valor total correspondente aos 15% do Item 8.7.2 para fins informativos e relatórios
+            let valorMultaReincidenciaMensal = temReincidenciaReuniao ? (totalBrutoGeral * 0.15) : 0;
 
             itensMedidos.sort((a, b) => {
                 const tA = a.dataConclusao ? a.dataConclusao.getTime() : 0;
