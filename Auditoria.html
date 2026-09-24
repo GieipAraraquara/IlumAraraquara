@@ -15,14 +15,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=44"></script>
+    <script src="js/domain/ChamadoModel.js?v=51"></script>
     <script src="js/repositories/ChamadosRepository.js?v=37"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=31"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=54"></script>
+    <script src="js/controllers/AuditoriaController.js?v=61"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -449,12 +449,12 @@
     </div>
 
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible relative z-30">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Tabela de Auditoria de OS</h3>
                 <div class="flex gap-2 items-center">
                     <div class="relative inline-block text-left">
-                        <button type="button" id="audit-cols-dropdown-trigger" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 active:scale-95" title="Selecionar quais colunas de auditoria exibir e filtrar">
+                        <button type="button" id="audit-cols-dropdown-trigger" onclick="window.toggleAuditColsDropdown(event)" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 active:scale-95" title="Selecionar quais colunas de auditoria exibir e filtrar">
                             <span class="material-symbols-outlined text-[16px] text-secondary">view_column</span>
                             <span id="audit-cols-btn-label">Colunas (10/10)</span>
                             <span class="material-symbols-outlined text-[14px] text-on-surface-variant/60">expand_more</span>
@@ -478,7 +478,7 @@
                                 </button>
                             </div>
 
-                            <div class="flex flex-col gap-1.5 max-h-64 overflow-y-auto pr-1" id="audit-cols-checkboxes-container">
+                            <div class="flex flex-col gap-1.5" id="audit-cols-checkboxes-container">
                                 <!-- Preenchido dinamicamente via JS com as 10 colunas -->
                             </div>
 
@@ -687,14 +687,14 @@
                             </th>
 
                             <!-- Audit Column 9 -->
-                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="11" data-audit-col="8" title="Aponta SIM quando: Foi solicita mais que um serviço de manutenção no material.">
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="11" data-audit-col="8" title="Aponta SIM quando: Quantidade de relés/luminárias/lâmpadas excede os pontos ou se foi lançado Refletor em OS viária.">
                                 <div class="vertical-header-text">
                                     <div>Material</div>
                                     <div>Divergente?</div>
                                 </div>
                                 <div class="header-tooltip">
                                     <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
-                                    <div>Foi solicitada mais que um serviço de manutenção no material.</div>
+                                    <div>Quantidade de relés, luminárias ou lâmpadas excede a quantidade de pontos da OS, ou foi lançado Refletor em OS viária.</div>
                                 </div>
                                 <div class="resizer"></div>
                             </th>
@@ -2189,6 +2189,10 @@
     // Concluir Auditoria Action (Direct with Supabase persistence)
     window.concluirAuditoria = async function(btn, event) {
         if (event) event.stopPropagation();
+        if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
+            console.warn('⛔ [Auditoria] Ação de concluir auditoria não permitida para o perfil Manutentor.');
+            return;
+        }
         const row = btn.closest('tr');
         if (!row) return;
 
@@ -2214,6 +2218,10 @@
     // Desfazer Conclusão Action (Requires Confirmation Modal & Supabase update)
     window.desfazerAuditoria = function(btn, event) {
         if (event) event.stopPropagation();
+        if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
+            console.warn('⛔ [Auditoria] Ação de desfazer conclusão não permitida para o perfil Manutentor.');
+            return;
+        }
         const row = btn.closest('tr');
         if (!row) return;
 
@@ -2246,8 +2254,21 @@
         });
     };
 
+    window.isCurrentUserManutentor = function() {
+        if (window.auditoriaController && typeof window.auditoriaController.isManutentorUser === 'function') {
+            return window.auditoriaController.isManutentorUser();
+        }
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            return role === 'manutentor';
+        }
+        return false;
+    };
+
     window.updateAuditActionButtons = function() {
         const rows = document.querySelectorAll('#os-table tbody tr');
+        const isManutentor = window.isCurrentUserManutentor();
+
         rows.forEach(row => {
             const isCompleted = row.getAttribute('data-completed') === 'true' || row.classList.contains('opacity-70');
             const actionCell = row.cells[row.cells.length - 1];
@@ -2255,6 +2276,13 @@
 
             let actionContainer = actionCell.querySelector('.action-buttons');
             if (!actionContainer) actionContainer = actionCell;
+
+            if (isManutentor) {
+                actionContainer.innerHTML = `
+                    <span class="text-[11px] text-on-surface-variant/40 font-medium" title="Apenas administradores podem concluir auditoria">—</span>
+                `;
+                return;
+            }
 
             if (isCompleted) {
                 row.classList.add('opacity-70');
@@ -2455,7 +2483,7 @@
     });
 
     // Controle Avançado de Seleção e Visibilidade das Colunas de Auditoria
-    const AUDIT_COLS_DEFS = [
+    const ALL_AUDIT_COLS_DEFS = [
         { index: 0, colIndex: 3, label: 'Problema Divergente', short: 'Problema Divergente' },
         { index: 1, colIndex: 4, label: 'Plaqueta Divergente', short: 'Plaqueta Divergente' },
         { index: 2, colIndex: 5, label: 'Quantidade Divergente', short: 'Quantidade Divergente' },
@@ -2468,14 +2496,26 @@
         { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' }
     ];
 
-    // Estado global de índices de colunas ativas (0..9)
+    // Colunas restritas que NÃO devem ser disponibilizadas nem exibidas para o Manutentor
+    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante
+    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7];
+
+    function getAuditColsDefs() {
+        if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
+            return ALL_AUDIT_COLS_DEFS.filter(col => !MANUTENTOR_EXCLUDED_COLS.includes(col.index));
+        }
+        return ALL_AUDIT_COLS_DEFS;
+    }
+
+    // Estado global de índices de colunas ativas
     window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     function renderAuditColsCheckboxes() {
         const container = document.getElementById('audit-cols-checkboxes-container');
         if (!container) return;
 
-        container.innerHTML = AUDIT_COLS_DEFS.map(col => {
+        const defs = getAuditColsDefs();
+        container.innerHTML = defs.map(col => {
             const isChecked = window.activeAuditCols.includes(col.index);
             return `
                 <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors text-on-surface font-medium">
@@ -2493,8 +2533,10 @@
     }
 
     function updateAuditColsUIIndicators() {
-        const count = window.activeAuditCols.length;
-        const total = AUDIT_COLS_DEFS.length;
+        const defs = getAuditColsDefs();
+        const allowedIndices = defs.map(d => d.index);
+        const count = window.activeAuditCols.filter(i => allowedIndices.includes(i)).length;
+        const total = defs.length;
 
         const btnLabel = document.getElementById('audit-cols-btn-label');
         if (btnLabel) {
@@ -2527,8 +2569,9 @@
     };
 
     window.toggleAllAuditColsDropdown = function(enableAll) {
+        const defs = getAuditColsDefs();
         if (enableAll) {
-            window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            window.activeAuditCols = defs.map(d => d.index);
         } else {
             window.activeAuditCols = [];
         }
@@ -2543,7 +2586,10 @@
 
     function saveAndApplyAuditCols() {
         try {
-            localStorage.setItem('active_audit_cols', JSON.stringify(window.activeAuditCols));
+            const storageKey = (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) 
+                ? 'active_audit_cols_manutentor' 
+                : 'active_audit_cols';
+            localStorage.setItem(storageKey, JSON.stringify(window.activeAuditCols));
         } catch(e) {}
 
         applyAuditColsVisibility();
@@ -2559,15 +2605,24 @@
         const table = document.getElementById('os-table');
         if (!table) return;
 
-        const count = window.activeAuditCols.length;
-        const total = AUDIT_COLS_DEFS.length;
+        const isManutentor = window.isCurrentUserManutentor && window.isCurrentUserManutentor();
+        const defs = getAuditColsDefs();
+        const allowedIndices = defs.map(d => d.index);
 
-        // Se nenhuma coluna estiver ativa, pode ativar classe geral hide-audit-cols
-        table.classList.toggle('hide-audit-cols', count === 0);
+        // Se for manutentor, as colunas excluídas são forçadas a ficar invisíveis
+        if (isManutentor) {
+            window.activeAuditCols = window.activeAuditCols.filter(i => !MANUTENTOR_EXCLUDED_COLS.includes(i));
+        }
 
-        // Para cada uma das 10 colunas de auditoria, adiciona ou remove audit-col-hidden
-        AUDIT_COLS_DEFS.forEach(col => {
-            const isVisible = window.activeAuditCols.includes(col.index);
+        const activeCount = window.activeAuditCols.filter(i => allowedIndices.includes(i)).length;
+
+        // Se nenhuma coluna estiver ativa, ativa classe geral hide-audit-cols
+        table.classList.toggle('hide-audit-cols', activeCount === 0);
+
+        // Aplica visibilidade em todas as 10 colunas possíveis
+        ALL_AUDIT_COLS_DEFS.forEach(col => {
+            const isExcludedForManutentor = isManutentor && MANUTENTOR_EXCLUDED_COLS.includes(col.index);
+            const isVisible = !isExcludedForManutentor && window.activeAuditCols.includes(col.index);
             const cells = table.querySelectorAll(`th[data-audit-col="${col.index}"], td[data-audit-col="${col.index}"]`);
             cells.forEach(cell => {
                 cell.classList.toggle('audit-col-hidden', !isVisible);
@@ -2577,18 +2632,28 @@
         // Atualiza colspan do empty state
         const noResultsCell = document.querySelector('#no-audit-results td');
         if (noResultsCell) {
-            const visibleColsCount = 4 + count; // 4 colunas base (Protocolo, Data, Ponto, Ações) + colunas ativas
+            const visibleColsCount = 4 + activeCount; // 4 colunas base (Protocolo, Data, Ponto, Ações) + colunas ativas
             noResultsCell.setAttribute('colspan', visibleColsCount.toString());
         }
     }
 
     function initAuditColumnsManager() {
+        const isManutentor = window.isCurrentUserManutentor && window.isCurrentUserManutentor();
+        const storageKey = isManutentor ? 'active_audit_cols_manutentor' : 'active_audit_cols';
+        const defs = getAuditColsDefs();
+        const defaultCols = defs.map(d => d.index);
+
+        window.activeAuditCols = [...defaultCols];
+
         try {
-            const saved = localStorage.getItem('active_audit_cols');
+            const saved = localStorage.getItem(storageKey);
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed)) {
-                    window.activeAuditCols = parsed.filter(n => typeof n === 'number' && n >= 0 && n <= 9);
+                    let filtered = parsed.filter(n => typeof n === 'number' && defaultCols.includes(n));
+                    if (filtered.length > 0 || parsed.length === 0) {
+                        window.activeAuditCols = filtered;
+                    }
                 }
             }
         } catch(e) {}
@@ -2596,6 +2661,30 @@
         renderAuditColsCheckboxes();
         applyAuditColsVisibility();
     }
+
+    window.toggleAuditColsDropdown = function(event) {
+        if (event) {
+            if (typeof event.stopPropagation === 'function') event.stopPropagation();
+            if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        }
+        const dropdown = document.getElementById('audit-cols-dropdown');
+        if (!dropdown) return;
+
+        const isHidden = dropdown.classList.contains('hidden') || dropdown.style.display === 'none';
+
+        // Fecha outros dropdowns se a função global estiver disponível
+        if (typeof window.closeAllFilterDropdownsGlobal === 'function') {
+            window.closeAllFilterDropdownsGlobal();
+        }
+
+        if (isHidden) {
+            dropdown.classList.remove('hidden');
+            dropdown.style.display = 'block';
+        } else {
+            dropdown.classList.add('hidden');
+            dropdown.style.display = 'none';
+        }
+    };
 </script>
 
 <script>
@@ -2733,7 +2822,6 @@
 
         function initFilterPortals() {
             [
-                auditColsDropdown,
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
@@ -2748,7 +2836,6 @@
 
         function closeAllFilterDropdowns() {
             [
-                auditColsDropdown,
                 dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
                 pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
                 compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
@@ -2760,6 +2847,7 @@
                 }
             });
         }
+        window.closeAllFilterDropdownsGlobal = closeAllFilterDropdowns;
 
         function openFloatingDropdown(triggerBtn, dropdownEl, alignRight = false) {
             if (!triggerBtn || !dropdownEl) return;
@@ -2917,11 +3005,6 @@
         });
 
         // Toggle dropdowns with floating positioning
-        auditColsTrigger?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openFloatingDropdown(auditColsTrigger, auditColsDropdown, true);
-        });
-
         dateTrigger?.addEventListener('click', (e) => {
             e.stopPropagation();
             openFloatingDropdown(dateTrigger, dateDropdown, false);

@@ -6,6 +6,33 @@ class AuditoriaController {
         this.service = new window.ChamadosService();
         this.chamadosList = [];
         this.concludedList = [];
+        this.userRole = '';
+    }
+
+    isManutentorUser() {
+        if (this.userRole === 'manutentor') return true;
+        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+            return role === 'manutentor';
+        }
+        return false;
+    }
+
+    isItemDivergent(item) {
+        if (!item || item.isDireto) return false;
+        if (this.isManutentorUser()) {
+            // Para manutentor, exclui: Outra plaqueta próxima, Anexo Plaqueta Divergente e Anexo Faltante
+            return Boolean(
+                item.isProblemaDivergente ||
+                item.isPlaquetaDivergente ||
+                item.isQuantidadeDivergente ||
+                item.isDistanciaAcima100m ||
+                item.isPlaquetaProblematica ||
+                item.isMaterialDivergente ||
+                item.isProblemaExterno
+            );
+        }
+        return Boolean(item.hasDivergence);
     }
 
     /**
@@ -17,7 +44,8 @@ class AuditoriaController {
             const authData = await window.AuthGuard.requireAuth();
             if (!authData) return;
             const role = window.AuthGuard.getUserRole(authData.user, authData.profile);
-            if (role !== 'admin') {
+            this.userRole = role;
+            if (role !== 'admin' && role !== 'manutentor') {
                 const redirectUrl = window.AuthGuard.getRedirectUrlForUser(authData);
                 try { if (document.documentElement) document.documentElement.style.display = 'none'; } catch(e) {}
                 window.location.href = redirectUrl;
@@ -27,6 +55,14 @@ class AuditoriaController {
         this.syncHeaderTooltips();
         this.bindEvents();
         await this.loadData();
+
+        // Se for perfil manutentor (ou admin), garante sincronização imediata do gerenciador de colunas e botões de ação
+        if (typeof window.initAuditColumnsManager === 'function') {
+            window.initAuditColumnsManager();
+        }
+        if (typeof window.updateAuditActionButtons === 'function') {
+            window.updateAuditActionButtons();
+        }
     }
 
     /**
@@ -231,7 +267,7 @@ class AuditoriaController {
                 return getTime(a) - getTime(b);
             });
 
-            this.auditDivergentList = this.concludedList.filter(item => item.hasDivergence);
+            this.auditDivergentList = this.concludedList.filter(item => this.isItemDivergent(item));
 
             console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs concluídas encontradas. (${this.pracaServicesList.length} Praças, ${this.emergenciaServicesList.length} Emergenciais, ${this.viariaConcludedList.length} Viárias Concluídas, ${this.auditDivergentList.length} com divergências 'S')`);
 
@@ -282,10 +318,10 @@ class AuditoriaController {
 
         const listToUse = (Array.isArray(auditList) && auditList.length > 0) 
             ? auditList 
-            : (this.auditDivergentList || (this.concludedList ? this.concludedList.filter(item => item.hasDivergence) : []));
+            : (this.auditDivergentList || (this.concludedList ? this.concludedList.filter(item => this.isItemDivergent(item)) : []));
 
         // Filter strictly for items that have at least one 'S' divergence flag
-        const divergentOnly = listToUse.filter(item => item.hasDivergence);
+        const divergentOnly = listToUse.filter(item => this.isItemDivergent(item));
 
         const activeCount = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) ? window.activeAuditCols.length : 10;
         const isAuditColsHidden = document.getElementById('os-table')?.classList.contains('hide-audit-cols') || activeCount === 0;
@@ -317,7 +353,7 @@ class AuditoriaController {
      * Generates HTML string for single audit row
      */
     createAuditRowHtml(item) {
-        const addressLines = item.addressPointsIniciais;
+        const addressLines = item.addressPointsFinais || item.addressPoints || item.addressPointsIniciais;
         let locationDisplayHtml = '';
 
         if (addressLines.length > 1) {
@@ -447,14 +483,75 @@ class AuditoriaController {
                     `;
 
                 case 8: // Material Divergente
-                    const mat = item.materialUtilizado || item.material_utilizado || item.formattedMaterialUtilizado || 'Mais de um material informado';
-                    return `
-                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
-                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
-                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Material Informado:</span>
-                                <span class="font-medium text-amber-200 break-words">${esc(mat)}</span>
+                    const matList = (item.materialsList && item.materialsList.length > 0) 
+                        ? item.materialsList 
+                        : (item.formattedMaterialUtilizado ? [item.formattedMaterialUtilizado] : ['Mais de um material informado']);
+                    const matItemsHtml = matList.map(m => `<li class="font-medium text-amber-200 leading-snug">${esc(m)}</li>`).join('');
+                    
+                    const numPtsReparados = (item.pontosDetalhados && item.pontosDetalhados.length > 0) 
+                        ? item.pontosDetalhados.length 
+                        : (item.qtdFinal || item.qtdInicial || 1);
+                    
+                    const isPraca = Boolean(item.isPraca);
+                    const hasRefletorViaria = !isPraca && matList.some(m => {
+                        const s = String(m).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        return s.includes('refletor');
+                    });
+
+                    const hasServicoProibidoPraca = isPraca && matList.some(m => {
+                        const s = String(m).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                        return (
+                            (s.includes('manutencao em iluminacao publica viaria') && s.includes('poste cpfl')) ||
+                            (s.includes('troca de rele sem analise') && s.includes('viaria')) ||
+                            (s.includes('instalacao de plaqueta') && s.includes('viaria')) ||
+                            (s.includes('poda de arvore') && s.includes('munk'))
+                        );
+                    });
+
+                    let rodapeHtml = '';
+                    if (hasRefletorViaria) {
+                        rodapeHtml = `
+                            <div class="p-1.5 rounded bg-rose-950/80 border border-rose-800/60 text-[10.5px] text-rose-300">
+                                <strong>Divergência detectada:</strong> Material <u>Refletor</u> lançado em OS Viária (permitido somente em Praças/Espaços Públicos).
                             </div>
-                            <div class="text-[10px] text-slate-300">Foi solicitado/utilizado mais de um serviço de manutenção no material.</div>
+                        `;
+                    } else if (hasServicoProibidoPraca) {
+                        rodapeHtml = `
+                            <div class="p-1.5 rounded bg-rose-950/80 border border-rose-800/60 text-[10.5px] text-rose-300">
+                                <strong>Divergência detectada:</strong> Serviço de <u>iluminação pública viária</u> lançado indevidamente em OS de Praça Pública.
+                            </div>
+                        `;
+                    } else if (isPraca) {
+                        rodapeHtml = `
+                            <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
+                                Praça Pública: materiais e componentes não possuem limitação de quantidade por ponto.
+                            </div>
+                        `;
+                    } else {
+                        rodapeHtml = `
+                            <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
+                                Regra: quantidade de componentes principais (relés, luminárias ou lâmpadas) não pode ultrapassar <strong>${numPtsReparados} un</strong> (1 por ponto).
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="flex flex-col gap-1.5 text-[11px] leading-tight">
+                            <div class="p-2 rounded bg-slate-800/90 border border-slate-700/80 flex items-center justify-between">
+                                <span class="text-[10px] uppercase font-bold text-slate-400">Pontos Reparados:</span>
+                                <span class="px-2 py-0.5 rounded font-bold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                    ${numPtsReparados} ${numPtsReparados > 1 ? 'pontos' : 'ponto'}
+                                </span>
+                            </div>
+
+                            <div class="p-2 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Materiais Utilizados:</span>
+                                <ul class="list-disc list-inside space-y-1 break-words">
+                                    ${matItemsHtml}
+                                </ul>
+                            </div>
+
+                            ${rodapeHtml}
                         </div>
                     `;
 
@@ -474,7 +571,15 @@ class AuditoriaController {
             }
         };
 
+        const isPracaItem = Boolean(item.isPraca);
         const renderBadge = (isTrue, ruleIdx, titleAttr = '') => {
+            // Regra: Colunas exclusivas de OS viária (0: Problema Div, 1: Plaqueta Div, 2: Qtd Div, 4: Plaqueta Próxima, 5: Plaqueta Problemática, 6: Anexo Plaqueta Div)
+            // Caso seja praça, a linha não deve nem aparecer S ou N, deve ficar em branco.
+            const viariaOnlyCols = [0, 1, 2, 4, 5, 6];
+            if (isPracaItem && viariaOnlyCols.includes(ruleIdx)) {
+                return '';
+            }
+
             if (!isTrue) {
                 return `<span class="audit-badge audit-n" ${titleAttr ? `title="${titleAttr}"` : ''}>N</span>`;
             }
@@ -520,7 +625,9 @@ class AuditoriaController {
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">
-                        ${isCompleted ? `
+                        ${this.isManutentorUser() ? `
+                            <span class="text-[11px] text-on-surface-variant/40 font-medium" title="Apenas administradores podem concluir auditoria">—</span>
+                        ` : (isCompleted ? `
                             <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors btn-uncomplete cursor-pointer" onclick="desfazerAuditoria(this, event)" title="Desfazer Auditoria">
                                 <span class="material-symbols-outlined text-[18px]">undo</span>
                             </button>
@@ -528,7 +635,7 @@ class AuditoriaController {
                             <button class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 transition-colors btn-complete cursor-pointer" onclick="concluirAuditoria(this, event)" title="Concluir Auditoria">
                                 <span class="material-symbols-outlined text-[18px]">check_circle</span>
                             </button>
-                        `}
+                        `)}
                     </div>
                 </td>
             </tr>
@@ -894,6 +1001,10 @@ class AuditoriaController {
      * Persists 'Concluída' audit status for specific OS ID or Protocol
      */
     async concluirAuditoria(idOrProtocol) {
+        if (this.isManutentorUser()) {
+            console.warn('⛔ [AuditoriaController] Ação não permitida para o perfil Manutentor.');
+            return null;
+        }
         if (!idOrProtocol) return null;
         const cleanVal = String(idOrProtocol).replace(/^#/, '').trim().toUpperCase();
         const item = this.chamadosList.find(c => {
@@ -1469,17 +1580,19 @@ class AuditoriaController {
                             </button>` : '')}
                         ` : ''}
 
+                        ${(isAdminUser || isManutentorUser) ? `
+                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                                <span>Editar Materiais</span>
+                            </button>
+                        ` : ''}
+
                         ${isAdminUser ? `
                             ${isPendente ? `
                             <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">check</span>
                                 <span>Aprovar OS</span>
                             </button>` : ''}
-
-                            <button type="button" onclick="window.editarMateriaisAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar lista de materiais desta OS">
-                                <span class="material-symbols-outlined text-[16px]">edit_note</span>
-                                <span>Editar Materiais</span>
-                            </button>
 
                             ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
                                 !isJaUrgente ? `
@@ -2199,24 +2312,30 @@ class AuditoriaController {
             return;
         }
 
-        // Validação de Perfil Administrativo
-        let isAdmin = false;
+        // Validação de Perfil Administrativo / Manutentor
+        let isAuthorized = false;
         try {
             if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
                 const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
-                if (r === 'admin') isAdmin = true;
+                if (r === 'admin' || r === 'manutentor') isAuthorized = true;
             }
-            if (!isAdmin && window.usuarioLogadoSupabase) {
+            if (!isAuthorized && window.usuarioLogadoSupabase) {
                 const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor') || r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isAuthorized = true;
             }
-            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
-                isAdmin = true;
+            if (!isAuthorized) {
+                const r = String(localStorage.getItem('user_role') || '').toLowerCase();
+                if (r.includes('admin') || r.includes('manutentor')) {
+                    isAuthorized = true;
+                }
+            }
+            if (!isAuthorized && (this.isManutentorUser() || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
+                isAuthorized = true;
             }
         } catch(e) {}
 
-        if (!isAdmin) {
-            alert('Acesso restrito: Apenas usuários com perfil de Administrador podem editar a lista de materiais.');
+        if (!isAuthorized) {
+            alert('Acesso restrito: Apenas administradores e manutentores podem editar a lista de materiais.');
             return;
         }
 
@@ -2626,7 +2745,7 @@ class AuditoriaController {
 
                 // Atualiza a lista de divergentes da auditoria com base no estado atualizado
                 if (Array.isArray(this.concludedList)) {
-                    this.auditDivergentList = this.concludedList.filter(o => o && o.hasDivergence);
+                    this.auditDivergentList = this.concludedList.filter(o => o && this.isItemDivergent(o));
                 }
 
                 document.removeEventListener('click', fecharDropdownsOnClickOutside);

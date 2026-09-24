@@ -1019,7 +1019,7 @@ class ChamadoModel {
      * Audit Divergence Indicators mapped from vw_auditoria_chamados or dynamic fallback logic
      */
     get isProblemaDivergente() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
 
         const isDivergentePair = (ini, fin) => {
             const catIni = ChamadoModel.obterCategoriaProblema(ini);
@@ -1061,7 +1061,7 @@ class ChamadoModel {
     }
 
     get isPlaquetaDivergente() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
 
         const pts = this.pontosDetalhados;
         if (pts && pts.length > 0) {
@@ -1103,7 +1103,7 @@ class ChamadoModel {
     }
 
     get isQuantidadeDivergente() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
 
         const parseArrayJson = (val) => {
             if (!val) return [];
@@ -1184,7 +1184,7 @@ class ChamadoModel {
     }
 
     get isOutraPlaquetaProxima() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
         if (this.audit && this.audit.outra_plaqueta_proxima !== undefined && this.audit.outra_plaqueta_proxima !== null) {
             return Boolean(this.audit.outra_plaqueta_proxima);
         }
@@ -1192,7 +1192,7 @@ class ChamadoModel {
     }
 
     get isPlaquetaProblematica() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
         if (this.audit && this.audit.outro_reparo_no_mes !== undefined && this.audit.outro_reparo_no_mes !== null) {
             return Boolean(this.audit.outro_reparo_no_mes);
         }
@@ -1200,7 +1200,7 @@ class ChamadoModel {
     }
 
     get isPrecisaAnexarFoto() {
-        if (this.isDireto) return false;
+        if (this.isDireto || this.isPraca) return false;
         if (this.isPlaquetaDivergente || this.anexoPlaquetaDivergente) return true;
         if (this.audit && this.audit.precisa_anexar_foto !== undefined && this.audit.precisa_anexar_foto !== null) {
             return Boolean(this.audit.precisa_anexar_foto);
@@ -1215,10 +1215,127 @@ class ChamadoModel {
 
     get isMaterialDivergente() {
         if (this.isDireto) return false;
-        if (this.audit && this.audit.material_divergente !== undefined && this.audit.material_divergente !== null) {
-            return Boolean(this.audit.material_divergente);
+        if (this.audit && this.audit.material_divergente === true) {
+            return true;
         }
-        return false;
+
+        // Validação dinâmica: quantidade de componentes principais (relés, luminárias, lâmpadas, etc.)
+        // não pode exceder o número de pontos/plaquetas atendidos na OS.
+        const materiaisRaw = this.materialUtilizado;
+        if (!materiaisRaw) return false;
+
+        let itens = [];
+        if (Array.isArray(materiaisRaw)) {
+            itens = materiaisRaw;
+        } else if (typeof materiaisRaw === 'string') {
+            const trimmed = materiaisRaw.trim();
+            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                try {
+                    const parsed = JSON.parse(trimmed);
+                    itens = Array.isArray(parsed) ? parsed : [parsed];
+                } catch (e) {
+                    itens = trimmed.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+                }
+            } else {
+                itens = trimmed.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+            }
+        }
+
+        if (!itens || itens.length === 0) return false;
+
+        // Categorias que possuem limite estrito de 1 unidade por ponto de iluminação
+        const categoriasContadas = {
+            RELE: 0,
+            LUMINARIA: 0,
+            LAMPADA: 0,
+            REATOR_DRIVER: 0,
+            BRACO: 0,
+            BASE: 0
+        };
+
+        for (const item of itens) {
+            if (!item) continue;
+            let nome = '';
+            let qtd = 1;
+
+            if (typeof item === 'string') {
+                nome = item;
+                const matchQtd = item.match(/\((\d+)\s*x?\)/i) || item.match(/(\d+)\s*x\b/i) || item.match(/[-:]\s*(\d+)\s*(?:un|pç|pc|und)?$/i);
+                if (matchQtd) {
+                    qtd = parseInt(matchQtd[1], 10) || 1;
+                }
+            } else if (typeof item === 'object') {
+                nome = item.nome || item.descricao || item.material || item.item || '';
+                qtd = parseInt(item.qtd || item.quantidade || item.qtd_utilizada || 1, 10) || 1;
+            }
+
+            const nomeLower = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            // Regra específica: Em OS de Praça Pública, NÃO é permitido lançar serviços de iluminação pública viária
+            if (this.isPraca) {
+                const isServicoProibidoPraca = (
+                    (nomeLower.includes('servico de manutencao em iluminacao publica viaria') || (nomeLower.includes('manutencao em iluminacao publica viaria') && nomeLower.includes('poste cpfl'))) ||
+                    (nomeLower.includes('servico de troca de rele sem analise de defeito em iluminacao publica viaria') || (nomeLower.includes('troca de rele sem analise') && nomeLower.includes('viaria'))) ||
+                    (nomeLower.includes('servico de instalacao de plaqueta de identificacao em braco metalico de iluminacao publica viaria') || (nomeLower.includes('instalacao de plaqueta') && nomeLower.includes('viaria'))) ||
+                    (nomeLower.includes('servico de poda de arvore') || nomeLower.includes('servico de poda de arvore') || (nomeLower.includes('poda de arvore') && nomeLower.includes('munk')))
+                );
+
+                if (isServicoProibidoPraca) {
+                    return true;
+                }
+            }
+
+            // Ignorar serviços e mão de obra gerais
+            if (nomeLower.includes('servico') || nomeLower.includes('mao de obra') || nomeLower.includes('caminhao') || nomeLower.includes('guindauto')) {
+                continue;
+            }
+
+            // Regra específica: Se for OS Viária e tiver "REFLETOR", é divergente (refletores são exclusivos de praças/espaços públicos)
+            if (!this.isPraca && nomeLower.includes('refletor')) {
+                return true;
+            }
+
+            // Ignorar placas de identificação, plaquetas e adesivos
+            if (nomeLower.includes('placa') || nomeLower.includes('plaqueta') || nomeLower.includes('identificacao') || nomeLower.includes('identificacao')) {
+                continue;
+            }
+
+            // Identificar categoria exclusiva (1 por ponto) - aplicável exclusivamente para OS Viária
+            // Em Praças Públicas não há limitação de quantidade de luminárias, relés, lâmpadas ou materiais por ponto.
+            if (!this.isPraca) {
+                if (nomeLower.includes('rele') || nomeLower.includes('fotoeletrico')) {
+                    categoriasContadas.RELE += qtd;
+                } else if (nomeLower.includes('luminaria') || nomeLower.includes('refletor')) {
+                    categoriasContadas.LUMINARIA += qtd;
+                } else if (nomeLower.includes('lampada') || nomeLower.includes('vapor de sodio') || nomeLower.includes('vapor metalico') || nomeLower.includes('vapor mercurio')) {
+                    categoriasContadas.LAMPADA += qtd;
+                } else if (nomeLower.includes('reator') || nomeLower.includes('driver')) {
+                    categoriasContadas.REATOR_DRIVER += qtd;
+                } else if (nomeLower.includes('braco') || nomeLower.includes('suporte')) {
+                    categoriasContadas.BRACO += qtd;
+                } else if (nomeLower.includes('base') || nomeLower.includes('soquete') || nomeLower.includes('tomada rele')) {
+                    categoriasContadas.BASE += qtd;
+                }
+            }
+        }
+
+        // Se for Praça e não disparou nenhum serviço proibido, não há divergência de quantidade de materiais
+        if (this.isPraca) {
+            return false;
+        }
+
+        // Determina a quantidade de pontos da OS Viária
+        let numPontos = 1;
+        if (this.pontosDetalhados && Array.isArray(this.pontosDetalhados) && this.pontosDetalhados.length > 0) {
+            numPontos = this.pontosDetalhados.length;
+        } else if (this.qtdFinal && this.qtdFinal > 0) {
+            numPontos = this.qtdFinal;
+        } else if (this.qtdInicial && this.qtdInicial > 0) {
+            numPontos = this.qtdInicial;
+        }
+
+        // Divergente se alguma categoria unitária exceder a quantidade de pontos na OS Viária
+        return Object.values(categoriasContadas).some(total => total > numPontos);
     }
 
     get isProblemaExterno() {
@@ -1226,6 +1343,25 @@ class ChamadoModel {
         if (this.audit && this.audit.problema_externo !== undefined && this.audit.problema_externo !== null) {
             return Boolean(this.audit.problema_externo);
         }
+
+        // Validação dinâmica caso não venha calculado pela view do banco
+        const checarTextoProblemaExterno = (txt) => {
+            if (!txt) return false;
+            const str = String(txt).toLowerCase();
+            return str.includes('cpfl') || str.includes('concessionaria') || str.includes('concessionária');
+        };
+
+        if (checarTextoProblemaExterno(this.problemaEncontrado)) return true;
+
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            for (const p of pts) {
+                if (checarTextoProblemaExterno(p.problemaEncontrado) || checarTextoProblemaExterno(p.problema)) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -1852,6 +1988,65 @@ class ChamadoModel {
     }
 
     /**
+     * Returns location points using strictly closing/finalization data (Endereço Final -> Plaqueta Final -> Coordenada Reparo)
+     */
+    get addressPointsFinais() {
+        try {
+            const list = this.pontosDetalhados;
+            if (list && list.length > 0) {
+                const formatted = list.map(p => {
+                    const parts = [];
+                    const rawEnd = p.enderecoFinal || (ChamadoModel.isValidLocationText(this.endereco) ? ChamadoModel.formatLocationText(this.endereco) : null);
+                    const end = (rawEnd && ChamadoModel.isValidLocationText(rawEnd)) ? rawEnd : null;
+                    const plq = p.plaquetaFinal || this.plaquetaFinal;
+                    const coord = p.coordenadaFinal || this.coordenadaReparo;
+                    if (end && end !== 'Endereço não informado' && end !== '---') parts.push(end);
+                    if (plq && plq !== 'Não informada' && plq !== '---' && plq !== 'null') parts.push(`Plaqueta: ${plq}`);
+                    if (coord && coord !== 'Sem coordenadas' && coord !== 'Não informada') {
+                        const cClean = String(coord).replace(/^coord:\s*/i, '').trim();
+                        parts.push(`Coord: ${cClean}`);
+                    }
+                    return parts.length > 0 ? parts.join(' | ') : null;
+                }).filter(Boolean);
+
+                if (formatted.length > 0) return formatted;
+            }
+
+            // Fallback 1: endereço direto em this.endereco
+            if (ChamadoModel.isValidLocationText(this.endereco)) {
+                const cleanAddress = ChamadoModel.formatLocationText(this.endereco);
+                const lines = cleanAddress.split(/\r?\n/).map(l => l.trim()).filter(l => ChamadoModel.isValidLocationText(l));
+                if (lines.length > 0) return lines;
+            }
+
+            // Fallback 2: praça
+            if (this.pracaNome && ChamadoModel.isValidLocationText(this.pracaNome)) {
+                return [ChamadoModel.formatLocationText(this.pracaNome)];
+            }
+
+            // Fallback 3: plaqueta final ou coordenada de reparo no nível raiz da OS
+            const rootParts = [];
+            const rPlq = this.plaquetaFinal || this.plaquetaInicial;
+            if (rPlq && rPlq !== 'Não informada' && rPlq !== '---' && rPlq !== 'null') {
+                rootParts.push(`Plaqueta: ${rPlq}`);
+            }
+            const rootCoord = this.coordenadaReparo || this.coordenadaInicial || this.coordenada;
+            if (rootCoord && rootCoord !== 'Sem coordenadas' && rootCoord !== 'Não informada') {
+                const cClean = String(rootCoord).replace(/^coord:\s*/i, '').trim();
+                rootParts.push(`Coord: ${cClean}`);
+            }
+            if (rootParts.length > 0) {
+                return [rootParts.join(' | ')];
+            }
+
+            return ['Ponto não informado'];
+        } catch (err) {
+            console.error('Erro ao processar addressPointsFinais:', err);
+            return ['Ponto não informado'];
+        }
+    }
+
+    /**
      * Returns location points with fallback hierarchy: Endereço -> Coordenada -> Plaqueta
      */
     get addressPoints() {
@@ -2287,7 +2482,7 @@ class ChamadoModel {
             headerText1: 'Material',
             headerText2: 'Divergente?',
             modelProperty: 'isMaterialDivergente',
-            explicacao: 'Foi solicitada mais que um serviço de manutenção no material.'
+            explicacao: 'Componentes principais excedem a quantidade de pontos da OS viária, refletor em OS viária, ou serviços viários lançados em OS de praça.'
         },
         {
             key: 'problemaExterno',
