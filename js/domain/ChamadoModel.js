@@ -686,7 +686,11 @@ class ChamadoModel {
                 textoAuditoriaOCR: f.texto_auditoria_ocr || '',
                 materiais: matParsed,
                 fotos: fotosParsed,
-                pontos: pontosParsed
+                pontos: pontosParsed,
+                desconsiderado: Boolean(f.desconsiderado),
+                desconsiderado_em: f.desconsiderado_em || null,
+                desconsiderado_por: f.desconsiderado_por || null,
+                motivo_desconsideracao: f.motivo_desconsideracao || null
             };
         });
     }
@@ -719,9 +723,10 @@ class ChamadoModel {
             }
         };
 
-        // 1. Prioriza materiais dos fechamentos complementares
+        // 1. Prioriza materiais dos fechamentos complementares (não desconsiderados)
         if (this.fechamentosList && this.fechamentosList.length > 0) {
             this.fechamentosList.forEach(f => {
+                if (f.desconsiderado) return;
                 if (f.materiais && Array.isArray(f.materiais)) {
                     f.materiais.forEach(addMat);
                 }
@@ -1547,9 +1552,10 @@ class ChamadoModel {
 
         let list = ChamadoModel.parseMaterialsList(this.materialUtilizado);
 
-        // Agrega materiais da nova tabela fechamentos_os (fechamentosList)
+        // Agrega materiais da nova tabela fechamentos_os (fechamentosList, excluindo desconsiderados)
         if (this.fechamentosList && this.fechamentosList.length > 0) {
             this.fechamentosList.forEach(f => {
+                if (f.desconsiderado) return;
                 if (f.materiais) {
                     const parsed = ChamadoModel.parseMaterialsList(f.materiais);
                     parsed.forEach(pMat => {

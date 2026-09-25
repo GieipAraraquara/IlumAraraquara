@@ -222,6 +222,31 @@ class ChamadosService {
     }
 
     /**
+     * Alterna a flag de desconsideração de um fechamento de OS (tabela fechamentos_os)
+     * @param {string|number} fechamentoId
+     * @param {string} protocolo
+     * @param {number|string} numeroFechamento
+     * @param {boolean} desconsiderar
+     * @param {string} [motivo='']
+     * @param {string} [origemTela='Painel']
+     */
+    async alternarDesconsiderarFechamento(fechamentoId, protocolo, numeroFechamento, desconsiderar, motivo = '', origemTela = 'Painel') {
+        const usuarioAtual = localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+
+        return await this.repository.alternarDesconsiderarFechamento(
+            fechamentoId,
+            protocolo,
+            Boolean(desconsiderar),
+            motivo,
+            {
+                numeroFechamento: numeroFechamento,
+                usuario: usuarioAtual,
+                origemTela: origemTela
+            }
+        );
+    }
+
+    /**
      * Loads list of Chamados for Auditoria, including vw_auditoria_chamados view metrics
      */
     async getAuditoriaChamadosList() {

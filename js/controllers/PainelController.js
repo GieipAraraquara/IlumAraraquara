@@ -1550,6 +1550,13 @@ class PainelController {
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
                     <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
+                <button type="button" 
+                        onclick="window.abrirMapaPontosManutencao ? window.abrirMapaPontosManutencao('${item.protocolo || item.id}', event) : window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" 
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 transition-all cursor-pointer active:scale-95 shadow-2xs" 
+                        title="Ver todos os pontos de manutenção e comparar distâncias no mapa Mapbox">
+                    <span class="material-symbols-outlined text-[14px]">map</span>
+                    <span>Ver no Mapa</span>
+                </button>
             </div>
 
             <!-- Lista Estruturada dos Pontos -->
@@ -1863,21 +1870,53 @@ class PainelController {
                     ${fechList.map((f, fIdx) => {
                         const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || 'Data não informada');
                         const numFech = f.numero || f.numero_fechamento || (fIdx + 1);
+                        const isDesconsiderado = Boolean(f.desconsiderado);
 
                         const matsParsed = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : [];
                         const fotosParsed = window.ChamadoModel ? window.ChamadoModel.parseClosurePhotos(f) : [];
 
+                        const borderCard = isDesconsiderado ? 'border-dashed border-rose-300 bg-rose-50/20 opacity-85' : 'border-amber-200/90 bg-white';
+                        const badgeStatus = isDesconsiderado
+                            ? '<span class="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">DESCONSIDERADO</span>'
+                            : '<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">ATIVO</span>';
+
                         return `
-                        <div class="p-3 rounded-xl bg-white border border-amber-200/90 shadow-2xs space-y-2.5">
-                            <div class="flex flex-wrap items-center justify-between gap-1.5 font-bold text-amber-950 border-b border-amber-100 pb-1.5">
-                                <span class="flex items-center gap-1.5 text-[12.5px]">
-                                    <span class="material-symbols-outlined text-[16px] text-amber-600">task_alt</span>
+                        <div class="p-3 rounded-xl ${borderCard} shadow-2xs space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-1.5 font-bold text-amber-950 border-b ${isDesconsiderado ? 'border-rose-100' : 'border-amber-100'} pb-1.5">
+                                <span class="flex items-center gap-1.5 text-[12.5px] ${isDesconsiderado ? 'line-through text-slate-500' : ''}">
+                                    <span class="material-symbols-outlined text-[16px] ${isDesconsiderado ? 'text-rose-500' : 'text-amber-600'}">${isDesconsiderado ? 'block' : 'task_alt'}</span>
                                     <span>Fechamento #${numFech}</span>
                                 </span>
-                                <span class="text-[10.5px] font-medium text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                                    📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
-                                </span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10.5px] font-medium text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                                        📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
+                                    </span>
+                                    ${badgeStatus}
+                                    ${(isAdminUser || isManutentorUser) && f.id ? `
+                                        ${isDesconsiderado ? `
+                                        <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar este fechamento para cálculos de medição">
+                                            <span class="material-symbols-outlined text-[12px]">undo</span>
+                                            <span>Reconsiderar</span>
+                                        </button>
+                                        ` : `
+                                        <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar este fechamento dos cálculos de medição">
+                                            <span class="material-symbols-outlined text-[12px]">block</span>
+                                            <span>Desconsiderar</span>
+                                        </button>
+                                        `}
+                                    ` : ''}
+                                </div>
                             </div>
+
+                            ${isDesconsiderado ? `
+                            <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[10.5px] text-rose-900 flex items-start gap-1.5 font-medium leading-relaxed">
+                                <span class="material-symbols-outlined text-[15px] text-rose-600 shrink-0 mt-0.5">info</span>
+                                <div>
+                                    <span>Este fechamento foi <b>desconsiderado</b> e seus materiais não serão computados na medição.</span>
+                                    ${f.motivo_desconsideracao ? `<br><span class="text-rose-800 text-[10px] italic">Motivo: "${f.motivo_desconsideracao}" ${f.desconsiderado_por ? `(por ${f.desconsiderado_por})` : ''}</span>` : ''}
+                                </div>
+                            </div>
+                            ` : ''}
 
                             ${(f.relatorioTecnico || f.relatorio_tecnico || f.observacoes) ? `
                             <div class="text-[11px] text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200/60 italic leading-relaxed">
@@ -3379,12 +3418,17 @@ window.reabrirOSAdmin = function(osId) {
             iconBgClass: 'bg-blue-100 text-blue-700',
             confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
             confirmText: 'Reabrir OS',
+            showJustification: true,
+            requireJustification: true,
             onConfirm: doReopen
         });
     } else {
-        if (confirm(`Deseja reabrir a OS #${protocol}?`)) {
-            doReopen();
+        let just = null;
+        while (just === null || just.trim() === '') {
+            just = prompt(`Justificativa obrigatória para reabrir a OS #${protocol}:`);
+            if (just === null) return;
         }
+        doReopen(just.trim());
     }
 };
 
@@ -3738,6 +3782,139 @@ window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsi
                 motivo = prompt('Informe a justificativa (Obrigatória):');
                 if (!motivo || !motivo.trim()) {
                     alert('A justificativa é obrigatória para desconsiderar a sessão.');
+                    return;
+                }
+            }
+            executarAcao(motivo);
+        }
+    }
+};
+
+// Global helper para desconsiderar ou reconsiderar um fechamento de OS (tabela fechamentos_os)
+window.alternarDesconsiderarFechamento = async function(fechamentoId, osId, numeroFechamento, desconsiderar) {
+    const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
+    let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+    const protocol = item ? (item.protocolo || osId) : osId;
+
+    const tituloConfirma = desconsiderar ? 'Desconsiderar Fechamento' : 'Reconsiderar Fechamento';
+    const msgConfirma = desconsiderar 
+        ? `Deseja realmente desconsiderar o <strong class="text-on-surface font-bold">Fechamento #${numeroFechamento}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Os materiais deste fechamento deixarão de ser computados na medição contratual.`
+        : `Deseja restabelecer o <strong class="text-on-surface font-bold">Fechamento #${numeroFechamento}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ele voltará a ser computado normalmente na medição.`;
+
+    const executarAcao = async (motivoJustificativa = '') => {
+        try {
+            const service = new window.ChamadosService();
+            const path = (window.location.pathname || '').toLowerCase();
+            const origemTela = path.includes('auditoria') ? 'Auditoria' : 'Painel';
+
+            await service.alternarDesconsiderarFechamento(fechamentoId, protocol, numeroFechamento, desconsiderar, motivoJustificativa, origemTela);
+
+            // Recarrega a OS atualizada diretamente via fetchById
+            const repo = new window.ChamadosRepository();
+            const freshRow = await repo.fetchById(protocol);
+
+            let updatedItem = null;
+            if (freshRow) {
+                const ModelClass = window.ChamadoModel;
+                updatedItem = (freshRow instanceof ModelClass) 
+                    ? freshRow 
+                    : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(freshRow) : (ModelClass ? new ModelClass(freshRow) : freshRow));
+                updatedItem._isEnriched = true;
+            }
+
+            // Atualiza o item em todas as referências e listas em memória
+            const updateInMemory = (targetList) => {
+                if (!Array.isArray(targetList)) return;
+                const idx = targetList.findIndex(o => o && (String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(protocol)));
+                if (idx >= 0) {
+                    if (updatedItem) {
+                        targetList[idx] = updatedItem;
+                    } else {
+                        const obj = targetList[idx];
+                        if (obj && obj.fechamentos_os && Array.isArray(obj.fechamentos_os)) {
+                            obj.fechamentos_os.forEach(f => {
+                                if (String(f.id) === String(fechamentoId)) {
+                                    f.desconsiderado = Boolean(desconsiderar);
+                                    f.desconsiderado_em = desconsiderar ? new Date().toISOString() : null;
+                                    f.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
+                                }
+                            });
+                        }
+                    }
+                }
+            };
+
+            [
+                window.chamadosListCache,
+                window.dadosOSsAbertasCache,
+                window.painelController?.chamadosList,
+                window.auditoriaController?.chamadosList,
+                window.auditoriaController?.concludedList,
+                window.auditoriaController?.pracaServicesList
+            ].forEach(l => updateInMemory(l));
+
+            const finalItem = updatedItem || item;
+
+            // Se o controller de medição estiver instanciado, recalcula imediatamente
+            if (window.medicaoController && typeof window.medicaoController.processarECalcular === 'function') {
+                try {
+                    window.medicaoController.processarECalcular();
+                    if (typeof window.medicaoController.renderMedicaoMensal === 'function') {
+                        window.medicaoController.renderMedicaoMensal();
+                    }
+                } catch(e) {
+                    console.warn('⚠️ Falha ao atualizar Medição após alterar fechamento:', e);
+                }
+            }
+
+            // Re-renderiza o modal de detalhes ativo instantaneamente
+            const container = document.getElementById('detalheModalConteudo');
+            if (container && finalItem) {
+                const isAuditoria = path.includes('auditoria') || !!document.getElementById('tabelaChamadosAuditoria');
+                const ctrl = (isAuditoria && window.auditoriaController) ? window.auditoriaController : (window.painelController || window.auditoriaController);
+                if (ctrl && typeof ctrl.buildDetalhesOSModalHtml === 'function') {
+                    container.innerHTML = ctrl.buildDetalhesOSModalHtml(finalItem);
+                }
+            }
+
+            // Notificação visual de sucesso
+            const msgSucesso = `Fechamento #${numeroFechamento} ${desconsiderar ? 'desconsiderado' : 'reconsiderado'} com sucesso!`;
+            if (window.painelController && typeof window.painelController.showSuccessToast === 'function') {
+                window.painelController.showSuccessToast(msgSucesso);
+            } else if (window.auditoriaController && typeof window.auditoriaController.showSuccessToast === 'function') {
+                window.auditoriaController.showSuccessToast(msgSucesso);
+            } else {
+                const toast = document.createElement('div');
+                toast.className = 'fixed bottom-5 right-5 z-[99999] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 border border-slate-700 animate-bounce';
+                toast.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span><span>${msgSucesso}</span>`;
+                document.body.appendChild(toast);
+                setTimeout(() => toast.remove(), 3000);
+            }
+        } catch (err) {
+            console.error('❌ Erro ao alternar status do fechamento:', err);
+            alert('Erro ao atualizar fechamento: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: tituloConfirma,
+            message: msgConfirma,
+            icon: desconsiderar ? 'block' : 'undo',
+            iconBgClass: desconsiderar ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+            confirmBtnClass: desconsiderar ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white',
+            confirmText: desconsiderar ? 'Sim, Desconsiderar' : 'Sim, Reconsiderar',
+            showJustification: Boolean(desconsiderar),
+            requireJustification: Boolean(desconsiderar), // Justificativa obrigatória ao desconsiderar
+            onConfirm: (justification) => executarAcao(justification)
+        });
+    } else {
+        if (confirm(`${tituloConfirma}\n\n${desconsiderar ? `Deseja desconsiderar o Fechamento #${numeroFechamento}?` : `Deseja reconsiderar o Fechamento #${numeroFechamento}?`}`)) {
+            let motivo = '';
+            if (desconsiderar) {
+                motivo = prompt('Informe a justificativa (Obrigatória):');
+                if (!motivo || !motivo.trim()) {
+                    alert('A justificativa é obrigatória para desconsiderar o fechamento.');
                     return;
                 }
             }

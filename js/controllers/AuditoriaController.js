@@ -1488,6 +1488,7 @@ class AuditoriaController {
         const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
         const isConcluida = (item.normalizedStatus === 'concluida');
         const isPendente = (item.normalizedStatus === 'pendente');
+        const isAuditoriaConcluida = Boolean(item.isAuditoriaConcluida || String(item.statusAuditoria || '').toLowerCase().includes('conclu'));
 
         const getCleanOp = (v) => {
             if (!v) return '';
@@ -1588,6 +1589,18 @@ class AuditoriaController {
                         ` : ''}
 
                         ${isAdminUser ? `
+                            ${isAuditoriaConcluida ? `
+                            <button type="button" onclick="window.desfazerAuditoriaModal('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desfazer conclusão e reabrir auditoria">
+                                <span class="material-symbols-outlined text-[16px]">undo</span>
+                                <span>Desfazer Auditoria</span>
+                            </button>
+                            ` : `
+                            <button type="button" onclick="window.confirmarAuditoriaModal('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Confirmar conclusão da auditoria desta OS">
+                                <span class="material-symbols-outlined text-[16px]">verified</span>
+                                <span>Confirmar Auditoria</span>
+                            </button>
+                            `}
+
                             ${isPendente ? `
                             <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">check</span>
@@ -1811,6 +1824,13 @@ class AuditoriaController {
                     <span class="material-symbols-outlined text-[16px]">location_on</span>
                     <span>Pontos de Manutenção (${(item.pontosDetalhados || []).length})</span>
                 </span>
+                <button type="button" 
+                        onclick="window.abrirMapaPontosManutencao ? window.abrirMapaPontosManutencao('${item.protocolo || item.id}', event) : window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" 
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-secondary/10 hover:bg-secondary/20 text-secondary border border-secondary/30 transition-all cursor-pointer active:scale-95 shadow-2xs" 
+                        title="Ver todos os pontos de manutenção e comparar distâncias no mapa Mapbox">
+                    <span class="material-symbols-outlined text-[14px]">map</span>
+                    <span>Ver no Mapa</span>
+                </button>
             </div>
 
             <!-- Lista Estruturada dos Pontos -->
@@ -2122,21 +2142,53 @@ class AuditoriaController {
                     ${fechList.map((f, fIdx) => {
                         const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || 'Data não informada');
                         const numFech = f.numero || f.numero_fechamento || (fIdx + 1);
+                        const isDesconsiderado = Boolean(f.desconsiderado);
 
                         const matsParsed = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : [];
                         const fotosParsed = window.ChamadoModel ? window.ChamadoModel.parseClosurePhotos(f) : [];
 
+                        const borderCard = isDesconsiderado ? 'border-dashed border-rose-300 bg-rose-50/20 opacity-85' : 'border-amber-200/90 bg-white';
+                        const badgeStatus = isDesconsiderado
+                            ? '<span class="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">DESCONSIDERADO</span>'
+                            : '<span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200">ATIVO</span>';
+
                         return `
-                        <div class="p-3 rounded-xl bg-white border border-amber-200/90 shadow-2xs space-y-2.5">
-                            <div class="flex flex-wrap items-center justify-between gap-1.5 font-bold text-amber-950 border-b border-amber-100 pb-1.5">
-                                <span class="flex items-center gap-1.5 text-[12.5px]">
-                                    <span class="material-symbols-outlined text-[16px] text-amber-600">task_alt</span>
+                        <div class="p-3 rounded-xl ${borderCard} shadow-2xs space-y-2.5">
+                            <div class="flex flex-wrap items-center justify-between gap-1.5 font-bold text-amber-950 border-b ${isDesconsiderado ? 'border-rose-100' : 'border-amber-100'} pb-1.5">
+                                <span class="flex items-center gap-1.5 text-[12.5px] ${isDesconsiderado ? 'line-through text-slate-500' : ''}">
+                                    <span class="material-symbols-outlined text-[16px] ${isDesconsiderado ? 'text-rose-500' : 'text-amber-600'}">${isDesconsiderado ? 'block' : 'task_alt'}</span>
                                     <span>Fechamento #${numFech}</span>
                                 </span>
-                                <span class="text-[10.5px] font-medium text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
-                                    📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
-                                </span>
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span class="text-[10.5px] font-medium text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                                        📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
+                                    </span>
+                                    ${badgeStatus}
+                                    ${(isAdminUser || isManutentorUser) && f.id ? `
+                                        ${isDesconsiderado ? `
+                                        <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar este fechamento para cálculos de medição">
+                                            <span class="material-symbols-outlined text-[12px]">undo</span>
+                                            <span>Reconsiderar</span>
+                                        </button>
+                                        ` : `
+                                        <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar este fechamento dos cálculos de medição">
+                                            <span class="material-symbols-outlined text-[12px]">block</span>
+                                            <span>Desconsiderar</span>
+                                        </button>
+                                        `}
+                                    ` : ''}
+                                </div>
                             </div>
+
+                            ${isDesconsiderado ? `
+                            <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[10.5px] text-rose-900 flex items-start gap-1.5 font-medium leading-relaxed">
+                                <span class="material-symbols-outlined text-[15px] text-rose-600 shrink-0 mt-0.5">info</span>
+                                <div>
+                                    <span>Este fechamento foi <b>desconsiderado</b> e seus materiais não serão computados na medição.</span>
+                                    ${f.motivo_desconsideracao ? `<br><span class="text-rose-800 text-[10px] italic">Motivo: "${f.motivo_desconsideracao}" ${f.desconsiderado_por ? `(por ${f.desconsiderado_por})` : ''}</span>` : ''}
+                                </div>
+                            </div>
+                            ` : ''}
 
                             ${(f.relatorioTecnico || f.relatorio_tecnico || f.observacoes) ? `
                             <div class="text-[11px] text-slate-700 bg-slate-50 p-2 rounded-lg border border-slate-200/60 italic leading-relaxed">
@@ -3335,6 +3387,166 @@ window.abrirDetalhesOSModal = function(id) {
     }
 };
 
+window.confirmarAuditoriaModal = async function(idOrProtocol) {
+    if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
+        alert('Ação não permitida para o perfil Manutentor.');
+        return;
+    }
+    if (!idOrProtocol || !window.auditoriaController) return;
+
+    try {
+        await window.auditoriaController.concluirAuditoria(idOrProtocol);
+
+        // Atualiza badge de auditoria no topo do modal se estiver aberto
+        const elAuditBadge = document.getElementById('detalheModalAuditBadge');
+        if (elAuditBadge) {
+            elAuditBadge.innerText = 'Auditoria Concluída';
+            elAuditBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300';
+        }
+
+        // Re-renderiza o corpo do modal com o novo estado in-memory (sem fetch adicional)
+        const cleanVal = String(idOrProtocol).replace(/^#/, '').trim().toUpperCase();
+        const list = window.auditoriaController.chamadosList || window.chamadosListCache || [];
+        const item = list.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanVal || cid === cleanVal;
+        });
+
+        if (item) {
+            const container = document.getElementById('detalheModalConteudo');
+            if (container) {
+                container.innerHTML = window.auditoriaController.buildDetalhesOSModalHtml(item);
+                window.auditoriaController.carregarLogsNoModal(item.protocolo);
+                window.auditoriaController.setupGlobalAuditTooltip();
+            }
+        }
+
+        // Sincroniza a linha correspondente na tabela da página se presente
+        const rowSelector = `tr[data-id="${item?.id || cleanVal}"], tr[data-id="${item?.protocolo || cleanVal}"], tr[data-protocolo="${item?.protocolo || cleanVal}"]`;
+        const row = document.querySelector(rowSelector) || Array.from(document.querySelectorAll('#os-table tbody tr')).find(r => {
+            const rId = String(r.getAttribute('data-id') || '').replace(/^#/, '').trim().toUpperCase();
+            return rId === cleanVal;
+        });
+
+        if (row) {
+            row.classList.add('opacity-70', 'transition-opacity', 'duration-300');
+            row.setAttribute('data-completed', 'true');
+            const actionCell = row.cells[row.cells.length - 1];
+            const actionContainer = actionCell ? (actionCell.querySelector('.action-buttons') || actionCell) : null;
+            if (typeof window.renderDesfazerBtn === 'function') {
+                window.renderDesfazerBtn(actionContainer);
+            }
+        }
+
+        // Re-aplica filtros combinados da tabela (ex: se o filtro ativo for apenas "Pendentes", a linha será ocultada imediatamente)
+        if (typeof window.applyCombinedFilters === 'function') {
+            window.applyCombinedFilters();
+        }
+        if (typeof window.updateAuditActionButtons === 'function') {
+            window.updateAuditActionButtons();
+        }
+
+        if (typeof window.showToast === 'function') {
+            window.showToast('Auditoria confirmada com sucesso!', 'success');
+        }
+    } catch (err) {
+        console.error('❌ [Auditoria] Erro ao confirmar auditoria:', err);
+        alert('Erro ao confirmar auditoria: ' + (err.message || err));
+    }
+};
+
+window.desfazerAuditoriaModal = function(idOrProtocol) {
+    if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
+        alert('Ação não permitida para o perfil Manutentor.');
+        return;
+    }
+    if (!idOrProtocol || !window.auditoriaController) return;
+
+    const cleanVal = String(idOrProtocol).replace(/^#/, '').trim().toUpperCase();
+
+    const executar = async () => {
+        try {
+            await window.auditoriaController.desfazerAuditoria(idOrProtocol);
+
+            // Atualiza badge de auditoria no topo do modal
+            const elAuditBadge = document.getElementById('detalheModalAuditBadge');
+            if (elAuditBadge) {
+                elAuditBadge.innerText = 'Auditoria Pendente';
+                elAuditBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300';
+            }
+
+            // Re-renderiza o corpo do modal com o novo estado in-memory (sem fetch adicional)
+            const list = window.auditoriaController.chamadosList || window.chamadosListCache || [];
+            const item = list.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanVal || cid === cleanVal;
+            });
+
+            if (item) {
+                const container = document.getElementById('detalheModalConteudo');
+                if (container) {
+                    container.innerHTML = window.auditoriaController.buildDetalhesOSModalHtml(item);
+                    window.auditoriaController.carregarLogsNoModal(item.protocolo);
+                    window.auditoriaController.setupGlobalAuditTooltip();
+                }
+            }
+
+            // Sincroniza a linha correspondente na tabela da página se presente
+            const rowSelector = `tr[data-id="${item?.id || cleanVal}"], tr[data-id="${item?.protocolo || cleanVal}"], tr[data-protocolo="${item?.protocolo || cleanVal}"]`;
+            const row = document.querySelector(rowSelector) || Array.from(document.querySelectorAll('#os-table tbody tr')).find(r => {
+                const rId = String(r.getAttribute('data-id') || '').replace(/^#/, '').trim().toUpperCase();
+                return rId === cleanVal;
+            });
+
+            if (row) {
+                row.classList.remove('opacity-70');
+                row.setAttribute('data-completed', 'false');
+                const actionCell = row.cells[row.cells.length - 1];
+                const actionContainer = actionCell ? (actionCell.querySelector('.action-buttons') || actionCell) : null;
+                if (typeof window.renderConcluirBtn === 'function') {
+                    window.renderConcluirBtn(actionContainer);
+                }
+            }
+
+            // Re-aplica filtros combinados da tabela
+            if (typeof window.applyCombinedFilters === 'function') {
+                window.applyCombinedFilters();
+            }
+            if (typeof window.updateAuditActionButtons === 'function') {
+                window.updateAuditActionButtons();
+            }
+
+            if (typeof window.showToast === 'function') {
+                window.showToast('Conclusão da auditoria desfeita.', 'info');
+            }
+        } catch (err) {
+            console.error('❌ [Auditoria] Erro ao desfazer auditoria:', err);
+            alert('Erro ao desfazer auditoria: ' + (err.message || err));
+        }
+    };
+
+    if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal({
+            title: 'Desfazer Conclusão',
+            message: 'Tem certeza que deseja desfazer a conclusão desta auditoria e reabrir os apontamentos?',
+            icon: 'undo',
+            iconBgClass: 'bg-amber-500/10 text-amber-600',
+            confirmBtnClass: 'bg-amber-600 text-white hover:bg-amber-700',
+            confirmText: 'Sim, Desfazer',
+            onConfirm: () => {
+                if (typeof window.closeConfirmModal === 'function') window.closeConfirmModal();
+                executar();
+            }
+        });
+    } else {
+        if (confirm('Tem certeza que deseja desfazer a conclusão desta auditoria e reabrir os apontamentos?')) {
+            executar();
+        }
+    }
+};
+
 // Se PainelController.js não tiver sido carregado na tela de Auditoria, garante alternarDesconsiderarSessao disponível
 if (typeof window.alternarDesconsiderarSessao !== 'function') {
     window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsiderar) {
@@ -3432,6 +3644,308 @@ if (typeof window.alternarDesconsiderarSessao !== 'function') {
                     }
                 }
                 executarAcao(motivo);
+            }
+        }
+    };
+}
+
+if (typeof window.alternarDesconsiderarFechamento !== 'function') {
+    window.alternarDesconsiderarFechamento = async function(fechamentoId, osId, numeroFechamento, desconsiderar) {
+        const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
+        let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+        const protocol = item ? (item.protocolo || osId) : osId;
+
+        const tituloConfirma = desconsiderar ? 'Desconsiderar Fechamento' : 'Reconsiderar Fechamento';
+        const msgConfirma = desconsiderar 
+            ? `Deseja realmente desconsiderar o <strong class="text-on-surface font-bold">Fechamento #${numeroFechamento}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Os materiais deste fechamento deixarão de ser computados na medição contratual.`
+            : `Deseja restabelecer o <strong class="text-on-surface font-bold">Fechamento #${numeroFechamento}</strong> da OS <strong class="font-mono font-bold">#${protocol}</strong>?<br>Ele voltará a ser computado normalmente na medição.`;
+
+        const executarAcao = async (motivoJustificativa = '') => {
+            try {
+                const service = new window.ChamadosService();
+                await service.alternarDesconsiderarFechamento(fechamentoId, protocol, numeroFechamento, desconsiderar, motivoJustificativa, 'Auditoria');
+
+                const repo = new window.ChamadosRepository();
+                const freshRow = await repo.fetchById(protocol);
+
+                let updatedItem = null;
+                if (freshRow) {
+                    const ModelClass = window.ChamadoModel;
+                    updatedItem = (freshRow instanceof ModelClass) 
+                        ? freshRow 
+                        : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(freshRow) : (ModelClass ? new ModelClass(freshRow) : freshRow));
+                    updatedItem._isEnriched = true;
+                }
+
+                const updateInMemory = (targetList) => {
+                    if (!Array.isArray(targetList)) return;
+                    const idx = targetList.findIndex(o => o && (String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(protocol)));
+                    if (idx >= 0) {
+                        if (updatedItem) {
+                            targetList[idx] = updatedItem;
+                        } else {
+                            const obj = targetList[idx];
+                            if (obj && obj.fechamentos_os && Array.isArray(obj.fechamentos_os)) {
+                                obj.fechamentos_os.forEach(f => {
+                                    if (String(f.id) === String(fechamentoId)) {
+                                        f.desconsiderado = Boolean(desconsiderar);
+                                        f.desconsiderado_em = desconsiderar ? new Date().toISOString() : null;
+                                        f.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
+                                    }
+                                });
+                            }
+                        }
+                    }
+                };
+
+                [
+                    window.chamadosListCache,
+                    window.dadosOSsAbertasCache,
+                    window.painelController?.chamadosList,
+                    window.auditoriaController?.chamadosList,
+                    window.auditoriaController?.concludedList,
+                    window.auditoriaController?.pracaServicesList
+                ].forEach(l => updateInMemory(l));
+
+                const finalItem = updatedItem || item;
+
+                if (window.medicaoController && typeof window.medicaoController.processarECalcular === 'function') {
+                    try {
+                        window.medicaoController.processarECalcular();
+                        if (typeof window.medicaoController.renderMedicaoMensal === 'function') {
+                            window.medicaoController.renderMedicaoMensal();
+                        }
+                    } catch(e) {}
+                }
+
+                const container = document.getElementById('detalheModalConteudo');
+                if (container && finalItem) {
+                    const ctrl = window.auditoriaController || window.painelController;
+                    if (ctrl && typeof ctrl.buildDetalhesOSModalHtml === 'function') {
+                        container.innerHTML = ctrl.buildDetalhesOSModalHtml(finalItem);
+                    }
+                }
+
+                const msgSucesso = `Fechamento #${numeroFechamento} ${desconsiderar ? 'desconsiderado' : 'reconsiderado'} com sucesso!`;
+                if (window.auditoriaController && typeof window.auditoriaController.showSuccessToast === 'function') {
+                    window.auditoriaController.showSuccessToast(msgSucesso);
+                } else if (window.painelController && typeof window.painelController.showSuccessToast === 'function') {
+                    window.painelController.showSuccessToast(msgSucesso);
+                } else {
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-5 right-5 z-[99999] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 border border-slate-700 animate-bounce';
+                    toast.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span><span>${msgSucesso}</span>`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3000);
+                }
+            } catch (err) {
+                console.error('❌ Erro ao alternar status do fechamento em Auditoria:', err);
+                alert('Erro ao atualizar fechamento: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: tituloConfirma,
+                message: msgConfirma,
+                icon: desconsiderar ? 'block' : 'undo',
+                iconBgClass: desconsiderar ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700',
+                confirmBtnClass: desconsiderar ? 'bg-rose-600 hover:bg-rose-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white',
+                confirmText: desconsiderar ? 'Sim, Desconsiderar' : 'Sim, Reconsiderar',
+                showJustification: Boolean(desconsiderar),
+                requireJustification: Boolean(desconsiderar),
+                onConfirm: (justification) => executarAcao(justification)
+            });
+        } else {
+            if (confirm(`${tituloConfirma}\n\n${desconsiderar ? `Deseja desconsiderar o Fechamento #${numeroFechamento}?` : `Deseja reconsiderar o Fechamento #${numeroFechamento}?`}`)) {
+                let motivo = '';
+                if (desconsiderar) {
+                    motivo = prompt('Informe a justificativa (Obrigatória):');
+                    if (!motivo || !motivo.trim()) {
+                        alert('A justificativa é obrigatória para desconsiderar o fechamento.');
+                        return;
+                    }
+                }
+                executarAcao(motivo);
+            }
+        }
+    };
+}
+
+// Helpers globais para ações administrativas (Reabrir, Alterar Prioridade, Rejeitar, Cancelar)
+if (typeof window.reabrirOSAdmin !== 'function') {
+    window.reabrirOSAdmin = function(osId) {
+        const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
+        const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+        const protocol = item ? item.protocolo : osId;
+        const isCancelada = item && item.normalizedStatus === 'cancelada';
+        const isConcluida = item && item.normalizedStatus === 'concluida';
+        const isRejeitada = item && item.normalizedStatus === 'rejeitada';
+
+        let actionTitle = 'Reabrir Ordem de Serviço';
+        if (isCancelada) actionTitle = 'Reabrir OS Cancelada';
+        else if (isConcluida) actionTitle = 'Reabrir OS Concluída';
+        else if (isRejeitada) actionTitle = 'Reabrir OS Rejeitada';
+
+        const doReopen = async (justification) => {
+            try {
+                if (item) {
+                    item.status = 'Aberta';
+                    item.rawStatus = 'Aberta';
+                    item.normalizedStatus = 'aberto';
+                    if (item._originalModel) {
+                        item._originalModel.rawStatus = 'Aberta';
+                        item._originalModel.normalizedStatus = 'aberto';
+                    }
+                }
+                const repo = new window.ChamadosRepository();
+                await repo.updateStatus(protocol || osId, 'Aberta', justification);
+                if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+                
+                if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                    await window.auditoriaController.loadData();
+                }
+                if (window.painelController && typeof window.painelController.loadData === 'function') {
+                    await window.painelController.loadData();
+                }
+                if (typeof window.carregarMapaOSsAbertas === 'function') {
+                    await window.carregarMapaOSsAbertas(true);
+                }
+                if (typeof window.carregarDadosMapaOSs === 'function') {
+                    await window.carregarDadosMapaOSs();
+                }
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            } catch(err) {
+                alert('Erro ao reabrir a Ordem de Serviço: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: actionTitle,
+                message: `Deseja realmente reabrir a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Seu status voltará para <strong class="text-emerald-700 font-bold">Em aberto</strong>.`,
+                icon: 'undo',
+                iconBgClass: 'bg-blue-100 text-blue-700',
+                confirmBtnClass: 'bg-blue-600 hover:bg-blue-700 text-white',
+                confirmText: 'Reabrir OS',
+                showJustification: true,
+                requireJustification: true,
+                onConfirm: doReopen
+            });
+        } else {
+            let just = null;
+            while (just === null || just.trim() === '') {
+                just = prompt(`Justificativa obrigatória para reabrir a OS #${protocol}:`);
+                if (just === null) return;
+            }
+            doReopen(just.trim());
+        }
+    };
+}
+
+if (typeof window.alterarPrioridadeOS !== 'function') {
+    window.alterarPrioridadeOS = function(osId, targetPriority = 'Urgente') {
+        const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
+        const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+        const protocol = item ? item.protocolo : osId;
+        const isTargetUrgente = (targetPriority === 'Urgente');
+
+        const doPrioritize = async () => {
+            try {
+                if (item) {
+                    item.prioridade = targetPriority;
+                    if (item._originalModel) item._originalModel.prioridade = targetPriority;
+                }
+                if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+                
+                const repo = new window.ChamadosRepository();
+                await repo.updatePriority(protocol || osId, targetPriority);
+                
+                if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                    await window.auditoriaController.loadData();
+                }
+                if (window.painelController && typeof window.painelController.loadData === 'function') {
+                    await window.painelController.loadData();
+                }
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            } catch(err) {
+                alert('Erro ao atualizar prioridade: ' + (err.message || err));
+            }
+        };
+
+        const title = isTargetUrgente ? 'Priorizar para Urgente' : 'Retornar para Normal';
+        const message = isTargetUrgente
+            ? `Deseja alterar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-amber-600 font-bold">URGENTE</strong>?`
+            : `Deseja retornar a prioridade da Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong> para <strong class="text-emerald-700 font-bold">NORMAL</strong>?`;
+        const icon = isTargetUrgente ? 'warning' : 'restart_alt';
+        const iconBgClass = isTargetUrgente ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+        const confirmBtnClass = isTargetUrgente ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white';
+        const confirmText = isTargetUrgente ? 'Definir como Urgente' : 'Retornar para Normal';
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title,
+                message,
+                icon,
+                iconBgClass,
+                confirmBtnClass,
+                confirmText,
+                onConfirm: doPrioritize,
+                showJustification: false
+            });
+        } else {
+            if (confirm(`Deseja alterar a prioridade da OS #${protocol} para ${targetPriority.toUpperCase()}?`)) {
+                doPrioritize();
+            }
+        }
+    };
+}
+
+if (typeof window.cancelarOSAdmin !== 'function') {
+    window.cancelarOSAdmin = function(osId) {
+        const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
+        const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
+        const protocol = item ? item.protocolo : osId;
+
+        const doCancel = async (justification) => {
+            try {
+                const repo = new window.ChamadosRepository();
+                await repo.updateStatus(protocol || osId, 'Cancelada', justification);
+                if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
+                
+                if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+                    await window.auditoriaController.loadData();
+                }
+                if (window.painelController && typeof window.painelController.loadData === 'function') {
+                    await window.painelController.loadData(true);
+                }
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
+            } catch(err) {
+                alert('Erro ao cancelar a Ordem de Serviço: ' + (err.message || err));
+            }
+        };
+
+        if (typeof window.showConfirmModal === 'function') {
+            window.showConfirmModal({
+                title: 'Cancelar Ordem de Serviço',
+                message: `Deseja realmente cancelar a Ordem de Serviço <strong class="text-on-surface font-bold">#${protocol}</strong>?<br>Esta ação alterará o status da OS para <strong class="text-rose-700 font-bold">Cancelada</strong>.`,
+                icon: 'block',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 hover:bg-rose-700 text-white',
+                confirmText: 'Cancelar OS',
+                requireJustification: true,
+                onConfirm: doCancel
+            });
+        } else {
+            let just = prompt(`Justificativa obrigatória para cancelar a OS #${protocol}:`);
+            if (just && just.trim()) {
+                doCancel(just.trim());
             }
         }
     };

@@ -934,7 +934,7 @@
 </div>
 
 <!-- Modal de Visualização do Ponto no Mapbox -->
-<div id="modal-mapa-ponto" class="fixed inset-0 z-50 hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+<div id="modal-mapa-ponto" onclick="if (event.target === this) window.closeMapaPontoModal()" class="fixed inset-0 z-[65000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
     <div id="modal-mapa-ponto-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] sm:h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
         <!-- Header do Modal (Sólido, não transparente) -->
         <div class="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex-shrink-0 gap-2">

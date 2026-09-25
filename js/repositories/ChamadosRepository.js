@@ -154,7 +154,7 @@ class ChamadosRepository {
                 chunks.push(protocolosVisiveis.slice(i, i + CHUNK_SIZE));
             }
 
-            const COLUNAS_FECHAMENTO = 'id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, created_at';
+            const COLUNAS_FECHAMENTO = 'id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, created_at, desconsiderado, desconsiderado_em, desconsiderado_por, motivo_desconsideracao';
 
             const promessas = chunks.map(chunk =>
                 client
@@ -457,7 +457,7 @@ class ChamadosRepository {
                 if (protAlvo) {
                     const resProt = await client
                         .from('fechamentos_os')
-                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at, desconsiderado, desconsiderado_em, desconsiderado_por, motivo_desconsideracao')
                         .ilike('protocolo', protAlvo)
                         .order('numero_fechamento', { ascending: true });
                     if (!resProt.error && resProt.data && resProt.data.length > 0) {
@@ -469,7 +469,7 @@ class ChamadosRepository {
                 if (!fechRows && row.id && !isNaN(Number(row.id))) {
                     const resId = await client
                         .from('fechamentos_os')
-                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at')
+                        .select('id, protocolo, numero_fechamento, data_fechamento, operador, materiais, relatorio_tecnico, ponto_referencia, os_id, fotos, created_at, desconsiderado, desconsiderado_em, desconsiderado_por, motivo_desconsideracao')
                         .eq('os_id', row.id)
                         .order('numero_fechamento', { ascending: true });
                     if (!resId.error && resId.data && resId.data.length > 0) {
@@ -881,7 +881,7 @@ class ChamadosRepository {
                             .from(tableName)
                             .update(updatePayload)
                             .eq(field, isNumeric && field === 'id' ? parseInt(strVal, 10) : strVal)
-                            .select();
+                            .select('id, protocolo');
 
                         if (res.data && res.data.length > 0) {
                             updatedData = res.data;
@@ -893,7 +893,7 @@ class ChamadosRepository {
                                     .from(tableName)
                                     .update({ status_auditoria: newStatusAuditoria })
                                     .eq(field, isNumeric && field === 'id' ? parseInt(strVal, 10) : strVal)
-                                    .select();
+                                    .select('id, protocolo');
                                 if (fallbackRes.data && fallbackRes.data.length > 0) {
                                     updatedData = fallbackRes.data;
                                     break;
@@ -1265,6 +1265,64 @@ class ChamadosRepository {
             return { success: true, tempoTotalMinutos: novoTempoMinutos, sessoes: sessoesArr };
         } catch (err) {
             console.error('❌ [ChamadosRepository] Exceção em updateHistoricoSessoes:', err);
+            throw err;
+        }
+    }
+
+    /**
+     * Alterna a flag desconsiderado de um fechamento de OS na tabela fechamentos_os
+     * @param {string|number} fechamentoId
+     * @param {string} protocolo
+     * @param {boolean} desconsiderar
+     * @param {string} [motivo='']
+     * @param {Object} [metaLog={}]
+     */
+    async alternarDesconsiderarFechamento(fechamentoId, protocolo, desconsiderar, motivo = '', metaLog = {}) {
+        try {
+            const client = this.getClient();
+            const usuarioAtual = metaLog.usuario || localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+            const nowIso = new Date().toISOString();
+
+            const updatePayload = {
+                desconsiderado: Boolean(desconsiderar),
+                desconsiderado_em: desconsiderar ? nowIso : null,
+                desconsiderado_por: desconsiderar ? usuarioAtual : null,
+                motivo_desconsideracao: desconsiderar ? (motivo || null) : null
+            };
+
+            let res = await client
+                .from('fechamentos_os')
+                .update(updatePayload)
+                .eq('id', fechamentoId)
+                .select();
+
+            if (res.error) {
+                console.error('❌ [ChamadosRepository] Erro ao atualizar status de fechamento:', res.error);
+                throw res.error;
+            }
+
+            // Registra log de auditoria
+            if (window.LogsRepository) {
+                const numFech = metaLog.numeroFechamento || '';
+                const acaoDesc = desconsiderar
+                    ? `Fechamento ${numFech ? `#${numFech} ` : ''}da OS ${protocolo || ''} desconsiderado dos cálculos de medição`
+                    : `Fechamento ${numFech ? `#${numFech} ` : ''}da OS ${protocolo || ''} reconsiderado para cálculos de medição`;
+
+                window.LogsRepository.registrarLog({
+                    protocolo: String(protocolo || '').trim(),
+                    tabelaOrigem: 'fechamentos_os',
+                    tipoAcao: desconsiderar ? 'DESCONSIDERAR_FECHAMENTO' : 'RECONSIDERAR_FECHAMENTO',
+                    descricao: acaoDesc + (motivo ? ` (Motivo: ${motivo})` : ''),
+                    dadosAnteriores: null,
+                    dadosNovos: { fechamento_id: fechamentoId, ...updatePayload },
+                    origemTela: metaLog.origemTela || 'Painel'
+                }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de fechamento:', err));
+            }
+
+            console.log(`✅ [ChamadosRepository] Fechamento ${fechamentoId} da OS ${protocolo} atualizado com sucesso. Desconsiderado: ${desconsiderar}`);
+            return { success: true, fechamentoId, desconsiderado: Boolean(desconsiderar) };
+        } catch (err) {
+            console.error('❌ [ChamadosRepository] Exceção em alternarDesconsiderarFechamento:', err);
             throw err;
         }
     }

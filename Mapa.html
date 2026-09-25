@@ -23,7 +23,7 @@
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
-    <script src="js/services/MapService.js?v=73"></script>
+    <script src="js/services/MapService.js?v=74"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/controllers/PainelController.js?v=33"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -1330,8 +1330,19 @@
 
             let pontosProcessados = [];
 
-            // 1. Processa múltiplos pontos se c.rawPontos for um array JSON ou lista válida
-            let rawPts = c.rawPontos;
+            // 1. Determina a fonte de pontos com base no status da OS:
+            // Para OSs Abertas/Em andamento, o endereço e a coordenada corretos onde o serviço deve ser executado
+            // são sempre os da abertura (rawPontosInicial ou pontos_inicial).
+            // Apenas para OSs Concluídas/Resolvidas o ponto de reparo final deve prevalecer (se houver).
+            const isOSConcluida = (c.normalizedStatus === 'concluida' || String(c.rawStatus || c.status || '').toLowerCase().includes('conclu'));
+
+            let rawPts = null;
+            if (isOSConcluida) {
+                rawPts = c.rawPontosFinal || c.rawPontos || c.rawPontosInicial;
+            } else {
+                rawPts = c.rawPontosInicial || c.rawPontos;
+            }
+
             if (typeof rawPts === 'string') {
                 try { rawPts = JSON.parse(rawPts); } catch(e) { rawPts = null; }
             }
@@ -1342,7 +1353,9 @@
                     const endText = pObj.endereco || pObj.local || (c.addressPoints && c.addressPoints[pIdx]) || c.endereco || '';
                     const plaqText = pObj.plaqueta || pObj.plaqueta_inicial || c.plaquetaInicial || '[---]';
                     const probText = pObj.problema || pObj.problema_inicial || c.problemaInicial || 'Outro';
-                    const coordRaw = pObj.coordenada || pObj.coordenada_inicial || pObj.coordenada_reparo || (pObj.lat && pObj.lng ? `${pObj.lat}, ${pObj.lng}` : null) || (pIdx === 0 ? (c.coordenadaInicial || c.coordenadaReparo) : null);
+                    const coordRaw = isOSConcluida 
+                        ? (pObj.coordenada_reparo || pObj.coordenada || pObj.coordenada_inicial || (pObj.lat && pObj.lng ? `${pObj.lat}, ${pObj.lng}` : null) || (pIdx === 0 ? (c.coordenadaReparo || c.coordenadaInicial) : null))
+                        : (pObj.coordenada_inicial || pObj.coordenada || (pObj.lat && pObj.lng ? `${pObj.lat}, ${pObj.lng}` : null) || (pIdx === 0 ? c.coordenadaInicial : null));
 
                     let parsedPt = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordRaw) : null;
                     let lat = parsedPt ? parsedPt.lat : null;
@@ -1384,9 +1397,11 @@
                 });
             }
 
-            // 2. Se nenhum ponto foi extraído de rawPontos, usa os dados da OS principal
+            // 2. Se nenhum ponto foi extraído, usa os dados da OS principal
             if (pontosProcessados.length === 0) {
-                const coordRaw = c.coordenadaInicial || c.coordenadaReparo;
+                const coordRaw = isOSConcluida 
+                    ? (c.coordenadaReparo || c.coordenadaInicial) 
+                    : (c.coordenadaInicial || c.coordenadaReparo);
                 let parsedPt = window.ChamadoModel ? window.ChamadoModel.parseLatLng(coordRaw) : null;
                 let lat = parsedPt ? parsedPt.lat : null;
                 let lng = parsedPt ? parsedPt.lng : null;

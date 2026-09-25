@@ -4654,18 +4654,9 @@
 
                   input.classList.add('input-validado'); btn.classList.add('btn-validado'); btn.innerText = "✓ Validado";
 
-                  var urlRev = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' + pt.lngAtual + ',' + pt.latAtual + '.json?access_token=' + MAPBOX_TOKEN + '&country=br&language=pt';
-                  fetch(urlRev)
-                    .then(function(res) { return res.json(); })
-                    .then(function(data) {
-                      var endTexto = (data && data.features && data.features[0]) ? "📍 " + data.features[0].place_name : "Endereço: " + pt.latAtual + ", " + pt.lngAtual;
-                      exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, endTexto, idx);
-                      checarDuplicidadeBackend(pt.latAtual, pt.lngAtual, idx, autoSave);
-                    })
-                    .catch(function() {
-                      exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, "📍 " + pt.latAtual + ", " + pt.lngAtual, idx);
-                      checarDuplicidadeBackend(pt.latAtual, pt.lngAtual, idx, autoSave);
-                    });
+                  var endTexto = "📍 Coordenada: " + pt.latAtual + ", " + pt.lngAtual;
+                  exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, endTexto, idx);
+                  checarDuplicidadeBackend(pt.latAtual, pt.lngAtual, idx, autoSave);
               } else {
                   pt.isPlaquetaDuplicadaOrigem = true; pt.enderecoValidado = false; pt.latAtual = null; pt.lngAtual = null;
                   input.classList.add('input-validado');
@@ -4686,7 +4677,7 @@
 
                       var divOpcao = document.createElement('div');
                       divOpcao.className = 'mapa-opcao'; divOpcao.id = wrapId;
-                      divOpcao.innerHTML = '<div class="mapa-opcao-header" id="'+headerId+'">Buscando endereço...</div><div id="'+mapId+'" class="mapa-opcao-canvas"></div>';
+                      divOpcao.innerHTML = '<div class="mapa-opcao-header" id="'+headerId+'">📍 '+pLat+', '+pLng+'</div><div id="'+mapId+'" class="mapa-opcao-canvas"></div>';
                       divOpcao.onclick = function() { selecionarMapaDuplicado(pLat, pLng, wrapId, idx); };
                       listaDiv.appendChild(divOpcao);
 
@@ -4702,16 +4693,6 @@
                           .addTo(mapDup);
 
                       setTimeout(function() { mapDup.resize(); }, 150);
-
-                      var urlRevD = 'https://api.mapbox.com/geocoding/v5/mapbox.places/' + pLng + ',' + pLat + '.json?access_token=' + MAPBOX_TOKEN + '&country=br&language=pt';
-                      fetch(urlRevD)
-                        .then(function(res) { return res.json(); })
-                        .then(function(data) {
-                          document.getElementById(headerId).innerText = (data && data.features && data.features[0]) ? "📍 " + data.features[0].place_name : "📍 " + pLat + ", " + pLng;
-                        })
-                        .catch(function() {
-                          document.getElementById(headerId).innerText = "📍 " + pLat + ", " + pLng;
-                        });
                   });
                   if(autoSave) { resetarBotaoSalvar(); validarProximoAsync(idx+1); }
               }
@@ -6301,7 +6282,11 @@
 
            var latVal = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.latAtual ? Number(pontosData[0].latAtual).toFixed(6) : null);
            var lngVal = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.lngAtual ? Number(pontosData[0].lngAtual).toFixed(6) : null);
-           end = await garantirEnderecoGeocodificado(latVal, lngVal, end);
+           if (modoSel === 'plaqueta') {
+               end = "";
+           } else {
+               end = await garantirEnderecoGeocodificado(latVal, lngVal, end);
+           }
 
            var elProb = document.getElementById('tipoProblema_' + i);
            var prob = elProb ? elProb.value : "";

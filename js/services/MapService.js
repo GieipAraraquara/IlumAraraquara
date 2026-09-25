@@ -91,6 +91,8 @@ window.abrirNavegacaoExterna = function(tipo, event) {
 // Global persistent references
 window.sharedMapInstance = window.sharedMapInstance || null;
 window.sharedMapMarker = window.sharedMapMarker || null;
+window.sharedMapMarkersList = window.sharedMapMarkersList || [];
+window.sharedMapPopupsList = window.sharedMapPopupsList || [];
 window.currentMapaNavLinks = window.currentMapaNavLinks || { gmaps: '#', waze: '#' };
 
 window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
@@ -220,11 +222,18 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
         const cRep = targetItem.coordenadaReparo || targetItem.coordenada_reparo;
         const cIni = targetItem.coordenadaInicial || targetItem.coordenada_inicial || targetItem.coordenada;
         
+        const isConcluida = targetItem.normalizedStatus === 'concluida' 
+            || String(targetItem.statusBadgeLabel || targetItem.status || '').toLowerCase().includes('conclu')
+            || Boolean(targetItem.dataConclusao);
+
         let pt = null;
         if (window.ChamadoModel && typeof window.ChamadoModel.parseLatLng === 'function') {
-            pt = window.ChamadoModel.parseLatLng(cRep) || window.ChamadoModel.parseLatLng(cIni);
+            pt = isConcluida 
+                ? (window.ChamadoModel.parseLatLng(cRep) || window.ChamadoModel.parseLatLng(cIni))
+                : (window.ChamadoModel.parseLatLng(cIni) || window.ChamadoModel.parseLatLng(cRep));
         } else {
-            const str = String(cRep || cIni || '').replace(/^"|"$/g, '').trim();
+            const firstCoord = isConcluida ? (cRep || cIni) : (cIni || cRep);
+            const str = String(firstCoord || '').replace(/^"|"$/g, '').trim();
             if (str && str.includes(',')) {
                 const parts = str.split(',').map(s => parseFloat(s.trim()));
                 if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
@@ -266,6 +275,7 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     if (btnWazeInit) btnWazeInit.href = initWaze;
 
     // 3. Display Modal with Animation
+    modal.style.zIndex = '65000';
     modal.classList.remove('hidden');
     setTimeout(() => {
         modalBox.classList.remove('scale-95', 'opacity-0');
@@ -405,6 +415,19 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
 
             if (window.sharedMapMarker) {
                 window.sharedMapMarker.remove();
+                window.sharedMapMarker = null;
+            }
+            if (Array.isArray(window.sharedMapMarkersList)) {
+                window.sharedMapMarkersList.forEach(m => m && m.remove && m.remove());
+                window.sharedMapMarkersList = [];
+            }
+            if (window.sharedMapInstance) {
+                if (window.sharedMapInstance.getLayer && window.sharedMapInstance.getLayer('route-line-pontos')) {
+                    window.sharedMapInstance.removeLayer('route-line-pontos');
+                }
+                if (window.sharedMapInstance.getSource && window.sharedMapInstance.getSource('route-line-pontos')) {
+                    window.sharedMapInstance.removeSource('route-line-pontos');
+                }
             }
 
             const elMarker = document.createElement('div');
@@ -432,12 +455,437 @@ window.closeMapaPontoModal = function() {
     const modalBox = document.getElementById('modal-mapa-ponto-box');
     if (!modal || !modalBox) return;
 
+    if (window.sharedMapMarker) {
+        window.sharedMapMarker.remove();
+        window.sharedMapMarker = null;
+    }
+    if (Array.isArray(window.sharedMapMarkersList)) {
+        window.sharedMapMarkersList.forEach(m => m && m.remove && m.remove());
+        window.sharedMapMarkersList = [];
+    }
+    if (window.sharedMapInstance) {
+        if (window.sharedMapInstance.getLayer && window.sharedMapInstance.getLayer('route-line-pontos')) {
+            window.sharedMapInstance.removeLayer('route-line-pontos');
+        }
+        if (window.sharedMapInstance.getSource && window.sharedMapInstance.getSource('route-line-pontos')) {
+            window.sharedMapInstance.removeSource('route-line-pontos');
+        }
+    }
+
     modalBox.classList.remove('scale-100', 'opacity-100');
     modalBox.classList.add('scale-95', 'opacity-0');
 
     setTimeout(() => {
         modal.classList.add('hidden');
     }, 200);
+};
+
+/**
+ * Visualiza todos os Pontos de Manutenção no Mapbox (Abertura e Finalização)
+ * permitindo comparar visualmente as distâncias entre eles e conferir a sequência.
+ */
+window.abrirMapaPontosManutencao = async function(osId, event) {
+    if (event && typeof event.stopPropagation === 'function') {
+        event.stopPropagation();
+    }
+
+    // 1. Localizar o item nos controllers ou DOM
+    let item = null;
+    if (typeof osId === 'object' && osId !== null) {
+        item = osId;
+    }
+    if (!item && window.painelController && Array.isArray(window.painelController.chamadosList)) {
+        item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    }
+    if (!item && window.auditoriaController) {
+        if (Array.isArray(window.auditoriaController.concludedList)) {
+            item = window.auditoriaController.concludedList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        }
+        if (!item && Array.isArray(window.auditoriaController.chamadosList)) {
+            item = window.auditoriaController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        }
+    }
+    if (!item && window.relatorioController && Array.isArray(window.relatorioController.chamadosList)) {
+        item = window.relatorioController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    }
+    if (!item && window.medicaoController && Array.isArray(window.medicaoController.chamadosList)) {
+        item = window.medicaoController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+    }
+
+    if (!item) {
+        console.warn('⚠️ Ordem de Serviço não encontrada para os Pontos de Manutenção:', osId);
+        return;
+    }
+
+    const modal = document.getElementById('modal-mapa-ponto');
+    const modalBox = document.getElementById('modal-mapa-ponto-box');
+    if (!modal || !modalBox) {
+        console.warn('⚠️ Modal de mapa #modal-mapa-ponto não encontrado no DOM');
+        return;
+    }
+
+    // 2. Extrair a lista de pontos
+    let pontos = [];
+    if (Array.isArray(item.pontosDetalhados) && item.pontosDetalhados.length > 0) {
+        pontos = item.pontosDetalhados;
+    } else if (item.raw && typeof item.raw === 'object' && Array.isArray(item.raw.pontosDetalhados)) {
+        pontos = item.raw.pontosDetalhados;
+    } else {
+        pontos = [{
+            numero: 1,
+            enderecoInicial: item.endereco || '',
+            plaquetaInicial: item.plaquetaInicial || item.plaqueta || '',
+            coordenadaInicial: item.coordenadaInicial || item.coordenada || '',
+            problemaInicial: item.problemaInicial || item.problema || '',
+            enderecoFinal: item.enderecoReparo || item.enderecoFinal || '',
+            plaquetaFinal: item.plaquetaFinal || '',
+            coordenadaFinal: item.coordenadaReparo || item.coordenadaFinal || '',
+            problemaEncontrado: item.problemaEncontrado || '',
+            hasFinalData: Boolean(item.coordenadaReparo || item.plaquetaFinal || item.problemaEncontrado)
+        }];
+    }
+
+    // 3. Atualizar Cabeçalho do Modal
+    const protoEl = document.getElementById('modal-mapa-protocolo');
+    if (protoEl) protoEl.textContent = `Protocolo #${item.protocolo} — Pontos de Manutenção (${pontos.length})`;
+
+    const statusBadge = document.getElementById('modal-mapa-status-badge');
+    if (statusBadge) {
+        const stText = item.statusBadgeLabel || item.status || 'Em aberto';
+        statusBadge.textContent = stText;
+        let badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-blue-100 text-blue-800 border border-blue-200';
+        if (item.normalizedStatus === 'concluida' || stText.toLowerCase().includes('conclu')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200';
+        } else if (item.normalizedStatus === 'cancelada' || stText.toLowerCase().includes('cancel')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700 border border-slate-300';
+        } else if (stText.toLowerCase().includes('andamento') || stText.toLowerCase().includes('iniciad')) {
+            badgeClass = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-200';
+        }
+        statusBadge.className = badgeClass;
+    }
+
+    // 4. Preparar Lista de Marcadores com Coordenadas
+    const markersData = [];
+    const parseCoord = (coordVal) => {
+        if (!coordVal) return null;
+        if (window.ChamadoModel && typeof window.ChamadoModel.parseLatLng === 'function') {
+            return window.ChamadoModel.parseLatLng(coordVal);
+        }
+        const str = String(coordVal).replace(/^"|"$/g, '').trim();
+        if (str && str.includes(',')) {
+            const parts = str.split(',').map(s => parseFloat(s.trim()));
+            if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                return Math.abs(parts[0]) > 35
+                    ? { lat: parts[1], lng: parts[0] }
+                    : { lat: parts[0], lng: parts[1] };
+            }
+        }
+        return null;
+    };
+
+    let totalDistanciaAberturaFinalizacao = 0;
+    let paresComDistancia = 0;
+
+    pontos.forEach((p, idx) => {
+        const numPonto = p.numero || (idx + 1);
+        const hasIni = p.hasInicialData || (idx === 0 && Boolean(p.plaquetaInicial || item.plaquetaInicial || item.plaqueta));
+        const coordIni = p.coordenadaInicial || (idx === 0 ? (item.coordenadaInicial || item.coordenada) : '');
+        const ptIni = hasIni ? parseCoord(coordIni) : null;
+
+        const hasFin = p.hasFinalData || Boolean(p.coordenadaFinal || p.plaquetaFinal || (idx === 0 && item.coordenadaReparo));
+        const coordFin = p.coordenadaFinal || (idx === 0 ? (item.coordenadaReparo || item.coordenadaFinal) : '');
+        const ptFin = hasFin ? parseCoord(coordFin) : null;
+
+        let distPar = null;
+        if (ptIni && ptFin) {
+            if (window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
+                distPar = window.ChamadoModel.calcularDistanciaMetros(ptIni, ptFin);
+            } else {
+                const R = 6371000;
+                const dLat = (ptFin.lat - ptIni.lat) * Math.PI / 180;
+                const dLng = (ptFin.lng - ptIni.lng) * Math.PI / 180;
+                const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                          Math.cos(ptIni.lat * Math.PI / 180) * Math.cos(ptFin.lat * Math.PI / 180) *
+                          Math.sin(dLng / 2) * Math.sin(dLng / 2);
+                distPar = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            }
+            if (distPar !== null && !isNaN(distPar)) {
+                totalDistanciaAberturaFinalizacao += distPar;
+                paresComDistancia++;
+            }
+        }
+
+        if (ptIni) {
+            markersData.push({
+                tipo: 'abertura',
+                pontoNumero: numPonto,
+                lat: ptIni.lat,
+                lng: ptIni.lng,
+                plaqueta: p.plaquetaInicial || (idx === 0 ? (item.plaquetaInicial || item.plaqueta) : ''),
+                endereco: p.enderecoInicial || (idx === 0 ? item.endereco : ''),
+                problema: p.problemaInicial || (idx === 0 ? item.problemaInicial : ''),
+                distanciaPar: distPar
+            });
+        }
+
+        if (ptFin) {
+            markersData.push({
+                tipo: 'finalizacao',
+                pontoNumero: numPonto,
+                lat: ptFin.lat,
+                lng: ptFin.lng,
+                plaqueta: p.plaquetaFinal || (idx === 0 ? item.plaquetaFinal : ''),
+                endereco: p.enderecoFinal || '',
+                problema: p.problemaEncontrado || (idx === 0 ? item.problemaEncontrado : ''),
+                fechamento: p.fechamento || p.numeroFechamento || 1,
+                distanciaPar: distPar
+            });
+        }
+    });
+
+    // Se nenhum ponto tinha coordenada GPS direta, tenta fallback no endereço da OS
+    if (markersData.length === 0) {
+        window.abrirMapaPonto(item, 0, event);
+        return;
+    }
+
+    // 5. Configurar Card Informativo Flutuante do Modal
+    const cardTipoBadge = document.getElementById('modal-mapa-card-tipo');
+    if (cardTipoBadge) {
+        cardTipoBadge.textContent = `Comparação (${markersData.length} marcadores)`;
+        cardTipoBadge.className = 'text-[10px] px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200';
+    }
+
+    const cardPonto = document.getElementById('modal-mapa-card-ponto');
+    if (cardPonto) {
+        cardPonto.innerHTML = `
+            <div class="space-y-1">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1 font-bold text-blue-700">
+                        <span class="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block"></span> Abertura: ${markersData.filter(m => m.tipo === 'abertura').length}
+                    </span>
+                    <span class="inline-flex items-center gap-1 font-bold text-emerald-700">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span> Finalização: ${markersData.filter(m => m.tipo === 'finalizacao').length}
+                    </span>
+                </div>
+                ${paresComDistancia > 0 ? `
+                    <div class="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
+                        📏 Deslocamento Médio: <b>${(totalDistanciaAberturaFinalizacao / paresComDistancia).toFixed(1)}m</b> (Total: ${totalDistanciaAberturaFinalizacao.toFixed(1)}m)
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    }
+
+    const plaquetaRow = document.getElementById('modal-mapa-card-plaqueta-row');
+    if (plaquetaRow) plaquetaRow.classList.add('hidden');
+
+    const cardProb = document.getElementById('modal-mapa-card-problema');
+    if (cardProb) {
+        cardProb.textContent = `Clique em qualquer marcador no mapa para ver detalhes do ponto e navegar.`;
+    }
+
+    const coordsRow = document.getElementById('modal-mapa-card-coords-row');
+    if (coordsRow) coordsRow.classList.add('hidden');
+
+    // 6. Configurar Links de Navegação Preliminares (Primeiro marcador)
+    const firstM = markersData[0];
+    const linkGmaps = `https://www.google.com/maps/search/?api=1&query=${firstM.lat},${firstM.lng}`;
+    const linkWaze = `https://waze.com/ul?ll=${firstM.lat},${firstM.lng}&navigate=yes`;
+    window.currentMapaNavLinks = { gmaps: linkGmaps, waze: linkWaze };
+    const btnGmaps = document.getElementById('modal-mapa-btn-gmaps');
+    if (btnGmaps) btnGmaps.href = linkGmaps;
+    const btnWaze = document.getElementById('modal-mapa-btn-waze');
+    if (btnWaze) btnWaze.href = linkWaze;
+
+    // 7. Exibir Modal com Transição Suave
+    modal.style.zIndex = '65000';
+    modal.classList.remove('hidden');
+    setTimeout(() => {
+        modalBox.classList.remove('scale-95', 'opacity-0');
+        modalBox.classList.add('scale-100', 'opacity-100');
+    }, 10);
+
+    // 8. Inicializar ou Reutilizar o Mapa Mapbox e Plotar Todos os Marcadores
+    setTimeout(() => {
+        if (!window.mapboxgl) return;
+        mapboxgl.accessToken = MAPBOX_TOKEN_SHARED;
+        if (mapboxgl.config) mapboxgl.config.SEND_EVENTS = false;
+
+        const bounds = new mapboxgl.LngLatBounds();
+        markersData.forEach(m => bounds.extend([m.lng, m.lat]));
+
+        if (!window.sharedMapInstance) {
+            window.sharedMapInstance = new mapboxgl.Map({
+                container: 'mapa-ponto-canvas',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [firstM.lng, firstM.lat],
+                zoom: 16
+            });
+            window.sharedMapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+            window.sharedMapInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+        } else {
+            window.sharedMapInstance.resize();
+        }
+
+        // Limpar marcador individual anterior
+        if (window.sharedMapMarker) {
+            window.sharedMapMarker.remove();
+            window.sharedMapMarker = null;
+        }
+
+        // Limpar lista anterior de múltiplos marcadores
+        if (Array.isArray(window.sharedMapMarkersList)) {
+            window.sharedMapMarkersList.forEach(m => m && m.remove && m.remove());
+            window.sharedMapMarkersList = [];
+        }
+
+        // Ajustar visualização para enquadrar todos os pontos
+        if (markersData.length === 1) {
+            window.sharedMapInstance.flyTo({ center: [firstM.lng, firstM.lat], zoom: 16, essential: true });
+        } else {
+            window.sharedMapInstance.fitBounds(bounds, { padding: 80, maxZoom: 18, duration: 800 });
+        }
+
+        // Renderizar cada marcador customizado com identificador de tipo (Abertura vs Finalização) e Ponto #
+        markersData.forEach(m => {
+            const isAbertura = m.tipo === 'abertura';
+            const bgColor = isAbertura ? 'bg-blue-600' : 'bg-emerald-600';
+            const borderGlow = isAbertura ? 'border-blue-200' : 'border-emerald-200';
+            const labelTipo = isAbertura ? 'Abertura' : 'Fechamento';
+            const icon = isAbertura ? 'flag' : 'check_circle';
+
+            const el = document.createElement('div');
+            el.className = 'custom-map-pin-multi flex flex-col items-center cursor-pointer transition-transform hover:scale-115 hover:z-30';
+            el.innerHTML = `
+                <div class="relative flex flex-col items-center">
+                    <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black text-white shadow-md border border-white mb-0.5 whitespace-nowrap ${bgColor}">
+                        #${m.pontoNumero} ${isAbertura ? 'ABR' : 'FIM'}
+                    </span>
+                    <div class="w-8 h-8 rounded-full ${bgColor} text-white flex items-center justify-center shadow-lg border-2 border-white">
+                        <span class="material-symbols-outlined text-[18px]">${icon}</span>
+                    </div>
+                </div>
+            `;
+
+            // Popup descritivo com informações e botão de navegação rápida
+            const popupHtml = `
+                <div class="p-2 space-y-1.5 text-xs text-slate-800" style="min-width: 200px;">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-1">
+                        <span class="font-bold flex items-center gap-1 ${isAbertura ? 'text-blue-700' : 'text-emerald-700'}">
+                            <span class="material-symbols-outlined text-[15px]">${icon}</span>
+                            <span>Ponto #${m.pontoNumero} (${labelTipo})</span>
+                        </span>
+                        <span class="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                            ${isAbertura ? 'Abertura' : (m.fechamento ? `Fech. #${m.fechamento}` : 'Final')}
+                        </span>
+                    </div>
+                    ${m.plaqueta ? `<div><b class="text-slate-600">Plaqueta:</b> <span class="font-bold text-slate-800">${m.plaqueta}</span></div>` : ''}
+                    ${m.problema ? `<div><b class="text-slate-600">Problema:</b> <span class="font-medium text-slate-700">${m.problema}</span></div>` : ''}
+                    ${m.endereco ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-700">${m.endereco}</span></div>` : ''}
+                    <div><b class="text-slate-600">GPS:</b> <span class="font-mono text-[10.5px] text-blue-600">${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</span></div>
+                    ${m.distanciaPar !== null ? `
+                        <div class="pt-1 mt-1 border-t border-slate-100 text-[11px] font-bold ${m.distanciaPar > 50 ? 'text-amber-700' : 'text-emerald-700'}">
+                            📏 Distância Abertura ➔ Finalização: <b>${m.distanciaPar.toFixed(1)}m</b>
+                        </div>
+                    ` : ''}
+                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                        <a href="https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}" target="_blank" class="flex-1 text-center py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[10px] border border-blue-200">
+                            Google Maps
+                        </a>
+                        <a href="https://waze.com/ul?ll=${m.lat},${m.lng}&navigate=yes" target="_blank" class="flex-1 text-center py-1 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-semibold text-[10px] border border-cyan-200">
+                            Waze
+                        </a>
+                    </div>
+                </div>
+            `;
+
+            const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '280px', closeButton: true })
+                .setHTML(popupHtml);
+
+            const marker = new mapboxgl.Marker({ element: el })
+                .setLngLat([m.lng, m.lat])
+                .setPopup(popup)
+                .addTo(window.sharedMapInstance);
+
+            window.sharedMapMarkersList.push(marker);
+        });
+
+        // Adicionar linhas conectando pares Abertura -> Finalização ou sequência de pontos
+        const pairsCoords = [];
+        pontos.forEach((p, idx) => {
+            const hasIni = p.hasInicialData || (idx === 0 && Boolean(p.plaquetaInicial || item.plaquetaInicial || item.plaqueta));
+            const coordIni = p.coordenadaInicial || (idx === 0 ? (item.coordenadaInicial || item.coordenada) : '');
+            const ptIni = hasIni ? parseCoord(coordIni) : null;
+
+            const hasFin = p.hasFinalData || Boolean(p.coordenadaFinal || p.plaquetaFinal || (idx === 0 && item.coordenadaReparo));
+            const coordFin = p.coordenadaFinal || (idx === 0 ? (item.coordenadaReparo || item.coordenadaFinal) : '');
+            const ptFin = hasFin ? parseCoord(coordFin) : null;
+
+            if (ptIni && ptFin) {
+                pairsCoords.push([
+                    [ptIni.lng, ptIni.lat],
+                    [ptFin.lng, ptFin.lat]
+                ]);
+            }
+        });
+
+        const drawLines = () => {
+            if (!window.sharedMapInstance) return;
+            try {
+                if (window.sharedMapInstance.getLayer('route-line-pontos')) {
+                    window.sharedMapInstance.removeLayer('route-line-pontos');
+                }
+                if (window.sharedMapInstance.getSource('route-line-pontos')) {
+                    window.sharedMapInstance.removeSource('route-line-pontos');
+                }
+
+                if (pairsCoords.length > 0) {
+                    const linesGeoJson = {
+                        type: 'FeatureCollection',
+                        features: pairsCoords.map(coords => ({
+                            type: 'Feature',
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: coords
+                            }
+                        }))
+                    };
+
+                    window.sharedMapInstance.addSource('route-line-pontos', {
+                        type: 'geojson',
+                        data: linesGeoJson
+                    });
+
+                    window.sharedMapInstance.addLayer({
+                        id: 'route-line-pontos',
+                        type: 'line',
+                        source: 'route-line-pontos',
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': '#0284c7',
+                            'line-width': 3,
+                            'line-dasharray': [2, 2],
+                            'line-opacity': 0.85
+                        }
+                    });
+                }
+            } catch(e) {
+                console.warn('⚠️ Não foi possível adicionar linhas ao mapa:', e);
+            }
+        };
+
+        if (window.sharedMapInstance.isStyleLoaded()) {
+            drawLines();
+        } else {
+            window.sharedMapInstance.once('load', drawLines);
+        }
+
+        window.sharedMapInstance.resize();
+    }, 150);
 };
 
 document.addEventListener('keydown', (e) => {
