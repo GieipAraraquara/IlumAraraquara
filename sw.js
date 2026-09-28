@@ -44,6 +44,16 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Não interceptar chamadas de API do Supabase (REST, Auth, Storage) ou domínios externos
+  const requestUrl = new URL(event.request.url);
+  if (requestUrl.pathname.startsWith('/rest/') || 
+      requestUrl.pathname.startsWith('/auth/') || 
+      requestUrl.pathname.startsWith('/storage/') ||
+      requestUrl.hostname.includes('supabase') || 
+      requestUrl.hostname.includes('ngrok')) {
+    return;
+  }
+
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
@@ -55,15 +65,16 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
-            return caches.match('./Login.html');
-          }
-        });
+      .catch(async () => {
+        const cachedResponse = await caches.match(event.request);
+        if (cachedResponse) {
+          return cachedResponse;
+        }
+        if (event.request.headers.get('accept') && event.request.headers.get('accept').includes('text/html')) {
+          const loginCache = await caches.match('./Login.html');
+          if (loginCache) return loginCache;
+        }
+        return new Response('Rede indisponível', { status: 503, statusText: 'Service Unavailable' });
       })
   );
 });
