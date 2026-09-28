@@ -898,9 +898,9 @@
       // Supabase Client Reference
       function obterSupabaseClient() {
         if (window.supabaseClient) return window.supabaseClient;
-        if (typeof supabase !== 'undefined') {
+        if (typeof supabase !== 'undefined' && window.SUPABASE_URL && window.SUPABASE_KEY) {
           try {
-            window.supabaseClient = supabase.createClient('https://bqkfqedxlyipjftdhgse.supabase.co', 'sb_publishable_nyPJfTBioOI5QEdzjKzKLw_AHYWy60R');
+            window.supabaseClient = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
           } catch(e) {
             console.warn('⚠️ Erro ao instanciar Supabase Client:', e);
           }

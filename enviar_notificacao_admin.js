@@ -21,9 +21,8 @@ webpush.setVapidDetails(
     VAPID_PRIVATE_KEY
 );
 
-// 2. Configuração do Cliente Supabase
-const SUPABASE_URL = 'https://bqkfqedxlyipjftdhgse.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_nyPJfTBioOI5QEdzjKzKLw_AHYWy60R';
+// 2. Configuração do Cliente Supabase (Importado das configurações centrais)
+const { SUPABASE_URL, SUPABASE_KEY } = require('./js/config/supabaseClient.js');
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 const LOCAL_STORAGE_FILE = path.join(__dirname, 'push_subscriptions.json');

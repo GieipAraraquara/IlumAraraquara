@@ -1358,16 +1358,12 @@
       // =========================================================================
       // SUPABASE CLIENT DIRECT FRONTEND INTEGRATION
       // =========================================================================
-      window.SUPABASE_URL = window.SUPABASE_URL || "https://bqkfqedxlyipjftdhgse.supabase.co";
-      window.SUPABASE_KEY = window.SUPABASE_KEY || "sb_publishable_nyPJfTBioOI5QEdzjKzKLw_AHYWy60R";
-      if (typeof window.supabaseClient === 'undefined') window.supabaseClient = null;
-
       function obterSupabaseClient() {
         if (window.supabaseClient) return window.supabaseClient;
-        if (typeof supabase !== 'undefined') {
+        if (typeof supabase !== 'undefined' && window.SUPABASE_URL && window.SUPABASE_KEY) {
           try {
             window.supabaseClient = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_KEY);
-            console.log("⚡ [Supabase Direct Frontend] Cliente inicializado no navegador!");
+            console.log("⚡ [Supabase Direct Frontend] Cliente inicializado com as configurações centrais!");
           } catch(e) {
             console.warn("⚠️ [Supabase Direct Frontend] Falha ao inicializar client:", e);
           }
@@ -2913,6 +2909,26 @@
               var coordsParsed = (typeof extrairCoordenadasPlaquetaRow === 'function') ? extrairCoordenadasPlaquetaRow(row) : null;
               var lat = coordsParsed ? coordsParsed.lat : parseFloat(row.latitude || row.lat || 0);
               var lng = coordsParsed ? coordsParsed.lng : parseFloat(row.longitude || row.lng || 0);
+
+              // 🚫 Checar se a plaqueta está desativada
+              var temTagDesativada = rowsP.some(function(r) {
+                var obs = r.observacao || r['Observação'] || r.observacoes || r.observacao_especial || '';
+                return obs.toUpperCase().indexOf('DESATIVADA') !== -1;
+              });
+
+              if (temTagDesativada) {
+                if (btn) btn.disabled = false;
+                if (input) { input.classList.remove('input-validado'); input.classList.add('input-invalido'); }
+                if (btn) { btn.className = 'btn-secundario px-4 input-invalido'; btn.innerText = 'X Desativada'; }
+                if (msg) {
+                  var obsTexto = (row.observacao || row['Observação'] || '').trim();
+                  msg.innerHTML = '<span class="text-rose-700 font-semibold text-xs bg-rose-50 px-2 py-1 rounded border border-rose-200 inline-block mt-1">🚫 Plaqueta DESATIVADA (' + (obsTexto || 'Bloqueada para novas OS') + ')</span>';
+                }
+                estadoPontoRapido.validado = false;
+                estadoPontoRapido.hasPlaquetaDuplicadaTag = false;
+                return;
+              }
+
               if (lat && lng) {
                 estadoPontoRapido.lat = lat;
                 estadoPontoRapido.lng = lng;
@@ -2926,7 +2942,7 @@
                 });
                 estadoPontoRapido.hasPlaquetaDuplicadaTag = temTagDuplicado;
 
-                if (input) input.classList.add('input-validado');
+                if (input) { input.classList.remove('input-invalido'); input.classList.add('input-validado'); }
                 if (btn) { btn.disabled = false; btn.className = 'btn-secundario px-4 input-validado'; btn.innerText = '✓ OK'; }
                 if (msg) {
                   if (temTagDuplicado) {
@@ -4634,6 +4650,32 @@
               resetarValidacaoPonto(idx);
               input.value = pl; 
               var pt = pontosData[idx];
+
+              // 🚫 Bloqueio de Plaqueta Desativada
+              var itemDesativado = coordenadas.find(function(c) {
+                  return (c.observacao || '').toUpperCase().indexOf('DESATIVADA') !== -1;
+              });
+
+              if (itemDesativado) {
+                  pt.enderecoValidado = false;
+                  pt.latAtual = null;
+                  pt.lngAtual = null;
+                  pt.hasPlaquetaDuplicadaTag = false;
+
+                  input.classList.remove('input-validado');
+                  input.classList.add('input-invalido');
+                  btn.classList.remove('btn-validado');
+                  btn.classList.add('btn-invalido');
+                  btn.innerText = "X Desativada";
+
+                  var elMsgErr = document.getElementById('msgErroPonto_' + idx);
+                  if (elMsgErr) {
+                      var obsTexto = (itemDesativado.observacao || '').trim();
+                      elMsgErr.innerHTML = '<div class="mt-1 text-xs text-rose-700 bg-rose-50 p-1.5 rounded border border-rose-200 font-medium">🚫 Plaqueta DESATIVADA (' + (obsTexto || 'Bloqueada para novas ordens de serviço') + ')</div>';
+                  }
+                  if (autoSave) { resetarBotaoSalvar(); }
+                  return;
+              }
 
               var temTagDuplicado = coordenadas.some(function(c) {
                   return (c.observacao || '').toUpperCase().indexOf('DUPLICADO') !== -1;

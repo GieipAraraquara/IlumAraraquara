@@ -1662,12 +1662,9 @@
             }
 
             try {
-                // Atualizar tanto nome em minúsculo quanto maiúsculo para compatibilidade com o esquema
                 const updatePayload = {
                     Latitude: newLat,
-                    Longitude: newLng,
-                    latitude: newLat,
-                    longitude: newLng
+                    Longitude: newLng
                 };
 
                 const { error } = await client.from('localizacao_plaquetas')
@@ -1789,48 +1786,62 @@
                     identificacao: identificacao,
                     Latitude: !isNaN(latVal) ? latVal : null,
                     Longitude: !isNaN(lngVal) ? lngVal : null,
-                    latitude: !isNaN(latVal) ? latVal : null,
-                    longitude: !isNaN(lngVal) ? lngVal : null,
                     "QTD. Lum.": qtdLum,
                     Empresa: empresa,
-                    empresa: empresa,
-                    Observação: observacao,
-                    observacao: observacao
+                    "Observação": observacao
                 };
 
                 let res;
                 if (idOriginal) {
-                    // Update
                     res = await client.from('localizacao_plaquetas')
                         .update(payload)
                         .eq('identificacao', idOriginal);
                 } else {
-                    // Insert
                     res = await client.from('localizacao_plaquetas')
-                        .insert([payload]);
+                        .upsert([payload], { onConflict: 'identificacao' });
                 }
 
                 if (res.error) {
                     alert("Erro ao salvar plaqueta no Supabase: " + res.error.message);
-                } else {
-                    if (!isNaN(latVal) && !isNaN(lngVal)) {
-                        try {
-                            const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
-                            await client.from('historico_localizacao_plaquetas').insert([{
-                                identificacao: identificacao,
-                                latitude: latVal,
-                                longitude: lngVal,
-                                origem: idOriginal ? 'EDICAO_FORMULARIO' : 'CADASTRO_NOVA_PLAQUETA',
-                                usuario: userNome,
-                                observacao: idOriginal ? 'Dados editados no Formulário' : 'Novo cadastro de plaqueta'
-                            }]);
-                        } catch (hErr) { console.warn('Aviso histórico:', hErr); }
-                    }
-
-                    alert(`✅ Plaqueta ${identificacao} salva com sucesso!`);
-                    window.fecharFormPlaquetaModal();
-                    carregarPlaquetas(paginaAtual);
+                    return;
                 }
+
+                // Verificação direta no banco logo após salvar para confirmar o que o Supabase realmente gravou
+                let checkSupabase = await client.from('localizacao_plaquetas')
+                    .select('*')
+                    .eq('identificacao', identificacao)
+                    .maybeSingle();
+
+                console.log('🔍 Plaqueta consultada após salvar:', checkSupabase.data);
+
+                // Gravar histórico se houver coordenadas
+                if (!isNaN(latVal) && !isNaN(lngVal)) {
+                    try {
+                        const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
+                        await client.from('historico_localizacao_plaquetas').insert([{
+                            identificacao: identificacao,
+                            latitude: latVal,
+                            longitude: lngVal,
+                            origem: idOriginal ? 'EDICAO_FORMULARIO' : 'CADASTRO_NOVA_PLAQUETA',
+                            usuario: userNome,
+                            observacao: observacao || (idOriginal ? 'Dados editados no Formulário' : 'Novo cadastro de plaqueta')
+                        }]);
+                    } catch (hErr) { console.warn('Aviso histórico:', hErr); }
+                }
+
+                // Atualizar cache local imediatamente para refletir na tabela
+                const itemCache = plaquetasCache.find(p => p.identificacao.toUpperCase() === identificacao.toUpperCase());
+                if (itemCache) {
+                    itemCache.observacao = observacao;
+                    itemCache.empresa = empresa;
+                    itemCache.qtd_lum = qtdLum;
+                    if (!isNaN(latVal)) itemCache.latitude = latVal;
+                    if (!isNaN(lngVal)) itemCache.longitude = lngVal;
+                }
+
+                alert(`✅ Plaqueta ${identificacao} salva com sucesso!`);
+                window.fecharFormPlaquetaModal();
+                carregarPlaquetas(paginaAtual);
 
             } catch(err) {
                 alert("Erro inesperado: " + err.message);
