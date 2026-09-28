@@ -41,7 +41,16 @@ let clientInstance = null;
 
 if (typeof window !== 'undefined' && window.supabase) {
     try {
-        clientInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+        const clientOptions = {};
+        // Se estiver acessando via túnel ngrok, adiciona cabeçalho que pula a tela de aviso do ngrok
+        if (SUPABASE_URL.includes('ngrok')) {
+            clientOptions.global = {
+                headers: {
+                    'ngrok-skip-browser-warning': 'true'
+                }
+            };
+        }
+        clientInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, clientOptions);
         console.log(`⚡ [SupabaseClient] Modo [${AMBIENTE_ATIVO}] ativado com sucesso:`, SUPABASE_URL);
     } catch (err) {
         console.error('❌ [SupabaseClient] Falha ao inicializar o Supabase Client:', err);
