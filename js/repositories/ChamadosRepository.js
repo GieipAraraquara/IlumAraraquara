@@ -636,10 +636,16 @@ class ChamadosRepository {
                 updatePayload.data_conclusao = nowIso;
                 updatePayload.data_fechamento = nowIso;
             } else if (newStatus === 'Aberta') {
+                const nowIso = new Date().toISOString();
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;
                 updatePayload.motivo_aprovacao = null;
+                // Registra o momento de liberação da OS como data de abertura para medições e prazos
+                updatePayload.data_abertura = nowIso;
             } else if (newStatus === 'Pendente') {
+                updatePayload.data_conclusao = null;
+                updatePayload.data_fechamento = null;
+            } else if (newStatus === 'Bloqueada') {
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;
             }
@@ -733,12 +739,21 @@ class ChamadosRepository {
                 const rec = updatedData[0];
                 const prot = rec.protocolo || strVal;
                 const actualTable = isPraca ? this.pracasTable : this.primaryTable;
+                const tipoAcao = (newStatus === 'Concluída' || newStatus === 'Concluida')
+                    ? 'FINALIZACAO'
+                    : (newStatus === 'Cancelada'
+                        ? 'CANCELAMENTO'
+                        : (newStatus === 'Aberta' && justification ? 'REABERTURA' : 'ALTERACAO_STATUS'));
+
                 window.LogsRepository.registrarLog({
                     protocolo: prot,
                     tabelaOrigem: actualTable,
-                    tipoAcao: newStatus === 'Concluída' || newStatus === 'Concluida' ? 'FINALIZACAO' : (newStatus === 'Cancelada' ? 'CANCELAMENTO' : 'ALTERACAO_STATUS'),
+                    tipoAcao: tipoAcao,
                     descricao: `Status alterado para "${newStatus}"${justification ? ' (Justificativa: ' + justification + ')' : ''}`,
-                    dadosNovos: { status: newStatus, observacao_final: justification },
+                    dadosNovos: {
+                        status: newStatus,
+                        justificativa: justification || null
+                    },
                     origemTela: 'Painel'
                 }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de status:', err));
             }

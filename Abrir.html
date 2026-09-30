@@ -2712,15 +2712,6 @@
             }
 
             atualizarEstadoBotaoSalvarGPSRapido();
-
-            fetch('https://api.mapbox.com/geocoding/v5/mapbox.places/' + lng + ',' + lat + '.json?access_token=' + MAPBOX_TOKEN + '&language=pt&country=br')
-              .then(function(r) { return r.json(); })
-              .then(function(resData) {
-                if (resData && resData.features && resData.features.length > 0) {
-                  estadoPontoRapido.endereco = resData.features[0].place_name;
-                }
-              })
-              .catch(function() {});
           },
           function(err) {
             if (gpsCongeladoRapido) return;
@@ -3160,7 +3151,7 @@
         }
 
         var plaq = (modo === 'plaqueta') ? (estadoPontoRapido.plaqueta || '') : '';
-        var end = (modo === 'endereco') ? (estadoPontoRapido.endereco || '') : (estadoPontoRapido.endereco || '');
+        var end = (modo === 'endereco') ? (estadoPontoRapido.endereco || '') : '';
 
         var lat6 = (estadoPontoRapido.lat !== null && estadoPontoRapido.lat !== undefined) ? Number(estadoPontoRapido.lat).toFixed(6) : '';
         var lng6 = (estadoPontoRapido.lng !== null && estadoPontoRapido.lng !== undefined) ? Number(estadoPontoRapido.lng).toFixed(6) : '';
@@ -3751,7 +3742,7 @@
                 pracaOutraState.enderecoValidado = true;
                 latInput.classList.add('input-validado'); lngInput.classList.add('input-validado');
                 btnV.classList.add('btn-validado'); btnV.innerText = '✓ Validado';
-                exibirMiniMapaPracaOutra(latNum, lngNum, "📍 " + endereco);
+                exibirMiniMapaPracaOutra(latNum, lngNum, "📍 Coordenada: " + latNum + ", " + lngNum);
               } else {
                 latInput.classList.add('input-invalido'); lngInput.classList.add('input-invalido');
                 btnV.classList.add('btn-invalido'); btnV.innerText = 'X Fora de Araraquara';
@@ -4469,7 +4460,7 @@
                 latInput.classList.add('input-validado'); lngInput.classList.add('input-validado');
                 btnV.classList.add('btn-validado'); btnV.innerText = '✓ Validado';
                 
-                exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, "📍 " + endereco, idx);
+                exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, "📍 Coordenada: " + latNum + ", " + lngNum, idx);
                 checarDuplicidadeBackend(pt.latAtual, pt.lngAtual, idx, autoSave);
               } else {
                 falhaValidacao(latInput, lngInput, btnV, idx, "Fora de Araraquara", autoSave);
@@ -6187,8 +6178,8 @@
 
       function confirmarSalvamento() {
         fecharModal();
-        var elRapido = document.getElementById('blocoModoRapido');
-        var isModoRapidoActive = (elRapido && elRapido.style.display !== 'none');
+        var elRapido = document.getElementById('painelModoRapido');
+        var isModoRapidoActive = (modoRapidoAtivo === true) || (elRapido && elRapido.style.display !== 'none');
         if (isModoRapidoActive) {
           validarEEnviarOSRapida(true);
         } else {
@@ -6324,7 +6315,7 @@
 
            var latVal = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.latAtual ? Number(pontosData[0].latAtual).toFixed(6) : null);
            var lngVal = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.lngAtual ? Number(pontosData[0].lngAtual).toFixed(6) : null);
-           if (modoSel === 'plaqueta') {
+           if (modoSel === 'plaqueta' || modoSel === 'coordenadas') {
                end = "";
            } else {
                end = await garantirEnderecoGeocodificado(latVal, lngVal, end);

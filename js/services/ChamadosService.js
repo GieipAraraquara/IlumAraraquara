@@ -69,9 +69,9 @@ class ChamadosService {
         const isManutentor = typeof window !== 'undefined' && Boolean(window.isManutentorView);
 
         return chamadosList.filter(item => {
-            // Manutentor view rule: Never show 'pendente' OS
+            // Manutentor view rule: Never show 'pendente' or 'bloqueada' OS
             const itemStatus = item.normalizedStatus || item.status;
-            if (isManutentor && (itemStatus === 'pendente' || itemStatus === 'Pendente')) {
+            if (isManutentor && (itemStatus === 'pendente' || itemStatus === 'Pendente' || itemStatus === 'bloqueada' || itemStatus === 'Bloqueada')) {
                 return false;
             }
 
@@ -136,6 +136,7 @@ class ChamadosService {
     async changeChamadoStatus(id, newUIStatus, justification = '') {
         const dbStatusMap = {
             'aberto': 'Aberta',
+            'bloqueada': 'Bloqueada',
             'em_andamento': 'Em Andamento',
             'concluida': 'Concluída',
             'cancelada': 'Cancelada',

@@ -962,6 +962,10 @@
                                                 <span>Em Aberto</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
+                                                <input type="checkbox" name="praca-status-filter" value="bloqueada" class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <span>Bloqueada</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
                                                 <input type="checkbox" name="praca-status-filter" value="cancelada" class="praca-status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Cancelada</span>
                                             </label>
@@ -3402,6 +3406,7 @@
                         if (filterVal === 'concluida' && (statusText.includes('concluíd') || statusText.includes('concluid'))) return true;
                         if (filterVal === 'em_andamento' && (statusText.includes('andamento') || statusText.includes('iniciad'))) return true;
                         if (filterVal === 'aberto' && statusText.includes('aberto')) return true;
+                        if (filterVal === 'bloqueada' && statusText.includes('bloquead')) return true;
                         if (filterVal === 'cancelada' && statusText.includes('cancelad')) return true;
                         if (filterVal === 'rejeitada' && (statusText.includes('rejeit') || statusText.includes('recus'))) return true;
                         return false;

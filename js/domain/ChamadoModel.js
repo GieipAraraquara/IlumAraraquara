@@ -1390,6 +1390,7 @@ class ChamadoModel {
     get normalizedStatus() {
         const statusStr = ChamadoModel.formatLocationText(this.rawStatus);
         const statusLower = statusStr.toLowerCase().trim();
+        if (statusLower.includes('bloq')) return 'bloqueada';
         if (statusLower.includes('abert') || statusLower === 'aberta') return 'aberto';
         if (statusLower.includes('andamento') || statusLower.includes('iniciad') || statusLower.includes('execu')) return 'em_andamento';
         if (statusLower.includes('conclu') || statusLower.includes('resolv')) return 'concluida';
@@ -1408,6 +1409,7 @@ class ChamadoModel {
             return 'Iniciado';
         }
         switch (this.normalizedStatus) {
+            case 'bloqueada': return 'Bloqueada';
             case 'aberto': return 'Em aberto';
             case 'em_andamento': return 'Em andamento';
             case 'concluida': return 'Concluída';

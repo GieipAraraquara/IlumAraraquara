@@ -955,6 +955,7 @@ class AuditoriaController {
         // Status Badge for Praça Services
         let statusBadgeClass = 'bg-slate-100 text-slate-700 border border-slate-300';
         if (item.normalizedStatus === 'aberto') statusBadgeClass = 'bg-sky-100 text-sky-800 border border-sky-300';
+        if (item.normalizedStatus === 'bloqueada') statusBadgeClass = 'bg-amber-100 text-amber-900 border border-amber-300 font-bold';
         if (item.normalizedStatus === 'em_andamento') statusBadgeClass = 'bg-amber-100 text-amber-800 border border-amber-300';
         if (item.statusBadgeLabel === 'Iniciado') statusBadgeClass = 'bg-blue-100 text-blue-800 border border-blue-300';
         if (item.normalizedStatus === 'concluida') statusBadgeClass = 'bg-[#dcfce7] text-[#166534]';
@@ -1156,6 +1157,8 @@ class AuditoriaController {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-[#dcfce7] text-[#166534]';
             } else if (stNorm === 'cancelada') {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700';
+            } else if (stNorm === 'bloqueada') {
+                elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 border border-amber-300';
             } else {
                 elStatusBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-error-container text-on-error-container';
             }
@@ -1206,24 +1209,24 @@ class AuditoriaController {
      */
     async carregarLogsNoModal(protocolo) {
         const listEl = document.getElementById('detalheModalLogsList');
+        const containerSecao = document.getElementById('containerHistoricoLogsModal');
         if (!listEl) return;
 
         if (!window.LogsRepository) {
-            listEl.innerHTML = `<span class="text-on-surface-variant italic text-[11px]">Repositório de logs indisponível.</span>`;
+            if (containerSecao) containerSecao.classList.add('hidden');
+            listEl.innerHTML = '';
             return;
         }
 
         try {
             const logs = await window.LogsRepository.buscarLogsPorProtocolo(protocolo);
             if (!logs || logs.length === 0) {
-                listEl.innerHTML = `
-                    <div class="p-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-on-surface-variant italic text-[11px] flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[16px] text-slate-400">info</span>
-                        <span>Nenhum evento de alteração registrado no histórico para este protocolo.</span>
-                    </div>
-                `;
+                if (containerSecao) containerSecao.classList.add('hidden');
+                listEl.innerHTML = '';
                 return;
             }
+
+            if (containerSecao) containerSecao.classList.remove('hidden');
 
             const mapAcaoBadge = {
                 'CRIACAO': 'bg-blue-100 text-blue-800 border-blue-300',
@@ -1373,15 +1376,121 @@ class AuditoriaController {
                         </div>
                     `;
                 } else if (hasAnteriores || hasNovos) {
-                    const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
-                    const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
-                    if (antStr || novStr) {
-                        diffHtml = `
-                            <div class="mt-2 pt-2 border-t border-outline-variant/30 text-[10.5px] text-slate-600 space-y-1">
-                                ${antStr ? `<div><b class="text-rose-700">Anterior:</b> <span class="font-mono">${antStr}</span></div>` : ''}
-                                ${novStr ? `<div><b class="text-emerald-700">Novo:</b> <span class="font-mono">${novStr}</span></div>` : ''}
-                            </div>
-                        `;
+                    const formatValueDisplay = (key, val) => {
+                        if (val === null || val === undefined || val === '') return '<span class="text-slate-400 italic">Vazio</span>';
+                        if (typeof val === 'boolean') return val ? '<span class="text-emerald-700 font-semibold">Sim</span>' : '<span class="text-slate-500 font-semibold">Não</span>';
+                        if (typeof val === 'object') {
+                            if (Array.isArray(val)) {
+                                if (val.length === 0) return '<span class="text-slate-400 italic">Nenhum</span>';
+                                return val.map(v => typeof v === 'object' ? (v.nome || v.material || JSON.stringify(v)) : String(v)).join(', ');
+                            }
+                            return `<code class="bg-slate-100 px-1 py-0.5 rounded text-[10px] break-all">${JSON.stringify(val)}</code>`;
+                        }
+                        return `<span class="break-words font-medium">${String(val)}</span>`;
+                    };
+
+                    const labelMap = {
+                        'status': 'Status',
+                        'observacao_final': 'Justificativa / Motivo',
+                        'prioridade': 'Prioridade',
+                        'status_auditoria': 'Status da Auditoria',
+                        'motivo': 'Motivo',
+                        'motivo_aprovacao': 'Motivo da Aprovação',
+                        'motivo_desconsideracao': 'Motivo da Desconsideração',
+                        'desconsiderado': 'Desconsiderado do Relatório',
+                        'fechamento_id': 'ID do Fechamento',
+                        'numeroFechamento': 'Nº do Fechamento',
+                        'material_utilizado': 'Materiais Utilizados',
+                        'material_anterior': 'Material Anterior',
+                        'material_novo': 'Material Novo',
+                        'quantidade_de': 'Qtd. Anterior',
+                        'quantidade_para': 'Qtd. Nova',
+                        'regraId': 'Regra',
+                        'regra': 'Regra',
+                        'justificativa': 'Justificativa',
+                        'justificativa_anistia': 'Justificativa da Anistia',
+                        'anistiado': 'Anistiado',
+                        'tempo_total_minutos': 'Tempo Total (min)'
+                    };
+
+                    const isObjAnt = typeof log.dados_anteriores === 'object' && log.dados_anteriores !== null;
+                    const isObjNov = typeof log.dados_novos === 'object' && log.dados_novos !== null;
+
+                    if (isObjAnt || isObjNov) {
+                        const antObj = isObjAnt ? log.dados_anteriores : {};
+                        const novObj = isObjNov ? log.dados_novos : {};
+                        const keys = Array.from(new Set([...Object.keys(antObj), ...Object.keys(novObj)]))
+                            .filter(k => k !== 'historico_sessoes' && k !== 'evidencias');
+
+                        if (keys.length > 0) {
+                            const camposHtml = keys.map(k => {
+                                const rotulo = labelMap[k] || k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                                const vAnt = antObj[k];
+                                const vNov = novObj[k];
+                                const temAnt = k in antObj;
+                                const temNov = k in novObj;
+
+                                if (temAnt && temNov && JSON.stringify(vAnt) !== JSON.stringify(vNov)) {
+                                    return `
+                                        <div class="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                            <div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">${rotulo}</div>
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200/80 line-through text-[10.5px]">
+                                                    ${formatValueDisplay(k, vAnt)}
+                                                </span>
+                                                <span class="material-symbols-outlined text-[13px] text-slate-400">arrow_forward</span>
+                                                <span class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-semibold text-[10.5px]">
+                                                    ${formatValueDisplay(k, vNov)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    `;
+                                } else if (temNov && !temAnt) {
+                                    return `
+                                        <div class="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                            <div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">${rotulo}</div>
+                                            <div class="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200/80 font-semibold text-[10.5px] inline-block">
+                                                ${formatValueDisplay(k, vNov)}
+                                            </div>
+                                        </div>
+                                    `;
+                                } else if (temAnt && !temNov) {
+                                    return `
+                                        <div class="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                            <div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">${rotulo}</div>
+                                            <div class="px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200/80 text-[10.5px] inline-block">
+                                                ${formatValueDisplay(k, vAnt)}
+                                            </div>
+                                        </div>
+                                    `;
+                                } else if (temNov) {
+                                    return `
+                                        <div class="p-1.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-1">
+                                            <div class="text-[10px] font-bold text-slate-600 uppercase tracking-wide">${rotulo}</div>
+                                            <div class="text-[10.5px] text-slate-800">${formatValueDisplay(k, vNov)}</div>
+                                        </div>
+                                    `;
+                                }
+                                return '';
+                            }).filter(Boolean).join('');
+
+                            if (camposHtml) {
+                                diffHtml = `<div class="mt-2 space-y-1.5 text-xs">${camposHtml}</div>`;
+                            }
+                        }
+                    }
+
+                    if (!diffHtml) {
+                        const antStr = typeof log.dados_anteriores === 'object' ? JSON.stringify(log.dados_anteriores) : String(log.dados_anteriores || '');
+                        const novStr = typeof log.dados_novos === 'object' ? JSON.stringify(log.dados_novos) : String(log.dados_novos || '');
+                        if (antStr || novStr) {
+                            diffHtml = `
+                                <div class="mt-2 pt-2 border-t border-outline-variant/30 text-[10.5px] text-slate-600 space-y-1">
+                                    ${antStr ? `<div><b class="text-rose-700">Anterior:</b> <span class="font-mono">${antStr}</span></div>` : ''}
+                                    ${novStr ? `<div><b class="text-emerald-700">Novo:</b> <span class="font-mono">${novStr}</span></div>` : ''}
+                                </div>
+                            `;
+                        }
                     }
                 }
 
@@ -1488,6 +1597,7 @@ class AuditoriaController {
         const isJaRejeitada = (item.normalizedStatus === 'rejeitada');
         const isConcluida = (item.normalizedStatus === 'concluida');
         const isPendente = (item.normalizedStatus === 'pendente');
+        const isBloqueada = (item.normalizedStatus === 'bloqueada');
         const isAuditoriaConcluida = Boolean(item.isAuditoriaConcluida || String(item.statusAuditoria || '').toLowerCase().includes('conclu'));
 
         const getCleanOp = (v) => {
@@ -1607,7 +1717,19 @@ class AuditoriaController {
                                 <span>Aprovar OS</span>
                             </button>` : ''}
 
-                            ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? (
+                            ${isBloqueada ? `
+                            <button type="button" onclick="window.liberarOSBloqueadaAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Liberar OS para a empresa">
+                                <span class="material-symbols-outlined text-[16px]">lock_open</span>
+                                <span>Liberar OS</span>
+                            </button>` : ''}
+
+                            ${(!isConcluida && !isJaCancelada && !isJaRejeitada && !isBloqueada && !isPendente) ? `
+                            <button type="button" onclick="window.bloquearOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Bloquear OS temporariamente">
+                                <span class="material-symbols-outlined text-[16px]">lock</span>
+                                <span>Bloquear OS</span>
+                            </button>` : ''}
+
+                            ${(!isConcluida && !isJaCancelada && !isJaRejeitada && !isBloqueada) ? (
                                 !isJaUrgente ? `
                                 <button type="button" onclick="window.alterarPrioridadeOS('${item.protocolo || item.id}', 'Urgente')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                     <span class="material-symbols-outlined text-[16px]">priority_high</span>
@@ -2123,8 +2245,18 @@ class AuditoriaController {
         <!-- Seção 3: Histórico de Fechamentos (Exclusivo para Protocolos Viários 'I') -->
         ${(() => {
             if (isPracaOS) return '';
-            const fechList = item.fechamentosList || [];
-            if (!fechList || fechList.length === 0) return '';
+            const fechList = (item.fechamentosList || []).filter(f => {
+                if (!f) return false;
+                // Se tiver id do banco (fechamentos_os), possui registro real
+                if (f.id) return true;
+                // Se for fechamento sintetizado/legado, só considera se possuir materiais, fotos, pontos ou relatório
+                const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : (Array.isArray(f.materiais) ? f.materiais : (f.materiais ? [f.materiais] : []));
+                const fotos = window.ChamadoModel ? window.ChamadoModel.parseClosurePhotos(f) : (Array.isArray(f.fotos) ? f.fotos : (f.fotos ? [f.fotos] : []));
+                const pontos = Array.isArray(f.pontos) ? f.pontos : [];
+                const temObs = Boolean((f.relatorioTecnico || f.relatorio_tecnico || f.observacoes || '').trim());
+                return mats.length > 0 || fotos.length > 0 || pontos.length > 0 || temObs;
+            });
+            if (fechList.length === 0) return '';
 
             return `
             <div class="p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl space-y-3 text-xs">
@@ -2331,7 +2463,7 @@ class AuditoriaController {
         </div>
 
         <!-- Seção 5: Linha do Tempo de Auditoria & Logs -->
-        <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
+        <div id="containerHistoricoLogsModal" class="hidden p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-2">
             <div class="font-bold text-secondary text-xs border-b border-outline-variant/30 pb-1 flex items-center justify-between">
                 <span class="flex items-center gap-1.5 text-indigo-700 font-bold">
                     <span class="material-symbols-outlined text-[18px]">history</span>
@@ -3793,9 +3925,12 @@ if (typeof window.reabrirOSAdmin !== 'function') {
                     item.status = 'Aberta';
                     item.rawStatus = 'Aberta';
                     item.normalizedStatus = 'aberto';
+                    item.motivoAprovacao = '';
+                    if (item.rawRow) item.rawRow.motivo_aprovacao = '';
                     if (item._originalModel) {
                         item._originalModel.rawStatus = 'Aberta';
                         item._originalModel.normalizedStatus = 'aberto';
+                        item._originalModel.motivoAprovacao = '';
                     }
                 }
                 const repo = new window.ChamadosRepository();
