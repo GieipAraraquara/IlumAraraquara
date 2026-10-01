@@ -154,6 +154,7 @@ class ChamadoModel {
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
         this.textoAuditoriaOCR = data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
         this.fechamentosRaw = data.fechamentos_os || data.fechamentos || [];
+        this.fotosComplementares = data.fotos_complementares || null;
     }
 
     /**
@@ -573,6 +574,22 @@ class ChamadoModel {
                     pushItem(cp.url, cp.titulo, { origem: `Fechamento #${f.numero || 1}` });
                 });
             });
+        }
+
+        // 7. Fotos complementares anexadas na abertura da OS (Viária / Geral)
+        const fotosComp = this.fotosComplementares || (this.rawRow && this.rawRow.fotos_complementares);
+        if (fotosComp) {
+            let arrComp = fotosComp;
+            if (typeof arrComp === 'string') {
+                try { arrComp = JSON.parse(arrComp); } catch(e) { arrComp = [arrComp]; }
+            }
+            if (Array.isArray(arrComp)) {
+                arrComp.forEach((f, idx) => {
+                    const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
+                    const t = typeof f === 'object' && f ? (f.titulo || f.estagio || `Foto Complementar #${idx + 1}`) : `Foto Complementar #${idx + 1}`;
+                    if (u) pushItem(u, t, { origem: 'Fotos Complementares', estagio: 'Foto Complementar' });
+                });
+            }
         }
 
         return list;

@@ -495,6 +495,23 @@ class OfflineSyncService {
     } else if (item.tipo === 'abertura_viaria') {
       console.log(`➕ [ProcessItem Abertura Viária] Cadastrando novo chamado ${item.protocolo} no Supabase...`);
       let payloadAtualAbertura = { ...payload };
+
+      if (Array.isArray(payloadAtualAbertura.fotos_complementares) && payloadAtualAbertura.fotos_complementares.length > 0 && cloudinary) {
+        for (let ic = 0; ic < payloadAtualAbertura.fotos_complementares.length; ic++) {
+          const fRaw = payloadAtualAbertura.fotos_complementares[ic];
+          if (fRaw && (fRaw.startsWith('data:image/') || fRaw.startsWith('blob:'))) {
+            try {
+              const plaqRef = (payloadAtualAbertura.pontos_inicial && payloadAtualAbertura.pontos_inicial[0]?.plaqueta) || 'S_P';
+              const nomeFotoComp = cloudinary.gerarNomePadraoFoto(item.protocolo, plaqRef, `FOTOS_COMPLEMENTARES_${ic + 1}`);
+              const cdnUrl = await cloudinary.uploadImage(fRaw, 'viaria_fotos', nomeFotoComp, { compress: true, maxDimension: 1200, quality: 0.75 });
+              payloadAtualAbertura.fotos_complementares[ic] = cdnUrl;
+            } catch(eCompOff) {
+              console.warn(`⚠️ Erro ao subir foto complementar offline ${ic + 1}:`, eCompOff);
+            }
+          }
+        }
+      }
+
       let insertRes = await supabaseClient.from('ordens_servico').insert([payloadAtualAbertura]);
 
       while (insertRes.error && insertRes.error.message && insertRes.error.message.includes("Could not find the")) {

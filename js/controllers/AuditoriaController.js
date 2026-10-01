@@ -11,10 +11,21 @@ class AuditoriaController {
 
     isManutentorUser() {
         if (this.userRole === 'manutentor') return true;
-        if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
-            const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
-            return role === 'manutentor';
-        }
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (role === 'manutentor') return true;
+            }
+            if (window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) return true;
+            }
+            const localRole = String(localStorage.getItem('user_role') || '').toLowerCase();
+            if (localRole.includes('manutentor')) return true;
+            if (Boolean(window.isManutentorView) || (document.body && document.body.classList.contains('manutentor-view')) || (window.location.href && window.location.href.toLowerCase().includes('manutentor'))) {
+                return true;
+            }
+        } catch (e) {}
         return false;
     }
 
@@ -2937,6 +2948,40 @@ class AuditoriaController {
                 const mEdit = document.getElementById('modalEditarMateriaisAdmin');
                 if (mEdit) mEdit.remove();
 
+                // Se a alteração de material for realizada por usuário do tipo manutentor,
+                // reverte o status de auditoria para 'Pendente' para que seja auditada novamente caso já estivesse concluída
+                const isManutentor = typeof this.isManutentorUser === 'function' ? this.isManutentorUser() : false;
+                let auditoriaRevertida = false;
+                if (isManutentor) {
+                    try {
+                        const targetId = (item && item.id) ? item.id : prot;
+                        if (this.service && typeof this.service.changeAuditoriaStatus === 'function') {
+                            await this.service.changeAuditoriaStatus(targetId, 'Pendente');
+                        }
+
+                        const updateAuditoriaRef = (targetObj) => {
+                            if (!targetObj) return;
+                            targetObj.statusAuditoria = 'Pendente';
+                            targetObj.dataConclusaoAuditoria = null;
+                            if (targetObj.rawRow) {
+                                targetObj.rawRow.status_auditoria = 'Pendente';
+                                targetObj.rawRow.data_conclusao_auditoria = null;
+                            }
+                        };
+
+                        updateAuditoriaRef(item);
+                        [this.chamadosList, this.concludedList, this.pracaServicesList, this.viariaConcludedList, this.emergenciaServicesList, this.auditDivergentList, window.chamadosListCache].forEach(arr => {
+                            if (Array.isArray(arr)) {
+                                arr.filter(o => o && (String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "") === String(prot)))
+                                   .forEach(o => updateAuditoriaRef(o));
+                            }
+                        });
+                        auditoriaRevertida = true;
+                    } catch (eAudit) {
+                        console.warn('⚠️ [AuditoriaController] Erro ao reverter status de auditoria após alteração de material por manutentor:', eAudit);
+                    }
+                }
+
                 // Re-renderiza o conteúdo do modal de detalhes da OS em tempo real
                 const container = document.getElementById('detalheModalConteudo');
                 if (container) {
@@ -2964,9 +3009,13 @@ class AuditoriaController {
                     window.applyCompletedServicesFilters();
                 }
 
+                const mensagemSucesso = auditoriaRevertida
+                    ? `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos com sucesso! Como a alteração foi realizada pelo perfil manutentor, a auditoria retornou para o status <strong>Pendente</strong>.`
+                    : `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados com sucesso!`;
+
                 this.exibirModalSucessoHTML(
                     'Materiais Salvos',
-                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados com sucesso!`
+                    mensagemSucesso
                 );
             } catch(err) {
                 console.error('Erro ao salvar materiais:', err);

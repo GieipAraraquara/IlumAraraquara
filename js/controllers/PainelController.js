@@ -16,6 +16,25 @@ class PainelController {
         this.medicaoService = window.MedicaoService ? new window.MedicaoService() : null;
     }
 
+    isManutentorUser() {
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const role = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (role === 'manutentor') return true;
+            }
+            if (window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) return true;
+            }
+            const localRole = String(localStorage.getItem('user_role') || '').toLowerCase();
+            if (localRole.includes('manutentor')) return true;
+            if (Boolean(window.isManutentorView) || (document.body && document.body.classList.contains('manutentor-view')) || (window.location.href && window.location.href.toLowerCase().includes('manutentor'))) {
+                return true;
+            }
+        } catch (e) {}
+        return false;
+    }
+
     /**
      * Initializes controller, loads data from Supabase, and binds UI listeners
      */
@@ -254,46 +273,58 @@ class PainelController {
         // Endereço / Pontos
         const tdEndereco = document.createElement('td');
         tdEndereco.className = 'py-3 px-5 align-middle';
-        const points = item.addressPointsIniciais;
-        console.log(`📌 [PainelController] Renderizando OS ${item.protocolo}:`, {
-            endereco: item.endereco,
-            plaquetaInicial: item.plaquetaInicial,
-            coordenadaInicial: item.coordenadaInicial,
-            rawPontos: item.rawPontos,
-            pointsResultantes: points
-        });
 
-        if (points.length > 1) {
+        // Se for OS de praça, exibe o nome da praça com link para o mapa na cor padrão
+        if (item.isPraca) {
+            const pracaNome = item.pracaNome || item.bairro || item.endereco || 'Praça Pública';
             tdEndereco.innerHTML = `
-                <div class="flex flex-col gap-1 w-full">
-                    <div class="flex items-center gap-2 whitespace-nowrap w-full">
-                        <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir no mapa Mapbox">
-                            <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                            <span class="font-medium truncate group-hover/loc:underline" title="${points[0]}">${points[0]}</span>
-                        </button>
-                        <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-label-sm font-semibold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 flex-shrink-0" onclick="window.toggleInlinePoints(this, ${points.length - 1}, event)" title="Expandir/Recolher pontos">
-                            <span class="btn-text">+${points.length - 1}</span>
-                            <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
-                        </button>
-                    </div>
-                    <div class="extra-points hidden flex-col gap-1 font-medium text-on-surface whitespace-nowrap mt-1 w-full">
-                        ${points.slice(1).map((p, idx) => `
-                            <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', ${idx + 1}, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
-                                <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                <span class="font-medium truncate group-hover/loc:underline" title="${p}">${p}</span>
-                            </button>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        } else {
-            const pointText = points[0] || 'Endereço não informado';
-            tdEndereco.innerHTML = `
-                <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir a localização no mapa Mapbox">
                     <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                    <span class="font-medium truncate group-hover/loc:underline" title="${pointText}">${pointText}</span>
+                    <span class="font-medium truncate group-hover/loc:underline" title="${pracaNome}">${pracaNome}</span>
                 </button>
             `;
+        } else {
+            const points = item.addressPointsIniciais;
+            console.log(`📌 [PainelController] Renderizando OS ${item.protocolo}:`, {
+                endereco: item.endereco,
+                plaquetaInicial: item.plaquetaInicial,
+                coordenadaInicial: item.coordenadaInicial,
+                rawPontos: item.rawPontos,
+                pointsResultantes: points
+            });
+
+            if (points.length > 1) {
+                tdEndereco.innerHTML = `
+                    <div class="flex flex-col gap-1 w-full">
+                        <div class="flex items-center gap-2 whitespace-nowrap w-full">
+                            <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir no mapa Mapbox">
+                                <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                <span class="font-medium truncate group-hover/loc:underline" title="${points[0]}">${points[0]}</span>
+                            </button>
+                            <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-label-sm font-semibold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 flex-shrink-0" onclick="window.toggleInlinePoints(this, ${points.length - 1}, event)" title="Expandir/Recolher pontos">
+                                <span class="btn-text">+${points.length - 1}</span>
+                                <span class="material-symbols-outlined text-[14px] btn-icon">expand_more</span>
+                            </button>
+                        </div>
+                        <div class="extra-points hidden flex-col gap-1 font-medium text-on-surface whitespace-nowrap mt-1 w-full">
+                            ${points.slice(1).map((p, idx) => `
+                                <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', ${idx + 1}, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                                    <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="${p}">${p}</span>
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else {
+                const pointText = points[0] || 'Endereço não informado';
+                tdEndereco.innerHTML = `
+                    <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
+                        <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
+                        <span class="font-medium truncate group-hover/loc:underline" title="${pointText}">${pointText}</span>
+                    </button>
+                `;
+            }
         }
 
         // Detectar modo manutentor
@@ -2764,6 +2795,40 @@ class PainelController {
                 const mEdit = document.getElementById('modalEditarMateriaisAdmin');
                 if (mEdit) mEdit.remove();
 
+                // Se a alteração de material for realizada por usuário do tipo manutentor,
+                // reverte o status de auditoria para 'Pendente' para que seja auditada novamente caso já estivesse concluída
+                const isManutentor = typeof this.isManutentorUser === 'function' ? this.isManutentorUser() : false;
+                let auditoriaRevertida = false;
+                if (isManutentor) {
+                    try {
+                        const targetId = (item && item.id) ? item.id : prot;
+                        if (this.service && typeof this.service.changeAuditoriaStatus === 'function') {
+                            await this.service.changeAuditoriaStatus(targetId, 'Pendente');
+                        }
+
+                        const updateAuditoriaRef = (targetObj) => {
+                            if (!targetObj) return;
+                            targetObj.statusAuditoria = 'Pendente';
+                            targetObj.dataConclusaoAuditoria = null;
+                            if (targetObj.rawRow) {
+                                targetObj.rawRow.status_auditoria = 'Pendente';
+                                targetObj.rawRow.data_conclusao_auditoria = null;
+                            }
+                        };
+
+                        updateAuditoriaRef(item);
+                        [this.chamadosList, window.chamadosListCache, window.dadosOSsAbertasCache].forEach(arr => {
+                            if (Array.isArray(arr)) {
+                                arr.filter(o => o && (String(o.protocolo || "").toUpperCase() === String(prot).toUpperCase() || String(o.id || "") === String(prot)))
+                                   .forEach(o => updateAuditoriaRef(o));
+                            }
+                        });
+                        auditoriaRevertida = true;
+                    } catch (eAudit) {
+                        console.warn('⚠️ [PainelController] Erro ao reverter status de auditoria após alteração de material por manutentor:', eAudit);
+                    }
+                }
+
                 // Re-renderiza o conteúdo do modal de detalhes da OS em tempo real
                 const container = document.getElementById('detalheModalConteudo');
                 if (container) {
@@ -2778,9 +2843,13 @@ class PainelController {
                 if (typeof this.renderTable === 'function') this.renderTable();
                 if (typeof this.renderOSTable === 'function') this.renderOSTable();
 
+                const mensagemSucesso = auditoriaRevertida
+                    ? `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos com sucesso! Como a alteração foi realizada pelo perfil manutentor, a auditoria retornou para o status <strong>Pendente</strong>.`
+                    : `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados com sucesso!`;
+
                 this.exibirModalSucessoHTML(
                     'Materiais Salvos',
-                    `Materiais da OS <strong class="text-indigo-600 font-bold">#${prot}</strong> salvos e auditados com sucesso!`
+                    mensagemSucesso
                 );
             } catch(err) {
                 console.error('Erro ao salvar materiais:', err);

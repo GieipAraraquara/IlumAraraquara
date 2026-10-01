@@ -444,7 +444,7 @@
                                value="1" 
                                min="1" 
                                onchange="ajustarPontos()" 
-                               oninput="this.value = this.value.replace(/[^0-9]/g, ''); ajustarPontos();"
+                               oninput="this.value = this.value.replace(/[^0-9]/g, ''); if(this.value && parseInt(this.value) >= 1) { ajustarPontos(); }"
                                class="w-full bg-slate-50 border border-slate-300 focus:bg-white focus:ring-2 focus:ring-blue-600 focus:border-transparent rounded-lg px-3.5 py-2.5 text-sm font-bold text-blue-600 transition-all" />
                     </div>
                 </div>
@@ -1351,7 +1351,11 @@
       // GERADOR DINÂMICO DE CARDS DE PONTOS (ILUMINAÇÃO VIÁRIA)
       // =========================================================================
       function ajustarPontos() {
-        var novaQtd = parseInt(document.getElementById('quantidade').value);
+        var inputQtd = document.getElementById('quantidade');
+        var valStr = inputQtd ? inputQtd.value.trim() : '';
+        if (!valStr) return; // Não faz nada se o usuário apagou temporariamente o dígito no teclado
+
+        var novaQtd = parseInt(valStr);
         if (isNaN(novaQtd) || novaQtd < 1) novaQtd = 1;
         var container = document.getElementById('pontosContainer');
 
@@ -1360,6 +1364,7 @@
             inicializarStatePonto(i);
             container.insertAdjacentHTML('beforeend', gerarHTMLPonto(i));
             atualizarVisibilidadeFotosPonto(i);
+            restaurarVisualPonto(i);
           }
         } else if (novaQtd < qtdAtual) {
           for (var j = qtdAtual - 1; j >= novaQtd; j--) {
@@ -1372,11 +1377,59 @@
       }
 
       function inicializarStatePonto(idx) {
-        pontosData[idx] = {
-          usarMesmoEndereco: false,
-          fotosEstagios: { 'Problema Encontrado': null, 'Reparo Efetuado': null, 'Plaqueta': null },
-          textoAuditoriaOCR: "Nenhuma leitura realizada"
-        };
+        if (!pontosData[idx]) {
+          pontosData[idx] = {
+            usarMesmoEndereco: false,
+            fotosEstagios: { 'Problema Encontrado': null, 'Reparo Efetuado': null, 'Plaqueta': null },
+            textoAuditoriaOCR: "Nenhuma leitura realizada"
+          };
+        }
+      }
+
+      function restaurarVisualPonto(idx) {
+        var pData = pontosData[idx];
+        if (!pData) return;
+
+        if (pData.plaqueta && document.getElementById('plaqueta_' + idx)) {
+          document.getElementById('plaqueta_' + idx).value = pData.plaqueta;
+        }
+        if (pData.tipoProblema && document.getElementById('tipoProblema_' + idx)) {
+          document.getElementById('tipoProblema_' + idx).value = pData.tipoProblema;
+          atualizarVisibilidadeFotosPonto(idx);
+        }
+        if (pData.lat && document.getElementById('lat_' + idx)) {
+          document.getElementById('lat_' + idx).value = pData.lat;
+        }
+        if (pData.lng && document.getElementById('lng_' + idx)) {
+          document.getElementById('lng_' + idx).value = pData.lng;
+        }
+        if (pData.lat || pData.lng) {
+          atualizarMapaPonto(idx);
+        }
+
+        if (pData.fotosEstagios) {
+          for (var estagio in pData.fotosEstagios) {
+            var base64 = pData.fotosEstagios[estagio];
+            if (base64) {
+              var idPreview = 'previewContainer_' + idx + '_' + estagio.replace(/ /g, '_');
+              var idImg = 'img_' + idx + '_' + estagio.replace(/ /g, '_');
+              var idBox = 'boxFoto_' + idx + '_' + estagio.replace(/ /g, '_');
+
+              var containerEl = document.getElementById(idPreview);
+              var imgEl = document.getElementById(idImg);
+              var boxEl = document.getElementById(idBox);
+
+              if (containerEl && imgEl) {
+                imgEl.src = base64;
+                containerEl.classList.remove('hidden');
+              }
+              if (boxEl) {
+                boxEl.classList.remove('border-slate-200', 'bg-slate-50');
+                boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
+              }
+            }
+          }
+        }
       }
 
       function gerarHTMLPonto(idx) {
