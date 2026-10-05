@@ -121,7 +121,6 @@ class FotosController {
 
     categorizePhotoType(titulo = '', estagio = '', origem = '') {
         const text = `${titulo} ${estagio} ${origem}`.toLowerCase();
-        if (text.includes('complementar')) return 'complementar';
         if (text.includes('problema') || text.includes('defeito') || text.includes('antes')) return 'problema';
         if (text.includes('reparo') || text.includes('efetuado') || text.includes('depois') || text.includes('conclus') || text.includes('encerramento')) return 'reparo';
         if (text.includes('plaqueta') || text.includes('poste') || text.includes('placa')) return 'plaqueta';
@@ -137,7 +136,6 @@ class FotosController {
             'plaqueta': 'Plaqueta do Poste',
             'entrada': 'Foto de Entrada',
             'andamento': 'Foto do Andamento',
-            'complementar': 'Foto Complementar',
             'outros': 'Evidência Geral'
         };
         return labels[cat] || 'Evidência';
@@ -150,7 +148,6 @@ class FotosController {
             'plaqueta': 'bg-blue-600 text-white border-blue-500 shadow-md font-bold',
             'entrada': 'bg-purple-600 text-white border-purple-500 shadow-md font-bold',
             'andamento': 'bg-teal-600 text-white border-teal-500 shadow-md font-bold',
-            'complementar': 'bg-sky-600 text-white border-sky-500 shadow-md font-bold',
             'outros': 'bg-slate-800 text-white border-slate-700 shadow-md font-bold'
         };
         return classes[cat] || 'bg-slate-800 text-white border-slate-700 shadow-md font-bold';

@@ -158,8 +158,8 @@ class ChamadosService {
     /**
      * Updates materials for an OS protocol or ID (with optional fechamentoId and numFechamento)
      */
-    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null) {
-        return await this.repository.updateMaterial(protocoloOrId, novosMateriais, fechamentoId, numFechamento);
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null) {
+        return await this.repository.updateMaterial(protocoloOrId, novosMateriais, fechamentoId, numFechamento, historicoSessoesAtualizado);
     }
 
     /**

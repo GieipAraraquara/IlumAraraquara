@@ -154,7 +154,6 @@ class ChamadoModel {
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
         this.textoAuditoriaOCR = data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
         this.fechamentosRaw = data.fechamentos_os || data.fechamentos || [];
-        this.fotosComplementares = data.fotos_complementares || null;
     }
 
     /**
@@ -522,6 +521,13 @@ class ChamadoModel {
                         });
                     }
                 }
+                if (p.fotos_complementares && Array.isArray(p.fotos_complementares)) {
+                    p.fotos_complementares.forEach((fComp, fcIdx) => {
+                        if (fComp) {
+                            pushItem(fComp, `Foto Complementar #${fcIdx + 1}`, { pontoIndex: idx + 1, origem: 'Fotos Complementares' });
+                        }
+                    });
+                }
                 const fotoUnica = p.foto || p.url_foto || p.foto_url;
                 if (fotoUnica) {
                     pushItem(fotoUnica, `Foto Ponto #${idx + 1}`, { pontoIndex: idx + 1 });
@@ -574,22 +580,6 @@ class ChamadoModel {
                     pushItem(cp.url, cp.titulo, { origem: `Fechamento #${f.numero || 1}` });
                 });
             });
-        }
-
-        // 7. Fotos complementares anexadas na abertura da OS (Viária / Geral)
-        const fotosComp = this.fotosComplementares || (this.rawRow && this.rawRow.fotos_complementares);
-        if (fotosComp) {
-            let arrComp = fotosComp;
-            if (typeof arrComp === 'string') {
-                try { arrComp = JSON.parse(arrComp); } catch(e) { arrComp = [arrComp]; }
-            }
-            if (Array.isArray(arrComp)) {
-                arrComp.forEach((f, idx) => {
-                    const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
-                    const t = typeof f === 'object' && f ? (f.titulo || f.estagio || `Foto Complementar #${idx + 1}`) : `Foto Complementar #${idx + 1}`;
-                    if (u) pushItem(u, t, { origem: 'Fotos Complementares', estagio: 'Foto Complementar' });
-                });
-            }
         }
 
         return list;
@@ -754,6 +744,16 @@ class ChamadoModel {
         if (map.size === 0 && this.materialUtilizado) {
             const legacyList = ChamadoModel.parseMaterialsList(this.materialUtilizado);
             legacyList.forEach(addMat);
+        }
+
+        // 3. Fallback para materiais gravados em sessões de trabalho (sessoesList)
+        if (map.size === 0 && this.sessoesList && this.sessoesList.length > 0) {
+            this.sessoesList.forEach(s => {
+                if (s.desconsiderada) return;
+                if (s.materiais && Array.isArray(s.materiais)) {
+                    s.materiais.forEach(addMat);
+                }
+            });
         }
 
         return Array.from(map.values());
@@ -1241,25 +1241,65 @@ class ChamadoModel {
             return true;
         }
 
-        // Validação dinâmica: quantidade de componentes principais (relés, luminárias, lâmpadas, etc.)
-        // não pode exceder o número de pontos/plaquetas atendidos na OS.
-        const materiaisRaw = this.materialUtilizado;
-        if (!materiaisRaw) return false;
+        // 1. Regra específica para Praça Pública:
+        // NÃO é permitido lançar serviços de iluminação pública viária nem nos materiais da OS nem nas sessões de trabalho
+        if (this.isPraca) {
+            const checarServicoProibidoPraca = (nome) => {
+                if (!nome) return false;
+                const s = String(nome).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                return (
+                    (s.includes('servico de manutencao em iluminacao publica viaria') || (s.includes('manutencao em iluminacao publica viaria') && s.includes('poste cpfl'))) ||
+                    (s.includes('servico de troca de rele sem analise de defeito em iluminacao publica viaria') || (s.includes('troca de rele sem analise') && s.includes('viaria'))) ||
+                    (s.includes('servico de instalacao de plaqueta de identificacao em braco metalico de iluminacao publica viaria') || (s.includes('instalacao de plaqueta') && s.includes('viaria'))) ||
+                    (s.includes('servico de poda de arvore') || (s.includes('poda de arvore') && s.includes('munk')))
+                );
+            };
 
+            // Checa materiais consolidados da Praça
+            const matsPraca = this.materiaisConsolidados || [];
+            for (const m of matsPraca) {
+                if (checarServicoProibidoPraca(m.nome || m)) return true;
+            }
+
+            // Checa materiais contidos nas sessões de trabalho
+            if (this.sessoesList && Array.isArray(this.sessoesList)) {
+                for (const sess of this.sessoesList) {
+                    if (sess.desconsiderada) continue;
+                    if (sess.materiais && Array.isArray(sess.materiais)) {
+                        for (const sMat of sess.materiais) {
+                            const sNome = typeof sMat === 'string' ? sMat : (sMat.nome || sMat.descricao || sMat.material || '');
+                            if (checarServicoProibidoPraca(sNome)) return true;
+                        }
+                    }
+                }
+            }
+
+            // Se for Praça e não disparou nenhum serviço proibido, não há limitação de quantidade de componentes por ponto
+            return false;
+        }
+
+        // 2. Validação dinâmica para OS Viária:
+        // Quantidade de componentes principais (relés, luminárias, lâmpadas, etc.) não pode exceder o número de pontos da OS.
+        // Utiliza a lista consolidada (sem duplicar entre fechamentos_os e materialUtilizado)
         let itens = [];
-        if (Array.isArray(materiaisRaw)) {
-            itens = materiaisRaw;
-        } else if (typeof materiaisRaw === 'string') {
-            const trimmed = materiaisRaw.trim();
-            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-                try {
-                    const parsed = JSON.parse(trimmed);
-                    itens = Array.isArray(parsed) ? parsed : [parsed];
-                } catch (e) {
+        if (this.materiaisConsolidados && Array.isArray(this.materiaisConsolidados) && this.materiaisConsolidados.length > 0) {
+            itens = this.materiaisConsolidados;
+        } else if (this.materialUtilizado) {
+            const raw = this.materialUtilizado;
+            if (Array.isArray(raw)) {
+                itens = raw;
+            } else if (typeof raw === 'string') {
+                const trimmed = raw.trim();
+                if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                    try {
+                        const parsed = JSON.parse(trimmed);
+                        itens = Array.isArray(parsed) ? parsed : [parsed];
+                    } catch(e) {
+                        itens = trimmed.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+                    }
+                } else {
                     itens = trimmed.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
                 }
-            } else {
-                itens = trimmed.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
             }
         }
 
@@ -1293,57 +1333,35 @@ class ChamadoModel {
 
             const nomeLower = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-            // Regra específica: Em OS de Praça Pública, NÃO é permitido lançar serviços de iluminação pública viária
-            if (this.isPraca) {
-                const isServicoProibidoPraca = (
-                    (nomeLower.includes('servico de manutencao em iluminacao publica viaria') || (nomeLower.includes('manutencao em iluminacao publica viaria') && nomeLower.includes('poste cpfl'))) ||
-                    (nomeLower.includes('servico de troca de rele sem analise de defeito em iluminacao publica viaria') || (nomeLower.includes('troca de rele sem analise') && nomeLower.includes('viaria'))) ||
-                    (nomeLower.includes('servico de instalacao de plaqueta de identificacao em braco metalico de iluminacao publica viaria') || (nomeLower.includes('instalacao de plaqueta') && nomeLower.includes('viaria'))) ||
-                    (nomeLower.includes('servico de poda de arvore') || nomeLower.includes('servico de poda de arvore') || (nomeLower.includes('poda de arvore') && nomeLower.includes('munk')))
-                );
-
-                if (isServicoProibidoPraca) {
-                    return true;
-                }
-            }
-
             // Ignorar serviços e mão de obra gerais
             if (nomeLower.includes('servico') || nomeLower.includes('mao de obra') || nomeLower.includes('caminhao') || nomeLower.includes('guindauto')) {
                 continue;
             }
 
             // Regra específica: Se for OS Viária e tiver "REFLETOR", é divergente (refletores são exclusivos de praças/espaços públicos)
-            if (!this.isPraca && nomeLower.includes('refletor')) {
+            if (nomeLower.includes('refletor')) {
                 return true;
             }
 
             // Ignorar placas de identificação, plaquetas e adesivos
-            if (nomeLower.includes('placa') || nomeLower.includes('plaqueta') || nomeLower.includes('identificacao') || nomeLower.includes('identificacao')) {
+            if (nomeLower.includes('placa') || nomeLower.includes('plaqueta') || nomeLower.includes('identificacao')) {
                 continue;
             }
 
-            // Identificar categoria exclusiva (1 por ponto) - aplicável exclusivamente para OS Viária
-            // Em Praças Públicas não há limitação de quantidade de luminárias, relés, lâmpadas ou materiais por ponto.
-            if (!this.isPraca) {
-                if (nomeLower.includes('rele') || nomeLower.includes('fotoeletrico')) {
-                    categoriasContadas.RELE += qtd;
-                } else if (nomeLower.includes('luminaria') || nomeLower.includes('refletor')) {
-                    categoriasContadas.LUMINARIA += qtd;
-                } else if (nomeLower.includes('lampada') || nomeLower.includes('vapor de sodio') || nomeLower.includes('vapor metalico') || nomeLower.includes('vapor mercurio')) {
-                    categoriasContadas.LAMPADA += qtd;
-                } else if (nomeLower.includes('reator') || nomeLower.includes('driver')) {
-                    categoriasContadas.REATOR_DRIVER += qtd;
-                } else if (nomeLower.includes('braco') || nomeLower.includes('suporte')) {
-                    categoriasContadas.BRACO += qtd;
-                } else if (nomeLower.includes('base') || nomeLower.includes('soquete') || nomeLower.includes('tomada rele')) {
-                    categoriasContadas.BASE += qtd;
-                }
+            // Identificar categoria exclusiva (1 por ponto)
+            if (nomeLower.includes('rele') || nomeLower.includes('fotoeletrico')) {
+                categoriasContadas.RELE += qtd;
+            } else if (nomeLower.includes('luminaria') || nomeLower.includes('refletor')) {
+                categoriasContadas.LUMINARIA += qtd;
+            } else if (nomeLower.includes('lampada') || nomeLower.includes('vapor de sodio') || nomeLower.includes('vapor metalico') || nomeLower.includes('vapor mercurio')) {
+                categoriasContadas.LAMPADA += qtd;
+            } else if (nomeLower.includes('reator') || nomeLower.includes('driver')) {
+                categoriasContadas.REATOR_DRIVER += qtd;
+            } else if (nomeLower.includes('braco') || nomeLower.includes('suporte')) {
+                categoriasContadas.BRACO += qtd;
+            } else if (nomeLower.includes('base') || nomeLower.includes('soquete') || nomeLower.includes('tomada rele')) {
+                categoriasContadas.BASE += qtd;
             }
-        }
-
-        // Se for Praça e não disparou nenhum serviço proibido, não há divergência de quantidade de materiais
-        if (this.isPraca) {
-            return false;
         }
 
         // Determina a quantidade de pontos da OS Viária
@@ -2382,7 +2400,7 @@ class ChamadoModel {
                 });
 
                 // 3. Sub-arrays de fotos dentro do item
-                ['fotos', 'evidencias_lista', 'fotosList'].forEach(prop => {
+                ['fotos', 'evidencias_lista', 'fotosList', 'fotos_complementares'].forEach(prop => {
                     if (item[prop]) {
                         processItem(item[prop], defaultPtIdx);
                     }

@@ -453,6 +453,37 @@
             <!-- CONTAINER DINÂMICO DE PONTOS -->
             <div id="pontosContainer" class="space-y-6"></div>
 
+            <!-- FOTOS COMPLEMENTARES DA OS VIÁRIA -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-blue-600 text-[18px]">collections</span>
+                            <span>Fotos Complementares</span>
+                        </label>
+                        <p class="text-[11px] text-slate-500 mt-0.5">Anexe quantas fotos complementares desejar (opcional)</p>
+                    </div>
+                    <span id="badgeCountFotosComplementaresViaria" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600">
+                        0
+                    </span>
+                </div>
+
+                <div id="boxFotoComplementarViaria">
+                    <input type="file" id="fotoComplementarViaria" accept="image/*" capture="environment" multiple class="hidden" onchange="adicionarFotoComplementarViaria(event)">
+                    <button type="button" 
+                            id="btnAnexarFotoComplementarViaria"
+                            onclick="document.getElementById('fotoComplementarViaria').click()"
+                            class="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-300 border-dashed rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                        <span class="material-symbols-outlined text-[20px] text-blue-600">add_a_photo</span>
+                        <span>Anexar Fotos Complementares</span>
+                    </button>
+                </div>
+
+                <!-- PREVIEWS DAS FOTOS COMPLEMENTARES -->
+                <div id="containerPreviewsComplementaresViaria" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+                </div>
+            </div>
+
             <!-- CARD DE MATERIAIS UTILIZADOS -->
             <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
                 <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 flex items-center gap-2">
@@ -980,6 +1011,7 @@
       var carrinhoMateriais = [];
       var qtdAtual = 0;
       var pontosData = {};
+      var fotosComplementaresViariaBase64Arr = [];
 
       // Praça Pública States
       var dadosPracaAtual = null;
@@ -1029,6 +1061,7 @@
           dataReparo: document.getElementById('dataReparo')?.value || '',
           quantidade: qtdAtual,
           pontosData: pontosData,
+          fotosComplementaresViariaBase64Arr: fotosComplementaresViariaBase64Arr,
           carrinhoMateriais: carrinhoMateriais,
           descricao: document.getElementById('descricao')?.value || '',
           protocoloPraca: document.getElementById('protocoloPraca')?.value || '',
@@ -1042,7 +1075,7 @@
         };
 
         var temFotosViaria = Object.values(pontosData).some(p => p && p.fotosEstagios && Object.values(p.fotosEstagios).some(f => !!f));
-        var temDadosViaria = draft.protocolo.trim() !== '' || draft.descricao.trim() !== '' || draft.carrinhoMateriais.length > 0 || temFotosViaria;
+        var temDadosViaria = draft.protocolo.trim() !== '' || draft.descricao.trim() !== '' || draft.carrinhoMateriais.length > 0 || temFotosViaria || (draft.fotosComplementaresViariaBase64Arr && draft.fotosComplementaresViariaBase64Arr.length > 0);
         var temDadosPraca = draft.protocoloPraca.trim() !== '' || !!draft.fotoEntradaPracaBase64 || (draft.fotosAndamentoPracaBase64Arr && draft.fotosAndamentoPracaBase64Arr.length > 0) || draft.carrinhoMateriaisPraca.length > 0;
 
         if (temDadosViaria || temDadosPraca) {
@@ -1134,6 +1167,12 @@
                   }
                 }
               }
+            }
+
+            if (draft.fotosComplementaresViariaBase64Arr && Array.isArray(draft.fotosComplementaresViariaBase64Arr) && draft.fotosComplementaresViariaBase64Arr.length > 0) {
+              fotosComplementaresViariaBase64Arr = draft.fotosComplementaresViariaBase64Arr;
+              renderizarPreviewsComplementaresViaria();
+              restaurouAlgo = true;
             }
 
             if (draft.carrinhoMateriais && Array.isArray(draft.carrinhoMateriais)) {
@@ -1696,6 +1735,106 @@
           boxEl.classList.add('border-slate-200', 'bg-slate-50');
         }
         salvarRascunhoFinalizar();
+      }
+
+      // =========================================================================
+      // GERENCIAMENTO DE FOTOS COMPLEMENTARES (OS VIÁRIA)
+      // =========================================================================
+      function adicionarFotoComplementarViaria(event) {
+        var files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+        var pendingCount = files.length;
+
+        Array.from(files).forEach(function(file) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var rawBase64 = e.target.result;
+            
+            if (cdnService && typeof cdnService.compressImage === 'function') {
+              cdnService.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
+                fotosComplementaresViariaBase64Arr.push(compressedBase64 || rawBase64);
+                pendingCount--;
+                if (pendingCount === 0) {
+                  renderizarPreviewsComplementaresViaria();
+                  salvarRascunhoFinalizar();
+                }
+              }).catch(function(err) {
+                console.warn('⚠️ Compressão de foto complementar viária falhou:', err);
+                fotosComplementaresViariaBase64Arr.push(rawBase64);
+                pendingCount--;
+                if (pendingCount === 0) {
+                  renderizarPreviewsComplementaresViaria();
+                  salvarRascunhoFinalizar();
+                }
+              });
+            } else {
+              fotosComplementaresViariaBase64Arr.push(rawBase64);
+              pendingCount--;
+              if (pendingCount === 0) {
+                renderizarPreviewsComplementaresViaria();
+                salvarRascunhoFinalizar();
+              }
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+
+        event.target.value = "";
+      }
+
+      function removerFotoComplementarViaria(index) {
+        if (index >= 0 && index < fotosComplementaresViariaBase64Arr.length) {
+          fotosComplementaresViariaBase64Arr.splice(index, 1);
+          renderizarPreviewsComplementaresViaria();
+          salvarRascunhoFinalizar();
+        }
+      }
+
+      function limparFotosComplementaresViaria() {
+        fotosComplementaresViariaBase64Arr = [];
+        var fileEl = document.getElementById('fotoComplementarViaria');
+        if (fileEl) fileEl.value = "";
+        renderizarPreviewsComplementaresViaria();
+      }
+
+      function renderizarPreviewsComplementaresViaria() {
+        var container = document.getElementById('containerPreviewsComplementaresViaria');
+        var badge = document.getElementById('badgeCountFotosComplementaresViaria');
+        if (!container) return;
+
+        var count = fotosComplementaresViariaBase64Arr.length;
+        if (badge) {
+          badge.innerText = count.toString();
+          badge.className = count > 0 
+            ? 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200'
+            : 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600';
+        }
+
+        if (count === 0) {
+          container.innerHTML = '';
+          container.classList.add('hidden');
+          return;
+        }
+
+        container.classList.remove('hidden');
+        container.innerHTML = fotosComplementaresViariaBase64Arr.map(function(b64, idx) {
+          return `
+            <div class="relative bg-slate-900 border border-slate-200 rounded-xl overflow-hidden shadow-2xs aspect-video">
+              <img src="${b64}" class="w-full h-full object-cover" />
+              <span class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/60 text-white font-bold text-[10px] backdrop-blur-xs">
+                #${idx + 1}
+              </span>
+              <button type="button" 
+                      onclick="removerFotoComplementarViaria(${idx})" 
+                      title="Remover foto complementar"
+                      class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-md flex items-center justify-center transition-all cursor-pointer z-10">
+                <span class="material-symbols-outlined text-[14px] font-bold">close</span>
+              </button>
+            </div>
+          `;
+        }).join('');
       }
 
       // =========================================================================
@@ -2387,6 +2526,57 @@
             });
           }
 
+          // Upload das Fotos Complementares da OS Viária para Cloudinary (caso existam)
+          var urlsComplementaresViaria = [];
+          if (fotosComplementaresViariaBase64Arr && fotosComplementaresViariaBase64Arr.length > 0) {
+            var cdnServiceComp = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
+            for (var iComp = 0; iComp < fotosComplementaresViariaBase64Arr.length; iComp++) {
+              var fCompBase64 = fotosComplementaresViariaBase64Arr[iComp];
+              if (fCompBase64.startsWith('http://') || fCompBase64.startsWith('https://')) {
+                urlsComplementaresViaria.push(fCompBase64);
+              } else if (cdnServiceComp) {
+                btnTexto.innerText = `☁️ Enviando foto complementar #${iComp + 1}...`;
+                try {
+                  var nomeFotoComp = cdnServiceComp.gerarNomePadraoFoto(protFinal, 'COMPLEMENTAR', 'FOTOS_COMPLEMENTARES_' + (iComp + 1), proximoNum);
+                  var urlUpComp = await cdnServiceComp.uploadImage(fCompBase64, 'viaria_fotos', nomeFotoComp);
+                  if (urlUpComp && (urlUpComp.startsWith('http://') || urlUpComp.startsWith('https://'))) {
+                    urlsComplementaresViaria.push(urlUpComp);
+                  } else {
+                    throw new Error(`Foto complementar #${iComp + 1} não retornou URL válida.`);
+                  }
+                } catch (uploadErrComp) {
+                  console.error('❌ Erro ao enviar foto complementar para Cloudinary:', uploadErrComp);
+                  throw new Error(`Falha ao subir foto complementar #${iComp + 1}. Base64 não permitido no banco.`);
+                }
+              } else {
+                throw new Error(`Serviço de upload de imagens (Cloudinary) não está disponível para fotos complementares.`);
+              }
+            }
+          }
+
+          // Se existirem fotos complementares, anexa aos pontos do fechamento
+          if (urlsComplementaresViaria.length > 0) {
+            var evidenciasComplementares = {};
+            urlsComplementaresViaria.forEach(function(uComp, idxComp) {
+              var chaveComp = (idxComp === 0) ? 'FOTOS_COMPLEMENTARES' : ('FOTOS_COMPLEMENTARES_' + (idxComp + 1));
+              evidenciasComplementares[chaveComp] = uComp;
+            });
+
+            arrPontosPayload.push({
+              fechamento: proximoNum,
+              ponto: arrPontosPayload.length + 1,
+              plaqueta: 'FOTOS_COMPLEMENTARES',
+              problema: 'Complementar',
+              lat: arrPontosPayload[0]?.lat || null,
+              lng: arrPontosPayload[0]?.lng || null,
+              coordenada: arrPontosPayload[0]?.coordenada || null,
+              data_reparo: dataReparo,
+              fotos_complementares: urlsComplementaresViaria,
+              evidencias: evidenciasComplementares,
+              texto_auditoria_ocr: null
+            });
+          }
+
           var firstPoint = arrPontosPayload[0] || {};
           var nomeOperadorFinalizacao = obterNomeOperadorLogado();
           var ocrGeral = arrPontosPayload.map(p => p.texto_auditoria_ocr).filter(t => t && t !== "Nenhuma leitura realizada").join(' | ') || (firstPoint.texto_auditoria_ocr || null);
@@ -2634,6 +2824,7 @@
         pontosData = {};
         document.getElementById('pontosContainer').innerHTML = '';
         ajustarPontos();
+        limparFotosComplementaresViaria();
         limparFotosAndamentoPraca();
 
         if (window.offlineSyncService) {

@@ -1787,12 +1787,38 @@ class PainelController {
                     const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, p.enderecoInicial) : { hasNav: false };
                     const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, p.enderecoFinal) : { hasNav: false };
 
+                    // Cálculo da distância individual do ponto (abertura -> fechamento)
+                    let pDistBadge = '';
+                    if (!item.isDireto && window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
+                        const coordIniVal = p.coordenadaInicial && p.coordenadaInicial !== 'Não informada' && p.coordenadaInicial !== 'Sem coordenadas' ? p.coordenadaInicial : (pIdx === 0 ? item.coordenadaInicial : null);
+                        const coordFinVal = p.coordenadaFinal && p.coordenadaFinal !== 'Não informada' && p.coordenadaFinal !== 'Sem coordenadas' ? p.coordenadaFinal : (pIdx === 0 ? item.coordenadaReparo : null);
+                        if (coordIniVal && coordFinVal) {
+                            const pDistM = window.ChamadoModel.calcularDistanciaMetros(coordIniVal, coordFinVal);
+                            if (pDistM !== null && !isNaN(pDistM)) {
+                                const distTxt = pDistM < 1000 ? `${Math.round(pDistM)}m` : `${(pDistM / 1000).toFixed(1)}km`;
+                                const isDiv = pDistM > 100;
+                                const colorCls = isDiv 
+                                    ? 'bg-rose-100 text-rose-800 border-rose-200 font-bold' 
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
+                                pDistBadge = `
+                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-mono border ${colorCls} shadow-2xs" title="Distância entre a coordenada de abertura e de reparo do Ponto #${p.numero}: ${Math.round(pDistM)} metros ${isDiv ? '(superior a 100m - Divergente)' : '(dentro do limite de 100m)'}">
+                                        <span class="material-symbols-outlined text-[13px]">straighten</span>
+                                        <span>Distância: <b>${distTxt}</b></span>
+                                    </span>
+                                `;
+                            }
+                        }
+                    }
+
                     return `
                     <div class="p-2.5 rounded-xl bg-surface-container-lowest border border-outline-variant/60 shadow-2xs space-y-2">
-                        <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1">
-                            <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
-                                <span class="material-symbols-outlined text-[15px]">pin_drop</span>
-                                <span>Ponto #${p.numero}</span>
+                        <div class="flex items-center justify-between gap-2 border-b border-outline-variant/30 pb-1 flex-wrap">
+                            <div class="flex items-center gap-2">
+                                <div class="flex items-center gap-1.5 font-bold text-secondary text-xs">
+                                    <span class="material-symbols-outlined text-[15px]">pin_drop</span>
+                                    <span>Ponto #${p.numero}</span>
+                                </div>
+                                ${pDistBadge}
                             </div>
                             ${p.hasFinalData ? `<span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[10px]">Concluído</span>` : `<span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-bold text-[10px]">Abertura / Pendente</span>`}
                         </div>
@@ -2778,6 +2804,28 @@ class PainelController {
                             targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
                         }
                     });
+
+                    // Atualiza também historico_sessoes em memória para praças
+                    const rawSess = targetObj.historico_sessoes || targetObj.historicoSessoes || (targetObj.rawRow && targetObj.rawRow.historico_sessoes);
+                    if (rawSess) {
+                        let sessList = rawSess;
+                        if (typeof sessList === 'string') {
+                            try { sessList = JSON.parse(sessList); } catch(e) {}
+                        }
+                        if (Array.isArray(sessList) && sessList.length > 0) {
+                            fechamentosState.forEach((fState) => {
+                                const targetIdx = sessList.findIndex(s => Number(s.numero) === Number(fState.numero));
+                                if (targetIdx >= 0) {
+                                    sessList[targetIdx].materiais = [...fState.materiais];
+                                } else if (sessList.length === 1) {
+                                    sessList[0].materiais = [...fState.materiais];
+                                }
+                            });
+                            targetObj.historico_sessoes = sessList;
+                            targetObj.historicoSessoes = sessList;
+                            if (targetObj.rawRow) targetObj.rawRow.historico_sessoes = sessList;
+                        }
+                    }
                 };
 
                 updateItemRef(item);

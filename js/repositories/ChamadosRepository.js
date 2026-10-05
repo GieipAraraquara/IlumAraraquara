@@ -1006,7 +1006,7 @@ class ChamadosRepository {
      * @param {string|number|null} [fechamentoId=null]
      * @param {number|null} [numFechamento=null]
      */
-    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null) {
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null) {
         try {
             const client = this.getClient();
             const protStr = String(protocoloOrId || '').trim();
@@ -1140,6 +1140,54 @@ class ChamadosRepository {
                 for (const field of fieldsToTry) {
                     try {
                         let currentPayload = { ...updatePayloadPrimary };
+
+                        // Sincroniza historico_sessoes para Praças Públicas
+                        if (tableName === this.pracasTable || isPraca) {
+                            if (historicoSessoesAtualizado && Array.isArray(historicoSessoesAtualizado)) {
+                                currentPayload.historico_sessoes = historicoSessoesAtualizado;
+                            } else {
+                                try {
+                                    let sessQuery = client.from(tableName).select('id, protocolo, historico_sessoes');
+                                    if (isNumeric) {
+                                        sessQuery = sessQuery.or(`protocolo.eq.${protStr},id.eq.${protStr}`);
+                                    } else {
+                                        sessQuery = sessQuery.eq('protocolo', protStr);
+                                    }
+                                    const { data: rowsSess } = await sessQuery.limit(1);
+                                    if (rowsSess && rowsSess.length > 0 && rowsSess[0].historico_sessoes) {
+                                        let sessoes = rowsSess[0].historico_sessoes;
+                                        if (typeof sessoes === 'string') {
+                                            try { sessoes = JSON.parse(sessoes); } catch (e) {}
+                                        }
+                                        if (Array.isArray(sessoes) && sessoes.length > 0) {
+                                            let alterou = false;
+                                            if (numFechamento) {
+                                                const sIdx = sessoes.findIndex(s => Number(s.numero) === Number(numFechamento));
+                                                if (sIdx >= 0) {
+                                                    sessoes[sIdx].materiais = matPayload;
+                                                    alterou = true;
+                                                } else if (sessoes[numFechamento - 1]) {
+                                                    sessoes[numFechamento - 1].materiais = matPayload;
+                                                    alterou = true;
+                                                }
+                                            } else if (sessoes.length === 1) {
+                                                sessoes[0].materiais = matPayload;
+                                                alterou = true;
+                                            } else {
+                                                sessoes[0].materiais = matPayload;
+                                                alterou = true;
+                                            }
+                                            if (alterou) {
+                                                currentPayload.historico_sessoes = sessoes;
+                                            }
+                                        }
+                                    }
+                                } catch (eSess) {
+                                    console.warn('⚠️ [ChamadosRepository] Falha ao sincronizar historico_sessoes da praça:', eSess);
+                                }
+                            }
+                        }
+
                         let res = await client
                             .from(tableName)
                             .update(currentPayload)

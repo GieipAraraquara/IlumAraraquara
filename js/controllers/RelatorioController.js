@@ -3667,10 +3667,13 @@ class RelatorioController {
 
                 if (!chamado) continue;
 
+                // 1. Atualiza fechamentos_os (se houver)
+                let alterouFech = false;
+                let ultimosNovosMatsFech = null;
                 if (chamado.fechamentosList && chamado.fechamentosList.length > 0) {
                     for (const fech of chamado.fechamentosList) {
                         let matArr = Array.isArray(fech.materiais) ? [...fech.materiais] : [];
-                        let alterouFech = false;
+                        let alterouEsteFech = false;
 
                         let novosMats = matArr.map(mItem => {
                             let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
@@ -3683,6 +3686,7 @@ class RelatorioController {
 
                             const resolved = this.resolveMarcaEMaterial(mNome);
                             if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
+                                alterouEsteFech = true;
                                 alterouFech = true;
                                 return {
                                     nome: novoMatValue,
@@ -3692,36 +3696,89 @@ class RelatorioController {
                             return mItem;
                         });
 
-                        if (alterouFech) {
-                            await this.service.updateMaterial(chamado.protocolo, novosMats, fech.id, fech.numero);
+                        if (alterouEsteFech) {
+                            fech.materiais = novosMats;
+                            ultimosNovosMatsFech = novosMats;
                         }
                     }
-                } else {
-                    let matArr = Array.isArray(chamado.materialsList) ? [...chamado.materialsList] : (chamado.materialUtilizado ? [chamado.materialUtilizado] : []);
-                    let alterouOS = false;
+                }
 
-                    let novosMats = matArr.map(mItem => {
-                        let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
-                        let mQtd = typeof mItem === 'object' ? (mItem.qtd || mItem.quantidade || 1) : 1;
-
-                        if (typeof mItem === 'string') {
-                            const matchX = mNome.match(/\(x(\d+)\)/i);
-                            if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                // 2. Atualiza historico_sessoes / sessoesList (para Praças Públicas)
+                let sessoesArr = Array.isArray(chamado.sessoesList) ? chamado.sessoesList : (chamado.historico_sessoes || chamado.historicoSessoes || (chamado.rawRow && chamado.rawRow.historico_sessoes) || []);
+                if (typeof sessoesArr === 'string') {
+                    try { sessoesArr = JSON.parse(sessoesArr); } catch (e) {}
+                }
+                let alterouSessoes = false;
+                if (Array.isArray(sessoesArr) && sessoesArr.length > 0) {
+                    sessoesArr.forEach(sess => {
+                        if (sess.materiais && Array.isArray(sess.materiais)) {
+                            sess.materiais = sess.materiais.map(mItem => {
+                                let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
+                                let mQtd = typeof mItem === 'object' ? (mItem.qtd || mItem.quantidade || 1) : 1;
+                                if (typeof mItem === 'string') {
+                                    const matchX = mNome.match(/\(x(\d+)\)/i);
+                                    if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                                }
+                                const resolved = this.resolveMarcaEMaterial(mNome);
+                                if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
+                                    alterouSessoes = true;
+                                    return {
+                                        nome: novoMatValue,
+                                        qtd: qtdPara
+                                    };
+                                }
+                                return mItem;
+                            });
                         }
-
-                        const resolved = this.resolveMarcaEMaterial(mNome);
-                        if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
-                            alterouOS = true;
-                            return {
-                                nome: novoMatValue,
-                                qtd: qtdPara
-                            };
-                        }
-                        return mItem;
                     });
+                    if (alterouSessoes) {
+                        chamado.historico_sessoes = sessoesArr;
+                        chamado.historicoSessoes = sessoesArr;
+                        if (chamado.rawRow) chamado.rawRow.historico_sessoes = sessoesArr;
+                    }
+                }
 
-                    if (alterouOS) {
-                        await this.service.updateMaterial(chamado.protocolo, novosMats);
+                // 3. Atualiza materiais da OS principal
+                let matArr = Array.isArray(chamado.materiais) ? [...chamado.materiais] : (Array.isArray(chamado.materialsList) ? [...chamado.materialsList] : (chamado.materialUtilizado ? [chamado.materialUtilizado] : []));
+                let alterouOS = false;
+                let novosMatsOS = matArr.map(mItem => {
+                    let mNome = typeof mItem === 'string' ? mItem : (mItem.nome || mItem.descricao || mItem.material || '');
+                    let mQtd = typeof mItem === 'object' ? (mItem.qtd || mItem.quantidade || 1) : 1;
+
+                    if (typeof mItem === 'string') {
+                        const matchX = mNome.match(/\(x(\d+)\)/i);
+                        if (matchX) mQtd = parseInt(matchX[1], 10) || 1;
+                    }
+
+                    const resolved = this.resolveMarcaEMaterial(mNome);
+                    if (resolved.desc.toUpperCase() === itemAntigoDesc.toUpperCase() || mNome.toUpperCase().includes(itemAntigoDesc.toUpperCase())) {
+                        alterouOS = true;
+                        return {
+                            nome: novoMatValue,
+                            qtd: qtdPara
+                        };
+                    }
+                    return mItem;
+                });
+
+                if (alterouOS || alterouFech || alterouSessoes) {
+                    const payloadFinal = ultimosNovosMatsFech || novosMatsOS;
+                    chamado.materiais = payloadFinal;
+                    chamado.materialUtilizado = payloadFinal.map(m => (m.qtd && m.qtd > 1 ? `${m.nome} (x${m.qtd})` : (m.nome || m))).join(' | ');
+                    if (chamado.rawRow) {
+                        chamado.rawRow.materiais = payloadFinal;
+                        chamado.rawRow.material_utilizado = chamado.materialUtilizado;
+                    }
+
+                    if (this.service) {
+                        const sessPayload = alterouSessoes ? sessoesArr : null;
+                        if (chamado.fechamentosList && chamado.fechamentosList.length > 0) {
+                            for (const fech of chamado.fechamentosList) {
+                                await this.service.updateMaterial(chamado.protocolo, fech.materiais || payloadFinal, fech.id, fech.numero, sessPayload);
+                            }
+                        } else {
+                            await this.service.updateMaterial(chamado.protocolo, payloadFinal, null, null, sessPayload);
+                        }
                     }
                 }
 

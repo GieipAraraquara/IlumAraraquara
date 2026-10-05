@@ -218,8 +218,6 @@
     <!-- Supabase JS Client & Auth Guard Layer -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
-    <script src="js/config/cloudinaryConfig.js"></script>
-    <script src="js/services/CloudinaryService.js"></script>
     <script src="js/services/OfflineSyncService.js"></script>
     <script src="js/guards/authGuard.js?v=9"></script>
     <script src="js/services/PushNotificationService.js"></script>
@@ -1234,32 +1232,6 @@
             </div>
 
             <div id="pontosContainer"></div>
-
-            <!-- FOTOS COMPLEMENTARES DA OS VIÁRIA -->
-            <div class="card-ponto mt-3">
-              <div class="card-ponto-header flex items-center justify-between">
-                <span class="flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[18px] text-blue-600">add_a_photo</span>
-                  <span>Fotos Complementares (Opcional)</span>
-                </span>
-                <span id="badgeCountFotosComplementaresViaria" class="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200">
-                  0 fotos
-                </span>
-              </div>
-              <p class="text-xs text-slate-500 mb-3 font-normal">
-                Anexe fotos adicionais do local, poste ou arredores para auxiliar as equipes de campo na localização e resolução.
-              </p>
-              
-              <input type="file" id="inputFotosComplementaresViaria" accept="image/*" multiple class="hidden" onchange="adicionarFotosComplementaresViaria(event)">
-              <button type="button" 
-                      onclick="document.getElementById('inputFotosComplementaresViaria').click()" 
-                      class="w-full py-2.5 px-4 bg-blue-50/70 hover:bg-blue-100/70 active:scale-[0.99] border border-blue-200 border-dashed rounded-xl text-xs font-bold text-blue-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs">
-                <span class="material-symbols-outlined text-[18px]">photo_camera</span>
-                <span>Anexar Fotos Complementares</span>
-              </button>
-
-              <div id="containerPreviewsFotosComplementaresViaria" class="hidden grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3 pt-1"></div>
-            </div>
           </div>
 
           <!-- ABA 2: PRAÇA PÚBLICA -->
@@ -4029,97 +4001,6 @@
       }
 
       // =========================================================================
-      // GERENCIAMENTO DE FOTOS COMPLEMENTARES (ILUMINAÇÃO VIÁRIA)
-      // =========================================================================
-      var fotosComplementaresViariaArr = []; // Array de strings Base64 comprimidas ou URLs
-
-      function adicionarFotosComplementaresViaria(event) {
-        var files = event.target.files;
-        if (!files || files.length === 0) return;
-
-        var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-        var pendingCount = files.length;
-
-        Array.from(files).forEach(function(file) {
-          var reader = new FileReader();
-          reader.onload = function(e) {
-            var rawBase64 = e.target.result;
-            if (cdnService && typeof cdnService.compressImage === 'function') {
-              cdnService.compressImage(rawBase64, 1200, 0.75).then(function(compressed) {
-                fotosComplementaresViariaArr.push(compressed || rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) renderizarPreviewsFotosComplementaresViaria();
-              }).catch(function(err) {
-                console.warn('⚠️ Falha ao comprimir foto complementar:', err);
-                fotosComplementaresViariaArr.push(rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) renderizarPreviewsFotosComplementaresViaria();
-              });
-            } else {
-              fotosComplementaresViariaArr.push(rawBase64);
-              pendingCount--;
-              if (pendingCount === 0) renderizarPreviewsFotosComplementaresViaria();
-            }
-          };
-          reader.readAsDataURL(file);
-        });
-
-        event.target.value = "";
-      }
-
-      function removerFotoComplementarViaria(index) {
-        if (index >= 0 && index < fotosComplementaresViariaArr.length) {
-          fotosComplementaresViariaArr.splice(index, 1);
-          renderizarPreviewsFotosComplementaresViaria();
-        }
-      }
-
-      function limparFotosComplementaresViaria() {
-        fotosComplementaresViariaArr = [];
-        var inputF = document.getElementById('inputFotosComplementaresViaria');
-        if (inputF) inputF.value = "";
-        renderizarPreviewsFotosComplementaresViaria();
-      }
-
-      function renderizarPreviewsFotosComplementaresViaria() {
-        var container = document.getElementById('containerPreviewsFotosComplementaresViaria');
-        var badge = document.getElementById('badgeCountFotosComplementaresViaria');
-        if (!container) return;
-
-        var count = fotosComplementaresViariaArr.length;
-        if (badge) {
-          badge.innerText = count + (count === 1 ? ' foto' : ' fotos');
-          badge.className = count > 0 
-            ? 'px-2 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-300'
-            : 'px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-600 border border-slate-200';
-        }
-
-        if (count === 0) {
-          container.innerHTML = '';
-          container.classList.add('hidden');
-          return;
-        }
-
-        container.classList.remove('hidden');
-        container.innerHTML = fotosComplementaresViariaArr.map(function(src, idx) {
-          return `
-            <div class="relative bg-slate-900 border border-slate-200 rounded-xl overflow-hidden shadow-2xs aspect-video group">
-              <img src="${src}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" />
-              <span class="absolute bottom-1.5 left-1.5 px-1.5 py-0.5 rounded-md bg-black/70 text-white font-bold text-[10px] backdrop-blur-xs">
-                #${idx + 1}
-              </span>
-              <button type="button" 
-                      onclick="removerFotoComplementarViaria(${idx})" 
-                      title="Remover foto complementar"
-                      class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-rose-600 hover:bg-rose-700 active:scale-95 text-white shadow-md flex items-center justify-center transition-all cursor-pointer z-10">
-                <span class="material-symbols-outlined text-[14px] font-bold">close</span>
-              </button>
-            </div>
-          `;
-        }).join('');
-      }
-
-      // =========================================================================
       // GERADOR DINÂMICO DE UI DE PONTOS (ILUMINAÇÃO VIÁRIA)
       // =========================================================================
       function ajustarPontos() {
@@ -6476,32 +6357,6 @@
 
         if (isModoEdicao && osRecordEmEdicao) {
           btn.innerText = "Atualizando OS no Supabase...";
-
-          // Upload de fotos complementares caso novas fotos tenham sido adicionadas na edição
-          var urlsFotosCompEdicao = [];
-          if (fotosComplementaresViariaArr && fotosComplementaresViariaArr.length > 0) {
-            btn.innerText = "Enviando fotos complementares (" + fotosComplementaresViariaArr.length + ")...";
-            var cdnServiceEd = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-            var protEd = osRecordEmEdicao.protocolo || osRecordEmEdicao.id;
-            for (var iCompEd = 0; iCompEd < fotosComplementaresViariaArr.length; iCompEd++) {
-              var fDataEd = fotosComplementaresViariaArr[iCompEd];
-              if (fDataEd.startsWith('http://') || fDataEd.startsWith('https://')) {
-                urlsFotosCompEdicao.push(fDataEd);
-              } else if (navigator.onLine && cdnServiceEd) {
-                try {
-                  var plaqEd = (arrPontosPayload[0] && arrPontosPayload[0].plaqueta) ? arrPontosPayload[0].plaqueta : 'S_P';
-                  var nomeEd = cdnServiceEd.gerarNomePadraoFoto(protEd, plaqEd, 'FOTOS_COMPLEMENTARES_' + (iCompEd + 1));
-                  var cdnUrlEd = await cdnServiceEd.uploadImage(fDataEd, 'viaria_fotos', nomeEd, { compress: true, maxDimension: 1200, quality: 0.75 });
-                  urlsFotosCompEdicao.push(cdnUrlEd || fDataEd);
-                } catch(eUpEd) {
-                  urlsFotosCompEdicao.push(fDataEd);
-                }
-              } else {
-                urlsFotosCompEdicao.push(fDataEd);
-              }
-            }
-          }
-
           var payloadUpdate = {
             prioridade: dadosFinais.prioridade,
             municipe_nome: dadosFinais.municipe,
@@ -6509,8 +6364,7 @@
             telefone_celular: dadosFinais.telefoneCelular,
             quantidade: parseInt(dadosFinais.quantidade) || 1,
             descricao: dadosFinais.descricao,
-            pontos_inicial: dadosFinais.pontos,
-            fotos_complementares: urlsFotosCompEdicao.length > 0 ? urlsFotosCompEdicao : (osRecordEmEdicao.fotos_complementares || null)
+            pontos_inicial: dadosFinais.pontos
           };
           
           atualizarSupabaseDiretoFrontend('ordens_servico', osRecordEmEdicao.id, payloadUpdate)
@@ -6580,36 +6434,6 @@
           }
         }
 
-        // Upload das fotos complementares para o Cloudinary (caso existam)
-        var urlsFotosComplementares = [];
-        if (fotosComplementaresViariaArr && fotosComplementaresViariaArr.length > 0) {
-          btn.innerText = "Enviando fotos complementares (" + fotosComplementaresViariaArr.length + ")...";
-          var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-
-          for (var iComp = 0; iComp < fotosComplementaresViariaArr.length; iComp++) {
-            var fData = fotosComplementaresViariaArr[iComp];
-            if (fData.startsWith('http://') || fData.startsWith('https://')) {
-              urlsFotosComplementares.push(fData);
-            } else if (navigator.onLine && cdnService) {
-              try {
-                var plaqRef = (arrPontosPayload[0] && arrPontosPayload[0].plaqueta) ? arrPontosPayload[0].plaqueta : 'S_P';
-                var nomeFotoComp = cdnService.gerarNomePadraoFoto(protExtraido, plaqRef, 'FOTOS_COMPLEMENTARES_' + (iComp + 1));
-                var cdnUrl = await cdnService.uploadImage(fData, 'viaria_fotos', nomeFotoComp, { compress: true, maxDimension: 1200, quality: 0.75 });
-                if (cdnUrl) {
-                  urlsFotosComplementares.push(cdnUrl);
-                } else {
-                  urlsFotosComplementares.push(fData);
-                }
-              } catch(eUploadComp) {
-                console.warn('⚠️ Erro ao subir foto complementar para Cloudinary:', eUploadComp);
-                urlsFotosComplementares.push(fData);
-              }
-            } else {
-              urlsFotosComplementares.push(fData);
-            }
-          }
-        }
-
         var payloadOSViaria = {
           protocolo: protExtraido,
           status: statusOS,
@@ -6622,7 +6446,6 @@
           quantidade: parseInt(dadosFinais.quantidade) || 1,
           descricao: dadosFinais.descricao || null,
           pontos_inicial: dadosFinais.pontos,
-          fotos_complementares: urlsFotosComplementares.length > 0 ? urlsFotosComplementares : null,
           user_id: userAuth.id || null,
           origem_login: userAuth.isGovBr ? 'gov.br' : 'servidor',
           user_email: userAuth.email || null,
@@ -6801,7 +6624,6 @@
         qtdAtual = 0;
         pontosData = {};
         document.getElementById('pontosContainer').innerHTML = '';
-        limparFotosComplementaresViaria();
         ajustarPontos(); 
 
         // Reset Modo Rápido
