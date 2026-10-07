@@ -25,6 +25,7 @@
     <script src="js/services/ChamadosService.js?v=30"></script>
     <script src="js/services/MapService.js?v=74"></script>
     <script src="js/services/PushNotificationService.js"></script>
+    <script src="js/services/PerimetrosBloqueadosService.js?v=1"></script>
     <script src="js/controllers/PainelController.js?v=33"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -508,6 +509,13 @@
                 <span class="flex items-center gap-1 font-bold text-amber-600" title="2 ou mais OSs Abertas concorrentes"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
                 <span class="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400" title="1 OS Aberta + histórico anterior no local"><span class="w-3.5 h-3.5 rounded-full bg-amber-600 border border-white flex items-center justify-center text-[8px] text-white">📁</span> Reincidente</span>
                 <span class="flex items-center gap-1 font-bold text-slate-600 dark:text-slate-400" title="Apenas chamados finalizados neste local"><span class="w-3.5 h-3.5 rounded-full bg-slate-600 border border-white flex items-center justify-center text-[8px] text-white">🕒</span> Histórico</span>
+                
+                <span class="border-l border-outline-variant pl-2 font-bold text-rose-700 flex items-center gap-1.5 cursor-pointer hover:underline" onclick="toggleVisibilidadePerimetrosBloqueados()" id="legenda-perimetros-bloqueados-item" title="Clique para alternar visibilidade dos perímetros restritos">
+                    <span class="w-3.5 h-3.5 rounded bg-rose-500/30 border-2 border-rose-600 flex items-center justify-center text-[9px] text-rose-800">🚫</span>
+                    <span>Áreas Bloqueadas</span>
+                    <span id="badge-total-perimetros-mapa" class="px-1.5 py-0.2 rounded-full text-[9px] bg-rose-100 text-rose-800 font-extrabold">0</span>
+                </span>
+
                 <span class="border-l border-outline-variant pl-2 font-bold text-secondary" id="statMapaOSsAbertas">Inicializando mapa...</span>
             </div>
 
@@ -2009,12 +2017,183 @@
 
         if (stat) stat.innerHTML = `Exibindo <b>${listaOSs.length} OSs</b> (${totalPontos} pontos no mapa)`;
 
+        // Renderiza automaticamente os perímetros bloqueados cadastrados
+        renderizarPerimetrosBloqueadosNoMapaOS();
+
         setTimeout(() => {
             if (mapOSsInstance) mapOSsInstance.resize();
             if (!bounds.isEmpty()) {
                 mapOSsInstance.fitBounds(bounds, { padding: 40, maxZoom: 16 });
             }
         }, 200);
+    }
+
+    // =========================================================================
+    // RENDERIZAÇÃO DE PERÍMETROS BLOQUEADOS NO MAPA GERAL DE OS
+    // =========================================================================
+    let visibilidadePerimetrosBloqueadosAtiva = true;
+    let perimetrosBloqueadosMapaCache = [];
+
+    async function renderizarPerimetrosBloqueadosNoMapaOS() {
+        if (!mapOSsInstance) return;
+
+        // Se o estilo ainda não estiver pronto, aguarda
+        if (!mapOSsInstance.isStyleLoaded()) {
+            mapOSsInstance.once('load', () => renderizarPerimetrosBloqueadosNoMapaOS());
+            return;
+        }
+
+        try {
+            if (window.PerimetrosBloqueadosService) {
+                perimetrosBloqueadosMapaCache = await window.PerimetrosBloqueadosService.listarPerimetros();
+            }
+        } catch (e) {
+            console.warn('Erro ao carregar perímetros no mapa:', e);
+        }
+
+        const badge = document.getElementById('badge-total-perimetros-mapa');
+        if (badge) {
+            const ativos = perimetrosBloqueadosMapaCache.filter(p => p.ativo !== false);
+            badge.textContent = ativos.length;
+        }
+
+        const sourceId = 'perimetros-bloqueados-geral-source';
+        const layerFillId = 'perimetros-bloqueados-geral-fill';
+        const layerLineId = 'perimetros-bloqueados-geral-line';
+        const layerLabelsId = 'perimetros-bloqueados-geral-labels';
+
+        const features = perimetrosBloqueadosMapaCache
+            .filter(p => p.ativo !== false) // Somente perímetros ativos
+            .map(p => {
+                let coords = p.coordenadas;
+                if (coords && coords.coordinates) coords = coords.coordinates[0];
+                else if (Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) coords = coords[0];
+
+                return {
+                    type: 'Feature',
+                    properties: {
+                        id: p.id,
+                        nome: p.nome,
+                        justificativa: p.justificativa
+                    },
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [coords]
+                    }
+                };
+            }).filter(f => f.geometry.coordinates[0] && f.geometry.coordinates[0].length >= 3);
+
+        const geojsonData = {
+            type: 'FeatureCollection',
+            features: features
+        };
+
+        if (mapOSsInstance.getSource(sourceId)) {
+            mapOSsInstance.getSource(sourceId).setData(geojsonData);
+        } else {
+            mapOSsInstance.addSource(sourceId, {
+                type: 'geojson',
+                data: geojsonData
+            });
+
+            // Camada de preenchimento vermelho translúcido com destaque visual
+            mapOSsInstance.addLayer({
+                id: layerFillId,
+                type: 'fill',
+                source: sourceId,
+                layout: {
+                    'visibility': visibilidadePerimetrosBloqueadosAtiva ? 'visible' : 'none'
+                },
+                paint: {
+                    'fill-color': '#e11d48',
+                    'fill-opacity': 0.18
+                }
+            });
+
+            // Camada de borda contornada
+            mapOSsInstance.addLayer({
+                id: layerLineId,
+                type: 'line',
+                source: sourceId,
+                layout: {
+                    'visibility': visibilidadePerimetrosBloqueadosAtiva ? 'visible' : 'none'
+                },
+                paint: {
+                    'line-color': '#be123c',
+                    'line-width': 2.5,
+                    'line-dasharray': [2, 1]
+                }
+            });
+
+            // Rótulo com nome do condomínio
+            mapOSsInstance.addLayer({
+                id: layerLabelsId,
+                type: 'symbol',
+                source: sourceId,
+                layout: {
+                    'visibility': visibilidadePerimetrosBloqueadosAtiva ? 'visible' : 'none',
+                    'text-field': ['concat', '🚫 ', ['get', 'nome']],
+                    'text-size': 11,
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-anchor': 'center',
+                    'text-allow-overlap': false
+                },
+                paint: {
+                    'text-color': '#9f1239',
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 2.5
+                }
+            });
+
+            // Popup ao clicar no condomínio/perímetro bloqueado
+            mapOSsInstance.on('click', layerFillId, (e) => {
+                if (e.features && e.features[0]) {
+                    const props = e.features[0].properties;
+                    new mapboxgl.Popup({ offset: 10, closeButton: true })
+                        .setLngLat(e.lngLat)
+                        .setHTML(`
+                            <div class="p-2 space-y-1.5 font-sans" style="min-width: 200px;">
+                                <div class="flex items-center gap-1.5 text-xs font-bold text-rose-800 border-b border-rose-100 pb-1">
+                                    <span>🚫</span>
+                                    <span>${props.nome}</span>
+                                </div>
+                                <div class="text-[11px] text-slate-700 leading-snug">
+                                    <strong class="text-rose-700">Bloqueio de OS:</strong><br>
+                                    ${props.justificativa || 'Área particular não atendida pelo município.'}
+                                </div>
+                                <div class="text-[10px] text-slate-400 font-semibold pt-0.5">
+                                    Condomínio / Perímetro Proibido
+                                </div>
+                            </div>
+                        `)
+                        .addTo(mapOSsInstance);
+                }
+            });
+
+            mapOSsInstance.on('mouseenter', layerFillId, () => {
+                mapOSsInstance.getCanvas().style.cursor = 'pointer';
+            });
+            mapOSsInstance.on('mouseleave', layerFillId, () => {
+                mapOSsInstance.getCanvas().style.cursor = '';
+            });
+        }
+    }
+
+    function toggleVisibilidadePerimetrosBloqueados() {
+        if (!mapOSsInstance) return;
+        visibilidadePerimetrosBloqueadosAtiva = !visibilidadePerimetrosBloqueadosAtiva;
+        const vis = visibilidadePerimetrosBloqueadosAtiva ? 'visible' : 'none';
+
+        ['perimetros-bloqueados-geral-fill', 'perimetros-bloqueados-geral-line', 'perimetros-bloqueados-geral-labels'].forEach(layerId => {
+            if (mapOSsInstance.getLayer(layerId)) {
+                mapOSsInstance.setLayoutProperty(layerId, 'visibility', vis);
+            }
+        });
+
+        const item = document.getElementById('legenda-perimetros-bloqueados-item');
+        if (item) {
+            item.style.opacity = visibilidadePerimetrosBloqueadosAtiva ? '1' : '0.4';
+        }
     }
 
     function filtrarOSsMapa(termoManual) {

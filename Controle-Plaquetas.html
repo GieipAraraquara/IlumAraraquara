@@ -16,7 +16,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
+    <script src="js/domain/ChamadoModel.js?v=58"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=39"></script>
+    <script src="js/repositories/LogsRepository.js?v=30"></script>
+    <script src="js/services/ChamadosService.js?v=33"></script>
     <script src="js/services/MapService.js?v=73"></script>
+    <script src="js/controllers/AuditoriaController.js?v=73"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -297,68 +302,85 @@
         </div>
     </div>
 
-    <!-- KPI Grid (Total, Registradas 30d, Atualizadas 30d) -->
-    <div class="grid grid-cols-12 gap-card-gap mb-4 max-w-max-width-content mx-auto">
-        <!-- Card 1: Total de Plaquetas -->
-        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:200ms]">
-            <div class="flex items-center justify-between mb-1">
-                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Plaquetas</span>
-                <div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[20px]">tag</span>
-                </div>
-            </div>
-            <div class="font-headline-lg text-headline-lg text-secondary overflow-visible font-bold" id="kpi-total-plaquetas">
-                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
-            </div>
-            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
-                <span class="material-symbols-outlined text-[15px] text-secondary">database</span>
-                <span>Registros ativos no sistema</span>
-            </div>
-        </div>
-
-        <!-- Card 2: Registradas nos Últimos 30 Dias -->
-        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:300ms]">
-            <div class="flex items-center justify-between mb-1">
-                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Registradas (30 Dias)</span>
-                <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[20px]">add_location_alt</span>
-                </div>
-            </div>
-            <div class="font-headline-lg text-headline-lg text-emerald-600 overflow-visible font-bold" id="kpi-novas-30-dias">
-                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
-            </div>
-            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
-                <span class="material-symbols-outlined text-[15px] text-emerald-600">calendar_month</span>
-                <span>Novas plaquetas nos últimos 30 dias</span>
-            </div>
-        </div>
-
-        <!-- Card 3: Atualizadas nos Últimos 30 Dias -->
-        <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:400ms]">
-            <div class="flex items-center justify-between mb-1">
-                <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Atualizadas (30 Dias)</span>
-                <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[20px]">edit_location</span>
-                </div>
-            </div>
-            <div class="font-headline-lg text-headline-lg text-blue-600 overflow-visible font-bold" id="kpi-atualizadas-30-dias">
-                <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
-            </div>
-            <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
-                <span class="material-symbols-outlined text-[15px] text-blue-600">update</span>
-                <span>Plaquetas editadas nos últimos 30 dias</span>
-            </div>
-        </div>
+    <!-- Abas Principais de Navegação -->
+    <div class="flex items-center gap-3 mb-4 max-w-max-width-content mx-auto border-b border-outline-variant/60 pb-1">
+        <button type="button" id="tab-btn-cadastro" onclick="window.alternarAbaPlaquetas('cadastro')" 
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-secondary text-white shadow-xs">
+            <span class="material-symbols-outlined text-[19px]">table_chart</span>
+            <span>Cadastro de Plaquetas</span>
+        </button>
+        <button type="button" id="tab-btn-aprovacao" onclick="window.alternarAbaPlaquetas('aprovacao')" 
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high">
+            <span class="material-symbols-outlined text-[19px] text-amber-600">verified</span>
+            <span>Aprovação de Coordenadas de OS</span>
+            <span id="badge-contador-pendentes-aprovacao" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 ml-1">0</span>
+        </button>
     </div>
 
-    <!-- Tabela Principal de Plaquetas -->
-    <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
-            <div class="px-5 py-3.5 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center flex-wrap gap-2">
-                <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-secondary text-[20px]">table_chart</span>
-                    <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Plaquetas de Iluminação Cadastradas</h3>
+    <!-- SEÇÃO 1: Cadastro de Plaquetas -->
+    <div id="secao-cadastro-plaquetas" class="space-y-4 max-w-max-width-content mx-auto">
+        <!-- KPI Grid (Total, Registradas 30d, Atualizadas 30d) -->
+        <div class="grid grid-cols-12 gap-card-gap mb-4">
+            <!-- Card 1: Total de Plaquetas -->
+            <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Total de Plaquetas</span>
+                    <div class="w-8 h-8 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">tag</span>
+                    </div>
                 </div>
+                <div class="font-headline-lg text-headline-lg text-secondary overflow-visible font-bold" id="kpi-total-plaquetas">
+                    <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+                </div>
+                <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                    <span class="material-symbols-outlined text-[15px] text-secondary">database</span>
+                    <span>Registros ativos no sistema</span>
+                </div>
+            </div>
+
+            <!-- Card 2: Registradas nos Últimos 30 Dias -->
+            <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Registradas (30 Dias)</span>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">add_location_alt</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-emerald-600 overflow-visible font-bold" id="kpi-novas-30-dias">
+                    <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+                </div>
+                <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                    <span class="material-symbols-outlined text-[15px] text-emerald-600">calendar_month</span>
+                    <span>Novas plaquetas nos últimos 30 dias</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Atualizadas nos Últimos 30 Dias -->
+            <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Atualizadas (30 Dias)</span>
+                    <div class="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">edit_location</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-blue-600 overflow-visible font-bold" id="kpi-atualizadas-30-dias">
+                    <div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div>
+                </div>
+                <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
+                    <span class="material-symbols-outlined text-[15px] text-blue-600">update</span>
+                    <span>Plaquetas editadas nos últimos 30 dias</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabela Principal de Plaquetas -->
+        <div class="grid grid-cols-12 gap-card-gap opacity-0 animate-fade-in-up [animation-delay:600ms]">
+            <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
+                <div class="px-5 py-3.5 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center flex-wrap gap-2">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-secondary text-[20px]">table_chart</span>
+                        <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Plaquetas de Iluminação Cadastradas</h3>
+                    </div>
                 
                 <div class="flex items-center gap-3">
                     <!-- Quantidade por Página -->
@@ -557,6 +579,131 @@
             </div>
         </div>
     </div>
+    </div>
+    <!-- FIM SEÇÃO 1: Cadastro de Plaquetas -->
+
+    <!-- SEÇÃO 2: Aprovação de Coordenadas de OS Concluídas -->
+    <div id="secao-aprovacao-coordenadas" class="hidden space-y-4 max-w-max-width-content mx-auto">
+        <!-- KPI Grid de Auditoria de Coordenadas -->
+        <div class="grid grid-cols-12 gap-card-gap mb-4">
+            <!-- Card 1: Pendentes de Aprovação -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Pendentes</span>
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">pending_actions</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-total-pendentes">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">OSs concluídas aguardando revisão</div>
+            </div>
+
+            <!-- Card 2: Divergência Baixa (< 15m) -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Baixa (&le; 15m)</span>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">check_circle</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-emerald-600 font-bold" id="kpi-aprov-baixa-dist">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Variação natural de GPS</div>
+            </div>
+
+            <!-- Card 3: Divergência Média (15m a 50m) -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Média (15m - 50m)</span>
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">warning</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-media-dist">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Requer conferência visual</div>
+            </div>
+
+            <!-- Card 4: Divergência Alta (> 50m) -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Alta (> 50m)</span>
+                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">error</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-rose-600 font-bold" id="kpi-aprov-alta-dist">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Possível plaqueta incorreta</div>
+            </div>
+        </div>
+
+        <!-- Tabela de Aprovação -->
+        <div class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] overflow-hidden">
+            <!-- Header da Tabela com Filtros e Ações em Lote -->
+            <div class="px-5 py-3.5 border-b border-outline-variant bg-[#F8FAFC]/80 flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-amber-600 text-[22px]">published_with_changes</span>
+                    <div>
+                        <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Fila de Aprovação de Coordenadas de OS</h3>
+                        <p class="text-xs text-on-surface-variant">Comparativo geodésico entre o cadastro e o reparo em campo.</p>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Filtro de Divergência -->
+                    <select id="filtro-aprov-faixa" onchange="window.aplicarFiltrosAprovacao()" class="text-xs font-semibold bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5 text-on-surface focus:outline-none cursor-pointer">
+                        <option value="todas">Todas as distâncias</option>
+                        <option value="baixa">&le; 15 metros (Alta confiança)</option>
+                        <option value="media">15m a 50m (Média divergência)</option>
+                        <option value="alta">&gt; 50 metros (Alta divergência)</option>
+                    </select>
+
+                    <!-- Botão Aprovar Selecionadas -->
+                    <button type="button" id="btn-aprovar-lote-coord" onclick="window.aprovarCoordenadasSelecionadasLote()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none" disabled>
+                        <span class="material-symbols-outlined text-[17px]">done_all</span>
+                        <span id="label-aprovar-lote">Aprovar Selecionadas (0)</span>
+                    </button>
+
+                    <!-- Botão Recarregar Fila -->
+                    <button type="button" onclick="window.carregarFilaAprovacaoCoordenadas()" class="p-1.5 rounded-xl border border-outline-variant hover:bg-surface-container-high text-on-surface transition-all active:scale-95 cursor-pointer" title="Recarregar Fila">
+                        <span class="material-symbols-outlined text-[18px] text-secondary">refresh</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabela -->
+            <div class="w-full min-h-[300px] overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs" id="tabela-aprovacao-coord">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/90 border-b border-outline-variant font-semibold text-on-surface-variant uppercase tracking-wider select-none">
+                            <th class="py-3 px-3 w-10 text-center">
+                                <input type="checkbox" id="chk-aprov-todos" onchange="window.toggleSelecionarTodasAprovacoes(this.checked)" class="rounded text-secondary focus:ring-secondary cursor-pointer">
+                            </th>
+                            <th class="py-3 px-4">OS / Protocolo</th>
+                            <th class="py-3 px-4">Plaqueta</th>
+                            <th class="py-3 px-4">Coord. Cadastrada</th>
+                            <th class="py-3 px-4">Coord. da OS (Campo)</th>
+                            <th class="py-3 px-4 text-center">Distância / Desvio</th>
+                            <th class="py-3 px-4">Conclusão / Operador</th>
+                            <th class="py-3 px-4 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-aprovacao-coord" class="divide-y divide-outline-variant/60 bg-surface-container-lowest">
+                        <!-- Linhas geradas dinamicamente -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Footer Informativo -->
+            <div class="px-5 py-3 border-t border-outline-variant bg-[#F8FAFC]/80 flex items-center justify-between text-xs text-on-surface-variant">
+                <div id="info-rodape-aprovacao">Nenhuma OS pendente carregada.</div>
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> &le; 15m</span>
+                    <span class="inline-flex items-center gap-1 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> 15m - 50m</span>
+                    <span class="inline-flex items-center gap-1 ml-2"><span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> &gt; 50m</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FIM SEÇÃO 2: Aprovação de Coordenadas -->
 
     <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
     <button id="btn-scroll-bottom" 
@@ -813,6 +960,201 @@
     </div>
 </div>
 
+<!-- MODAL 5: COMPARATIVO NO MAPA (COORDENADA ATUAL VS COORDENADA DA OS) -->
+<div id="modal-comparativo-coords" onclick="if (event.target === this) window.fecharModalComparativoCoords()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-comparativo-coords-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-5xl w-full h-[92vh] max-h-[820px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">compare</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900" id="comparativo-modal-titulo">Comparativo: Plaqueta #---</h3>
+                        <span id="comparativo-modal-badge-dist" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">0.0 m de distância</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium truncate max-w-xl mt-0.5" id="comparativo-modal-subtitulo">OS #--- &bull; Comparando ponto cadastrado com a coordenada enviada pelo operador na conclusão.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="window.fecharModalComparativoCoords()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas do Mapa Mapbox com Painel Lateral -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-comparativo-canvas" class="w-full h-full min-h-[350px]"></div>
+
+            <!-- Painel Informativo e Botões de Decisão (Overlay Glassmorphism) -->
+            <div class="absolute bottom-4 left-4 right-4 sm:right-auto sm:w-96 bg-white/95 backdrop-blur-md border border-slate-200 p-4 rounded-2xl shadow-xl text-xs space-y-3 z-10 text-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="font-bold text-slate-900 flex items-center gap-1.5 text-sm">
+                        <span class="material-symbols-outlined text-[18px] text-amber-600">straighten</span>
+                        <span>Divergência Geodésica</span>
+                    </span>
+                    <span id="comp-panel-dist-badge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">0 m</span>
+                </div>
+
+                <div class="space-y-2">
+                    <!-- Ponto 1: Original -->
+                    <div class="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
+                        <div class="w-3.5 h-3.5 rounded-full bg-blue-600 mt-0.5 flex-shrink-0 ring-4 ring-blue-100"></div>
+                        <div class="min-w-0 flex-1">
+                            <span class="font-bold text-blue-900 text-[11px] block">Ponto Cadastrado Atual</span>
+                            <span class="font-mono text-[11px] text-blue-700 break-all" id="comp-panel-orig-coords">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Ponto 2: OS Campo -->
+                    <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 flex items-start gap-2.5">
+                        <div class="w-3.5 h-3.5 rounded-full bg-amber-600 mt-0.5 flex-shrink-0 ring-4 ring-amber-100"></div>
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-amber-900 text-[11px] block">Ponto Registrado na OS Concluída</span>
+                                <button type="button" onclick="window.abrirDetalhesOSModalComparativo()" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer" title="Abrir modal completo de detalhes e fotos da OS">
+                                    <span class="material-symbols-outlined text-[13px]">visibility</span>
+                                    <span>Ver OS Completa</span>
+                                </button>
+                            </div>
+                            <span class="font-mono text-[11px] text-amber-800 break-all" id="comp-panel-os-coords">-</span>
+                            <span class="text-[10px] text-slate-500 block mt-0.5" id="comp-panel-os-op">Técnico: ---</span>
+                        </div>
+                    </div>
+                    <!-- Ponto 3: Poste Aéreo Selecionado (Snap) -->
+                    <div id="comp-panel-poste-box" class="p-2.5 rounded-xl bg-purple-50/70 border border-purple-200 hidden transition-all">
+                        <div class="flex items-start gap-2.5">
+                            <div class="w-3.5 h-3.5 rounded-full bg-purple-600 mt-0.5 flex-shrink-0 ring-4 ring-purple-100 flex items-center justify-center text-[8px] text-white font-bold">⚡</div>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-purple-900 text-[11px]">Poste da Base Aérea (Snap Ativo)</span>
+                                    <button type="button" onclick="window.deselecionarPosteAereo()" class="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer">Remover</button>
+                                </div>
+                                <span class="font-mono text-[11px] text-purple-800 break-all block" id="comp-panel-poste-coords">-</span>
+                                <span class="text-[10px] text-purple-600 block mt-0.5" id="comp-panel-poste-dist">A 0m do ponto da OS</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Aviso de Duplicatas no Banco -->
+                    <div id="comp-panel-duplicadas-box" class="p-2.5 rounded-xl bg-amber-50/80 border border-amber-300 text-amber-900 hidden transition-all space-y-2">
+                        <div class="flex items-center gap-1.5 font-bold text-[11px] text-amber-800">
+                            <span class="material-symbols-outlined text-[17px] text-amber-600">content_copy</span>
+                            <span id="comp-panel-duplicadas-titulo">Plaqueta Duplicada no Banco</span>
+                        </div>
+                        <p class="text-[10px] text-amber-700 leading-tight">
+                            Existem múltiplos registros para este código. Selecione no mapa qual ponto você deseja calibrar:
+                        </p>
+                        <div id="comp-panel-duplicadas-lista" class="space-y-1.5 max-h-28 overflow-y-auto pr-1"></div>
+                        <label class="flex items-center gap-2 pt-1 border-t border-amber-200/80 text-[11px] font-semibold text-amber-900 cursor-pointer select-none">
+                            <input type="checkbox" id="chk-limpar-duplicatas-obsoletas" checked class="rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
+                            <span>Remover as outras duplicatas obsoletas do banco ao aprovar</span>
+                        </label>
+                    </div>
+
+                    <div id="comp-panel-poste-dica" class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[15px] text-purple-600">electric_bolt</span>
+                        <span>Clique em um poste aéreo (roxo) no mapa para calibrar a plaqueta exatamente nele.</span>
+                    </div>
+                </div>
+
+                <!-- Botões de Ação -->
+                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="window.fecharModalComparativoCoords()" class="flex-1 py-2 px-3 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition-all text-xs text-center cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btn-aprovar-modal-comp" onclick="window.confirmarAprovacaoModalComparativo()" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white transition-all text-xs text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">check</span>
+                        <span id="btn-aprovar-modal-comp-label">Aprovar Alteração</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Detalhes da Ordem de Serviço (Auditoria & Evidências) -->
+<div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) window.fecharDetalhesOSModal()" class="fixed inset-0 z-[70000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modalDetalhesOSBox" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden text-on-surface transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">assignment</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="font-headline-sm text-headline-sm font-bold text-on-surface" id="detalheModalProtocolo">Protocolo #---</h3>
+                        <span id="detalheModalStatusBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800">Concluída</span>
+                        <span id="detalheModalAuditBadge" class="px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-200 text-slate-700">Auditoria Pendente</span>
+                    </div>
+                    <p class="font-label-sm text-label-sm text-on-surface-variant truncate max-w-md mt-0.5" id="detalheModalDataSub">Abertura: --/--/---- | Conclusão: --/--/----</p>
+                </div>
+            </div>
+            <button type="button" onclick="window.fecharDetalhesOSModal()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                <span class="material-symbols-outlined text-[22px]">close</span>
+            </button>
+        </div>
+
+        <!-- Body Scrollable -->
+        <div class="flex-1 overflow-y-auto p-6 space-y-5" id="detalheModalConteudo">
+            <div class="flex items-center justify-center py-12 text-on-surface-variant text-sm">
+                Carregando detalhes do protocolo...
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="px-6 py-3 border-t border-outline-variant/60 bg-surface-container-low/50 flex items-center justify-between flex-shrink-0">
+            <button type="button" onclick="window.fecharDetalhesOSModal()" class="px-5 py-2 rounded-xl text-label-md font-semibold text-on-surface bg-surface-container-high hover:bg-surface-container transition-colors cursor-pointer ml-auto">
+                Fechar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Galeria de Fotos Cloudinary (Lightbox) -->
+<div id="modalGaleriaFotosCloudinary" onclick="if (event.target === this) window.fecharGaleriaFotosModal()" class="fixed inset-0 bg-black/85 backdrop-blur-md z-[80000] hidden flex-col items-center justify-center p-4 transition-all duration-300">
+    <div class="relative w-full max-w-4xl max-h-[90vh] flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-700/60 shadow-2xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-950/80 border-b border-slate-800 text-white">
+            <div class="flex items-center gap-2.5">
+                <span class="material-symbols-outlined text-amber-400 text-xl">photo_camera</span>
+                <div>
+                    <h3 id="galeriaModalProtocolo" class="text-sm font-bold text-white leading-tight">Fotos da OS #---</h3>
+                    <p id="galeriaModalTituloFoto" class="text-[11px] text-slate-400 font-medium">Estágio / Ponto</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="galeriaModalCounter" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">1 / 1</span>
+                <button type="button" onclick="window.fecharGaleriaFotosModal()" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800 cursor-pointer">
+                    <span class="material-symbols-outlined text-2xl">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas Principal -->
+        <div class="relative flex-1 flex items-center justify-center p-4 bg-slate-950/90 min-h-[350px] max-h-[70vh] select-none">
+            <button type="button" id="btnGaleriaPrev" onclick="window.navegarGaleriaFotos(-1)" class="absolute left-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_left</span>
+            </button>
+            
+            <img id="galeriaModalImgPrincipal" src="" alt="Evidência Cloudinary" class="max-w-full max-h-[65vh] object-contain rounded-lg shadow-2xl transition-opacity duration-200" />
+            
+            <button type="button" id="btnGaleriaNext" onclick="window.navegarGaleriaFotos(1)" class="absolute right-4 z-10 w-10 h-10 rounded-full bg-black/60 text-white hover:bg-black/90 hover:scale-110 border border-white/20 transition-all flex items-center justify-center cursor-pointer">
+                <span class="material-symbols-outlined text-2xl">chevron_right</span>
+            </button>
+        </div>
+
+        <!-- Thumbnails Strip -->
+        <div id="galeriaModalThumbnailsStrip" class="flex items-center gap-2 px-4 py-3 bg-slate-950/95 border-t border-slate-800 overflow-x-auto">
+            <!-- Thumbnails geradas via JS -->
+        </div>
+    </div>
+</div>
+
 <!-- CONTROLLER E LÓGICA DE GERENCIAMENTO DE PLAQUETAS -->
 <script>
     (function() {
@@ -839,6 +1181,9 @@
         window.initControlePlaquetas = function() {
             initEvents();
             carregarPlaquetas(1);
+            if (typeof window.carregarFilaAprovacaoCoordenadas === 'function') {
+                window.carregarFilaAprovacaoCoordenadas();
+            }
         };
 
         // Executar inicialização quando DOM e Supabase estiverem prontos
@@ -1436,43 +1781,32 @@
                 // Data limite de 30 dias atrás
                 const data30DiasAtras = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-                // 2. Quantidade de plaquetas registradas nos últimos 30 dias
+                // 2. Novas / Atualizadas consultadas com segurança na tabela historico_localizacao_plaquetas (que possui created_at)
                 let countNovas = 0;
+                let countAtualizadas = 0;
                 try {
-                    let resNovas = await client.from('localizacao_plaquetas')
-                        .select('identificacao', { count: 'exact', head: true })
-                        .gte('created_at', data30DiasAtras);
-
-                    if (!resNovas.error && resNovas.count !== null) {
-                        countNovas = resNovas.count;
-                    } else {
-                        // Fallback tentando coluna alternativa de data
-                        let resNovasFB = await client.from('localizacao_plaquetas')
-                            .select('identificacao', { count: 'exact', head: true })
-                            .gte('quando_colocado', data30DiasAtras);
-                        if (!resNovasFB.error && resNovasFB.count !== null) {
-                            countNovas = resNovasFB.count;
-                        }
+                    const resHistNovas = await client.from('historico_localizacao_plaquetas')
+                        .select('id', { count: 'exact', head: true })
+                        .gte('created_at', data30DiasAtras)
+                        .eq('origem', 'CADASTRO_NOVA_PLAQUETA');
+                    if (!resHistNovas.error && resHistNovas.count !== null) {
+                        countNovas = resHistNovas.count;
                     }
-                } catch (eNovas) {
-                    console.warn("⚠️ Não foi possível consultar registradas nos últimos 30 dias:", eNovas);
+
+                    const resHistAtualiz = await client.from('historico_localizacao_plaquetas')
+                        .select('id', { count: 'exact', head: true })
+                        .gte('created_at', data30DiasAtras)
+                        .neq('origem', 'CADASTRO_NOVA_PLAQUETA');
+                    if (!resHistAtualiz.error && resHistAtualiz.count !== null) {
+                        countAtualizadas = resHistAtualiz.count;
+                    }
+                } catch (eHist) {
+                    console.warn("⚠️ Aviso ao consultar métricas de 30 dias no histórico:", eHist);
                 }
+
                 const elNovas = document.getElementById('kpi-novas-30-dias');
                 if (elNovas) elNovas.innerText = countNovas.toLocaleString('pt-BR');
 
-                // 3. Quantidade de plaquetas atualizadas nos últimos 30 dias
-                let countAtualizadas = 0;
-                try {
-                    let resAtualiz = await client.from('localizacao_plaquetas')
-                        .select('identificacao', { count: 'exact', head: true })
-                        .gte('updated_at', data30DiasAtras);
-
-                    if (!resAtualiz.error && resAtualiz.count !== null) {
-                        countAtualizadas = resAtualiz.count;
-                    }
-                } catch (eAtualiz) {
-                    console.warn("⚠️ Não foi possível consultar atualizadas nos últimos 30 dias:", eAtualiz);
-                }
                 const elAtualizadas = document.getElementById('kpi-atualizadas-30-dias');
                 if (elAtualizadas) elAtualizadas.innerText = countAtualizadas.toLocaleString('pt-BR');
 
@@ -2198,6 +2532,1133 @@
                 modal.classList.add('hidden');
             }, 200);
         };
+
+        // =========================================================================
+        // MÓDULO: APROVAÇÃO DE COORDENADAS DE OS CONCLUÍDAS (AUDITORIA GEODÉSICA)
+        // =========================================================================
+        let abaAtiva = 'cadastro'; // 'cadastro' | 'aprovacao'
+        let filaAprovacaoCache = [];
+        let itemEmComparacaoModal = null;
+        let compMapboxInstance = null;
+        let compMarkers = [];
+        let compPostesMarkers = [];
+        let compPosteSelecionado = null;
+        let compDuplicatasList = [];
+        let compInstanciaSelecionadaId = null;
+
+        window.alternarAbaPlaquetas = function(aba) {
+            abaAtiva = aba;
+            const btnCad = document.getElementById('tab-btn-cadastro');
+            const btnApr = document.getElementById('tab-btn-aprovacao');
+            const secCad = document.getElementById('secao-cadastro-plaquetas');
+            const secApr = document.getElementById('secao-aprovacao-coordenadas');
+
+            if (aba === 'cadastro') {
+                if (btnCad) btnCad.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-secondary text-white shadow-xs";
+                if (btnApr) btnApr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high";
+                if (secCad) {
+                    secCad.classList.remove('hidden');
+                    secCad.style.display = 'block';
+                }
+                if (secApr) {
+                    secApr.classList.add('hidden');
+                    secApr.style.display = 'none';
+                }
+            } else {
+                if (btnApr) btnApr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-amber-600 text-white shadow-xs";
+                if (btnCad) btnCad.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high";
+                if (secCad) {
+                    secCad.classList.add('hidden');
+                    secCad.style.display = 'none';
+                }
+                if (secApr) {
+                    secApr.classList.remove('hidden');
+                    secApr.style.display = 'block';
+                }
+
+                if (filaAprovacaoCache.length === 0) {
+                    window.carregarFilaAprovacaoCoordenadas();
+                } else {
+                    atualizarKPIsAprovacao();
+                    renderizarFilaAprovacao();
+                }
+            }
+        };
+
+        // Utilitário interno para parse de latitude e longitude
+        function extrairLatLng(coordStr) {
+            if (!coordStr) return null;
+            if (typeof coordStr === 'object' && coordStr !== null) {
+                const lat = parseFloat(coordStr.lat ?? coordStr.latitude);
+                const lng = parseFloat(coordStr.lng ?? coordStr.longitude);
+                if (!isNaN(lat) && !isNaN(lng)) {
+                    if (Math.abs(lat) > 35 && Math.abs(lng) < 35) return { lat: lng, lng: lat };
+                    return { lat, lng };
+                }
+            }
+            if (typeof coordStr === 'string') {
+                const parts = coordStr.replace(/[^\d.,\- ]/g, '').split(/[,\s]+/).map(p => parseFloat(p.trim())).filter(p => !isNaN(p));
+                if (parts.length >= 2) {
+                    let [lat, lng] = parts;
+                    if (Math.abs(lat) > 35 && Math.abs(lng) < 35) { const temp = lat; lat = lng; lng = temp; }
+                    return { lat, lng };
+                }
+            }
+            return null;
+        }
+
+        // Cálculo de distância geodésica em metros (Fórmula de Haversine)
+        function calcularDistanciaHaversine(c1, c2) {
+            if (!c1 || !c2) return null;
+            if (window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
+                return window.ChamadoModel.calcularDistanciaMetros(c1, c2);
+            }
+            const R = 6371000;
+            const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+            const dLng = (c2.lng - c1.lng) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(c1.lat * Math.PI / 180) * Math.cos(c2.lat * Math.PI / 180) *
+                      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        /**
+         * Carrega OSs Concluídas recentes e cruza estritamente com localizacao_plaquetas
+         * Conforme INSTRUCOES_SUPABASE_EGRESS.md:
+         * - Projeção estrita de poucas colunas leves (sem fotos / sem pontos_final)
+         * - Janela temporal de 45 dias
+         * - Batches de 50 no .in()
+         */
+        window.carregarFilaAprovacaoCoordenadas = async function() {
+            const tbody = document.getElementById('tbody-aprovacao-coord');
+            const infoRodape = document.getElementById('info-rodape-aprovacao');
+            if (tbody) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500 font-medium">
+                    <span class="material-symbols-outlined text-[28px] animate-spin text-amber-600 mb-2">sync</span>
+                    <p>Consultando ordens de serviço concluídas e cruzando com o cadastro de plaquetas...</p>
+                </td></tr>`;
+            }
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-600 font-bold">Cliente Supabase não inicializado.</td></tr>`;
+                return;
+            }
+
+            try {
+                // Janela temporal padrão de 45 dias
+                const dataCorte = new Date();
+                dataCorte.setDate(dataCorte.getDate() - 45);
+                const dataCorteIso = dataCorte.toISOString();
+
+                // Projeção estrita e leve (Zero fotos em Base64 / Zero OCR)
+                // pontos_inicial e pontos_final são arrays leves de pontos quando parsed sem fotos pesadas
+                const COLUNAS_AUDITORIA_LEVE = 'id, protocolo, plaqueta_final, plaqueta_inicial, coordenada_reparo, coordenada, data_fechamento, data_abertura, operador_finalizacao, status, pontos_final, pontos_inicial';
+
+                console.log('🔍 [Aprovação Coordenadas] Consultando OSs concluídas recentes...');
+                let resOS = await client.from('vw_todas_ordens_servico')
+                    .select(COLUNAS_AUDITORIA_LEVE)
+                    .in('status', ['Concluída', 'Concluida'])
+                    .gte('data_fechamento', dataCorteIso)
+                    .order('data_fechamento', { ascending: false })
+                    .limit(300);
+
+                if (resOS.error || !resOS.data || resOS.data.length === 0) {
+                    console.warn('⚠️ [Aprovação Coordenadas] Tentando fallback na tabela ordens_servico...');
+                    resOS = await client.from('ordens_servico')
+                        .select(COLUNAS_AUDITORIA_LEVE)
+                        .in('status', ['Concluída', 'Concluida'])
+                        .gte('data_fechamento', dataCorteIso)
+                        .order('data_fechamento', { ascending: false })
+                        .limit(300);
+                }
+
+                if (resOS.error || !resOS.data || resOS.data.length === 0) {
+                    // Fallback geral por ID decrescente
+                    resOS = await client.from('vw_todas_ordens_servico')
+                        .select(COLUNAS_AUDITORIA_LEVE)
+                        .in('status', ['Concluída', 'Concluida'])
+                        .order('id', { ascending: false })
+                        .limit(200);
+
+                    if (resOS.error || !resOS.data || resOS.data.length === 0) {
+                        resOS = await client.from('ordens_servico')
+                            .select(COLUNAS_AUDITORIA_LEVE)
+                            .in('status', ['Concluída', 'Concluida'])
+                            .order('id', { ascending: false })
+                            .limit(200);
+                    }
+                }
+
+                if (resOS.error) {
+                    throw new Error("Erro ao consultar OSs: " + resOS.error.message);
+                }
+
+                const listaOS = resOS.data || [];
+                console.log(`📋 [Aprovação Coordenadas] ${listaOS.length} OSs concluídas encontradas para análise.`);
+
+                if (listaOS.length > 0) {
+                    const amostra = listaOS[0];
+                    console.log('🔎 [Amostra OS 0]:', {
+                        protocolo: amostra.protocolo,
+                        plaqueta_final: amostra.plaqueta_final,
+                        plaqueta_inicial: amostra.plaqueta_inicial,
+                        coordenada_reparo: amostra.coordenada_reparo,
+                        coordenada: amostra.coordenada,
+                        hasPontosFinal: Boolean(amostra.pontos_final),
+                        hasPontosInicial: Boolean(amostra.pontos_inicial)
+                    });
+                }
+
+                const parseArrayJson = (val) => {
+                    if (Array.isArray(val)) return val;
+                    if (typeof val === 'string') {
+                        try { return JSON.parse(val); } catch(e) {}
+                    }
+                    return null;
+                };
+
+                // Filtrar apenas OSs que tenham plaqueta e coordenada de reparo válidas
+                const osComCoord = [];
+                const plaquetasNecessarias = new Set();
+
+                listaOS.forEach(os => {
+                    let plq = (os.plaqueta_final || os.plaqueta_inicial || '').trim();
+                    let cRep = (os.coordenada_reparo || os.coordenada || '').trim();
+
+                    const ptsFinal = parseArrayJson(os.pontos_final);
+                    const ptsInicial = parseArrayJson(os.pontos_inicial);
+
+                    // Extração dos pontos_final caso as colunas diretas estejam em branco
+                    if (ptsFinal && ptsFinal.length > 0) {
+                        const p0Fin = ptsFinal[0] || {};
+                        if (!plq) plq = (p0Fin.plaqueta || p0Fin.plaqueta_final || p0Fin.identificacao || '').trim();
+                        if (!cRep) {
+                            if (p0Fin.coordenada || p0Fin.coordenada_reparo) cRep = String(p0Fin.coordenada || p0Fin.coordenada_reparo).trim();
+                            else if (p0Fin.lat && p0Fin.lng) cRep = `${p0Fin.lat}, ${p0Fin.lng}`;
+                        }
+                    }
+
+                    // Fallback para pontos_inicial
+                    if (ptsInicial && ptsInicial.length > 0) {
+                        const p0Ini = ptsInicial[0] || {};
+                        if (!plq) plq = (p0Ini.plaqueta || p0Ini.plaqueta_inicial || p0Ini.identificacao || '').trim();
+                        if (!cRep) {
+                            if (p0Ini.coordenada || p0Ini.coordenada_inicial) cRep = String(p0Ini.coordenada || p0Ini.coordenada_inicial).trim();
+                            else if (p0Ini.lat && p0Ini.lng) cRep = `${p0Ini.lat}, ${p0Ini.lng}`;
+                        }
+                    }
+
+                    if (plq && cRep) {
+                        const parsedRep = extrairLatLng(cRep);
+                        if (parsedRep) {
+                            osComCoord.push({
+                                osId: os.id,
+                                protocolo: os.protocolo || String(os.id),
+                                plaquetaId: plq,
+                                coordReparoRaw: cRep,
+                                coordReparoParsed: parsedRep,
+                                dataFechamento: os.data_fechamento || os.data_abertura,
+                                operador: os.operador_finalizacao || 'Técnico'
+                            });
+                            plaquetasNecessarias.add(plq);
+                        }
+                    }
+                });
+
+                console.log(`📌 [Aprovação Coordenadas] ${osComCoord.length} OSs com plaqueta e coordenada extraídas. Plaquetas únicas: ${plaquetasNecessarias.size}`);
+
+                if (plaquetasNecessarias.size === 0) {
+                    filaAprovacaoCache = [];
+                    renderizarFilaAprovacao();
+                    atualizarKPIsAprovacao();
+                    return;
+                }
+
+                // Buscar plaquetas cadastradas correspondentes em lotes de 50 (.in() seguro contra HTTP 414)
+                const plaquetasArray = Array.from(plaquetasNecessarias);
+                const CHUNK_SIZE = 50;
+                const plaquetasMap = new Map(); // key -> Array de instâncias no banco
+
+                for (let i = 0; i < plaquetasArray.length; i += CHUNK_SIZE) {
+                    const chunk = plaquetasArray.slice(i, i + CHUNK_SIZE);
+                    const { data: plaquetasChunk, error: plqErr } = await client
+                        .from('localizacao_plaquetas')
+                        .select('id, identificacao, "Latitude", "Longitude", "Empresa"')
+                        .in('identificacao', chunk);
+
+                    if (!plqErr && plaquetasChunk) {
+                        plaquetasChunk.forEach(p => {
+                            if (p.identificacao) {
+                                const key = p.identificacao.toUpperCase();
+                                if (!plaquetasMap.has(key)) {
+                                    plaquetasMap.set(key, []);
+                                }
+                                plaquetasMap.get(key).push(p);
+                            }
+                        });
+                    }
+                }
+
+                console.log(`📍 [Aprovação Coordenadas] ${plaquetasMap.size} códigos únicos de plaquetas encontrados no cadastro.`);
+
+                // Cruzamento e cálculo de distância geodésica
+                const filaMontada = [];
+                osComCoord.forEach(item => {
+                    const instsCadastradas = plaquetasMap.get(item.plaquetaId.toUpperCase());
+                    if (!instsCadastradas || instsCadastradas.length === 0) return; // Plaqueta não cadastrada ou já excluída
+
+                    // Mapear todas as instâncias válidas calculando a distância de cada uma até a OS
+                    const instsValidas = [];
+                    instsCadastradas.forEach(cad => {
+                        const latCad = parseFloat(cad.Latitude);
+                        const lngCad = parseFloat(cad.Longitude);
+                        if (!isNaN(latCad) && !isNaN(lngCad)) {
+                            const coordParsed = { lat: latCad, lng: lngCad };
+                            const dist = calcularDistanciaHaversine(coordParsed, item.coordReparoParsed);
+                            if (dist !== null && !isNaN(dist)) {
+                                instsValidas.push({
+                                    id: cad.id,
+                                    identificacao: cad.identificacao,
+                                    empresa: cad.Empresa || '---',
+                                    lat: latCad,
+                                    lng: lngCad,
+                                    rawCoord: `${latCad.toFixed(6)}, ${lngCad.toFixed(6)}`,
+                                    distanciaMetros: Math.round(dist * 10) / 10
+                                });
+                            }
+                        }
+                    });
+
+                    if (instsValidas.length === 0) return;
+
+                    // Ordenar as instâncias da mais próxima para a mais distante da OS
+                    instsValidas.sort((a, b) => a.distanciaMetros - b.distanciaMetros);
+                    const melhorInstancia = instsValidas[0];
+
+                    // Ignorar OSs cuja menor distância seja praticamente 0 metros (já sincronizadas ou idênticas)
+                    if (melhorInstancia.distanciaMetros < 0.5 && instsValidas.length === 1) return;
+
+                    filaMontada.push({
+                        ...item,
+                        idRegistroPlaqueta: melhorInstancia.id,
+                        instanciasDuplicadas: instsValidas,
+                        totalDuplicatasBanco: instsValidas.length,
+                        coordCadastradaRaw: melhorInstancia.rawCoord,
+                        coordCadastradaParsed: { lat: melhorInstancia.lat, lng: melhorInstancia.lng },
+                        distanciaMetros: melhorInstancia.distanciaMetros,
+                        empresa: melhorInstancia.empresa,
+                        selecionado: false
+                    });
+                });
+
+                console.log(`🎯 [Aprovação Coordenadas] ${filaMontada.length} divergências geodésicas calculadas.`);
+
+                // Ordenar por data de fechamento mais recente
+                filaMontada.sort((a, b) => new Date(b.dataFechamento) - new Date(a.dataFechamento));
+
+                filaAprovacaoCache = filaMontada;
+                atualizarKPIsAprovacao();
+                renderizarFilaAprovacao();
+
+            } catch (err) {
+                console.error("❌ Erro ao carregar fila de aprovação de coordenadas:", err);
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-rose-600 font-semibold">
+                        Erro ao carregar dados: ${err.message}
+                    </td></tr>`;
+                }
+            }
+        };
+
+        function atualizarKPIsAprovacao() {
+            const total = filaAprovacaoCache.length;
+            const baixa = filaAprovacaoCache.filter(i => i.distanciaMetros <= 15).length;
+            const media = filaAprovacaoCache.filter(i => i.distanciaMetros > 15 && i.distanciaMetros <= 50).length;
+            const alta = filaAprovacaoCache.filter(i => i.distanciaMetros > 50).length;
+
+            const elTotal = document.getElementById('kpi-aprov-total-pendentes');
+            const elBaixa = document.getElementById('kpi-aprov-baixa-dist');
+            const elMedia = document.getElementById('kpi-aprov-media-dist');
+            const elAlta = document.getElementById('kpi-aprov-alta-dist');
+            const badgeAba = document.getElementById('badge-contador-pendentes-aprovacao');
+
+            if (elTotal) elTotal.innerText = total;
+            if (elBaixa) elBaixa.innerText = baixa;
+            if (elMedia) elMedia.innerText = media;
+            if (elAlta) elAlta.innerText = alta;
+            if (badgeAba) badgeAba.innerText = total;
+        }
+
+        window.aplicarFiltrosAprovacao = function() {
+            renderizarFilaAprovacao();
+        };
+
+        function renderizarFilaAprovacao() {
+            const tbody = document.getElementById('tbody-aprovacao-coord');
+            const infoRodape = document.getElementById('info-rodape-aprovacao');
+            const filtroFaixa = document.getElementById('filtro-aprov-faixa')?.value || 'todas';
+            if (!tbody) return;
+
+            let itensFiltrados = filaAprovacaoCache;
+            if (filtroFaixa === 'baixa') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros <= 15);
+            else if (filtroFaixa === 'media') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros > 15 && i.distanciaMetros <= 50);
+            else if (filtroFaixa === 'alta') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros > 50);
+
+            if (itensFiltrados.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500">
+                    <span class="material-symbols-outlined text-[36px] text-slate-300 mb-1">task_alt</span>
+                    <p class="font-bold text-slate-700">Nenhuma coordenada divergente pendente nesta categoria</p>
+                    <p class="text-xs text-slate-400 mt-0.5">As coordenadas das plaquetas conferem com os reparos das OSs concluídas.</p>
+                </td></tr>`;
+                if (infoRodape) infoRodape.innerText = "0 pendências encontradas.";
+                atualizarBotaoAprovarLote();
+                return;
+            }
+
+            if (infoRodape) {
+                infoRodape.innerText = `Exibindo ${itensFiltrados.length} de ${filaAprovacaoCache.length} pendências para revisão.`;
+            }
+
+            tbody.innerHTML = itensFiltrados.map((item, idx) => {
+                // Classificação de cor pela distância
+                let badgeDistClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                let dotColor = "bg-emerald-500";
+                if (item.distanciaMetros > 50) {
+                    badgeDistClass = "bg-rose-50 text-rose-700 border-rose-200";
+                    dotColor = "bg-rose-500";
+                } else if (item.distanciaMetros > 15) {
+                    badgeDistClass = "bg-amber-50 text-amber-800 border-amber-200";
+                    dotColor = "bg-amber-500";
+                }
+
+                const distFormatada = item.distanciaMetros < 1000 
+                    ? `${item.distanciaMetros.toFixed(1)} m` 
+                    : `${(item.distanciaMetros / 1000).toFixed(2)} km`;
+
+                const dtFech = item.dataFechamento 
+                    ? new Date(item.dataFechamento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                    : '---';
+
+                return `
+                    <tr class="hover:bg-slate-50/70 transition-colors">
+                        <td class="py-3 px-3 text-center align-middle">
+                            <input type="checkbox" onchange="window.toggleSelecionarItemAprovacao('${item.protocolo}', this.checked)" ${item.selecionado ? 'checked' : ''} class="chk-item-aprov rounded text-secondary focus:ring-secondary cursor-pointer">
+                        </td>
+                        <td class="py-3 px-4 font-bold text-slate-900 align-middle">
+                            <span class="font-mono text-xs">${item.protocolo}</span>
+                        </td>
+                        <td class="py-3 px-4 align-middle">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="inline-flex items-center gap-1 font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded text-xs">
+                                    <span class="material-symbols-outlined text-[13px]">tag</span>
+                                    <span>${item.plaquetaId}</span>
+                                </span>
+                                ${item.totalDuplicatasBanco > 1 ? `
+                                    <span class="inline-flex items-center gap-0.5 font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded text-[10px]" title="${item.totalDuplicatasBanco} registros desta plaqueta encontrados no banco de dados">
+                                        <span class="material-symbols-outlined text-[12px]">content_copy</span>
+                                        <span>${item.totalDuplicatasBanco}x</span>
+                                    </span>
+                                ` : ''}
+                            </div>
+                        </td>
+                        <td class="py-3 px-4 font-mono text-slate-600 align-middle">
+                            ${item.coordCadastradaRaw}
+                        </td>
+                        <td class="py-3 px-4 font-mono text-amber-900 font-medium align-middle">
+                            ${item.coordReparoRaw}
+                        </td>
+                        <td class="py-3 px-4 text-center align-middle">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${badgeDistClass}">
+                                <span class="w-2 h-2 rounded-full ${dotColor}"></span>
+                                <span>${distFormatada}</span>
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-slate-600 align-middle">
+                            <div class="font-medium text-slate-800 text-[11px]">${item.operador}</div>
+                            <div class="text-[10px] text-slate-400">${dtFech}</div>
+                        </td>
+                        <td class="py-3 px-4 text-center align-middle">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button type="button" onclick="window.abrirDetalhesOSModal('${item.protocolo}')" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all cursor-pointer" title="Inspecionar Detalhes & Fotos da OS">
+                                    <span class="material-symbols-outlined text-[17px]">visibility</span>
+                                </button>
+                                <button type="button" onclick="window.abrirModalComparativoCoords('${item.protocolo}')" class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all cursor-pointer" title="Ver Comparativo no Mapa">
+                                    <span class="material-symbols-outlined text-[17px]">map</span>
+                                </button>
+                                <button type="button" onclick="window.aprovarCoordenadaOS('${item.protocolo}')" class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer" title="Aprovar Modificação">
+                                    <span class="material-symbols-outlined text-[17px]">check</span>
+                                </button>
+                                <button type="button" onclick="window.descartarCoordenadaOS('${item.protocolo}')" class="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 transition-all cursor-pointer" title="Descartar / Manter Atual">
+                                    <span class="material-symbols-outlined text-[17px]">close</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            atualizarBotaoAprovarLote();
+        }
+
+        window.toggleSelecionarItemAprovacao = function(protocolo, checked) {
+            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+            if (item) item.selecionado = checked;
+            atualizarBotaoAprovarLote();
+        };
+
+        window.toggleSelecionarTodasAprovacoes = function(checked) {
+            filaAprovacaoCache.forEach(i => i.selecionado = checked);
+            document.querySelectorAll('.chk-item-aprov').forEach(cb => cb.checked = checked);
+            atualizarBotaoAprovarLote();
+        };
+
+        function atualizarBotaoAprovarLote() {
+            const btn = document.getElementById('btn-aprovar-lote-coord');
+            const lbl = document.getElementById('label-aprovar-lote');
+            const selCount = filaAprovacaoCache.filter(i => i.selecionado).length;
+
+            if (btn && lbl) {
+                lbl.innerText = `Aprovar Selecionadas (${selCount})`;
+                btn.disabled = selCount === 0;
+            }
+        }
+
+        /**
+         * Aprova uma modificação de coordenada de OS
+         * Obedece aos Mandamentos 6 e 7 de Egress:
+         * - Update sem .select('*')
+         * - Mescla/remoção local de estado
+         */
+        window.aprovarCoordenadaOS = async function(protocolo) {
+            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+            if (!item) return;
+
+            const confirmar = confirm(`Deseja aprovar a coordenada da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId}?\n\n` +
+                                      `Coordenada Atual: ${item.coordCadastradaRaw}\n` +
+                                      `Nova Coordenada: ${item.coordReparoRaw}\n` +
+                                      `Desvio: ${item.distanciaMetros} metros`);
+            if (!confirmar) return;
+
+            await executarAprovacao(item);
+        };
+
+        async function executarAprovacao(item, coordOverride = null, posteAereoId = null, options = {}) {
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                alert("Erro: Cliente Supabase indisponível.");
+                return false;
+            }
+
+            try {
+                const newLat = coordOverride ? coordOverride.lat : item.coordReparoParsed.lat;
+                const newLng = coordOverride ? coordOverride.lng : item.coordReparoParsed.lng;
+                const isSnapPoste = Boolean(posteAereoId);
+                const idRegistroAlvo = options.idRegistroAlvo || item.idRegistroPlaqueta;
+                const limparObsoletas = Boolean(options.limparDuplicatasObsoletas && idRegistroAlvo && item.instanciasDuplicadas && item.instanciasDuplicadas.length > 1);
+
+                // 1. Atualizar localizacao_plaquetas
+                // Se temos o ID único da linha específica, atualizamos exatamente ela para não afetar registros errados
+                let queryUpdate = client.from('localizacao_plaquetas')
+                    .update({
+                        Latitude: newLat,
+                        Longitude: newLng,
+                        "Observação": limparObsoletas ? '' : undefined
+                    });
+
+                if (idRegistroAlvo) {
+                    queryUpdate = queryUpdate.eq('id', idRegistroAlvo);
+                } else {
+                    queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
+                }
+
+                const { error: errUpdate } = await queryUpdate;
+
+                if (errUpdate) {
+                    alert(`Erro ao atualizar plaqueta #${item.plaquetaId}: ` + errUpdate.message);
+                    return false;
+                }
+
+                // 1.1 Se o usuário optou por remover as duplicatas obsoletas
+                if (limparObsoletas) {
+                    const idsParaRemover = item.instanciasDuplicadas
+                        .filter(inst => inst.id !== idRegistroAlvo)
+                        .map(inst => inst.id);
+
+                    if (idsParaRemover.length > 0) {
+                        try {
+                            const { error: delErr } = await client.from('localizacao_plaquetas')
+                                .delete()
+                                .in('id', idsParaRemover);
+                            if (delErr) console.warn("Aviso ao remover duplicatas obsoletas:", delErr);
+                            else console.log(`🗑️ [Duplicatas] ${idsParaRemover.length} registro(s) obsoleto(s) de #${item.plaquetaId} removidos com sucesso.`);
+                        } catch (dErr) { console.warn("Erro ao deletar duplicatas:", dErr); }
+                    }
+                }
+
+                // 2. Se foi vinculado a um poste aéreo, atualizar a tabela de postes
+                if (isSnapPoste) {
+                    try {
+                        await client.from('postes_base_aerea')
+                            .update({ id_plaqueta_vinculada: item.plaquetaId })
+                            .eq('id', posteAereoId);
+                    } catch (pErr) { console.warn("Aviso ao vincular poste:", pErr); }
+                }
+
+                // 3. Gravar no histórico de localização
+                try {
+                    const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
+                    let obsTexto = isSnapPoste
+                        ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId} (OS #${item.protocolo})`
+                        : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`;
+
+                    if (limparObsoletas) {
+                        obsTexto += ` [Duplicatas obsoletas removidas]`;
+                    }
+
+                    await client.from('historico_localizacao_plaquetas').insert([{
+                        identificacao: item.plaquetaId,
+                        latitude: newLat,
+                        longitude: newLng,
+                        origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
+                        usuario: userNome,
+                        observacao: obsTexto
+                    }]);
+                } catch (hErr) { console.warn("Aviso ao gravar histórico:", hErr); }
+
+                // 4. Atualizar estado local em memória (Remover da fila)
+                filaAprovacaoCache = filaAprovacaoCache.filter(i => i.protocolo !== item.protocolo);
+                atualizarKPIsAprovacao();
+                renderizarFilaAprovacao();
+
+                return true;
+            } catch (err) {
+                alert("Erro inesperado: " + err.message);
+                return false;
+            }
+        }
+
+        window.descartarCoordenadaOS = function(protocolo) {
+            const confirmar = confirm(`Deseja descartar a sugestão da OS #${protocolo} e manter a localização cadastrada atual da plaqueta?`);
+            if (!confirmar) return;
+
+            filaAprovacaoCache = filaAprovacaoCache.filter(i => i.protocolo !== protocolo);
+            atualizarKPIsAprovacao();
+            renderizarFilaAprovacao();
+        };
+
+        window.aprovarCoordenadasSelecionadasLote = async function() {
+            const selecionados = filaAprovacaoCache.filter(i => i.selecionado);
+            if (selecionados.length === 0) return;
+
+            const confirmar = confirm(`Confirma a aprovação de ${selecionados.length} coordenadas selecionadas no banco de dados?`);
+            if (!confirmar) return;
+
+            const btn = document.getElementById('btn-aprovar-lote-coord');
+            if (btn) { btn.disabled = true; btn.innerText = "Aprovando em lote..."; }
+
+            let sucessos = 0;
+            for (const item of selecionados) {
+                const ok = await executarAprovacao(item);
+                if (ok) sucessos++;
+            }
+
+            alert(`✅ ${sucessos} de ${selecionados.length} plaqueta(s) atualizada(s) com sucesso!`);
+            atualizarBotaoAprovarLote();
+        };
+
+        // =========================================================================
+        // MODAL COMPARATIVO NO MAPBOX
+        // =========================================================================
+        window.abrirModalComparativoCoords = function(protocolo) {
+            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+            if (!item) return;
+
+            itemEmComparacaoModal = item;
+
+            const modal = document.getElementById('modal-comparativo-coords');
+            const modalBox = document.getElementById('modal-comparativo-coords-box');
+            if (!modal || !modalBox) return;
+
+            document.getElementById('comparativo-modal-titulo').innerText = `Comparativo: Plaqueta #${item.plaquetaId}`;
+            document.getElementById('comparativo-modal-badge-dist').innerText = `${item.distanciaMetros.toFixed(1)} m de distância`;
+            document.getElementById('comparativo-modal-subtitulo').innerText = `OS #${item.protocolo} • Operador: ${item.operador}`;
+
+            document.getElementById('comp-panel-dist-badge').innerText = `${item.distanciaMetros.toFixed(1)} m`;
+            document.getElementById('comp-panel-orig-coords').innerText = item.coordCadastradaRaw;
+            document.getElementById('comp-panel-os-coords').innerText = item.coordReparoRaw;
+            document.getElementById('comp-panel-os-op').innerText = `Técnico: ${item.operador}`;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            // Inicializar / Redesenhar Mapa Mapbox
+            const cOrig = [item.coordCadastradaParsed.lng, item.coordCadastradaParsed.lat];
+            const cOS = [item.coordReparoParsed.lng, item.coordReparoParsed.lat];
+
+            if (!compMapboxInstance) {
+                mapboxgl.accessToken = MAPBOX_TOKEN;
+                compMapboxInstance = new mapboxgl.Map({
+                    container: 'mapa-comparativo-canvas',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: cOrig,
+                    zoom: 17
+                });
+                compMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+            }
+
+            // Limpar marcadores anteriores
+            compMarkers.forEach(m => m.remove());
+            compMarkers = [];
+            limparPostesAereosMapa();
+            window.deselecionarPosteAereo();
+
+            const duplicatas = item.instanciasDuplicadas || [];
+            compDuplicatasList = duplicatas;
+            compInstanciaSelecionadaId = item.idRegistroPlaqueta;
+
+            const boxDup = document.getElementById('comp-panel-duplicadas-box');
+            const listaDup = document.getElementById('comp-panel-duplicadas-lista');
+            const titDup = document.getElementById('comp-panel-duplicadas-titulo');
+
+            const bounds = new mapboxgl.LngLatBounds();
+            bounds.extend(cOS);
+
+            if (duplicatas.length > 1) {
+                if (boxDup) boxDup.classList.remove('hidden');
+                if (titDup) titDup.innerText = `Atenção: Plaqueta Duplicada (${duplicatas.length} registros no banco)`;
+                if (listaDup) {
+                    listaDup.innerHTML = duplicatas.map((dup, idx) => {
+                        const distOS = dup.distanciaMetros;
+                        const distFmt = distOS < 1000 ? `${distOS.toFixed(1)}m` : `${(distOS / 1000).toFixed(2)}km`;
+                        const isMelhor = (dup.id === item.idRegistroPlaqueta);
+                        return `
+                            <div id="dup-item-${dup.id}" onclick="window.selecionarInstanciaDuplicada(${dup.id})" class="p-1.5 rounded-lg border text-[11px] flex items-center justify-between transition-all cursor-pointer ${isMelhor ? 'bg-blue-100/90 border-blue-400 font-bold text-blue-950' : 'bg-white border-amber-200 text-slate-700 hover:bg-amber-100/50'}">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full ${isMelhor ? 'bg-blue-600 ring-2 ring-blue-300' : 'bg-sky-400'}"></span>
+                                    <span>Ponto #${idx + 1} (${dup.empresa})</span>
+                                </div>
+                                <div class="flex items-center gap-1">
+                                    <span class="font-mono text-[10px] text-slate-500">${distFmt} da OS</span>
+                                    ${isMelhor ? '<span class="text-[9px] bg-blue-600 text-white px-1 rounded font-bold">Mais Próximo</span>' : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+
+                // Plotar marcadores para CADA duplicata existente
+                duplicatas.forEach((dup, idx) => {
+                    const isMelhor = (dup.id === item.idRegistroPlaqueta);
+                    const elDup = document.createElement('div');
+                    elDup.id = `marker-duplicata-${dup.id}`;
+                    elDup.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all ${isMelhor ? 'bg-blue-600 ring-4 ring-blue-300 z-20 scale-110' : 'bg-sky-500 ring-2 ring-sky-200 z-10'}`;
+                    elDup.title = `Ponto Cadastrado #${idx + 1} (${dup.empresa}) - Clique para selecionar`;
+                    elDup.innerHTML = `<span>${idx + 1}</span>`;
+
+                    elDup.onclick = (e) => {
+                        e.stopPropagation();
+                        window.selecionarInstanciaDuplicada(dup.id);
+                    };
+
+                    const cDup = [dup.lng, dup.lat];
+                    bounds.extend(cDup);
+
+                    const mDup = new mapboxgl.Marker({ element: elDup, anchor: 'center' })
+                        .setLngLat(cDup)
+                        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`
+                            <div class="text-xs p-1 text-slate-800">
+                                <strong class="text-blue-700 font-bold">Ponto Cadastrado #${idx + 1}</strong>
+                                <div class="text-[11px] text-slate-500 font-mono mt-0.5">${dup.rawCoord}</div>
+                                <div class="text-[11px] text-slate-600 mt-0.5">Empresa: <strong>${dup.empresa}</strong></div>
+                                <div class="text-[11px] text-amber-700 font-bold mt-1">Distância da OS: ${dup.distanciaMetros.toFixed(1)}m</div>
+                            </div>
+                        `))
+                        .addTo(compMapboxInstance);
+                    compMarkers.push(mDup);
+                });
+
+            } else {
+                if (boxDup) boxDup.classList.add('hidden');
+
+                // Plaqueta única normal
+                const elOrig = document.createElement('div');
+                elOrig.className = 'w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-blue-300';
+                elOrig.innerHTML = '<span class="material-symbols-outlined text-[14px]">pin_drop</span>';
+                const mOrig = new mapboxgl.Marker({ element: elOrig, anchor: 'center' })
+                    .setLngLat(cOrig)
+                    .setPopup(new mapboxgl.Popup().setHTML(`<strong>Cadastro Atual</strong><br>Plaqueta #${item.plaquetaId}`))
+                    .addTo(compMapboxInstance);
+                compMarkers.push(mOrig);
+                bounds.extend(cOrig);
+            }
+
+            // Adicionar Marcador Âmbar (Ponto da OS)
+            const elOS = document.createElement('div');
+            elOS.className = 'w-6 h-6 rounded-full bg-amber-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-300';
+            elOS.innerHTML = '<span class="material-symbols-outlined text-[14px]">build</span>';
+            const mOS = new mapboxgl.Marker({ element: elOS, anchor: 'center' })
+                .setLngLat(cOS)
+                .setPopup(new mapboxgl.Popup().setHTML(`<strong>OS Concluída (#${item.protocolo})</strong><br>Distância: ${item.distanciaMetros.toFixed(1)}m`))
+                .addTo(compMapboxInstance);
+            compMarkers.push(mOS);
+
+            setTimeout(() => {
+                compMapboxInstance.resize();
+                compMapboxInstance.fitBounds(bounds, { padding: 90, maxZoom: 18 });
+
+                // Carregar postes aéreos num raio de ~70m ao redor do ponto da OS
+                carregarPostesAereosProximos(item.coordReparoParsed.lat, item.coordReparoParsed.lng);
+            }, 300);
+        };
+
+        function limparPostesAereosMapa() {
+            compPostesMarkers.forEach(m => m.remove());
+            compPostesMarkers = [];
+        }
+
+        async function carregarPostesAereosProximos(latCenter, lngCenter) {
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client || !compMapboxInstance) return;
+
+            try {
+                // Bounding box de ~70 metros (delta ~0.0007 graus)
+                const delta = 0.0007;
+                const { data: postes, error } = await client
+                    .from('postes_base_aerea')
+                    .select('id, latitude, longitude, id_plaqueta_vinculada')
+                    .gte('latitude', latCenter - delta)
+                    .lte('latitude', latCenter + delta)
+                    .gte('longitude', lngCenter - delta)
+                    .lte('longitude', lngCenter + delta)
+                    .limit(30);
+
+                if (error || !postes) {
+                    console.warn("⚠️ Aviso ao buscar postes da base aérea:", error);
+                    return;
+                }
+
+                console.log(`⚡ [Base Aérea] ${postes.length} postes elétricos encontrados no raio da OS.`);
+
+                postes.forEach(poste => {
+                    const elPoste = document.createElement('div');
+                    elPoste.id = `marker-poste-${poste.id}`;
+                    elPoste.className = 'w-6 h-6 rounded-full bg-purple-700 hover:bg-purple-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300 cursor-pointer';
+                    elPoste.title = `Poste Aéreo #${poste.id} (Clique para vincular)`;
+                    elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+
+                    elPoste.onclick = (e) => {
+                        e.stopPropagation();
+                        window.selecionarPosteAereo(poste);
+                    };
+
+                    const m = new mapboxgl.Marker({ element: elPoste, anchor: 'center' })
+                        .setLngLat([poste.longitude, poste.latitude])
+                        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`
+                            <div class="text-xs p-1 text-slate-800">
+                                <strong class="text-purple-700 flex items-center gap-1 font-bold">⚡ Poste Aéreo #${poste.id}</strong>
+                                <div class="text-[11px] text-slate-500 font-mono mt-0.5">${poste.latitude.toFixed(6)}, ${poste.longitude.toFixed(6)}</div>
+                                <button type="button" onclick="window.selecionarPosteAereo({id: ${poste.id}, latitude: ${poste.latitude}, longitude: ${poste.longitude}})" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-2 rounded text-[11px] cursor-pointer">
+                                    Vincular Plaqueta a Este Poste
+                                </button>
+                            </div>
+                        `))
+                        .addTo(compMapboxInstance);
+
+                    compPostesMarkers.push(m);
+                });
+
+            } catch (err) {
+                console.warn("Erro ao plotar postes aéreos:", err);
+            }
+        }
+
+        window.selecionarPosteAereo = function(poste) {
+            compPosteSelecionado = poste;
+
+            // Destaque visual no marcador do mapa
+            document.querySelectorAll('[id^="marker-poste-"]').forEach(el => {
+                el.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-600', 'scale-125');
+                el.classList.add('bg-purple-700', 'ring-purple-300');
+            });
+            const selEl = document.getElementById(`marker-poste-${poste.id}`);
+            if (selEl) {
+                selEl.classList.remove('bg-purple-700', 'ring-purple-300');
+                selEl.classList.add('bg-emerald-600', 'ring-4', 'ring-emerald-400', 'scale-125');
+            }
+
+            // Atualizar Painel
+            const box = document.getElementById('comp-panel-poste-box');
+            const coordsEl = document.getElementById('comp-panel-poste-coords');
+            const distEl = document.getElementById('comp-panel-poste-dist');
+            const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
+
+            if (box && coordsEl && distEl) {
+                box.classList.remove('hidden');
+                coordsEl.innerText = `${poste.latitude.toFixed(6)}, ${poste.longitude.toFixed(6)}`;
+
+                if (itemEmComparacaoModal) {
+                    const distOS = calcularDistanciaHaversine({ lat: poste.latitude, lng: poste.longitude }, itemEmComparacaoModal.coordReparoParsed);
+                    const distCad = calcularDistanciaHaversine({ lat: poste.latitude, lng: poste.longitude }, itemEmComparacaoModal.coordCadastradaParsed);
+                    distEl.innerText = `A ${distOS.toFixed(1)}m da coordenada da OS (desvio do cadastro antigo: ${distCad.toFixed(1)}m)`;
+                }
+            }
+
+            if (btnLabel) {
+                btnLabel.innerText = `Aprovar no Poste #${poste.id}`;
+            }
+        };
+
+        window.deselecionarPosteAereo = function() {
+            compPosteSelecionado = null;
+            const box = document.getElementById('comp-panel-poste-box');
+            const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
+
+            if (box) box.classList.add('hidden');
+            if (btnLabel) btnLabel.innerText = 'Aprovar Alteração';
+
+            document.querySelectorAll('[id^="marker-poste-"]').forEach(el => {
+                el.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-600', 'scale-125');
+                el.classList.add('bg-purple-700', 'ring-purple-300');
+            });
+        };
+
+        window.fecharModalComparativoCoords = function() {
+            const modal = document.getElementById('modal-comparativo-coords');
+            const modalBox = document.getElementById('modal-comparativo-coords-box');
+            if (!modal || !modalBox) return;
+
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                itemEmComparacaoModal = null;
+                window.deselecionarPosteAereo();
+                limparPostesAereosMapa();
+            }, 200);
+        };
+
+        window.selecionarInstanciaDuplicada = function(dupId) {
+            compInstanciaSelecionadaId = dupId;
+            const dup = compDuplicatasList.find(d => d.id === dupId);
+            if (!dup) return;
+
+            // Destaque visual na lista lateral
+            document.querySelectorAll('[id^="dup-item-"]').forEach(el => {
+                el.className = 'p-1.5 rounded-lg border text-[11px] flex items-center justify-between transition-all cursor-pointer bg-white border-amber-200 text-slate-700 hover:bg-amber-100/50';
+            });
+            const selItem = document.getElementById(`dup-item-${dupId}`);
+            if (selItem) {
+                selItem.className = 'p-1.5 rounded-lg border text-[11px] flex items-center justify-between transition-all cursor-pointer bg-blue-100/90 border-blue-400 font-bold text-blue-950';
+            }
+
+            // Destaque visual nos marcadores do mapa
+            document.querySelectorAll('[id^="marker-duplicata-"]').forEach(el => {
+                el.className = 'w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all bg-sky-500 ring-2 ring-sky-200 z-10';
+            });
+            const selMarker = document.getElementById(`marker-duplicata-${dupId}`);
+            if (selMarker) {
+                selMarker.className = 'w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all bg-blue-600 ring-4 ring-blue-300 z-20 scale-110';
+            }
+
+            // Atualizar os campos de exibição do ponto original
+            const origCoordsEl = document.getElementById('comp-panel-orig-coords');
+            const distBadge = document.getElementById('comp-panel-dist-badge');
+            if (origCoordsEl) origCoordsEl.innerText = `${dup.rawCoord} (${dup.empresa})`;
+            if (distBadge) distBadge.innerText = `${dup.distanciaMetros.toFixed(1)} m`;
+
+            // Centralizar suavemente no ponto selecionado
+            if (compMapboxInstance) {
+                compMapboxInstance.flyTo({ center: [dup.lng, dup.lat], zoom: 17.5, speed: 1.2 });
+            }
+        };
+
+        window.confirmarAprovacaoModalComparativo = async function() {
+            if (!itemEmComparacaoModal) return;
+            const item = itemEmComparacaoModal;
+
+            let coordOverride = null;
+            let posteAereoId = null;
+
+            if (compPosteSelecionado) {
+                coordOverride = { lat: compPosteSelecionado.latitude, lng: compPosteSelecionado.longitude };
+                posteAereoId = compPosteSelecionado.id;
+            }
+
+            const chkLimpar = document.getElementById('chk-limpar-duplicatas-obsoletas');
+            const limparDuplicatasObsoletas = Boolean(chkLimpar && chkLimpar.checked);
+            const idRegistroAlvo = compInstanciaSelecionadaId || item.idRegistroPlaqueta;
+
+            window.fecharModalComparativoCoords();
+            await executarAprovacao(item, coordOverride, posteAereoId, {
+                idRegistroAlvo,
+                limparDuplicatasObsoletas
+            });
+        };
+
+        // =========================================================================
+        // ATALHO E VISUALIZADOR DE DETALHES DE ORDEM DE SERVIÇO (AUDITORIA & FOTOS)
+        // =========================================================================
+        let galeriaFotosAtualList = [];
+        let galeriaFotosIndexAtual = 0;
+
+        window.abrirDetalhesOSModal = async function(protocoloOrId) {
+            if (!protocoloOrId) return;
+            const clean = String(protocoloOrId).replace(/^#/, '').trim();
+
+            if (window.auditoriaController && typeof window.auditoriaController.abrirDetalhesOSModal === 'function') {
+                try {
+                    await window.auditoriaController.abrirDetalhesOSModal(clean);
+                    return;
+                } catch (e) {
+                    console.warn("⚠️ [AuditoriaController] Falha ao abrir detalhes:", e);
+                }
+            }
+
+            // Fallback: se o auditoriaController não estiver instanciado, instancia e abre
+            if (window.AuditoriaController) {
+                if (!window.auditoriaController) {
+                    window.auditoriaController = new window.AuditoriaController();
+                }
+                try {
+                    await window.auditoriaController.abrirDetalhesOSModal(clean);
+                } catch (err) {
+                    console.error("❌ Erro ao abrir modal de detalhes da OS:", err);
+                    alert("Não foi possível carregar os detalhes da OS #" + clean);
+                }
+            }
+        };
+
+        window.abrirDetalhesOSModalComparativo = function() {
+            if (itemEmComparacaoModal && itemEmComparacaoModal.protocolo) {
+                window.abrirDetalhesOSModal(itemEmComparacaoModal.protocolo);
+            } else {
+                console.warn("⚠️ Nenhum item ativo na comparação atual para inspecionar.");
+            }
+        };
+
+        window.fecharDetalhesOSModal = function() {
+            const modal = document.getElementById('modalDetalhesOSAuditoria');
+            const box = document.getElementById('modalDetalhesOSBox');
+            if (!modal || !box) return;
+            box.classList.remove('scale-100', 'opacity-100');
+            box.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        };
+
+        window.abrirGaleriaFotosModal = function(protocolo, indexInicial) {
+            let listFotos = [];
+            let titleProt = 'Fotos da OS';
+
+            if (Array.isArray(protocolo)) {
+                listFotos = protocolo;
+                titleProt = 'Evidência Fotográfica';
+            } else {
+                const list = (window.chamadosListCache || (window.auditoriaController ? window.auditoriaController.chamadosList : [])) || [];
+                const osObj = list.find(o => String(o.protocolo || "").toUpperCase() === String(protocolo || "").toUpperCase() || String(o.id || "") === String(protocolo));
+                if (osObj && osObj.fotosEvidencias && osObj.fotosEvidencias.length > 0) {
+                    listFotos = osObj.fotosEvidencias;
+                    titleProt = `Fotos da OS #${osObj.protocolo}`;
+                }
+            }
+
+            if (!listFotos || listFotos.length === 0) {
+                alert("Nenhuma foto de evidência disponível para esta Ordem de Serviço.");
+                return;
+            }
+
+            galeriaFotosAtualList = listFotos;
+            galeriaFotosIndexAtual = (typeof indexInicial === 'number' && indexInicial >= 0) ? indexInicial : 0;
+
+            const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+            if (!elModal) return;
+
+            const elProt = document.getElementById('galeriaModalProtocolo');
+            if (elProt) elProt.innerText = titleProt;
+
+            renderizarFotoModalAtual();
+
+            elModal.classList.remove('hidden');
+            elModal.classList.add('flex');
+        };
+
+        function renderizarFotoModalAtual() {
+            if (!galeriaFotosAtualList || galeriaFotosAtualList.length === 0) return;
+            if (galeriaFotosIndexAtual < 0) galeriaFotosIndexAtual = 0;
+            if (galeriaFotosIndexAtual >= galeriaFotosAtualList.length) galeriaFotosIndexAtual = galeriaFotosAtualList.length - 1;
+
+            const foto = galeriaFotosAtualList[galeriaFotosIndexAtual];
+
+            const imgEl = document.getElementById('galeriaModalImgPrincipal');
+            const tituloEl = document.getElementById('galeriaModalTituloFoto');
+            const counterEl = document.getElementById('galeriaModalCounter');
+            const stripEl = document.getElementById('galeriaModalThumbnailsStrip');
+
+            if (imgEl) imgEl.src = foto.url;
+            if (tituloEl) tituloEl.innerText = foto.titulo || `Evidência Fotográfica ${galeriaFotosIndexAtual + 1}`;
+            if (counterEl) counterEl.innerText = `${galeriaFotosIndexAtual + 1} / ${galeriaFotosAtualList.length}`;
+
+            if (stripEl) {
+                stripEl.innerHTML = '';
+                galeriaFotosAtualList.forEach((f, idx) => {
+                    const isSelected = idx === galeriaFotosIndexAtual;
+                    const thumbDiv = document.createElement('div');
+                    thumbDiv.className = `w-14 h-10 rounded-lg overflow-hidden border-2 cursor-pointer transition-all flex-shrink-0 ${isSelected ? 'border-amber-400 scale-105 shadow-md' : 'border-slate-700 opacity-60 hover:opacity-100'}`;
+                    thumbDiv.onclick = (e) => {
+                        e.stopPropagation();
+                        galeriaFotosIndexAtual = idx;
+                        renderizarFotoModalAtual();
+                    };
+                    thumbDiv.innerHTML = `<img src="${f.url}" class="w-full h-full object-cover" alt="Thumb ${idx+1}" />`;
+                    stripEl.appendChild(thumbDiv);
+                });
+            }
+
+            const btnPrev = document.getElementById('btnGaleriaPrev');
+            const btnNext = document.getElementById('btnGaleriaNext');
+            if (btnPrev && btnNext) {
+                if (galeriaFotosAtualList.length <= 1) {
+                    btnPrev.style.display = 'none';
+                    btnNext.style.display = 'none';
+                } else {
+                    btnPrev.style.display = 'flex';
+                    btnNext.style.display = 'flex';
+                }
+            }
+        }
+
+        window.navegarGaleriaFotos = function(delta) {
+            if (!galeriaFotosAtualList || galeriaFotosAtualList.length <= 1) return;
+            galeriaFotosIndexAtual = (galeriaFotosIndexAtual + delta + galeriaFotosAtualList.length) % galeriaFotosAtualList.length;
+            renderizarFotoModalAtual();
+        };
+
+        window.fecharGaleriaFotosModal = function() {
+            const elModal = document.getElementById('modalGaleriaFotosCloudinary');
+            if (elModal) {
+                elModal.classList.add('hidden');
+                elModal.classList.remove('flex');
+            }
+        };
+
+        document.addEventListener('keydown', (e) => {
+            const modalGaleria = document.getElementById('modalGaleriaFotosCloudinary');
+            if (modalGaleria && !modalGaleria.classList.contains('hidden')) {
+                if (e.key === 'Escape') window.fecharGaleriaFotosModal();
+                if (e.key === 'ArrowLeft') window.navegarGaleriaFotos(-1);
+                if (e.key === 'ArrowRight') window.navegarGaleriaFotos(1);
+            }
+            const modalDetalhes = document.getElementById('modalDetalhesOSAuditoria');
+            if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && (modalGaleria ? modalGaleria.classList.contains('hidden') : true)) {
+                if (e.key === 'Escape') window.fecharDetalhesOSModal();
+            }
+        });
 
     })();
 </script>

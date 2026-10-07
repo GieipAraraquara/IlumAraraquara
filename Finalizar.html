@@ -2554,27 +2554,11 @@
             }
           }
 
-          // Se existirem fotos complementares, anexa aos pontos do fechamento
+          // Se existirem fotos complementares, anexa aos dados do fechamento e ao ponto principal
           if (urlsComplementaresViaria.length > 0) {
-            var evidenciasComplementares = {};
-            urlsComplementaresViaria.forEach(function(uComp, idxComp) {
-              var chaveComp = (idxComp === 0) ? 'FOTOS_COMPLEMENTARES' : ('FOTOS_COMPLEMENTARES_' + (idxComp + 1));
-              evidenciasComplementares[chaveComp] = uComp;
-            });
-
-            arrPontosPayload.push({
-              fechamento: proximoNum,
-              ponto: arrPontosPayload.length + 1,
-              plaqueta: 'FOTOS_COMPLEMENTARES',
-              problema: 'Complementar',
-              lat: arrPontosPayload[0]?.lat || null,
-              lng: arrPontosPayload[0]?.lng || null,
-              coordenada: arrPontosPayload[0]?.coordenada || null,
-              data_reparo: dataReparo,
-              fotos_complementares: urlsComplementaresViaria,
-              evidencias: evidenciasComplementares,
-              texto_auditoria_ocr: null
-            });
+            if (arrPontosPayload.length > 0) {
+              arrPontosPayload[0].fotos_complementares = urlsComplementaresViaria;
+            }
           }
 
           var firstPoint = arrPontosPayload[0] || {};
@@ -2607,13 +2591,17 @@
             texto_auditoria_ocr: ocrGeral
           };
 
+          if (urlsComplementaresViaria.length > 0) {
+            payloadUpdate.fotos_complementares = urlsComplementaresViaria;
+          }
+
           if (isDireto) {
             var dataAgora = new Date();
             payloadUpdate.protocolo = protFinal;
             payloadUpdate.data_abertura = dataAgora.toISOString();
             payloadUpdate.operador = prot;
             payloadUpdate.municipe_nome = "ATENDIMENTO DIRETO";
-            payloadUpdate.descricao = obsFinalTexto;
+            payloadUpdate.descricao = null;
           }
 
           // Se estiver OFFLINE, salva o envio na fila local para sincronização posterior
@@ -2689,7 +2677,7 @@
 
           // Registo complementar na tabela fechamentos_os (para histórico sem sobrescrita)
           try {
-            await client.from('fechamentos_os').insert([{
+            var fechPayload = {
               protocolo: protFinal,
               os_id: osAtual ? String(osAtual.id) : null,
               numero_fechamento: proximoNum,
@@ -2701,7 +2689,11 @@
               texto_auditoria_ocr: ocrGeral,
               materiais: carrinhoMateriais,
               fotos: arrPontosPayload
-            }]);
+            };
+            if (urlsComplementaresViaria.length > 0) {
+              fechPayload.fotos_complementares = urlsComplementaresViaria;
+            }
+            await client.from('fechamentos_os').insert([fechPayload]);
             console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
           } catch(errFechInsert) {
             console.warn('⚠️ Não foi possível salvar em fechamentos_os:', errFechInsert);
@@ -2711,7 +2703,7 @@
           try {
             for (var pIdx = 0; pIdx < arrPontosPayload.length; pIdx++) {
               var pt = arrPontosPayload[pIdx];
-              if (pt.plaqueta && pt.lat && pt.lng) {
+              if (pt.plaqueta && pt.plaqueta !== 'FOTOS_COMPLEMENTARES' && pt.lat && pt.lng) {
                 var pLat = parseFloat(String(pt.lat).replace(',', '.'));
                 var pLng = parseFloat(String(pt.lng).replace(',', '.'));
                 if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) {

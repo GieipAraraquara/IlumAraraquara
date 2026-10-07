@@ -15,14 +15,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=52"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=38"></script>
+    <script src="js/domain/ChamadoModel.js?v=58"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=39"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=32"></script>
-    <script src="js/services/MapService.js?v=73"></script>
+    <script src="js/services/ChamadosService.js?v=33"></script>
+    <script src="js/services/MapService.js?v=74"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=65"></script>
+    <script src="js/controllers/AuditoriaController.js?v=73"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -712,8 +712,21 @@
                                 <div class="resizer"></div>
                             </th>
 
+                            <!-- Audit Column 11 -->
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="13" data-audit-col="10" title="Aponta SIM quando: Alguma das plaquetas informadas nos fechamentos desta OS já foi reparada nos 30 dias anteriores a este fechamento.">
+                                <div class="vertical-header-text">
+                                    <div>Reincidência</div>
+                                    <div>30d?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>Alguma das plaquetas informadas nos fechamentos desta OS já foi reparada nos 30 dias anteriores a este fechamento.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
                             <!-- Column 14 (Ações com Filtro Pendentes/Concluídas) -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="13">
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="14">
                                 <div class="relative inline-block text-left group/action-filter">
                                     <button class="flex items-center justify-center gap-1 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary mx-auto" id="action-filter-trigger" title="Filtrar por Status de Conclusão">
                                         <span class="font-label-md uppercase tracking-wider">Ações</span>
@@ -2497,12 +2510,13 @@
         { index: 6, colIndex: 9, label: 'Anexo Plaqueta Divergente?', short: 'Anexo Plaqueta Div.' },
         { index: 7, colIndex: 10, label: 'Anexo Faltante?', short: 'Anexo Faltante' },
         { index: 8, colIndex: 11, label: 'Material Divergente?', short: 'Material Divergente' },
-        { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' }
+        { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' },
+        { index: 10, colIndex: 13, label: 'Reincidência 30d?', short: 'Reincidência 30d' }
     ];
 
     // Colunas restritas que NÃO devem ser disponibilizadas nem exibidas para o Manutentor
-    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante
-    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7];
+    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante, 10: Reincidência 30d
+    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7, 10];
 
     function getAuditColsDefs() {
         if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
@@ -2512,7 +2526,7 @@
     }
 
     // Estado global de índices de colunas ativas
-    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
     function renderAuditColsCheckboxes() {
         const container = document.getElementById('audit-cols-checkboxes-container');
@@ -2655,6 +2669,14 @@
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed)) {
                     let filtered = parsed.filter(n => typeof n === 'number' && defaultCols.includes(n));
+                    // Se uma nova coluna foi adicionada ao sistema (ex: index 10) e não existia no cache salvo antigo,
+                    // adiciona-a automaticamente às ativas para que o admin visualize a nova funcionalidade imediatamente
+                    defaultCols.forEach(colIdx => {
+                        if (!filtered.includes(colIdx) && !parsed.includes(colIdx)) {
+                            filtered.push(colIdx);
+                        }
+                    });
+                    filtered.sort((a, b) => a - b);
                     if (filtered.length > 0 || parsed.length === 0) {
                         window.activeAuditCols = filtered;
                     }
@@ -3297,7 +3319,7 @@
                 // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS
                 const activeColIndices = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) 
                     ? window.activeAuditCols 
-                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
                 if (activeColIndices.length === 0) {
                     // Se o usuário desmarcou todas as colunas de auditoria, nenhuma linha com critério de auditoria deve passar

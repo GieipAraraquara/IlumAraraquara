@@ -221,6 +221,7 @@
     <script src="js/services/OfflineSyncService.js"></script>
     <script src="js/guards/authGuard.js?v=9"></script>
     <script src="js/services/PushNotificationService.js"></script>
+    <script src="js/services/PerimetrosBloqueadosService.js?v=1"></script>
     <script src="js/domain/ChamadoModel.js?v=43"></script>
     
     <script>
@@ -856,6 +857,35 @@
       </div>
     </div>
 
+    <!-- MODAL DE BLOQUEIO DE PERÍMETRO (CONDOMÍNIOS E ÁREAS PRIVADAS) -->
+    <div id="modalPerimetroBloqueado" class="modal-overlay hidden" style="z-index: 60050; display: none;">
+      <div class="modal-content text-center max-w-md p-6 bg-white rounded-2xl shadow-2xl border border-rose-200">
+        <div class="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mx-auto text-3xl mb-3 shadow-inner">
+          🚫
+        </div>
+        <div class="inline-block px-3 py-1 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold uppercase rounded-full mb-2 tracking-wide">
+          Área Privada / Restrita
+        </div>
+        <h3 class="text-rose-900 font-extrabold text-lg mb-1" id="modalPerimetroNome">Condomínio Proibido</h3>
+        <p class="text-xs text-slate-500 font-medium mb-4">Abertura de Ordem de Serviço Bloqueada</p>
+        
+        <!-- Justificativa customizada -->
+        <div class="bg-rose-50/70 border border-rose-200 rounded-xl p-4 mb-5 text-left">
+          <div class="text-[11px] font-bold uppercase text-rose-800 tracking-wider mb-1 flex items-center gap-1">
+            <span>ℹ️</span> Justificativa Cadastrada:
+          </div>
+          <p class="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed" id="modalPerimetroJustificativa">
+            Este local pertence a um perímetro privado não atendido pelo serviço público municipal.
+          </p>
+        </div>
+
+        <button type="button" class="w-full py-3 px-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2" onclick="fecharModalPerimetroBloqueado()">
+          <span>Compreendi, alterar local</span>
+          <span>✕</span>
+        </button>
+      </div>
+    </div>
+
     <div id="modalProximidade" class="modal-overlay" style="z-index: 60000;">
       <div class="modal-content">
         <div id="modalProximidadeHeader" class="modal-header text-amber-700">⚠️ PROTOCOLOS EXISTENTES NO LOCAL</div>
@@ -893,8 +923,8 @@
       </div>
     </div>
 
-    <div id="modalConsultarProtocolo" class="modal-overlay" style="z-index: 65000; display: none;">
-      <div class="modal-content !max-w-2xl w-full !p-6 shadow-2xl rounded-2xl border border-slate-200">
+    <div id="modalConsultarProtocolo" class="modal-overlay !overflow-y-auto !py-6 !px-3 sm:!py-10" style="z-index: 65000; display: none;" onclick="if(event.target===this) fecharModalConsultarProtocolo();">
+      <div class="modal-content !max-w-2xl w-full !p-6 shadow-2xl rounded-2xl border border-slate-200 !max-h-none !h-auto !overflow-visible my-auto">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
           <div class="flex items-center gap-2.5">
             <div class="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -974,6 +1004,15 @@
                   <span>Observação do Solicitante</span>
                 </strong>
                 <div id="resConsultaObservacao" class="text-slate-700 bg-white p-2 rounded-lg border border-slate-200/60 text-[11.5px] leading-relaxed italic"></div>
+              </div>
+
+              <!-- Motivo do Cancelamento / Rejeição -->
+              <div id="boxResConsultaCancelamento" class="hidden bg-rose-50/90 border border-rose-200 p-3 rounded-xl text-rose-900 shadow-2xs space-y-1">
+                <strong class="text-rose-800 font-bold flex items-center gap-1.5 text-xs">
+                  <span class="material-symbols-outlined text-[15px]">cancel</span>
+                  <span id="resConsultaCancelamentoTitulo">Motivo do Cancelamento</span>
+                </strong>
+                <div id="resConsultaCancelamento" class="bg-white/90 p-2 rounded-lg border border-rose-200/70 text-[11.5px] font-medium leading-relaxed text-slate-800"></div>
               </div>
 
               <!-- Conclusão / Motivo / Observação de Fechamento -->
@@ -2190,6 +2229,46 @@
       }
 
       // =========================================================================
+      // VALIDAÇÃO DE PERÍMETROS BLOQUEADOS / CONDOMÍNIOS PROIBIDOS
+      // =========================================================================
+      async function checarPerimetroBloqueado(lat, lng) {
+        if (!lat || !lng || isNaN(lat) || isNaN(lng)) return null;
+        if (window.PerimetrosBloqueadosService && typeof window.PerimetrosBloqueadosService.verificarPontoBloqueado === 'function') {
+          try {
+            return await window.PerimetrosBloqueadosService.verificarPontoBloqueado(lat, lng);
+          } catch(e) {
+            console.warn("Erro ao checar perímetro restrito:", e);
+          }
+        }
+        return null;
+      }
+
+      function alertarPerimetroBloqueado(perimetro) {
+        if (!perimetro) return;
+        var modal = document.getElementById('modalPerimetroBloqueado');
+        var elNome = document.getElementById('modalPerimetroNome');
+        var elJust = document.getElementById('modalPerimetroJustificativa');
+
+        if (elNome) elNome.textContent = perimetro.nome || 'Área Privada / Restrita';
+        if (elJust) {
+          elJust.textContent = perimetro.justificativa || 'Este local pertence a um perímetro privado não atendido pelo serviço público municipal.';
+        }
+
+        if (modal) {
+          modal.classList.remove('hidden');
+          modal.style.display = 'flex';
+        }
+      }
+
+      function fecharModalPerimetroBloqueado() {
+        var modal = document.getElementById('modalPerimetroBloqueado');
+        if (modal) {
+          modal.classList.add('hidden');
+          modal.style.display = 'none';
+        }
+      }
+
+      // =========================================================================
       // VARIÁVEIS GLOBAIS E ESTADO DINÂMICO
       // =========================================================================
       var qtdAtual = 0;
@@ -3100,6 +3179,15 @@
             if (msg) msg.innerHTML = '<span class="text-red-600 font-semibold">Selecione um endereço na lista.</span>';
             return;
           }
+        }
+
+        // Checar se o ponto do Modo Rápido está dentro de um condomínio/perímetro proibido
+        var perimetroBloqueadoR = await checarPerimetroBloqueado(estadoPontoRapido.lat, estadoPontoRapido.lng);
+        if (perimetroBloqueadoR) {
+          if (modo === 'gps') descongelarGpsRapido();
+          alertarPerimetroBloqueado(perimetroBloqueadoR);
+          if (msg) msg.innerHTML = '<span class="text-rose-600 font-bold">Local proibido: ' + (perimetroBloqueadoR.nome || 'Área Privada') + '</span>';
+          return;
         }
 
         if (!window.usuarioLogadoSupabase) {
@@ -5642,7 +5730,7 @@
         }
       }
 
-      function validarEEnviarPraca() {
+      async function validarEEnviarPraca() {
         var msg = document.getElementById('mensagem');
         var inputSearch = document.getElementById('pracaSearchInput');
         var valPraca = idPracaSelecionada;
@@ -5727,6 +5815,20 @@
           problemas: problemasList,
           descricao: document.getElementById('descricao').value.trim()
         };
+
+        // Checar se a praça está em perímetro bloqueado
+        if (coordPracaFinal) {
+          var pPartsChec = coordPracaFinal.split(',');
+          if (pPartsChec.length >= 2) {
+            var periPraca = await checarPerimetroBloqueado(parseFloat(pPartsChec[0]), parseFloat(pPartsChec[1]));
+            if (periPraca) {
+              resetarBotaoSalvar();
+              alertarPerimetroBloqueado(periPraca);
+              msg.innerHTML = '<span class="erro">Local proibido: ' + (periPraca.nome || 'Área Privada') + '</span>';
+              return;
+            }
+          }
+        }
 
         console.log("🚀 [DEBUG] Objeto final da Praça a ser enviado:", dadosFinaisPraca);
         if (isModoEdicao) {
@@ -6125,7 +6227,26 @@
          ptsLocalsGrafico = [];
 
          var btn = document.getElementById('btnSalvar');
-         if (btn) { btn.disabled = true; btn.innerText = "Verificando histórico e duplicidade..."; }
+         if (btn) { btn.disabled = true; btn.innerText = "Verificando restrições de perímetro..."; }
+
+         // Checar se qualquer um dos pontos está em perímetro restrito
+         for (var i = 0; i < qtdAtual; i++) {
+             var ptP = pontosData[i];
+             var latCheckP = ptP.usarMesmoEndereco ? (pontosData[0] ? pontosData[0].latAtual : null) : ptP.latAtual;
+             var lngCheckP = ptP.usarMesmoEndereco ? (pontosData[0] ? pontosData[0].lngAtual : null) : ptP.lngAtual;
+             if (latCheckP && lngCheckP) {
+                 var periBloq = await checarPerimetroBloqueado(latCheckP, lngCheckP);
+                 if (periBloq) {
+                     resetarBotaoSalvar();
+                     alertarPerimetroBloqueado(periBloq);
+                     var msgEl = document.getElementById('mensagem');
+                     if (msgEl) msgEl.innerHTML = '<span class="erro">Ponto ' + (i + 1) + ' proibido: ' + (periBloq.nome || 'Área Privada') + '</span>';
+                     return;
+                 }
+             }
+         }
+
+         if (btn) { btn.innerText = "Verificando histórico e duplicidade..."; }
 
          for (var i = 0; i < qtdAtual; i++) {
              var pt = pontosData[i];
@@ -6894,6 +7015,9 @@
           var elObs = document.getElementById('resConsultaObservacao');
           var boxConc = document.getElementById('boxResConsultaConclusao');
           var elConc = document.getElementById('resConsultaConclusao');
+          var boxCanc = document.getElementById('boxResConsultaCancelamento');
+          var elCanc = document.getElementById('resConsultaCancelamento');
+          var elCancTitulo = document.getElementById('resConsultaCancelamentoTitulo');
 
           var protExibicao = (chamado && chamado.protocolo) ? chamado.protocolo : (row.protocolo || termo);
           if (elProt) elProt.textContent = '#' + protExibicao;
@@ -6901,11 +7025,13 @@
           // Status & Badge
           var rawStatus = (chamado && chamado.rawStatus) ? chamado.rawStatus : String(row.status || 'Aberta').trim();
           var statusLower = rawStatus.toLowerCase();
+          var isCanceladaStatus = statusLower.includes('cancel');
+          var isRejeitadaStatus = statusLower.includes('rejeit');
           var badgeClasses = "bg-slate-100 text-slate-700 border border-slate-200";
 
           if (statusLower.includes('conclu')) {
             badgeClasses = "bg-emerald-100 text-emerald-800 border border-emerald-300";
-          } else if (statusLower.includes('cancel') || statusLower.includes('rejeit')) {
+          } else if (isCanceladaStatus || isRejeitadaStatus) {
             badgeClasses = "bg-rose-100 text-rose-800 border border-rose-300";
           } else if (statusLower.includes('andamento') || statusLower.includes('execu')) {
             badgeClasses = "bg-blue-100 text-blue-800 border border-blue-300";
@@ -7147,7 +7273,56 @@
           if (chamado && chamado.motivoAprovacao) conclusaoTexto = chamado.motivoAprovacao;
           else conclusaoTexto = row.motivo_aprovacao || row.motivo || row.observacao_fechamento || row.historico_sessao || '';
 
-          if (conclusaoTexto && boxConc && elConc) {
+          // Motivo de Cancelamento / Rejeição
+          var motivoCancelamentoTexto = '';
+          if (isCanceladaStatus || isRejeitadaStatus) {
+            motivoCancelamentoTexto = (chamado && chamado.observacaoFinal) ? chamado.observacaoFinal : (row.observacao_final || row.justificativa || row.motivo_cancelamento || row.motivo || '');
+            
+            // Se ainda não encontrou e temos cliente Supabase, tenta buscar no histórico de logs (logs_protocolos)
+            if (!motivoCancelamentoTexto && client) {
+              try {
+                var resLog = await client.from('logs_protocolos')
+                  .select('descricao, dados_novos, tipo_acao')
+                  .eq('protocolo', protExibicao)
+                  .in('tipo_acao', ['CANCELAMENTO', 'ALTERACAO_STATUS', 'REJEICAO'])
+                  .order('created_at', { ascending: false })
+                  .limit(5);
+
+                if (resLog && resLog.data && resLog.data.length > 0) {
+                  for (var i = 0; i < resLog.data.length; i++) {
+                    var lg = resLog.data[i];
+                    var just = (lg.dados_novos && (lg.dados_novos.justificativa || lg.dados_novos.motivo || lg.dados_novos.observacao_final)) || '';
+                    if (!just && lg.descricao && (lg.descricao.includes('Justificativa:') || lg.descricao.includes('Cancelada') || lg.descricao.includes('Rejeitada'))) {
+                      var matchJust = lg.descricao.match(/Justificativa:\s*([^\)]+)/i);
+                      if (matchJust && matchJust[1]) just = matchJust[1].trim();
+                    }
+                    if (just) {
+                      motivoCancelamentoTexto = just;
+                      break;
+                    }
+                  }
+                }
+              } catch(eLog) {
+                console.warn('⚠️ Falha ao consultar log de cancelamento:', eLog);
+              }
+            }
+          }
+
+          // Renderizar Box de Cancelamento / Rejeição
+          if ((isCanceladaStatus || isRejeitadaStatus || motivoCancelamentoTexto) && boxCanc && elCanc) {
+            if (elCancTitulo) {
+              elCancTitulo.textContent = isRejeitadaStatus ? 'Motivo da Rejeição' : 'Motivo do Cancelamento';
+            }
+            elCanc.textContent = motivoCancelamentoTexto || 'Motivo não informado no momento do cancelamento.';
+            boxCanc.classList.remove('hidden');
+          } else if (boxCanc) {
+            boxCanc.classList.add('hidden');
+          }
+
+          // Se a OS foi cancelada/rejeitada, não duplicar a mesma justificativa no card de Conclusão se for idêntica
+          if (conclusaoTexto && (conclusaoTexto === motivoCancelamentoTexto || isCanceladaStatus || isRejeitadaStatus)) {
+            if (boxConc) boxConc.classList.add('hidden');
+          } else if (conclusaoTexto && boxConc && elConc) {
             elConc.textContent = conclusaoTexto;
             boxConc.classList.remove('hidden');
           } else if (boxConc) {

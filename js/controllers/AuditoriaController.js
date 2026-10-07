@@ -3,7 +3,7 @@
 
 class AuditoriaController {
     constructor() {
-        this.service = new window.ChamadosService();
+        this.service = (window.ChamadosService && typeof window.ChamadosService === 'function') ? new window.ChamadosService() : null;
         this.chamadosList = [];
         this.concludedList = [];
         this.userRole = '';
@@ -32,7 +32,7 @@ class AuditoriaController {
     isItemDivergent(item) {
         if (!item || item.isDireto) return false;
         if (this.isManutentorUser()) {
-            // Para manutentor, exclui: Outra plaqueta próxima, Anexo Plaqueta Divergente e Anexo Faltante
+            // Para manutentor, exclui: Outra plaqueta próxima, Anexo Plaqueta Divergente, Anexo Faltante e Reincidência 30d
             return Boolean(
                 item.isProblemaDivergente ||
                 item.isPlaquetaDivergente ||
@@ -267,6 +267,9 @@ class AuditoriaController {
             this.pracaServicesList = this.chamadosList.filter(item => item.isPraca && !item.isDireto);
             this.viariaConcludedList = this.concludedList.filter(item => !item.isPraca && !item.isDireto);
 
+            // Calcula se cada plaqueta dos fechamentos foi reparada nos 30 dias anteriores
+            this.processarReincidencias30Dias(this.concludedList);
+
             // Ordenar Praças por data (ascendente)
             this.pracaServicesList.sort((a, b) => {
                 const getTime = (item) => {
@@ -304,6 +307,136 @@ class AuditoriaController {
     }
 
     /**
+     * Analisa cada OS concluída e seus pontos/fechamentos para identificar se alguma plaqueta reparada
+     * já foi reparada em outra OS nos 30 dias anteriores à data de fechamento da própria OS.
+     * @param {Array} concludedList Lista de OSs concluídas
+     */
+    processarReincidencias30Dias(concludedList = []) {
+        if (!Array.isArray(concludedList) || concludedList.length === 0) return;
+
+        const isPlaquetaValida = (val) => {
+            if (!val || typeof val !== 'string') return false;
+            const clean = val.trim().toUpperCase();
+            if (!clean || clean === '---' || clean === 'NULL' || clean === 'UNDEFINED' || clean === 'NÃO INFORMADA' || clean === 'NAO INFORMADA') return false;
+            if (clean.includes('FOTOS') || clean.includes('COMPLEMENTAR')) return false;
+            return true;
+        };
+
+        const extrairPlaquetasReparadasOS = (item) => {
+            const plaquetas = new Set();
+
+            // 1. Plaquetas dos fechamentos (fechamentosList / fechamentos_os)
+            if (item.fechamentosList && Array.isArray(item.fechamentosList)) {
+                item.fechamentosList.forEach(f => {
+                    if (f.desconsiderado) return;
+                    const pts = f.pontos || f.fotos;
+                    if (Array.isArray(pts)) {
+                        pts.forEach(p => {
+                            if (p && typeof p === 'object') {
+                                const plq = p.plaqueta || p.plaqueta_final;
+                                if (isPlaquetaValida(plq)) plaquetas.add(String(plq).trim().toUpperCase());
+                            }
+                        });
+                    }
+                });
+            }
+
+            // 2. Plaquetas dos pontos finais detalhados (pontosDetalhados / rawPontosFinal)
+            if (item.pontosDetalhados && Array.isArray(item.pontosDetalhados)) {
+                item.pontosDetalhados.forEach(p => {
+                    const plq = p.plaquetaFinal;
+                    if (isPlaquetaValida(plq)) plaquetas.add(String(plq).trim().toUpperCase());
+                });
+            }
+
+            // 3. Fallback: plaquetaFinal da OS
+            if (isPlaquetaValida(item.plaquetaFinal)) {
+                plaquetas.add(String(item.plaquetaFinal).trim().toUpperCase());
+            }
+
+            return Array.from(plaquetas);
+        };
+
+        const getTimestampOS = (item) => {
+            if (item.dataConclusao && !isNaN(new Date(item.dataConclusao).getTime())) {
+                return new Date(item.dataConclusao).getTime();
+            }
+            if (item.dataFechamento && !isNaN(new Date(item.dataFechamento).getTime())) {
+                return new Date(item.dataFechamento).getTime();
+            }
+            if (item.dataAbertura && !isNaN(new Date(item.dataAbertura).getTime())) {
+                return new Date(item.dataAbertura).getTime();
+            }
+            return 0;
+        };
+
+        // Extrai todas as ocorrências de plaquetas reparadas com suas respectivas datas e referências de OS
+        const registrosPorPlaqueta = new Map();
+
+        concludedList.forEach(item => {
+            const ts = getTimestampOS(item);
+            if (!ts) return;
+
+            const plaquetas = extrairPlaquetasReparadasOS(item);
+            plaquetas.forEach(plq => {
+                if (!registrosPorPlaqueta.has(plq)) {
+                    registrosPorPlaqueta.set(plq, []);
+                }
+                registrosPorPlaqueta.get(plq).push({
+                    timestamp: ts,
+                    protocolo: String(item.protocolo || item.id || '').trim(),
+                    dataStr: item.formattedDateConclusaoShort || (item.dataConclusao ? new Date(item.dataConclusao).toLocaleDateString('pt-BR') : ''),
+                    os: item
+                });
+            });
+        });
+
+        // Ordena cada histórico por timestamp ascendente
+        registrosPorPlaqueta.forEach(lista => {
+            lista.sort((a, b) => a.timestamp - b.timestamp);
+        });
+
+        const MS_30_DIAS = 30 * 24 * 60 * 60 * 1000;
+
+        // Para cada OS, verifica se alguma de suas plaquetas foi reparada em outra OS no intervalo de 30 dias anteriores
+        concludedList.forEach(item => {
+            const tsAtual = getTimestampOS(item);
+            const plaquetasItem = extrairPlaquetasReparadasOS(item);
+            const meuProt = String(item.protocolo || item.id || '').trim().toUpperCase();
+
+            let reincidente = false;
+            const reincidenciasEncontradas = [];
+
+            if (tsAtual > 0 && plaquetasItem.length > 0) {
+                for (const plq of plaquetasItem) {
+                    const historico = registrosPorPlaqueta.get(plq) || [];
+                    for (const anterior of historico) {
+                        const protAnterior = String(anterior.protocolo || '').toUpperCase();
+                        // Deve ser outra OS (protocolo diferente)
+                        if (protAnterior === meuProt) continue;
+
+                        const diffMs = tsAtual - anterior.timestamp;
+                        // O reparo anterior ocorreu antes da OS atual (diffMs > 0) e em até 30 dias (<= 30 dias)
+                        if (diffMs > 0 && diffMs <= MS_30_DIAS) {
+                            reincidente = true;
+                            const diasAtras = Math.max(1, Math.round(diffMs / (24 * 60 * 60 * 1000)));
+                            reincidenciasEncontradas.push({
+                                plaqueta: plq,
+                                protocoloAnterior: anterior.protocolo,
+                                dataAnterior: anterior.dataStr,
+                                diasAtras: diasAtras
+                            });
+                        }
+                    }
+                }
+            }
+
+            item._isReincidencia30d = reincidente;
+            item._reincidencia30dInfo = reincidenciasEncontradas.length > 0 ? reincidenciasEncontradas : null;
+        });
+    }
+
+    /**
      * Updates KPI metric cards with real data calculations for concluded OSs
      */
     updateKPIs(auditList = []) {
@@ -334,7 +467,7 @@ class AuditoriaController {
         // Filter strictly for items that have at least one 'S' divergence flag
         const divergentOnly = listToUse.filter(item => this.isItemDivergent(item));
 
-        const activeCount = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) ? window.activeAuditCols.length : 10;
+        const activeCount = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) ? window.activeAuditCols.length : 11;
         const isAuditColsHidden = document.getElementById('os-table')?.classList.contains('hide-audit-cols') || activeCount === 0;
         const colspanVal = (4 + activeCount).toString();
 
@@ -577,6 +710,25 @@ class AuditoriaController {
                         </div>
                     `;
 
+                case 10: // Reincidência 30d
+                    const infoList = item.reincidencia30dInfo || [];
+                    const itemsHtml = infoList.map(r => `
+                        <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80 mb-1 last:mb-0">
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                                <span class="text-[10px] uppercase font-bold text-rose-400">Plaqueta: ${esc(r.plaqueta)}</span>
+                                <span class="px-1.5 py-0.2 rounded text-[9.5px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">${r.diasAtras}d atrás</span>
+                            </div>
+                            <div class="text-slate-300 text-[10.5px]">OS Anterior: <strong>${esc(r.protocoloAnterior)}</strong> (${esc(r.dataAnterior || 'Data não informada')})</div>
+                        </div>
+                    `).join('');
+
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="text-[10px] uppercase font-bold text-amber-400 mb-0.5">Reincidência em Menos de 30 Dias:</div>
+                            ${itemsHtml || '<div class="p-1.5 rounded bg-slate-800/90 text-slate-300">Plaqueta reparada recentemente em outra OS.</div>'}
+                        </div>
+                    `;
+
                 default:
                     return '';
             }
@@ -633,6 +785,7 @@ class AuditoriaController {
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="7">${renderBadge(item.isAnexoFaltante, 7)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="8">${renderBadge(item.isMaterialDivergente, 8)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="9">${renderBadge(item.isProblemaExterno, 9)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="10">${renderBadge(item.isReincidencia30d, 10)}</td>
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">
@@ -1082,9 +1235,23 @@ class AuditoriaController {
                 if (needsEnrich) {
                     const fullRow = await repo.fetchById(cleanId);
                     if (fullRow) {
+                        const prevReincidente = item?._isReincidencia30d;
+                        const prevReincidenteInfo = item?._reincidencia30dInfo;
+
                         const ModelClass = window.ChamadoModel;
                         const fullItem = (fullRow instanceof ModelClass) ? fullRow : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fullRow) : (ModelClass ? new ModelClass(fullRow) : fullRow));
                         fullItem._isEnriched = true;
+
+                        // Preserva ou recalcula a auditoria de reincidência de 30 dias
+                        if (prevReincidente !== undefined) {
+                            fullItem._isReincidencia30d = prevReincidente;
+                            fullItem._reincidencia30dInfo = prevReincidenteInfo;
+                        }
+                        if (typeof this.processarReincidencias30Dias === 'function') {
+                            const sourceList = (this.chamadosList && this.chamadosList.length > 0) ? this.chamadosList : (window.chamadosListCache || []);
+                            this.processarReincidencias30Dias([fullItem, ...sourceList]);
+                        }
+
                         item = fullItem;
 
                         // Atualiza as referências nas listas em memória mantendo os getters do protótipo
@@ -1224,20 +1391,22 @@ class AuditoriaController {
         if (!listEl) return;
 
         if (!window.LogsRepository) {
-            if (containerSecao) containerSecao.classList.add('hidden');
-            listEl.innerHTML = '';
+            if (containerSecao) containerSecao.classList.remove('hidden');
+            listEl.innerHTML = '<div class="py-2 text-on-surface-variant text-[11px] italic">Módulo de histórico indisponível no momento.</div>';
             return;
         }
 
         try {
+            if (containerSecao) containerSecao.classList.remove('hidden');
             const logs = await window.LogsRepository.buscarLogsPorProtocolo(protocolo);
             if (!logs || logs.length === 0) {
-                if (containerSecao) containerSecao.classList.add('hidden');
-                listEl.innerHTML = '';
+                listEl.innerHTML = `
+                    <div class="py-3 px-3 bg-surface-container-lowest rounded-lg border border-outline-variant/30 text-center text-on-surface-variant text-[11px] italic">
+                        Nenhuma alteração ou observação registrada ainda neste protocolo.
+                    </div>
+                `;
                 return;
             }
-
-            if (containerSecao) containerSecao.classList.remove('hidden');
 
             const mapAcaoBadge = {
                 'CRIACAO': 'bg-blue-100 text-blue-800 border-blue-300',
@@ -1247,7 +1416,8 @@ class AuditoriaController {
                 'FINALIZACAO': 'bg-emerald-100 text-emerald-800 border-emerald-300',
                 'CANCELAMENTO': 'bg-rose-100 text-rose-800 border-rose-300',
                 'REABERTURA': 'bg-cyan-100 text-cyan-800 border-cyan-300',
-                'AUDITORIA': 'bg-indigo-100 text-indigo-800 border-indigo-300'
+                'AUDITORIA': 'bg-indigo-100 text-indigo-800 border-indigo-300',
+                'OBSERVACAO': 'bg-amber-100 text-amber-900 border-amber-300'
             };
 
             const parseAndFormatMaterialsLog = (dataVal) => {
@@ -1633,12 +1803,9 @@ class AuditoriaController {
         let auditBadgesHtml = rulesList.map(r => {
             const isActive = !!item[r.modelProperty];
             return `
-            <div class="p-2.5 rounded-xl border flex flex-col justify-between transition-all cursor-help ${isActive ? 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm' : 'bg-surface-container-low border-outline-variant/40 text-on-surface-variant hover:bg-surface-container'}" data-audit-explicacao="${r.explicacao}">
-                <div class="flex items-start justify-between gap-1.5 mb-1.5 pointer-events-none">
-                    <span class="text-[11px] font-bold leading-snug break-words ${isActive ? 'text-rose-900' : 'text-on-surface'}">${r.label}</span>
-                    <span class="px-1.5 py-0.5 rounded text-[10px] font-extrabold flex-shrink-0 ${isActive ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'}">${isActive ? 'SIM' : 'NÃO'}</span>
-                </div>
-                <span class="text-[10px] leading-tight opacity-75 line-clamp-2 pointer-events-none">${r.explicacao}</span>
+            <div class="p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-all cursor-help ${isActive ? 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm' : 'bg-surface-container-low border-outline-variant/40 text-on-surface-variant hover:bg-surface-container'}" data-audit-explicacao="${r.explicacao}">
+                <span class="text-[11px] font-bold leading-tight break-words pointer-events-none ${isActive ? 'text-rose-900' : 'text-on-surface'}">${r.label}</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold flex-shrink-0 pointer-events-none ${isActive ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'}">${isActive ? 'SIM' : 'NÃO'}</span>
             </div>
             `;
         }).join('');
@@ -1647,7 +1814,7 @@ class AuditoriaController {
             <div class="p-2.5 bg-blue-50/95 border border-blue-200 rounded-xl flex items-center justify-between text-xs text-blue-900 shadow-2xs mb-3">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-[18px] text-blue-600 shrink-0">link</span>
-                    <span>Visualizando OS referenciada como duplicata <strong class="font-mono font-bold text-blue-800">#${item.protocolo}</strong></span>
+                    <span>Visualizando OS referenciada / vinculada <strong class="font-mono font-bold text-blue-800">#${item.protocolo}</strong></span>
                 </div>
                 <button type="button" onclick="window.auditoriaController.voltarModalOS()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white text-blue-700 hover:bg-blue-100 hover:text-blue-900 border border-blue-300 hover:border-blue-400 active:scale-95 transition-all shadow-2xs cursor-pointer">
                     <span class="material-symbols-outlined text-[16px]">arrow_back</span>
@@ -1801,24 +1968,28 @@ class AuditoriaController {
 
         <!-- Seção 2: Observações de Abertura (Munícipe / Solicitante) -->
         ${(() => {
-            const obsIni = (item.observacaoInicial || item.descricao || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes || item.raw.descricao)) || '').trim();
+            const obsIni = (item.observacaoInicial || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes)) || (!item.isDireto ? item.descricao : '') || '').trim();
             const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
 
-            if (!obsIni && !obsFin) return '';
+            if (!obsIni) return '';
 
-            let bodyObs = '';
-            if (obsIni && obsFin && obsIni !== obsFin) {
-                bodyObs = `<div><b class="text-slate-700 font-semibold">📌 Abertura / Solicitante:</b> ${obsIni.replace(/\n/g, '<br/>')}</div><div class="mt-2 pt-2 border-t border-slate-200/60"><b class="text-slate-700 font-semibold">📝 Observação Complementar:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
-            } else {
-                bodyObs = `<div>${(obsIni || obsFin).replace(/\n/g, '<br/>')}</div>`;
+            let bodyObs = `<div>${obsIni.replace(/\n/g, '<br/>')}</div>`;
+            if (obsFin && obsFin !== obsIni && !item.isDireto) {
+                bodyObs += `<div class="mt-2 pt-2 border-t border-slate-200/60"><b class="text-slate-700 font-semibold">📝 Observação Complementar:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
             }
 
             return `
             <div class="p-3 bg-surface-container-low border border-outline-variant/50 rounded-xl text-xs space-y-1.5">
-                <strong class="text-secondary font-bold flex items-center gap-1.5 mb-1">
-                    <span class="material-symbols-outlined text-[16px]">chat</span>
-                    <span>Observações de Abertura (Munícipe / Solicitante)</span>
-                </strong>
+                <div class="flex items-center justify-between mb-1">
+                    <strong class="text-secondary font-bold flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px]">chat</span>
+                        <span>Observações de Abertura (Munícipe / Solicitante)</span>
+                    </strong>
+                    <button type="button" onclick="window.auditoriaController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[13px]">add_comment</span>
+                        <span>+ Nova Observação</span>
+                    </button>
+                </div>
                 <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 text-[11.5px] text-on-surface leading-relaxed italic">
                     ${bodyObs}
                 </div>
@@ -2000,15 +2171,22 @@ class AuditoriaController {
                         return { hasNav: (lat !== null || isRealAddr(enderecoVal)), gmaps, waze };
                     };
 
+                    const isAddrValid = isRealAddr(item.endereco) ? item.endereco : '';
+                    const endIniVal = p.enderecoInicial || isAddrValid || '';
+                    const endFinVal = p.enderecoFinal || '';
                     const hasIni = p.hasInicialData || (pIdx === 0 && Boolean(p.plaquetaInicial || item.plaquetaInicial || item.plaqueta));
-                    const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, p.enderecoInicial) : { hasNav: false };
-                    const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, p.enderecoFinal) : { hasNav: false };
+                    const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, endIniVal) : (p.coordenadaInicial ? buildNavLinks(p.coordenadaInicial, endIniVal) : { hasNav: false });
+                    const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, endFinVal) : { hasNav: false };
 
                     // Cálculo da distância individual do ponto (abertura -> fechamento)
                     let pDistBadge = '';
                     if (!item.isDireto && window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
-                        const coordIniVal = p.coordenadaInicial && p.coordenadaInicial !== 'Não informada' && p.coordenadaInicial !== 'Sem coordenadas' ? p.coordenadaInicial : (pIdx === 0 ? item.coordenadaInicial : null);
-                        const coordFinVal = p.coordenadaFinal && p.coordenadaFinal !== 'Não informada' && p.coordenadaFinal !== 'Sem coordenadas' ? p.coordenadaFinal : (pIdx === 0 ? item.coordenadaReparo : null);
+                        const coordIniVal = (p.coordenadaInicial && p.coordenadaInicial !== 'Não informada' && p.coordenadaInicial !== 'Sem coordenadas') 
+                            ? p.coordenadaInicial 
+                            : (item.coordenadaInicial || null);
+                        const coordFinVal = (p.coordenadaFinal && p.coordenadaFinal !== 'Não informada' && p.coordenadaFinal !== 'Sem coordenadas') 
+                            ? p.coordenadaFinal 
+                            : (pIdx === 0 ? item.coordenadaReparo : null);
                         if (coordIniVal && coordFinVal) {
                             const pDistM = window.ChamadoModel.calcularDistanciaMetros(coordIniVal, coordFinVal);
                             if (pDistM !== null && !isNaN(pDistM)) {
@@ -2045,9 +2223,9 @@ class AuditoriaController {
                                     <div class="space-y-1">
                                         <div class="font-bold text-slate-700 text-xs border-b border-slate-200/60 pb-1">📌 Abertura (Inicial)</div>
                                         <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-slate-800">${(p.plaquetaInicial && p.plaquetaInicial !== 'Não informada') ? p.plaquetaInicial : (pIdx === 0 ? (item.plaquetaInicial || item.plaqueta || 'Não informada') : 'Não informada')}</span></div>
-                                        <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-slate-800">${(p.coordenadaInicial && p.coordenadaInicial !== 'Não informada') ? p.coordenadaInicial : (pIdx === 0 ? (item.coordenadaInicial || item.coordenada || 'Não informada') : 'Não informada')}</span></div>
+                                        ${!isRealAddr(endIniVal) ? `<div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-slate-800">${(p.coordenadaInicial && p.coordenadaInicial !== 'Não informada') ? p.coordenadaInicial : (pIdx === 0 ? (item.coordenadaInicial || item.coordenada || 'Não informada') : 'Não informada')}</span></div>` : ''}
                                         <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-slate-800">${(p.problemaInicial && p.problemaInicial !== 'Não informado') ? p.problemaInicial : (pIdx === 0 ? (item.problemaInicial || item.problema || 'Não informado') : 'Não informado')}</span></div>
-                                        ${isRealAddr(p.enderecoInicial || (pIdx === 0 ? item.endereco : '')) ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-800">${p.enderecoInicial || item.endereco}</span></div>` : ''}
+                                        ${isRealAddr(endIniVal) ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-800">${endIniVal}</span></div>` : ''}
                                     </div>
                                     ${navIni.hasNav ? `
                                     <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-200/60 mt-1.5">
@@ -2068,10 +2246,19 @@ class AuditoriaController {
                                     ` : ''}
                                 </div>
                             ` : `
-                                <div class="p-2.5 rounded-lg bg-slate-100/60 border border-dashed border-slate-300 text-xs flex flex-col items-center justify-center text-center space-y-1 text-slate-500 italic h-full py-4">
-                                    <span class="material-symbols-outlined text-[22px] text-slate-400">playlist_add</span>
-                                    <span class="font-semibold text-slate-600 text-xs">Sem Registro de Abertura</span>
-                                    <span class="text-[10.5px] text-slate-500">Ponto adicional registrado durante o fechamento em campo.</span>
+                                <div class="p-2.5 rounded-lg bg-slate-100/60 border border-dashed border-slate-300 text-xs flex flex-col justify-between h-full space-y-1">
+                                    <div class="space-y-1">
+                                        <div class="font-bold text-slate-600 text-xs border-b border-slate-200/60 pb-1 flex items-center justify-between">
+                                            <span>📌 Abertura Compartilhada</span>
+                                            <span class="text-[10px] font-normal text-slate-500">Ponto adicional</span>
+                                        </div>
+                                        <div><b class="text-slate-600">Endereço Base:</b> <span class="font-medium text-slate-700">${isRealAddr(endIniVal) ? endIniVal : (isRealAddr(item.endereco) ? item.endereco : 'Mesmo local da OS')}</span></div>
+                                        <div><b class="text-slate-600">Problema Solicitado:</b> <span class="font-medium text-slate-700">${item.problemaInicial || 'Não informado'}</span></div>
+                                        ${(!isRealAddr(endIniVal) && !isRealAddr(item.endereco)) ? `<div><b class="text-slate-600">Coord. Abertura:</b> <span class="font-mono text-[11px] text-slate-600">${item.coordenadaInicial || 'Não informada'}</span></div>` : ''}
+                                    </div>
+                                    <div class="text-[10px] text-slate-500 italic pt-1 border-t border-slate-200/50">
+                                        Ponto adicional atendido na mesma ordem de serviço.
+                                    </div>
                                 </div>
                             `}
                             ${p.hasFinalData ? `
@@ -2081,7 +2268,7 @@ class AuditoriaController {
                                          <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (pIdx === 0 ? (item.plaquetaFinal || 'Não informada') : 'Não informada')}</span></div>
                                          <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
                                          <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
-                                         ${isRealAddr(p.enderecoFinal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${p.enderecoFinal}</span></div>` : ''}
+                                         ${isRealAddr(endFinVal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFinVal}</span></div>` : ''}
                                      </div>
                                      ${navFin.hasNav ? `
                                      <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
@@ -2100,6 +2287,27 @@ class AuditoriaController {
                                          </a>
                                      </div>
                                      ` : ''}
+                                     ${(() => {
+                                         const plqVal = String((p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (pIdx === 0 ? (item.plaquetaFinal || '') : '')).trim().toUpperCase();
+                                         if (!plqVal || !Array.isArray(item.reincidencia30dInfo) || item.reincidencia30dInfo.length === 0) return '';
+                                         const reincsPonto = item.reincidencia30dInfo.filter(r => String(r.plaqueta || '').trim().toUpperCase() === plqVal);
+                                         if (reincsPonto.length === 0) return '';
+                                         return `
+                                             <div class="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-rose-200/60 mt-1.5">
+                                                 ${reincsPonto.map(r => `
+                                                     <button type="button" 
+                                                         onclick="event.stopPropagation(); window.abrirDetalhesOSModal('${r.protocoloAnterior}')" 
+                                                         class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" 
+                                                         title="Abrir OS #${r.protocoloAnterior} reparada há ${r.diasAtras} dias (Plaqueta: ${r.plaqueta})">
+                                                         <span class="material-symbols-outlined text-[13px] text-rose-700">warning</span>
+                                                         <span>Reincidente: OS #${r.protocoloAnterior}</span>
+                                                         <span class="text-[9.5px] font-bold text-rose-800 bg-white/90 px-1.5 py-0.2 rounded border border-rose-200">(${r.diasAtras}d atrás)</span>
+                                                         <span class="material-symbols-outlined text-[11px] text-rose-700">open_in_new</span>
+                                                     </button>
+                                                 `).join('')}
+                                             </div>
+                                         `;
+                                     })()}
                                  </div>
                              ` : `
                                  <div class="p-2.5 rounded-lg bg-amber-50/50 border border-dashed border-amber-300 text-xs flex flex-col items-center justify-center text-center space-y-1 text-amber-700 italic h-full py-4">
@@ -2506,6 +2714,10 @@ class AuditoriaController {
                     <span class="material-symbols-outlined text-[18px]">history</span>
                     <span>Histórico do protocolo</span>
                 </span>
+                <button type="button" onclick="window.auditoriaController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                    <span class="material-symbols-outlined text-[14px]">add_comment</span>
+                    <span>+ Nova Observação</span>
+                </button>
             </div>
             <div id="detalheModalLogsList" class="space-y-2">
                 <div class="flex items-center gap-2 py-3 text-on-surface-variant text-[11px] italic">
@@ -2605,19 +2817,42 @@ class AuditoriaController {
             return;
         }
 
-        // Monta o estado dos Fechamentos (ou Geral se não houver fechamentos)
-        const fechamentosList = item.fechamentosList || [];
+        // Identifica se a OS é de Praça Pública
+        const isPracaOS = Boolean(
+            item.isPraca ||
+            (item.protocolo && String(item.protocolo).trim().toUpperCase().startsWith('P'))
+        );
+
+        // Monta o estado dos Fechamentos / Sessões (ou Geral se não houver registros)
+        const sessoesList = (isPracaOS && item.sessoesList && item.sessoesList.length > 0) ? item.sessoesList : null;
+        const fechamentosList = !sessoesList ? (item.fechamentosList || []) : [];
         let fechamentosState = [];
 
-        if (fechamentosList.length > 0) {
+        if (sessoesList && sessoesList.length > 0) {
+            fechamentosState = sessoesList.map((s, idx) => {
+                const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(s.materiais) : (Array.isArray(s.materiais) ? s.materiais : (s.materiais ? [s.materiais] : []));
+                const dataStr = s.inicioStr ? `${s.inicioStr} até ${s.fimStr || '...'}` : '';
+                return {
+                    id: null,
+                    isSessao: true,
+                    numero: s.numero || (idx + 1),
+                    operador: s.tecnico || item.operadorFinalizacao || item.operador || 'Técnico da Equipe',
+                    dataStr: dataStr,
+                    desconsiderada: Boolean(s.desconsiderada),
+                    materiais: [...mats]
+                };
+            });
+        } else if (fechamentosList.length > 0) {
             fechamentosState = fechamentosList.map((f, idx) => {
                 const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(f.materiais) : (Array.isArray(f.materiais) ? f.materiais : [f.materiais]);
                 const dataStr = f.data_fechamento ? new Date(f.data_fechamento).toLocaleString('pt-BR') : (f.dataFechamentoStr || '');
                 return {
                     id: f.id,
+                    isSessao: false,
                     numero: f.numero || f.numero_fechamento || (idx + 1),
                     operador: f.operador || 'Técnico Responsável',
                     dataStr: dataStr,
+                    desconsiderada: Boolean(f.desconsiderado),
                     materiais: [...mats]
                 };
             });
@@ -2625,9 +2860,11 @@ class AuditoriaController {
             const mats = window.ChamadoModel ? window.ChamadoModel.parseMaterialsList(item.materialUtilizado) : [];
             fechamentosState = [{
                 id: null,
+                isSessao: isPracaOS,
                 numero: 1,
                 operador: item.operador || 'Abertura / Geral',
                 dataStr: item.dataConclusaoStr || 'Atendimento Geral',
+                desconsiderada: false,
                 materiais: [...mats]
             }];
         }
@@ -2654,7 +2891,7 @@ class AuditoriaController {
                         </div>
                         <div>
                             <h3 class="font-bold text-base text-on-surface">Editar Materiais da OS</h3>
-                            <p class="text-xs text-on-surface-variant font-medium">Protocolo: <span class="text-indigo-600 font-bold">#${item.protocolo || item.id}</span></p>
+                            <p class="text-xs text-on-surface-variant font-medium">Protocolo: <span class="text-indigo-600 font-bold">#${item.protocolo || item.id}</span> ${isPracaOS ? '<span class="ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">Praça Pública</span>' : ''}</p>
                         </div>
                     </div>
                     <button type="button" onclick="document.getElementById('modalEditarMateriaisAdmin').remove()" class="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer">
@@ -2665,11 +2902,12 @@ class AuditoriaController {
                 <!-- Body (Scrollable) -->
                 <div class="p-5 space-y-5 overflow-y-auto custom-scrollbar flex-1">
                     ${fechamentosState.map((fState, fIdx) => `
-                    <div class="bg-white border border-slate-200 rounded-2xl p-4 space-y-3.5 shadow-2xs">
-                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <div class="bg-white border ${fState.desconsiderada ? 'border-dashed border-rose-300 bg-rose-50/20' : 'border-slate-200'} rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                        <div class="flex items-center justify-between border-b ${fState.desconsiderada ? 'border-rose-100' : 'border-slate-100'} pb-2 flex-wrap gap-2">
                             <div class="flex items-center gap-2 font-bold text-slate-800 text-xs sm:text-sm">
-                                <span class="material-symbols-outlined text-[18px] text-amber-600">task_alt</span>
-                                <span>${fechamentosList.length > 0 ? `Fechamento #${fState.numero}` : 'Materiais Utilizados da OS'}</span>
+                                <span class="material-symbols-outlined text-[18px] ${fState.desconsiderada ? 'text-rose-500' : 'text-amber-600'}">${fState.desconsiderada ? 'block' : 'task_alt'}</span>
+                                <span>${fState.isSessao ? `Sessão de Trabalho #${fState.numero}` : (fechamentosList.length > 0 ? `Fechamento #${fState.numero}` : 'Materiais Utilizados da OS')}</span>
+                                ${fState.desconsiderada ? '<span class="text-[10px] px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 border border-rose-200 font-bold">DESCONSIDERADA</span>' : ''}
                             </div>
                             <span class="text-[10.5px] font-medium text-slate-600 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
                                 👤 ${fState.operador} ${fState.dataStr ? `• 📅 ${fState.dataStr}` : ''}
@@ -2760,7 +2998,7 @@ class AuditoriaController {
                                     }).join('') : `
                                         <tr>
                                             <td colspan="3" class="py-4 px-4 text-center text-slate-400 font-medium italic text-[11px]">
-                                                Nenhum material cadastrado para este fechamento.
+                                                ${fState.isSessao ? 'Nenhum material cadastrado para esta sessão.' : 'Nenhum material cadastrado para este fechamento.'}
                                             </td>
                                         </tr>
                                     `}
@@ -2911,10 +3149,41 @@ class AuditoriaController {
 
             try {
                 let todosMateriaisConsolidados = [];
+                let sessoesAtualizadas = null;
 
-                for (const fState of fechamentosState) {
-                    await this.service.updateMaterial(prot, fState.materiais, fState.id, fState.numero);
-                    todosMateriaisConsolidados = todosMateriaisConsolidados.concat(fState.materiais);
+                if (isPracaOS) {
+                    // Para praças: prepara o array completo de historico_sessoes
+                    const rawSess = item.historico_sessoes || item.historicoSessoes || (item.rawRow && item.rawRow.historico_sessoes);
+                    let baseSessList = [];
+                    if (rawSess) {
+                        baseSessList = typeof rawSess === 'string' ? JSON.parse(rawSess || '[]') : JSON.parse(JSON.stringify(rawSess));
+                    } else if (item.sessoesList && Array.isArray(item.sessoesList)) {
+                        baseSessList = JSON.parse(JSON.stringify(item.sessoesList));
+                    }
+
+                    if (baseSessList && baseSessList.length > 0) {
+                        fechamentosState.forEach(fState => {
+                            const sIdx = baseSessList.findIndex(s => Number(s.numero) === Number(fState.numero));
+                            if (sIdx >= 0) {
+                                baseSessList[sIdx].materiais = [...fState.materiais];
+                            } else if (baseSessList.length === 1) {
+                                baseSessList[0].materiais = [...fState.materiais];
+                            }
+                        });
+                        sessoesAtualizadas = baseSessList;
+                    }
+
+                    fechamentosState.forEach(fState => {
+                        todosMateriaisConsolidados = todosMateriaisConsolidados.concat(fState.materiais);
+                    });
+
+                    // Chama updateMaterial sincronizando historico_sessoes
+                    await this.service.updateMaterial(prot, todosMateriaisConsolidados, null, null, sessoesAtualizadas, 'Auditoria');
+                } else {
+                    for (const fState of fechamentosState) {
+                        await this.service.updateMaterial(prot, fState.materiais, fState.id, fState.numero, null, 'Auditoria');
+                        todosMateriaisConsolidados = todosMateriaisConsolidados.concat(fState.materiais);
+                    }
                 }
 
                 // Armazena JSON array para evitar que vírgulas no nome do material quebrem o item
@@ -2939,39 +3208,50 @@ class AuditoriaController {
                     } catch (eMat) {}
 
                     // Atualiza fechamentos_os bruto e fechamentosRaw
-                    if (targetObj.fechamentosRaw && Array.isArray(targetObj.fechamentosRaw)) {
+                    if (!isPracaOS) {
+                        if (targetObj.fechamentosRaw && Array.isArray(targetObj.fechamentosRaw)) {
+                            fechamentosState.forEach((fState, idx) => {
+                                if (targetObj.fechamentosRaw[idx]) {
+                                    targetObj.fechamentosRaw[idx].materiais = [...fState.materiais];
+                                }
+                            });
+                        }
+
                         fechamentosState.forEach((fState, idx) => {
-                            if (targetObj.fechamentosRaw[idx]) {
-                                targetObj.fechamentosRaw[idx].materiais = [...fState.materiais];
+                            if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
+                                targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
                             }
                         });
                     }
 
-                    fechamentosState.forEach((fState, idx) => {
-                        if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
-                            targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
-                        }
-                    });
-
                     // Atualiza também historico_sessoes em memória para praças
-                    const rawSess = targetObj.historico_sessoes || targetObj.historicoSessoes || (targetObj.rawRow && targetObj.rawRow.historico_sessoes);
-                    if (rawSess) {
-                        let sessList = rawSess;
-                        if (typeof sessList === 'string') {
-                            try { sessList = JSON.parse(sessList); } catch(e) {}
-                        }
-                        if (Array.isArray(sessList) && sessList.length > 0) {
-                            fechamentosState.forEach((fState) => {
-                                const targetIdx = sessList.findIndex(s => Number(s.numero) === Number(fState.numero));
-                                if (targetIdx >= 0) {
-                                    sessList[targetIdx].materiais = [...fState.materiais];
-                                } else if (sessList.length === 1) {
-                                    sessList[0].materiais = [...fState.materiais];
+                    if (isPracaOS) {
+                        const listToApply = sessoesAtualizadas ? JSON.parse(JSON.stringify(sessoesAtualizadas)) : null;
+                        if (listToApply) {
+                            targetObj.historico_sessoes = listToApply;
+                            targetObj.historicoSessoes = listToApply;
+                            if (targetObj.rawRow) targetObj.rawRow.historico_sessoes = listToApply;
+                        } else {
+                            const rawSess = targetObj.historico_sessoes || targetObj.historicoSessoes || (targetObj.rawRow && targetObj.rawRow.historico_sessoes);
+                            if (rawSess) {
+                                let sessList = rawSess;
+                                if (typeof sessList === 'string') {
+                                    try { sessList = JSON.parse(sessList); } catch(e) {}
                                 }
-                            });
-                            targetObj.historico_sessoes = sessList;
-                            targetObj.historicoSessoes = sessList;
-                            if (targetObj.rawRow) targetObj.rawRow.historico_sessoes = sessList;
+                                if (Array.isArray(sessList) && sessList.length > 0) {
+                                    fechamentosState.forEach((fState) => {
+                                        const targetIdx = sessList.findIndex(s => Number(s.numero) === Number(fState.numero));
+                                        if (targetIdx >= 0) {
+                                            sessList[targetIdx].materiais = [...fState.materiais];
+                                        } else if (sessList.length === 1) {
+                                            sessList[0].materiais = [...fState.materiais];
+                                        }
+                                    });
+                                    targetObj.historico_sessoes = sessList;
+                                    targetObj.historicoSessoes = sessList;
+                                    if (targetObj.rawRow) targetObj.rawRow.historico_sessoes = sessList;
+                                }
+                            }
                         }
                     }
                 };
@@ -3558,6 +3838,125 @@ class AuditoriaController {
         if (res.error && !updated) {
             console.error('❌ Erro no update do Supabase:', res.error);
             throw new Error(res.error.message || 'Erro ao persistir glosas no banco.');
+        }
+    }
+
+    /**
+     * Abre modal para adicionar uma nova observação/apontamento na OS
+     * Registra como log no histórico (logs_protocolos) e recarrega os logs no modal de detalhes
+     * @param {string} protocoloOrId
+     */
+    abrirModalAdicionarObservacao(protocoloOrId) {
+        const item = (this.chamadosList || []).find(c => 
+            String(c.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
+            String(c.id || '') === String(protocoloOrId || '')
+        );
+
+        const protocol = item ? (item.protocolo || protocoloOrId) : protocoloOrId;
+        if (!protocol) {
+            alert('Protocolo não informado.');
+            return;
+        }
+
+        let existingModal = document.getElementById('modalAdicionarObservacaoOS');
+        if (existingModal) existingModal.remove();
+
+        const modalEl = document.createElement('div');
+        modalEl.id = 'modalAdicionarObservacaoOS';
+        modalEl.className = 'fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs transition-opacity animate-fade-in-up';
+        modalEl.style.zIndex = '999999';
+
+        const endTexto = item ? (item.endereco || 'Endereço da OS') : '';
+
+        modalEl.innerHTML = `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col text-on-surface">
+                <!-- Header -->
+                <div class="px-5 py-4 border-b border-outline-variant/60 bg-surface-container-low flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center flex-shrink-0">
+                            <span class="material-symbols-outlined text-[20px]">add_comment</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-sm text-on-surface">Nova Observação / Apontamento</h3>
+                            <p class="text-[11px] text-on-surface-variant font-medium">Protocolo: <span class="font-mono font-bold text-amber-700">#${protocol}</span> ${endTexto ? `• ${endTexto}` : ''}</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="document.getElementById('modalAdicionarObservacaoOS').remove()" class="p-1 rounded-lg text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Formulário -->
+                <div class="p-5 space-y-3.5">
+                    <div>
+                        <label class="block text-xs font-bold text-secondary mb-1.5 flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[15px] text-amber-600">edit_note</span>
+                            <span>Descrição da Observação:</span>
+                        </label>
+                        <textarea id="txtNovaObservacaoOS" rows="4" placeholder="Digite as informações, anotações técnicas, histórico ou parecer sobre esta OS..." class="w-full text-xs p-3 rounded-xl border border-outline-variant/80 bg-surface-container-lowest text-on-surface focus:outline-hidden focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-all resize-y placeholder:text-on-surface-variant/50"></textarea>
+                        <p class="text-[10.5px] text-on-surface-variant mt-1.5 flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[13px] text-secondary">info</span>
+                            <span>Esta observação será registrada permanentemente no histórico cronológico do protocolo.</span>
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Rodapé -->
+                <div class="px-5 py-3.5 border-t border-outline-variant/60 bg-surface-container-low/70 flex justify-end items-center gap-2">
+                    <button type="button" onclick="document.getElementById('modalAdicionarObservacaoOS').remove()" class="px-4 py-2 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button type="button" id="btnSalvarObservacaoOS" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-xs cursor-pointer">
+                        <span class="material-symbols-outlined text-[16px]">save</span>
+                        <span>Salvar Observação</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalEl);
+
+        const txtArea = document.getElementById('txtNovaObservacaoOS');
+        if (txtArea) txtArea.focus();
+
+        const btnSalvar = document.getElementById('btnSalvarObservacaoOS');
+        if (btnSalvar) {
+            btnSalvar.onclick = async () => {
+                const texto = (txtArea ? txtArea.value : '').trim();
+                if (!texto) {
+                    alert('Por favor, informe o texto da observação antes de salvar.');
+                    if (txtArea) txtArea.focus();
+                    return;
+                }
+
+                btnSalvar.disabled = true;
+                btnSalvar.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Salvando...</span>`;
+
+                try {
+                    await this.service.adicionarObservacaoOS(protocol, texto, 'Auditoria');
+
+                    // Fecha o modal de formulário
+                    modalEl.remove();
+
+                    // Recarrega a listagem de logs no modal de detalhes se estiver aberto
+                    if (typeof this.carregarLogsNoModal === 'function') {
+                        await this.carregarLogsNoModal(protocol);
+                    }
+
+                    // Toast de confirmação
+                    const toast = document.createElement('div');
+                    toast.className = 'fixed bottom-5 right-5 z-[999999] px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-2xl flex items-center gap-2 border border-slate-700 animate-fade-in-up';
+                    toast.innerHTML = `<span class="material-symbols-outlined text-[18px] text-emerald-400">check_circle</span><span>Observação adicionada com sucesso!</span>`;
+                    document.body.appendChild(toast);
+                    setTimeout(() => toast.remove(), 3500);
+
+                } catch (err) {
+                    console.error('❌ Erro ao adicionar observação:', err);
+                    alert('Erro ao salvar observação: ' + (err.message || err));
+                    btnSalvar.disabled = false;
+                    btnSalvar.innerHTML = `<span class="material-symbols-outlined text-[16px]">save</span><span>Salvar Observação</span>`;
+                }
+            };
         }
     }
 }
@@ -4191,7 +4590,11 @@ function bootAuditoriaController() {
     if (!window.auditoriaController) {
         window.auditoriaController = new window.AuditoriaController();
     }
-    window.auditoriaController.init();
+    // Apenas inicializa a auditoria completa (carregamento das tabelas e bind de eventos) se estivermos na página de Auditoria
+    const isAuditoriaPage = window.location.pathname.toLowerCase().includes('auditoria') || Boolean(document.getElementById('completed-services-table'));
+    if (isAuditoriaPage && typeof window.auditoriaController.init === 'function') {
+        window.auditoriaController.init();
+    }
 }
 
 if (document.readyState === 'loading') {

@@ -16,14 +16,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=44"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=38"></script>
+    <script src="js/domain/ChamadoModel.js?v=56"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=39"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=32"></script>
-    <script src="js/services/MapService.js?v=73"></script>
+    <script src="js/services/ChamadosService.js?v=33"></script>
+    <script src="js/services/MapService.js?v=74"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/PainelController.js?v=41"></script>
+    <script src="js/controllers/PainelController.js?v=45"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -327,10 +327,16 @@
     <!-- Tabela Nova: Pendentes para aprovação -->
     <div id="container-pendentes-aprovacao" class="hidden grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-card-gap opacity-0 animate-fade-in-up [animation-delay:550ms]">
         <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
-            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
+            <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-amber-600 text-[20px]">pending_actions</span>
                     <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Pendentes para aprovação</h3>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button type="button" id="btn-mapa-pendentes-aprovacao" onclick="window.abrirMapaPendentesAprovacaoModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-all shadow-sm active:scale-95 cursor-pointer" title="Visualizar todos os pontos das OS pendentes no mapa Mapbox">
+                        <span class="material-symbols-outlined text-[18px]">map</span>
+                        <span id="label-btn-mapa-pendentes">Ver Pontos no Mapa</span>
+                    </button>
                 </div>
             </div>
             
@@ -841,6 +847,67 @@
                     <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-slate-700 font-medium">---</span></p>
                     <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-blue-600 font-bold">---</span></p>
                 </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Visualização de Todos os Pontos das OS Pendentes de Aprovação no Mapbox -->
+<div id="modal-mapa-pendentes-aprovacao" onclick="if (event.target === this) window.fecharMapaPendentesAprovacaoModal()" class="fixed inset-0 z-[65000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-pendentes-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-6xl w-full h-[92vh] max-h-[850px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 sm:px-6 py-3.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">pending_actions</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900" id="modal-mapa-pendentes-titulo">Mapa de OS Pendentes para Aprovação</h3>
+                        <span id="modal-mapa-pendentes-badge-count" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200">0 pontos</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium truncate max-w-xl mt-0.5" id="modal-mapa-pendentes-subtitulo">Exibindo os pontos de localização de todas as Ordens de Serviço aguardando aprovação.</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="window.centralizarMapaPendentes()" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-all cursor-pointer" title="Ajustar zoom para abranger todos os pontos">
+                    <span class="material-symbols-outlined text-[16px]">center_focus_strong</span>
+                    <span>Centralizar Todas</span>
+                </button>
+                <button type="button" onclick="window.fecharMapaPendentesAprovacaoModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-1" title="Fechar (Esc)">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Canvas do Mapa -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-pendentes-canvas" class="w-full h-full min-h-[400px]"></div>
+
+            <!-- Legend Overlay -->
+            <div class="absolute bottom-4 left-4 bg-white/95 backdrop-blur-md border border-slate-200 p-3.5 rounded-xl shadow-lg text-xs space-y-2 z-10 text-slate-800 max-w-sm">
+                <div class="font-bold text-slate-900 text-xs flex items-center gap-1.5 border-b border-slate-200 pb-1.5">
+                    <span class="material-symbols-outlined text-[16px] text-amber-600">info</span>
+                    <span>Legenda de Cores & Vínculos</span>
+                </div>
+                <div class="space-y-1.5 text-[11px]">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-white shadow-xs flex-shrink-0"></span>
+                        <span class="font-semibold text-amber-900">OS Pendente de Aprovação</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-3.5 h-3.5 rounded-full bg-indigo-600 border-2 border-white shadow-xs flex-shrink-0"></span>
+                        <span class="font-semibold text-indigo-900">OS Motivo / Duplicata Vinculada</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 h-0.5 border-b-2 border-dashed border-indigo-600 flex-shrink-0"></span>
+                        <span class="text-slate-600">Linha de vínculo com distância entre pontos</span>
+                    </div>
+                </div>
+                <p class="text-[10.5px] text-slate-500 pt-1 border-t border-slate-100 leading-tight">
+                    Clique nos marcadores para detalhes completos ou nos botões de navegação e aprovação rápida.
+                </p>
             </div>
         </div>
     </div>
@@ -2222,6 +2289,9 @@
             if (typeof window.closeMapaPontoModal === 'function') {
                 window.closeMapaPontoModal();
             }
+            if (typeof window.fecharMapaPendentesAprovacaoModal === 'function') {
+                window.fecharMapaPendentesAprovacaoModal();
+            }
         }
     });
 
@@ -2232,6 +2302,858 @@
             }
         }
     });
+
+    // =========================================================================
+    // Lógica do Modal Multi-Ponto: OS Pendentes de Aprovação (Mapbox)
+    // =========================================================================
+    let pendentesMapboxInstance = null;
+    let pendentesMapboxMarkers = [];
+    let pendentesPontosCache = [];
+    let pendentesConexoesCache = [];
+
+    // Helper para extrair protocolo citado no motivo (ex: "#IP3IM2M050826" ou "duplicata da OS #12345")
+    function extrairProtocolosDoMotivo(textoMotivo) {
+        if (!textoMotivo || typeof textoMotivo !== 'string') return [];
+        const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/gi;
+        const matches = [];
+        let match;
+        while ((match = regex.exec(textoMotivo)) !== null) {
+            const raw = (match[1] || match[2] || '').trim();
+            if (raw) matches.push(raw.replace(/^#/, ''));
+        }
+        return Array.from(new Set(matches));
+    }
+
+    // Helper para calcular distância em metros entre duas coordenadas
+    function calcularDistanciaEntreCoords(c1, c2) {
+        if (!c1 || !c2 || isNaN(c1.lat) || isNaN(c1.lng) || isNaN(c2.lat) || isNaN(c2.lng)) return null;
+        if (window.ChamadoModel && typeof window.ChamadoModel.calcularDistanciaMetros === 'function') {
+            return window.ChamadoModel.calcularDistanciaMetros(c1, c2);
+        }
+        const R = 6371000;
+        const dLat = (c2.lat - c1.lat) * Math.PI / 180;
+        const dLng = (c2.lng - c1.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.cos(c1.lat * Math.PI / 180) * Math.cos(c2.lat * Math.PI / 180) *
+                  Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+    }
+
+    window.abrirMapaPendentesAprovacaoModal = function() {
+        console.log("🗺️ [Mapa Pendentes] Abrindo visualização de OS pendentes e seus motivos vinculados...");
+        let listaPendentes = [];
+        if (window.painelController && Array.isArray(window.painelController.pendentesList) && window.painelController.pendentesList.length > 0) {
+            listaPendentes = window.painelController.pendentesList;
+        } else if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
+            listaPendentes = window.painelController.chamadosList.filter(c => c.normalizedStatus === 'pendente' || (c.status || '').toLowerCase().trim() === 'pendente');
+        }
+
+        if (listaPendentes.length === 0) {
+            alert('Não há Ordens de Serviço pendentes para aprovação no momento.');
+            return;
+        }
+
+        const modal = document.getElementById('modal-mapa-pendentes-aprovacao');
+        const modalBox = document.getElementById('modal-mapa-pendentes-box');
+        if (!modal || !modalBox) {
+            console.error('❌ Elementos do modal de pendentes não encontrados.');
+            return;
+        }
+
+        const parseCoord = (coordVal) => {
+            if (!coordVal) return null;
+            if (window.ChamadoModel && typeof window.ChamadoModel.parseLatLng === 'function') {
+                return window.ChamadoModel.parseLatLng(coordVal);
+            }
+            const str = String(coordVal).replace(/^"|"$/g, '').trim();
+            if (str && str.includes(',')) {
+                const parts = str.split(',').map(s => parseFloat(s.trim()));
+                if (parts.length >= 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    return Math.abs(parts[0]) > 35
+                        ? { lat: parts[1], lng: parts[0] }
+                        : { lat: parts[0], lng: parts[1] };
+                }
+            }
+            return null;
+        };
+
+        const todosChamados = (window.painelController && Array.isArray(window.painelController.chamadosList))
+            ? window.painelController.chamadosList
+            : listaPendentes;
+
+        const pontosParaExibir = [];
+        const conexoes = [];
+        const motivosAdicionadosMap = new Map(); // evita duplicar marcador de uma mesma OS motivo
+
+        const normalizarTextoEndereco = (txt) => {
+            if (!txt) return "";
+            return String(txt).toLowerCase()
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .replace(/\b(avenida|av\.|av)\b/g, 'av')
+                .replace(/\b(rua|r\.|r)\b/g, 'r')
+                .replace(/\b(doutor|dr\.|dr)\b/g, 'dr')
+                .replace(/\b(professor|prof\.|prof)\b/g, 'prof')
+                .replace(/[^a-z0-9]/g, ' ')
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const extrairCoordRobusta = (p, fallbackItem) => {
+            if (!p && !fallbackItem) return null;
+            // 1. Tenta coordenadas diretas lat/lng numéricas se existirem
+            if (p && (p.lat !== undefined && p.lat !== null) && (p.lng !== undefined && p.lng !== null)) {
+                const latN = parseFloat(p.lat);
+                const lngN = parseFloat(p.lng);
+                if (!isNaN(latN) && !isNaN(lngN)) {
+                    return Math.abs(latN) > 35 ? { lat: lngN, lng: latN } : { lat: latN, lng: lngN };
+                }
+            }
+            // 2. Tenta os campos comuns de coordenadas em texto
+            const campos = [
+                p?.coordenadaFinal,
+                p?.coordenadaReparo,
+                p?.coordenadaInicial,
+                p?.coordenada,
+                p?.coord,
+                fallbackItem?.coordenadaReparo,
+                fallbackItem?.coordenadaFinal,
+                fallbackItem?.coordenadaInicial,
+                fallbackItem?.coordenada
+            ];
+            for (const val of campos) {
+                if (val && val !== 'Não informada' && val !== '---') {
+                    const parsed = parseCoord(val);
+                    if (parsed) return parsed;
+                }
+            }
+            return null;
+        };
+
+        listaPendentes.forEach((item) => {
+            const proto = item.protocolo || item.id;
+            const isPraca = Boolean(item.isPraca);
+            const prob = item.problemaInicial || item.problema || 'Não informado';
+            const dataFmt = item.formattedDateShort || item.dataCriacao || '';
+            const motivoTexto = item.motivoAprovacao || '';
+            const protocolosCitados = extrairProtocolosDoMotivo(motivoTexto);
+
+            let ptPendente = null;
+
+            if (isPraca) {
+                const parsed = extrairCoordRobusta(item, item);
+                const locNome = item.pracaNome || item.bairro || item.endereco || 'Praça Pública';
+                ptPendente = {
+                    key: `pendente_${proto}_1`,
+                    tipoMarcador: 'pendente', // 'pendente' | 'motivo'
+                    osId: item.id,
+                    protocolo: proto,
+                    pontoNum: 1,
+                    totalPontos: 1,
+                    isPraca: true,
+                    localizacaoNome: locNome,
+                    plaqueta: item.plaquetaInicial || item.plaqueta || '',
+                    problema: prob,
+                    motivoAprovacao: motivoTexto,
+                    protocolosVinculados: protocolosCitados,
+                    dataCriacao: dataFmt,
+                    lat: parsed ? parsed.lat : null,
+                    lng: parsed ? parsed.lng : null,
+                    hasCoord: Boolean(parsed)
+                };
+                pontosParaExibir.push(ptPendente);
+            } else {
+                const pts = Array.isArray(item.pontosDetalhados) && item.pontosDetalhados.length > 0
+                    ? item.pontosDetalhados
+                    : (item.raw && Array.isArray(item.raw.pontosDetalhados) && item.raw.pontosDetalhados.length > 0 
+                        ? item.raw.pontosDetalhados 
+                        : (item.raw && Array.isArray(item.raw.pontos_inicial) ? item.raw.pontos_inicial : null));
+
+                if (pts && pts.length > 0) {
+                    pts.forEach((p, pIdx) => {
+                        // Não injeta fallback da OS no pIdx === 0 se houver múltiplos pontos, para evitar coordenadas divergentes de cabeçalho
+                        const parsed = extrairCoordRobusta(p, pts.length === 1 ? item : null);
+                        const plq = p.plaquetaInicial || p.plaqueta || (pts.length === 1 ? (item.plaquetaInicial || item.plaqueta) : '');
+                        const end = p.enderecoInicial || p.endereco || item.endereco || 'Endereço não informado';
+                        const pontoItem = {
+                            key: `pendente_${proto}_${p.numero || (pIdx + 1)}`,
+                            tipoMarcador: 'pendente',
+                            osId: item.id,
+                            protocolo: proto,
+                            pontoNum: p.numero || (pIdx + 1),
+                            totalPontos: pts.length,
+                            isPraca: false,
+                            localizacaoNome: end,
+                            plaqueta: plq,
+                            problema: p.problemaInicial || p.problema || prob,
+                            motivoAprovacao: motivoTexto,
+                            protocolosVinculados: protocolosCitados,
+                            dataCriacao: dataFmt,
+                            lat: parsed ? parsed.lat : null,
+                            lng: parsed ? parsed.lng : null,
+                            hasCoord: Boolean(parsed)
+                        };
+                        if (pIdx === 0) ptPendente = pontoItem;
+                        pontosParaExibir.push(pontoItem);
+                    });
+                } else {
+                    const parsed = extrairCoordRobusta(item, item);
+                    const plq = item.plaquetaInicial || item.plaqueta || '';
+                    const end = item.endereco || 'Endereço não informado';
+                    ptPendente = {
+                        key: `pendente_${proto}_1`,
+                        tipoMarcador: 'pendente',
+                        osId: item.id,
+                        protocolo: proto,
+                        pontoNum: 1,
+                        totalPontos: 1,
+                        isPraca: false,
+                        localizacaoNome: end,
+                        plaqueta: plq,
+                        problema: prob,
+                        motivoAprovacao: motivoTexto,
+                        protocolosVinculados: protocolosCitados,
+                        dataCriacao: dataFmt,
+                        lat: parsed ? parsed.lat : null,
+                        lng: parsed ? parsed.lng : null,
+                        hasCoord: Boolean(parsed)
+                    };
+                    pontosParaExibir.push(ptPendente);
+                }
+            }
+
+            // Coleta todos os pontos desta OS pendente que foram adicionados
+            const pontosDestaOSPendente = pontosParaExibir.filter(pt => pt.tipoMarcador === 'pendente' && pt.protocolo === proto);
+
+            // Tenta extrair distância informada textualmente no motivo (ex: "a 15 metros", "a 42 metros", "(15 metros)")
+            let distInformadaTexto = null;
+            if (motivoTexto) {
+                const matchDistTexto = motivoTexto.match(/(?:a\s+|dist[aâ]ncia(?:\s+de)?\s+|\()(\d+(?:\.\d+)?)\s*metros?/i);
+                if (matchDistTexto && matchDistTexto[1]) {
+                    const valParsed = parseFloat(matchDistTexto[1]);
+                    if (!isNaN(valParsed)) {
+                        distInformadaTexto = Math.round(valParsed);
+                    }
+                }
+            }
+
+            // Para cada protocolo citado no motivo da pendência, busca o chamado correspondente no sistema
+            protocolosCitados.forEach(protMotivo => {
+                const cleanProt = String(protMotivo).replace(/^#/, '').trim();
+                if (!cleanProt || cleanProt.toLowerCase() === String(proto).toLowerCase()) return;
+
+                const osMotivo = todosChamados.find(c => {
+                    const cProt = String(c.protocolo || c.id || '').replace(/^#/, '').trim();
+                    return cProt.toLowerCase() === cleanProt.toLowerCase();
+                });
+
+                if (!osMotivo) return;
+
+                // Extrai todos os possíveis pontos da OS motivo (suportando múltiplos pontos / pontosDetalhados / raw)
+                let ptsMotivoRaw = null;
+                if (Array.isArray(osMotivo.pontosDetalhados) && osMotivo.pontosDetalhados.length > 0) {
+                    ptsMotivoRaw = osMotivo.pontosDetalhados;
+                } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontosDetalhados) && osMotivo.raw.pontosDetalhados.length > 0) {
+                    ptsMotivoRaw = osMotivo.raw.pontosDetalhados;
+                } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontos_final) && osMotivo.raw.pontos_final.length > 0) {
+                    ptsMotivoRaw = osMotivo.raw.pontos_final;
+                } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontos_inicial) && osMotivo.raw.pontos_inicial.length > 0) {
+                    ptsMotivoRaw = osMotivo.raw.pontos_inicial;
+                }
+
+                const candidatosMotivo = [];
+
+                if (ptsMotivoRaw && ptsMotivoRaw.length > 0) {
+                    ptsMotivoRaw.forEach((p, pIdx) => {
+                        // Não injeta fallback da OS se houver múltiplos pontos para não replicar coordenadas divergentes
+                        const parsedCoord = extrairCoordRobusta(p, ptsMotivoRaw.length === 1 ? osMotivo : null);
+                        const endM = p.enderecoFinal || p.enderecoReparo || p.enderecoInicial || p.endereco || osMotivo.endereco || 'Endereço não informado';
+                        const plqM = p.plaquetaFinal || p.plaquetaInicial || p.plaqueta || (ptsMotivoRaw.length === 1 ? (osMotivo.plaquetaFinal || osMotivo.plaquetaInicial || osMotivo.plaqueta) : '') || '';
+
+                        candidatosMotivo.push({
+                            numeroPonto: p.numero || (pIdx + 1),
+                            totalPontos: ptsMotivoRaw.length,
+                            endereco: endM,
+                            plaqueta: plqM,
+                            problema: p.problemaEncontrado || p.problemaInicial || p.problema || osMotivo.problemaEncontrado || osMotivo.problemaInicial || '',
+                            lat: parsedCoord ? parsedCoord.lat : null,
+                            lng: parsedCoord ? parsedCoord.lng : null,
+                            hasCoord: Boolean(parsedCoord)
+                        });
+                    });
+                } else {
+                    const parsedM = extrairCoordRobusta(osMotivo, osMotivo);
+                    const endMotivo = osMotivo.enderecoReparo || osMotivo.endereco || osMotivo.pracaNome || 'Endereço da OS duplicada';
+                    const plqMotivo = osMotivo.plaquetaFinal || osMotivo.plaquetaInicial || osMotivo.plaqueta || '';
+
+                    candidatosMotivo.push({
+                        numeroPonto: 1,
+                        totalPontos: 1,
+                        endereco: endMotivo,
+                        plaqueta: plqMotivo,
+                        problema: osMotivo.problemaEncontrado || osMotivo.problemaInicial || '',
+                        lat: parsedM ? parsedM.lat : null,
+                        lng: parsedM ? parsedM.lng : null,
+                        hasCoord: Boolean(parsedM)
+                    });
+                }
+
+                // Encontrar o par exato mais congruente:
+                // 1º critério: mesma plaqueta (match exato de identificação)
+                // 2º critério: endereço muito similar / coincidente
+                // 3º critério: menor distância geográfica real (com corte estrito de coerência <= 150m)
+                let melhorPontoPendente = null;
+                let melhorPontoMotivo = null;
+                let menorDistanciaGeral = Infinity;
+                let matchTipo = null; // 'plaqueta' | 'endereco' | 'proximidade' | null
+
+                // 1º Passo: Match por Plaqueta idêntica
+                for (const ptPend of pontosDestaOSPendente) {
+                    const plqP = String(ptPend.plaqueta || '').replace(/^plaqueta:\s*/i, '').trim().toLowerCase();
+                    if (!plqP || plqP === '---' || plqP === '[---]') continue;
+
+                    for (const candM of candidatosMotivo) {
+                        const plqM = String(candM.plaqueta || '').replace(/^plaqueta:\s*/i, '').trim().toLowerCase();
+                        if (plqM && plqM === plqP) {
+                            melhorPontoPendente = ptPend;
+                            melhorPontoMotivo = candM;
+                            matchTipo = 'plaqueta';
+                            if (ptPend.hasCoord && candM.hasCoord) {
+                                menorDistanciaGeral = calcularDistanciaEntreCoords(
+                                    { lat: ptPend.lat, lng: ptPend.lng },
+                                    { lat: candM.lat, lng: candM.lng }
+                                ) || 0;
+                            }
+                            break;
+                        }
+                    }
+                    if (melhorPontoMotivo) break;
+                }
+
+                // 2º Passo: Match por Endereço coincidente ou similar
+                if (!melhorPontoMotivo) {
+                    for (const ptPend of pontosDestaOSPendente) {
+                        const endNormP = normalizarTextoEndereco(ptPend.localizacaoNome);
+                        if (!endNormP || endNormP.length < 5) continue;
+
+                        for (const candM of candidatosMotivo) {
+                            const endNormM = normalizarTextoEndereco(candM.endereco);
+                            if (endNormM && endNormM.length >= 5 && (endNormP === endNormM || endNormP.includes(endNormM) || endNormM.includes(endNormP))) {
+                                melhorPontoPendente = ptPend;
+                                melhorPontoMotivo = candM;
+                                matchTipo = 'endereco';
+                                if (ptPend.hasCoord && candM.hasCoord) {
+                                    menorDistanciaGeral = calcularDistanciaEntreCoords(
+                                        { lat: ptPend.lat, lng: ptPend.lng },
+                                        { lat: candM.lat, lng: candM.lng }
+                                    ) || 0;
+                                }
+                                break;
+                            }
+                        }
+                        if (melhorPontoMotivo) break;
+                    }
+                }
+
+                // 3º Passo: Se não encontrou por plaqueta nem por endereço, avalia proximidade geográfica real
+                // O disparo de duplicata por proximidade no sistema ocorre com raio <= 50 metros!
+                if (!melhorPontoMotivo) {
+                    for (const ptPend of pontosDestaOSPendente) {
+                        if (!ptPend.hasCoord) continue;
+                        for (const candM of candidatosMotivo) {
+                            if (!candM.hasCoord) continue;
+                            const d = calcularDistanciaEntreCoords(
+                                { lat: ptPend.lat, lng: ptPend.lng },
+                                { lat: candM.lat, lng: candM.lng }
+                            );
+                            if (d !== null && d <= 50 && d < menorDistanciaGeral) {
+                                menorDistanciaGeral = d;
+                                melhorPontoPendente = ptPend;
+                                melhorPontoMotivo = candM;
+                                matchTipo = 'proximidade';
+                            }
+                        }
+                    }
+                }
+
+                // Fallback padrão se não houver match direto:
+                // Escolhe o primeiro candidato da OS motivo e da OS pendente para exibição das informações
+                if (!melhorPontoMotivo) {
+                    melhorPontoMotivo = candidatosMotivo[0];
+                    melhorPontoPendente = pontosDestaOSPendente[0] || ptPendente;
+                }
+                if (!melhorPontoPendente) {
+                    melhorPontoPendente = pontosDestaOSPendente[0] || ptPendente;
+                }
+
+                const stBadge = osMotivo.statusBadgeLabel || osMotivo.status || 'Atendida';
+                let distMetros = (melhorPontoPendente && melhorPontoPendente.hasCoord && melhorPontoMotivo && melhorPontoMotivo.hasCoord)
+                    ? calcularDistanciaEntreCoords(
+                        { lat: melhorPontoPendente.lat, lng: melhorPontoPendente.lng },
+                        { lat: melhorPontoMotivo.lat, lng: melhorPontoMotivo.lng }
+                    )
+                    : (menorDistanciaGeral !== Infinity ? menorDistanciaGeral : null);
+
+                const ptMotivoChave = `motivo_${cleanProt}_p${melhorPontoMotivo.numeroPonto}`;
+                const chaveExibicao = `${cleanProt}_${melhorPontoMotivo.numeroPonto}`;
+                
+                let ptMotivoExistente = motivosAdicionadosMap.get(chaveExibicao);
+                if (!ptMotivoExistente) {
+                    ptMotivoExistente = {
+                        key: ptMotivoChave,
+                        tipoMarcador: 'motivo',
+                        osId: osMotivo.id,
+                        protocolo: cleanProt,
+                        protocolosPendentesVinculados: [proto],
+                        pontoNum: melhorPontoMotivo.numeroPonto,
+                        totalPontos: melhorPontoMotivo.totalPontos,
+                        isPraca: Boolean(osMotivo.isPraca),
+                        localizacaoNome: melhorPontoMotivo.endereco,
+                        plaqueta: melhorPontoMotivo.plaqueta,
+                        problema: melhorPontoMotivo.problema || 'Histórico duplicata',
+                        statusLabel: stBadge,
+                        distanciaAoPendente: distMetros,
+                        dataCriacao: osMotivo.formattedDateShort || osMotivo.dataCriacao || '',
+                        lat: melhorPontoMotivo.lat,
+                        lng: melhorPontoMotivo.lng,
+                        hasCoord: melhorPontoMotivo.hasCoord
+                    };
+                    motivosAdicionadosMap.set(chaveExibicao, ptMotivoExistente);
+                    pontosParaExibir.push(ptMotivoExistente);
+                } else {
+                    if (!ptMotivoExistente.protocolosPendentesVinculados.includes(proto)) {
+                        ptMotivoExistente.protocolosPendentesVinculados.push(proto);
+                    }
+                }
+
+                // CRITÉRIO DE SEGURANÇA PARA DESENHAR LINHA:
+                // O disparo de duplicata por proximidade no sistema é <= 50 metros.
+                // Permitimos desenhar linha se:
+                // 1. Houve match confirmado de mesma Plaqueta (e coordenadas não são absurdamente discrepantes <= 100m)
+                // 2. Houve match de mesmo Endereço (e distância <= 60m)
+                // 3. A distância física entre os pontos for rigorosamente <= 50 metros (ou até 60m para compensar imprecisão de GPS).
+                const deveDesenharLinha = (
+                    melhorPontoPendente &&
+                    melhorPontoPendente.hasCoord &&
+                    ptMotivoExistente.hasCoord &&
+                    (
+                        (matchTipo === 'plaqueta' && (distMetros === null || distMetros <= 100)) ||
+                        (matchTipo === 'endereco' && (distMetros === null || distMetros <= 60)) ||
+                        (distMetros !== null && distMetros <= 55)
+                    )
+                );
+
+                if (deveDesenharLinha) {
+                    conexoes.push({
+                        id: `conn_${proto}_${cleanProt}_${melhorPontoMotivo.numeroPonto}`,
+                        origem: melhorPontoPendente,
+                        destino: ptMotivoExistente,
+                        distancia: distMetros
+                    });
+                }
+            });
+        });
+
+        pendentesPontosCache = pontosParaExibir;
+        pendentesConexoesCache = conexoes;
+
+        const badgeCount = document.getElementById('modal-mapa-pendentes-badge-count');
+        if (badgeCount) {
+            const countPend = pontosParaExibir.filter(p => p.tipoMarcador === 'pendente').length;
+            const countMot = pontosParaExibir.filter(p => p.tipoMarcador === 'motivo').length;
+            badgeCount.textContent = countMot > 0 
+                ? `${countPend} pendente(s) + ${countMot} motivo(s)`
+                : `${countPend} ponto(s) pendente(s)`;
+        }
+
+        modal.style.display = 'flex';
+        modal.classList.remove('hidden');
+
+        setTimeout(() => {
+            modalBox.classList.remove('scale-95', 'opacity-0');
+            modalBox.classList.add('scale-100', 'opacity-100');
+            inicializarMapaPendentes(pontosParaExibir, conexoes);
+        }, 50);
+    };
+
+    // Estado de filtro de conexões ativas no mapa
+    let conexaoFocoAtivo = null;
+
+    window.destacarConexaoOS = function(protocoloAlvo) {
+        conexaoFocoAtivo = protocoloAlvo;
+        atualizarEstiloLinhasConexao();
+    };
+
+    window.limparDestaqueConexaoOS = function() {
+        conexaoFocoAtivo = null;
+        atualizarEstiloLinhasConexao();
+    };
+
+    function atualizarEstiloLinhasConexao() {
+        if (!pendentesMapboxInstance || !pendentesMapboxInstance.getSource('pendentes-conexoes')) return;
+
+        if (conexaoFocoAtivo) {
+            // Filtra para exibir apenas a linha associada à OS focada (seja ela origem ou destino)
+            const cleanAlvo = String(conexaoFocoAtivo).replace(/^#/, '').trim().toLowerCase();
+            const filterExpr = [
+                'any',
+                ['==', ['downcase', ['get', 'origem']], cleanAlvo],
+                ['==', ['downcase', ['get', 'destino']], cleanAlvo]
+            ];
+
+            if (pendentesMapboxInstance.getLayer('pendentes-lines-dashed')) {
+                pendentesMapboxInstance.setFilter('pendentes-lines-dashed', filterExpr);
+                pendentesMapboxInstance.setPaintProperty('pendentes-lines-dashed', 'line-width', 4);
+                pendentesMapboxInstance.setPaintProperty('pendentes-lines-dashed', 'line-opacity', 1.0);
+            }
+            if (pendentesMapboxInstance.getLayer('pendentes-lines-labels')) {
+                pendentesMapboxInstance.setFilter('pendentes-lines-labels', filterExpr);
+            }
+        } else {
+            // Mostra todas as conexões de forma suave e legível
+            if (pendentesMapboxInstance.getLayer('pendentes-lines-dashed')) {
+                pendentesMapboxInstance.setFilter('pendentes-lines-dashed', null);
+                pendentesMapboxInstance.setPaintProperty('pendentes-lines-dashed', 'line-width', 2.5);
+                pendentesMapboxInstance.setPaintProperty('pendentes-lines-dashed', 'line-opacity', 0.5);
+            }
+            if (pendentesMapboxInstance.getLayer('pendentes-lines-labels')) {
+                pendentesMapboxInstance.setFilter('pendentes-lines-labels', null);
+            }
+        }
+    }
+
+    function inicializarMapaPendentes(pontos, conexoes = []) {
+        const container = document.getElementById('mapa-pendentes-canvas');
+        if (!container) return;
+
+        const MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+
+        if (!pendentesMapboxInstance) {
+            mapboxgl.accessToken = MAPBOX_TOKEN;
+            pendentesMapboxInstance = new mapboxgl.Map({
+                container: 'mapa-pendentes-canvas',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-48.17188, -21.75478],
+                zoom: 13
+            });
+
+            pendentesMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+            pendentesMapboxInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
+
+            // Clicar em área vazia do mapa restaura todas as conexões
+            pendentesMapboxInstance.on('click', (e) => {
+                if (e.defaultPrevented) return;
+                window.limparDestaqueConexaoOS();
+            });
+        }
+
+        conexaoFocoAtivo = null;
+
+        // Limpar marcadores anteriores
+        pendentesMapboxMarkers.forEach(m => m && m.remove && m.remove());
+        pendentesMapboxMarkers = [];
+
+        // Limpar camadas e fontes de linhas anteriores se existirem
+        const layerIds = ['pendentes-lines-dashed', 'pendentes-lines-labels'];
+        layerIds.forEach(id => {
+            if (pendentesMapboxInstance.getLayer(id)) {
+                pendentesMapboxInstance.removeLayer(id);
+            }
+        });
+        if (pendentesMapboxInstance.getSource('pendentes-conexoes')) {
+            pendentesMapboxInstance.removeSource('pendentes-conexoes');
+        }
+
+        const bounds = new mapboxgl.LngLatBounds();
+        let validCoordsCount = 0;
+
+        pontos.forEach((p, idx) => {
+            let lat = p.lat;
+            let lng = p.lng;
+            let isFallback = false;
+
+            if (!p.hasCoord || lat === null || lng === null) {
+                isFallback = true;
+                const offsetLat = ((idx % 7) - 3) * 0.0035;
+                const offsetLng = (Math.floor(idx / 7) - 3) * 0.0035;
+                lat = -21.75478 + offsetLat;
+                lng = -48.17188 + offsetLng;
+                p.lat = lat;
+                p.lng = lng;
+            } else {
+                validCoordsCount++;
+            }
+
+            bounds.extend([lng, lat]);
+
+            const isMotivo = p.tipoMarcador === 'motivo';
+
+            // Marcador visual customizado com diferenciação nítida de cores e estilos
+            const el = document.createElement('div');
+            el.className = 'custom-pendentes-marker flex flex-col items-center cursor-pointer group select-none transition-transform hover:scale-110';
+            
+            // Cores: Âmbar/Laranja para Pendente; Índigo/Roxo para Motivo
+            const badgeBg = isMotivo 
+                ? 'bg-indigo-700 text-white border-indigo-300 ring-2 ring-indigo-400/40' 
+                : (isFallback ? 'bg-amber-800 text-amber-100 border-amber-300' : (p.isPraca ? 'bg-emerald-700 text-white border-emerald-300' : 'bg-amber-600 text-white border-amber-300 ring-2 ring-amber-400/40'));
+            
+            const dotBg = isMotivo ? 'bg-indigo-600' : (p.isPraca ? 'bg-emerald-500' : 'bg-amber-500');
+            const iconName = isMotivo ? 'link' : (p.isPraca ? 'park' : 'pending_actions');
+            const tipoLabel = isMotivo ? 'MOTIVO' : 'PENDENTE';
+            const ptLabel = p.totalPontos > 1 ? ` #${p.protocolo} (P.${p.pontoNum})` : ` #${p.protocolo}`;
+
+            el.innerHTML = `
+                <div class="px-2 py-0.5 rounded-md text-[10.5px] font-bold ${badgeBg} shadow-lg border whitespace-nowrap flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[13px]">${iconName}</span>
+                    <span>${tipoLabel}${ptLabel}${isFallback ? ' (s/ coord)' : ''}</span>
+                </div>
+                <div class="w-3.5 h-3.5 ${dotBg} rounded-full border-2 border-white shadow-md -mt-1"></div>
+            `;
+
+            // Popup com detalhes ricos sobre o motivo ou a pendência
+            let popupContent = '';
+
+            if (isMotivo) {
+                const pendentesList = Array.isArray(p.protocolosPendentesVinculados) && p.protocolosPendentesVinculados.length > 0
+                    ? p.protocolosPendentesVinculados
+                    : (p.protocoloPendenteVinculado ? [p.protocoloPendenteVinculado] : []);
+
+                const listaBotoesFoco = pendentesList.map(protoPend => `
+                    <button type="button" onclick="window.destacarConexaoOS('${protoPend}')" class="px-2 py-1 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-mono text-[11px] font-bold flex items-center gap-1 transition-colors cursor-pointer border border-indigo-300/60" title="Destacar linha ligando a esta OS pendente">
+                        <span class="material-symbols-outlined text-[12px] text-indigo-600">visibility</span>
+                        #${protoPend}
+                    </button>
+                `).join('');
+
+                popupContent = `
+                    <div class="p-2.5 text-xs text-slate-800 space-y-2 min-w-[250px] max-w-[320px]">
+                        <div class="flex items-center justify-between border-b border-indigo-100 pb-1.5 font-bold">
+                            <span class="text-indigo-800 font-mono text-[13px] flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[15px] text-indigo-600">link</span>
+                                #${p.protocolo}
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold uppercase">
+                                OS Motivo / Duplicata
+                            </span>
+                        </div>
+                        <div class="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2 text-[11px] text-indigo-900 leading-tight space-y-1.5">
+                            <div>
+                                <strong>Vinculada à(s) OS Pendente(s) (${pendentesList.length}):</strong>
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    ${listaBotoesFoco}
+                                </div>
+                            </div>
+                            ${p.totalPontos > 1 ? `<div><strong>Ponto Identificado:</strong> Ponto ${p.pontoNum} de ${p.totalPontos}</div>` : ''}
+                            ${p.distanciaAoPendente !== null && p.distanciaAoPendente !== undefined ? `<div><strong>Menor distância calculada:</strong> ${p.distanciaAoPendente >= 1000 ? (p.distanciaAoPendente/1000).toFixed(1) + ' km' : p.distanciaAoPendente + ' metros'}</div>` : ''}
+                            <div class="text-[10px] text-indigo-700 italic">Ponto que motivou a retenção da duplicata/reparo recente.</div>
+                        </div>
+                        <div class="space-y-1 text-[11.5px]">
+                            <div><strong>Local:</strong> <span class="text-slate-700">${p.localizacaoNome || 'Não informado'}</span></div>
+                            ${p.plaqueta ? `<div><strong>Plaqueta:</strong> <span class="font-mono text-slate-800 font-semibold">${p.plaqueta}</span></div>` : ''}
+                            <div><strong>Status Atual:</strong> <span class="text-slate-700 font-medium">${p.statusLabel || 'Auditada / Concluída'}</span></div>
+                            <div><strong>Problema:</strong> <span class="text-slate-700">${p.problema || 'Não informado'}</span></div>
+                            ${p.dataCriacao ? `<div><strong>Data:</strong> <span class="text-slate-500">${p.dataCriacao}</span></div>` : ''}
+                        </div>
+                        
+                        <div class="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100">
+                            <button type="button" onclick="window.abrirDetalhesOSModal('${p.protocolo}')" class="w-full py-1.5 px-2 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-center font-bold text-xs flex items-center justify-center gap-1 transition-all shadow-xs active:scale-95 cursor-pointer" title="Abrir modal de detalhes desta Ordem de Serviço">
+                                <span class="material-symbols-outlined text-[15px]">assignment</span>
+                                <span>Abrir OS Motivo #${p.protocolo}</span>
+                            </button>
+                            <button type="button" onclick="window.destacarConexaoOS('${p.protocolo}')" class="w-full py-1 px-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/60 text-center font-bold text-[11px] flex items-center justify-center gap-1 transition-all cursor-pointer" title="Filtrar linhas apenas desta OS">
+                                <span class="material-symbols-outlined text-[13px] text-indigo-600">filter_alt</span>
+                                <span>Destacar conexões desta OS</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                const motivoFormatado = p.motivoAprovacao 
+                    ? `<div class="bg-amber-50/80 border border-amber-200 rounded-lg p-2 text-[11px] text-amber-900 leading-tight">
+                         <strong>Motivo da Retenção:</strong> ${p.motivoAprovacao}
+                       </div>` 
+                    : '';
+
+                popupContent = `
+                    <div class="p-2.5 text-xs text-slate-800 space-y-2 min-w-[240px] max-w-[300px]">
+                        <div class="flex items-center justify-between border-b border-amber-100 pb-1.5 font-bold text-slate-900">
+                            <span class="text-amber-700 font-mono text-[13px] flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[15px] text-amber-600">pending_actions</span>
+                                #${p.protocolo}
+                            </span>
+                            <span class="text-[10px] px-2 py-0.5 rounded-full ${p.isPraca ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-800 border border-amber-200'} font-bold uppercase">
+                                ${p.isPraca ? 'Praça' : (p.totalPontos > 1 ? `Ponto ${p.pontoNum}/${p.totalPontos}` : 'Pendente')}
+                            </span>
+                        </div>
+                        ${motivoFormatado}
+                        <div class="space-y-1 text-[11.5px]">
+                            <div><strong>Local:</strong> <span class="text-slate-700">${p.localizacaoNome || 'Não informado'}</span></div>
+                            ${p.plaqueta ? `<div><strong>Plaqueta:</strong> <span class="font-mono text-slate-800 font-semibold">${p.plaqueta}</span></div>` : ''}
+                            <div><strong>Problema:</strong> <span class="text-slate-700">${p.problema || 'Não informado'}</span></div>
+                            ${p.dataCriacao ? `<div><strong>Abertura:</strong> <span class="text-slate-500">${p.dataCriacao}</span></div>` : ''}
+                        </div>
+                        
+                        <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                            <button type="button" onclick="window.abrirDetalhesOSModal('${p.protocolo}')" class="flex-1 py-1.5 px-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface border border-outline-variant/60 text-center font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-2xs active:scale-95 cursor-pointer" title="Abrir modal de detalhes desta Ordem de Serviço">
+                                <span class="material-symbols-outlined text-[14px] text-secondary">assignment</span>
+                                <span>Abrir OS</span>
+                            </button>
+                            <button type="button" onclick="window.painelController?.handleStatusAction('${p.protocolo}', 'aberto', event); window.fecharMapaPendentesAprovacaoModal();" class="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-center font-bold text-[11px] flex items-center justify-center gap-1 transition-all shadow-xs active:scale-95 cursor-pointer" title="Aprovar esta Ordem de Serviço">
+                                <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                <span>Aprovar</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }
+
+            const popup = new mapboxgl.Popup({ offset: 25, closeButton: true, maxWidth: '330px' }).setHTML(popupContent);
+
+            // Ao abrir o popup, foca e destaca exclusivamente a linha desta OS
+            popup.on('open', () => {
+                window.destacarConexaoOS(p.protocolo);
+            });
+
+            // Ao fechar o popup, restaura as linhas para a visão geral
+            popup.on('close', () => {
+                window.limparDestaqueConexaoOS();
+            });
+
+            const marker = new mapboxgl.Marker({ element: el })
+                .setLngLat([lng, lat])
+                .setPopup(popup)
+                .addTo(pendentesMapboxInstance);
+
+            pendentesMapboxMarkers.push(marker);
+        });
+
+        // Desenhar as linhas de conexão entre os pontos da OS pendente e os pontos da OS motivo
+        const desenharLinhasConexao = () => {
+            if (!pendentesMapboxInstance) return;
+
+            const features = [];
+            conexoes.forEach((c) => {
+                if (!c.origem || !c.destino) return;
+                const p1 = [c.origem.lng, c.origem.lat];
+                const p2 = [c.destino.lng, c.destino.lat];
+                const distStr = (c.distancia !== null && c.distancia !== undefined)
+                    ? (c.distancia >= 1000 ? `${(c.distancia / 1000).toFixed(1)} km` : `${c.distancia} m`)
+                    : '';
+
+                features.push({
+                    type: 'Feature',
+                    properties: {
+                        id: c.id,
+                        origem: String(c.origem.protocolo).replace(/^#/, ''),
+                        destino: String(c.destino.protocolo).replace(/^#/, ''),
+                        distancia: distStr,
+                        rotulo: distStr ? `${distStr}` : `#${c.origem.protocolo} ➔ #${c.destino.protocolo}`
+                    },
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: [p1, p2]
+                    }
+                });
+            });
+
+            if (features.length === 0) return;
+
+            const geojson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            // Adiciona Source
+            pendentesMapboxInstance.addSource('pendentes-conexoes', {
+                type: 'geojson',
+                data: geojson
+            });
+
+            // Linha tracejada índigo conectando os dois pontos
+            pendentesMapboxInstance.addLayer({
+                id: 'pendentes-lines-dashed',
+                type: 'line',
+                source: 'pendentes-conexoes',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#4f46e5', // Indigo-600
+                    'line-width': 2.5,
+                    'line-dasharray': [2, 2],
+                    'line-opacity': 0.5
+                }
+            });
+
+            // Rótulo flutuante com a distância no centro da linha
+            pendentesMapboxInstance.addLayer({
+                id: 'pendentes-lines-labels',
+                type: 'symbol',
+                source: 'pendentes-conexoes',
+                layout: {
+                    'symbol-placement': 'line-center',
+                    'text-field': ['get', 'rotulo'],
+                    'text-size': 11,
+                    'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                    'text-offset': [0, -0.7],
+                    'text-allow-overlap': true,
+                    'text-ignore-placement': true
+                },
+                paint: {
+                    'text-color': '#312e81', // Indigo-900
+                    'text-halo-color': '#ffffff',
+                    'text-halo-width': 2
+                }
+            });
+
+            atualizarEstiloLinhasConexao();
+        };
+
+        if (pendentesMapboxInstance.isStyleLoaded()) {
+            desenharLinhasConexao();
+        } else {
+            pendentesMapboxInstance.once('load', desenharLinhasConexao);
+        }
+
+        if (pontos.length > 0) {
+            pendentesMapboxInstance.fitBounds(bounds, { padding: 90, maxZoom: 16 });
+        }
+
+        setTimeout(() => {
+            if (pendentesMapboxInstance) pendentesMapboxInstance.resize();
+        }, 200);
+    }
+
+    window.centralizarMapaPendentes = function() {
+        if (!pendentesPontosCache || pendentesPontosCache.length === 0 || !pendentesMapboxInstance) return;
+        const bounds = new mapboxgl.LngLatBounds();
+        pendentesPontosCache.forEach((p, idx) => {
+            let lat = p.lat;
+            let lng = p.lng;
+            if (!p.hasCoord || lat === null || lng === null) {
+                const offsetLat = ((idx % 7) - 3) * 0.0035;
+                const offsetLng = (Math.floor(idx / 7) - 3) * 0.0035;
+                lat = -21.75478 + offsetLat;
+                lng = -48.17188 + offsetLng;
+            }
+            bounds.extend([lng, lat]);
+        });
+        pendentesMapboxInstance.fitBounds(bounds, { padding: 90, maxZoom: 16 });
+    };
+
+    window.fecharMapaPendentesAprovacaoModal = function() {
+        const modal = document.getElementById('modal-mapa-pendentes-aprovacao');
+        const modalBox = document.getElementById('modal-mapa-pendentes-box');
+        if (!modal || !modalBox) return;
+
+        modalBox.classList.remove('scale-100', 'opacity-100');
+        modalBox.classList.add('scale-95', 'opacity-0');
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            modal.style.display = 'none';
+        }, 200);
+    };
 </script>
 
 <!-- Helper de Testes Supabase (DevTools Console) -->

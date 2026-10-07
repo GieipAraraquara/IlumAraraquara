@@ -158,8 +158,8 @@ class ChamadosService {
     /**
      * Updates materials for an OS protocol or ID (with optional fechamentoId and numFechamento)
      */
-    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null) {
-        return await this.repository.updateMaterial(protocoloOrId, novosMateriais, fechamentoId, numFechamento, historicoSessoesAtualizado);
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null, origemTela = null) {
+        return await this.repository.updateMaterial(protocoloOrId, novosMateriais, fechamentoId, numFechamento, historicoSessoesAtualizado, origemTela);
     }
 
     /**
@@ -245,6 +245,38 @@ class ChamadosService {
                 origemTela: origemTela
             }
         );
+    }
+
+    /**
+     * Registra uma nova observação/apontamento no histórico da OS (logs_protocolos)
+     * @param {string} protocolo
+     * @param {string} observacao
+     * @param {string} [origemTela='Painel']
+     */
+    async adicionarObservacaoOS(protocolo, observacao, origemTela = 'Painel') {
+        const obsTexto = String(observacao || '').trim();
+        if (!protocolo) {
+            throw new Error('Protocolo da OS não informado.');
+        }
+        if (!obsTexto) {
+            throw new Error('O texto da observação não pode ficar vazio.');
+        }
+
+        const isPraca = String(protocolo).trim().toUpperCase().startsWith('P');
+        const tabelaOrigem = isPraca ? 'ordens_servico_pracas' : 'ordens_servico';
+
+        if (window.LogsRepository) {
+            const logsRepo = typeof window.LogsRepository === 'function' ? new window.LogsRepository() : window.LogsRepository;
+            return await logsRepo.registrarLog({
+                protocolo: String(protocolo).trim(),
+                tabelaOrigem: tabelaOrigem,
+                tipoAcao: 'OBSERVACAO',
+                descricao: obsTexto,
+                origemTela: origemTela
+            });
+        }
+        console.warn('⚠️ [ChamadosService] LogsRepository não encontrado para registrar observação.');
+        return null;
     }
 
     /**

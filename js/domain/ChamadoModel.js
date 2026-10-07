@@ -572,6 +572,21 @@ class ChamadoModel {
             }
         }
 
+        // 5.1 Fotos complementares diretas da OS (rawRow.fotos_complementares)
+        const fotosCompOS = this.rawRow && (this.rawRow.fotos_complementares || this.rawRow.fotos_complementares_viaria);
+        if (fotosCompOS) {
+            let arrComp = fotosCompOS;
+            if (typeof arrComp === 'string') {
+                try { arrComp = JSON.parse(arrComp); } catch(e) { arrComp = [arrComp]; }
+            }
+            if (Array.isArray(arrComp)) {
+                arrComp.forEach((f, idx) => {
+                    const u = typeof f === 'string' ? f : (f ? (f.url || f.link || f.foto) : null);
+                    if (u) pushItem(u, `Foto Complementar #${idx + 1}`, { origem: 'Fotos Complementares' });
+                });
+            }
+        }
+
         // 6. Fotos registradas na nova tabela fechamentos_os
         if (this.fechamentosList && this.fechamentosList.length > 0) {
             this.fechamentosList.forEach(f => {
@@ -649,7 +664,7 @@ class ChamadoModel {
                 data_fechamento: this.dataConclusao || null,
                 dataFechamento: this.dataConclusao || null,
                 dataFechamentoStr: this.dataConclusao ? this.dataConclusao.toLocaleString('pt-BR') : '',
-                relatorioTecnico: this.observacaoFinal || this.descricao || '',
+                relatorioTecnico: this.observacaoFinal || '',
                 textoAuditoriaOCR: this.textoAuditoriaOCR || '',
                 materiais: matsParsed,
                 fotos: fotosParsed,
@@ -870,8 +885,18 @@ class ChamadoModel {
             });
         }
 
-        const iniList = ptsIni.length > 0 ? ptsIni : (ptsLegacy.length > 0 && !this.rawPontosFinal ? ptsLegacy : []);
-        const finList = ptsFin.length > 0 ? ptsFin : (ptsLegacy.length > 0 && String(this.rawStatus || '').toLowerCase().includes('conclu') ? ptsLegacy : []);
+        const isPontoReal = (pt) => {
+            if (!pt || typeof pt !== 'object') return false;
+            const plq = String(pt.plaqueta || pt.plaqueta_inicial || pt.plaqueta_final || '').trim().toUpperCase();
+            if (plq === 'FOTOS_COMPLEMENTARES' || plq === '[FOTOS_COMPLEMENTARES]' || plq === 'FOTOS COMPLEMENTARES') return false;
+            if (pt.is_foto_complementar || pt.isFotoComplementar) return false;
+            const prob = String(pt.problema || pt.problema_inicial || pt.problema_encontrado || '').trim().toLowerCase();
+            if (prob === 'complementar' && !pt.lat && !pt.lng && !pt.coordenada && !pt.coordenada_reparo) return false;
+            return true;
+        };
+
+        const iniList = (ptsIni.length > 0 ? ptsIni : (ptsLegacy.length > 0 && !this.rawPontosFinal ? ptsLegacy : [])).filter(isPontoReal);
+        const finList = (ptsFin.length > 0 ? ptsFin : (ptsLegacy.length > 0 && String(this.rawStatus || '').toLowerCase().includes('conclu') ? ptsLegacy : [])).filter(isPontoReal);
 
         if (iniList.length === 0 && finList.length === 0) {
             const isConcluida = this.normalizedStatus === 'concluida' || Boolean(this.dataConclusao);
@@ -915,7 +940,8 @@ class ChamadoModel {
             if (i === 0 && !plqIni && this.plaquetaInicial) plqIni = this.plaquetaInicial;
             if (i === 0 && !coordIni && this.coordenadaInicial) coordIni = this.coordenadaInicial;
             if (i === 0 && !probIni && this.problemaInicial) probIni = this.problemaInicial;
-            if (i === 0 && !endIni && this.endereco) endIni = this.endereco;
+            // Fallback de endereço da OS para todos os pontos caso o ponto específico não tenha endereço
+            if (!endIni && this.endereco) endIni = this.endereco;
 
             if (i === 0 && !plqFin && this.plaquetaFinal) plqFin = this.plaquetaFinal;
             if (i === 0 && !coordFin && this.coordenadaReparo) coordFin = this.coordenadaReparo;
@@ -928,11 +954,17 @@ class ChamadoModel {
             let numFech = pFin ? (pFin.fechamento || pFin.numero_fechamento || pFin.numero || null) : null;
             if (!numFech && hasFinalData) numFech = 1;
 
+            const modoIni = (pIni && (pIni.modo || pIni.tipoLocal || pIni.tipo_local)) || '';
+            const isAddressMode = modoIni === 'endereco' || (!modoIni && ChamadoModel.isRealAddress(endIni));
+
             result.push({
                 numero: i + 1,
                 fechamento: numFech,
                 numeroFechamento: numFech,
                 hasInicialData: hasInicialData,
+                isAddressMode: isAddressMode,
+                modoInicial: modoIni,
+                tipoLocalInicial: (pIni && (pIni.tipoLocal || pIni.tipo_local)) || '',
                 enderecoInicial: ChamadoModel.isRealAddress(endIni) ? ChamadoModel.formatLocationText(endIni) : '',
                 plaquetaInicial: ChamadoModel.formatLocationText(plqIni),
                 coordenadaInicial: ChamadoModel.formatLocationText(coordIni),
@@ -1405,6 +1437,19 @@ class ChamadoModel {
         return false;
     }
 
+    get isReincidencia30d() {
+        if (this.isDireto) return false;
+        if (this._isReincidencia30d !== undefined) return Boolean(this._isReincidencia30d);
+        if (this.audit && this.audit.reincidencia_30d !== undefined && this.audit.reincidencia_30d !== null) {
+            return Boolean(this.audit.reincidencia_30d);
+        }
+        return false;
+    }
+
+    get reincidencia30dInfo() {
+        return this._reincidencia30dInfo || null;
+    }
+
     get hasDivergence() {
         if (this.isDireto) return false;
         return this.isProblemaDivergente ||
@@ -1416,7 +1461,8 @@ class ChamadoModel {
                this.isPrecisaAnexarFoto ||
                this.isAnexoFaltante ||
                this.isMaterialDivergente ||
-               this.isProblemaExterno;
+               this.isProblemaExterno ||
+               this.isReincidencia30d;
     }
 
     /**
@@ -2414,6 +2460,7 @@ class ChamadoModel {
             f.pontos,
             f.evidencias,
             f.fotos_evidencias,
+            f.fotos_complementares,
             f.foto,
             f.foto_url,
             f.url_foto,
@@ -2421,7 +2468,8 @@ class ChamadoModel {
             f.foto_saida,
             f.rawRow?.fotos,
             f.rawRow?.pontos,
-            f.rawRow?.evidencias
+            f.rawRow?.evidencias,
+            f.rawRow?.fotos_complementares
         ];
 
         sources.forEach(src => {
@@ -2534,6 +2582,14 @@ class ChamadoModel {
             headerText2: 'Externo?',
             modelProperty: 'isProblemaExterno',
             explicacao: 'O problema selecionado pela empresa prestadora de serviço necessita de intervenção da CPFL.'
+        },
+        {
+            key: 'reincidencia30d',
+            label: 'Reincidência 30d?',
+            headerText1: 'Reincidência',
+            headerText2: '30d?',
+            modelProperty: 'isReincidencia30d',
+            explicacao: 'Alguma das plaquetas informadas nos fechamentos desta OS já foi reparada nos 30 dias anteriores a este fechamento.'
         }
     ];
 }

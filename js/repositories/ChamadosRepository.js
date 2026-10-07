@@ -1005,8 +1005,10 @@ class ChamadosRepository {
      * @param {string|Array} novosMateriais
      * @param {string|number|null} [fechamentoId=null]
      * @param {number|null} [numFechamento=null]
+     * @param {Array|null} [historicoSessoesAtualizado=null]
+     * @param {string|null} [origemTela=null]
      */
-    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null) {
+    async updateMaterial(protocoloOrId, novosMateriais, fechamentoId = null, numFechamento = null, historicoSessoesAtualizado = null, origemTela = null) {
         try {
             const client = this.getClient();
             const protStr = String(protocoloOrId || '').trim();
@@ -1082,6 +1084,39 @@ class ChamadosRepository {
                     } catch (prevErr) {
                         console.warn(`⚠️ [ChamadosRepository] Falha ao consultar materiais anteriores da tabela ${tableName}:`, prevErr);
                     }
+                }
+            }
+
+            // Se ainda não encontrou materiais anteriores e é praça ou tem sessões, extrai das sessões da praça
+            if (isValEmpty(materiaisAnteriores)) {
+                try {
+                    let sessQuery = client.from(this.pracasTable).select('historico_sessoes, materiais, material_utilizado');
+                    if (isNumeric) {
+                        sessQuery = sessQuery.or(`protocolo.eq.${protStr},id.eq.${protStr}`);
+                    } else {
+                        sessQuery = sessQuery.eq('protocolo', protStr);
+                    }
+                    const { data: rowsP } = await sessQuery.limit(1);
+                    if (rowsP && rowsP.length > 0) {
+                        let sessList = rowsP[0].historico_sessoes;
+                        if (typeof sessList === 'string') {
+                            try { sessList = JSON.parse(sessList); } catch (e) {}
+                        }
+                        if (Array.isArray(sessList) && sessList.length > 0) {
+                            let matsDasSessoes = [];
+                            sessList.forEach(s => {
+                                if (s && s.materiais) {
+                                    if (Array.isArray(s.materiais)) matsDasSessoes = matsDasSessoes.concat(s.materiais);
+                                    else if (typeof s.materiais === 'string' && s.materiais.trim()) matsDasSessoes.push(s.materiais);
+                                }
+                            });
+                            if (matsDasSessoes.length > 0) {
+                                materiaisAnteriores = matsDasSessoes;
+                            }
+                        }
+                    }
+                } catch (ePrevSess) {
+                    console.warn('⚠️ [ChamadosRepository] Falha ao extrair materiais anteriores das sessões da praça:', ePrevSess);
                 }
             }
 
@@ -1223,18 +1258,28 @@ class ChamadosRepository {
 
             // 3. Register log in logs_protocolos table via LogsRepository
             if (window.LogsRepository) {
-                const descText = numFechamento 
-                    ? `Alteração da lista de materiais do Fechamento #${numFechamento} pelo Administrador`
-                    : `Alteração da lista de materiais da OS pelo Administrador`;
+                const isPraca = protStr.toUpperCase().startsWith('P');
+                const tabelaOrigemLog = isPraca ? this.pracasTable : this.primaryTable;
+
+                let descText;
+                if (isPraca) {
+                    descText = historicoSessoesAtualizado 
+                        ? 'Alteração da lista de materiais das sessões da praça pelo Administrador'
+                        : (numFechamento ? `Alteração da lista de materiais da Sessão #${numFechamento} da praça pelo Administrador` : 'Alteração da lista de materiais da praça pelo Administrador');
+                } else if (numFechamento) {
+                    descText = `Alteração da lista de materiais do Fechamento #${numFechamento} pelo Administrador`;
+                } else {
+                    descText = 'Alteração da lista de materiais da OS pelo Administrador';
+                }
 
                 window.LogsRepository.registrarLog({
                     protocolo: protStr,
-                    tabelaOrigem: 'ordens_servico',
+                    tabelaOrigem: tabelaOrigemLog,
                     tipoAcao: 'ALTERACAO_MATERIAL',
                     descricao: descText,
                     dadosAnteriores: { fechamento_id: fechamentoId, materiais: materiaisAnterioresCloned },
                     dadosNovos: { fechamento_id: fechamentoId, materiais: matPayload, material_utilizado: matStr },
-                    origemTela: 'Auditoria'
+                    origemTela: origemTela || (isPraca ? 'Praça' : 'Auditoria')
                 }).catch(err => console.warn('⚠️ [ChamadosRepository] Falha ao registrar log de materiais:', err));
             }
 

@@ -17,6 +17,14 @@
     <script src="js/guards/authGuard.js?v=31"></script>
     <script src="js/services/ConfiguracoesService.js?v=1"></script>
     <script src="js/services/MedicaoService.js?v=1"></script>
+    <script src="js/services/PerimetrosBloqueadosService.js?v=1"></script>
+    
+    <!-- Mapbox GL JS & Mapbox GL Draw -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.css" type="text/css" />
+    
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="sidebar.js"></script>
     <script src="header.js"></script>
@@ -155,6 +163,11 @@
             background-color: rgba(0, 81, 213, 0.04);
             font-weight: 600;
         }
+
+        .filtro-header-dropdown {
+            z-index: 100 !important;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased min-h-screen sidebar-collapsed">
@@ -168,7 +181,7 @@
     <!-- Conteúdo Principal com espaçamentos sincronizados com o header e sidebar -->
     <main class="ml-[260px] mt-16 p-container-padding min-h-[calc(100vh-64px)] w-[calc(100%-260px)] transition-all duration-300 relative z-0 pb-28 box-border" id="main-content">
         
-        <div class="max-w-6xl mx-auto w-full">
+        <div class="w-full max-w-[1440px] mx-auto px-2 sm:px-4">
             <!-- Header da Página -->
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
@@ -199,8 +212,8 @@
             <div id="aviso-sql" class="hidden mb-6 p-4 rounded-xl border border-amber-200 bg-amber-50/80 text-amber-900 flex items-start gap-3">
                 <span class="material-symbols-outlined text-amber-600 mt-0.5">info</span>
                 <div class="text-sm">
-                    <strong class="font-semibold">Tabela Supabase:</strong> 
-                    Caso ainda não tenha executado o script no Supabase, execute o arquivo <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono font-bold">supabase_configuracoes.sql</code> no SQL Editor.
+                    <strong class="font-semibold">Tabelas Supabase:</strong> 
+                    Caso ainda não tenha executado os scripts no Supabase, execute os arquivos <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono font-bold">supabase_configuracoes.sql</code> e <code class="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono font-bold">supabase_perimetros_bloqueados.sql</code> no SQL Editor.
                 </div>
             </div>
 
@@ -225,6 +238,15 @@
                 <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('notificacoes', this)">
                     <span class="material-symbols-outlined text-lg">notifications_active</span>
                     Alertas & Notificações
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('usuarios', this)">
+                    <span class="material-symbols-outlined text-lg">manage_accounts</span>
+                    Usuários & Senhas
+                </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('perimetros', this)">
+                    <span class="material-symbols-outlined text-lg text-rose-600">fence</span>
+                    <span class="font-semibold text-rose-600">Perímetros Bloqueados</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700" id="badge-total-perimetros">0</span>
                 </button>
             </div>
 
@@ -562,10 +584,455 @@
                     </div>
                 </section>
 
+                <!-- ABA 6: USUÁRIOS & SENHAS -->
+                <section id="tab-usuarios" class="tab-content hidden space-y-4">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-4 sm:p-5 shadow-sm">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                            <div>
+                                <h2 class="text-lg font-bold text-on-surface mb-0.5 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-secondary">admin_panel_settings</span>
+                                    Gerenciamento de Acessos & Senhas
+                                </h2>
+                                <p class="text-xs text-on-surface-variant">
+                                    Autorize cadastros pendentes de servidores e redefina senhas diretamente pelo painel administrativo.
+                                </p>
+                            </div>
+                            <button type="button" onclick="carregarUsuariosSistema()" class="px-3.5 py-1.5 rounded-xl border border-outline-variant hover:bg-surface-container-high text-xs font-semibold text-on-surface flex items-center gap-1.5 transition">
+                                <span class="material-symbols-outlined text-base" id="icon-refresh-users">refresh</span>
+                                Atualizar Lista
+                            </button>
+                        </div>
+
+                        <!-- Tabela de Usuários com Filtros no Cabeçalho -->
+                        <div class="rounded-xl border border-outline-variant/40 min-h-[360px] pb-12 overflow-x-auto overflow-y-visible">
+                            <table class="w-full text-left border-collapse text-xs sm:text-sm">
+                                <thead>
+                                    <tr class="bg-surface-container-low border-b border-outline-variant/40 text-on-surface-variant text-[11px] font-semibold uppercase tracking-wider relative z-10">
+                                        
+                                        <!-- Coluna 1: Usuário / Busca com Dropdown no Header -->
+                                        <th class="py-2.5 px-3 relative" style="min-width: 200px;">
+                                            <div class="relative inline-block text-left">
+                                                <button type="button" onclick="toggleHeaderFilter('filter-dropdown-nome')" class="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-secondary cursor-pointer">
+                                                    <span>Usuário / Nome</span>
+                                                    <span class="material-symbols-outlined text-[15px]">search</span>
+                                                    <span class="w-2 h-2 rounded-full bg-secondary hidden" id="indicator-filtro-nome"></span>
+                                                </button>
+                                                <div id="filter-dropdown-nome" class="filtro-header-dropdown absolute left-0 mt-1.5 w-64 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 hidden normal-case text-on-surface">
+                                                    <span class="text-[11px] text-on-surface-variant font-semibold uppercase block mb-1.5">Buscar Usuário</span>
+                                                    <div class="relative mb-2">
+                                                        <input type="text" id="filtro-usuarios-busca" placeholder="Nome ou e-mail..." oninput="aplicarFiltrosUsuariosHeader()" class="w-full text-xs border border-outline-variant rounded-lg px-2.5 py-1.5 pl-7 focus:ring-1 focus:ring-secondary outline-none bg-surface-container-low text-on-surface" />
+                                                        <span class="material-symbols-outlined absolute left-2 top-1/2 -translate-y-1/2 text-[14px] text-on-surface-variant/60">search</span>
+                                                    </div>
+                                                    <button type="button" onclick="limparFiltroHeader('busca')" class="text-xs text-red-600 hover:underline cursor-pointer block text-left font-medium">Limpar Busca</button>
+                                                </div>
+                                            </div>
+                                        </th>
+
+                                        <!-- Coluna 2: E-mail -->
+                                        <th class="py-2.5 px-3 hidden sm:table-cell" style="min-width: 170px;">
+                                            E-mail
+                                        </th>
+
+                                        <!-- Coluna 3: Origem com Dropdown de Filtro no Header -->
+                                        <th class="py-2.5 px-3 relative" style="min-width: 140px;">
+                                            <div class="relative inline-block text-left">
+                                                <button type="button" onclick="toggleHeaderFilter('filter-dropdown-origem')" class="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-secondary cursor-pointer">
+                                                    <span>Origem</span>
+                                                    <span class="material-symbols-outlined text-[15px]">filter_alt</span>
+                                                    <span class="w-2 h-2 rounded-full bg-secondary hidden" id="indicator-filtro-origem"></span>
+                                                </button>
+                                                <div id="filter-dropdown-origem" class="filtro-header-dropdown absolute left-0 mt-1.5 w-52 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-2.5 hidden normal-case text-on-surface space-y-1">
+                                                    <span class="text-[11px] text-on-surface-variant font-semibold uppercase block px-1 mb-1">Filtrar por Origem</span>
+                                                    <button type="button" onclick="selecionarFiltroHeader('origem', '')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Todas as Origens</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-origem" data-val="">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('origem', 'servidor')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>🏢 Servidor / Interno</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-origem hidden" data-val="servidor">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('origem', 'govbr')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>🇧🇷 gov.br (Cidadão)</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-origem hidden" data-val="govbr">check</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </th>
+
+                                        <!-- Coluna 4: Função com Dropdown de Filtro no Header -->
+                                        <th class="py-2.5 px-3 relative" style="min-width: 150px;">
+                                            <div class="relative inline-block text-left">
+                                                <button type="button" onclick="toggleHeaderFilter('filter-dropdown-role')" class="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-secondary cursor-pointer">
+                                                    <span>Função</span>
+                                                    <span class="material-symbols-outlined text-[15px]">filter_alt</span>
+                                                    <span class="w-2 h-2 rounded-full bg-secondary hidden" id="indicator-filtro-role"></span>
+                                                </button>
+                                                <div id="filter-dropdown-role" class="filtro-header-dropdown absolute left-0 mt-1.5 w-56 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-2.5 hidden normal-case text-on-surface space-y-1">
+                                                    <span class="text-[11px] text-on-surface-variant font-semibold uppercase block px-1 mb-1">Filtrar por Função</span>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', '')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Todas as Funções</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role" data-val="">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'admin')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Administrador / Gestor</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="admin">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'ouvidoria')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Ouvidoria</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="ouvidoria">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'manutentor')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Manutentor</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="manutentor">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'operador')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Operador de Campo</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="operador">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'cidadao')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Cidadão</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="cidadao">check</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </th>
+
+                                        <!-- Coluna 5: Status com Dropdown de Filtro no Header -->
+                                        <th class="py-2.5 px-3 text-center relative" style="min-width: 130px;">
+                                            <div class="relative inline-block text-center">
+                                                <button type="button" onclick="toggleHeaderFilter('filter-dropdown-status')" class="flex items-center justify-center gap-1.5 px-1.5 py-1 rounded hover:bg-surface-container-high transition-colors text-on-surface-variant hover:text-secondary mx-auto cursor-pointer">
+                                                    <span>Status</span>
+                                                    <span class="material-symbols-outlined text-[15px]">filter_alt</span>
+                                                    <span class="w-2 h-2 rounded-full bg-secondary hidden" id="indicator-filtro-status"></span>
+                                                </button>
+                                                <div id="filter-dropdown-status" class="filtro-header-dropdown absolute right-0 sm:left-1/2 sm:-translate-x-1/2 mt-1.5 w-48 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-2.5 hidden normal-case text-on-surface space-y-1 text-left">
+                                                    <span class="text-[11px] text-on-surface-variant font-semibold uppercase block px-1 mb-1">Filtrar Status</span>
+                                                    <button type="button" onclick="selecionarFiltroHeader('status', '')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Todos os Status</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-status" data-val="">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('status', 'pendente')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>⏳ Pendentes</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-status hidden" data-val="pendente">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('status', 'ativo')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>✅ Liberados</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-status hidden" data-val="ativo">check</span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </th>
+
+                                        <!-- Coluna 6: Ações -->
+                                        <th class="py-2.5 px-3 text-right" style="min-width: 140px;">
+                                            Ações
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-usuarios-corpo" class="divide-y divide-outline-variant/20">
+                                    <tr>
+                                        <td colspan="6" class="py-8 text-center text-on-surface-variant">
+                                            <span class="material-symbols-outlined text-2xl animate-spin text-secondary block mx-auto mb-2">sync</span>
+                                            Carregando usuários...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA 7: PERÍMETROS BLOQUEADOS (CONDOMÍNIOS E ÁREAS PRIVADAS) -->
+                <section id="tab-perimetros" class="tab-content hidden space-y-4">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-5 shadow-sm">
+                        <!-- Cabeçalho da Aba -->
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 pb-4 border-b border-outline-variant/40">
+                            <div>
+                                <h2 class="text-lg font-bold text-on-surface mb-0.5 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-rose-600">fence</span>
+                                    Perímetros Proibidos para Abertura de OS
+                                </h2>
+                                <p class="text-xs text-on-surface-variant">
+                                    Demarque condomínios fechados ou áreas privadas no mapa de Araraquara. Nenhuma OS poderá ser aberta dentro dessas áreas demarcadas.
+                                </p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" onclick="carregarListaPerimetrosUI()" class="px-3 py-1.5 rounded-xl border border-outline-variant hover:bg-surface-container-high text-xs font-semibold text-on-surface flex items-center gap-1.5 transition cursor-pointer">
+                                    <span class="material-symbols-outlined text-base">refresh</span>
+                                    Recarregar
+                                </button>
+                                <button type="button" onclick="abrirModalSelecionarCondominioBase()" class="px-3.5 py-1.5 rounded-xl bg-blue-50 border border-blue-200 hover:bg-blue-100 text-secondary text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer">
+                                    <span class="material-symbols-outlined text-base">layers</span>
+                                    Importar do QGIS (384)
+                                </button>
+                                <button type="button" onclick="iniciarNovoPerimetroUI()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer">
+                                    <span class="material-symbols-outlined text-base">draw</span>
+                                    Desenhar Manual
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Grid Principal: Mapa e Painel de Gestão -->
+                        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+                            
+                            <!-- Coluna do Mapa Mapbox (8 colunas) -->
+                            <div class="lg:col-span-8 flex flex-col space-y-2">
+                                <!-- Barra de ferramentas do mapa -->
+                                <div class="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-surface-container-low rounded-xl border border-outline-variant/40 text-xs">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-semibold text-on-surface flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-sm text-secondary">explore</span>
+                                            Ferramentas:
+                                        </span>
+                                        <button type="button" onclick="ativarDesenhoPoligono()" class="px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant text-on-surface hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 transition flex items-center gap-1 cursor-pointer font-medium">
+                                            <span class="material-symbols-outlined text-sm">pentagon</span>
+                                            Demarcar Área
+                                        </button>
+                                        <button type="button" onclick="cancelarDesenhoOuEdicao()" class="px-2.5 py-1 rounded-lg bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition flex items-center gap-1 cursor-pointer font-medium">
+                                            <span class="material-symbols-outlined text-sm">clear</span>
+                                            Limpar Seleção
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-on-surface-variant text-[11px]">
+                                        <span class="inline-block w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                                        <span>Clique nos cantos do condomínio para fechar o perímetro</span>
+                                    </div>
+                                </div>
+
+                                <!-- Container do Mapa -->
+                                <div class="relative w-full h-[520px] rounded-xl overflow-hidden border border-outline-variant/60 shadow-inner bg-slate-100">
+                                    <div id="mapaPerimetrosConfig" class="w-full h-full"></div>
+                                    
+                                    <!-- Overlay de Instrução no Mapa quando estiver desenhando -->
+                                    <div id="badge-instrucao-desenho" class="hidden absolute top-3 left-3 z-10 bg-rose-600/90 text-white backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-semibold shadow-lg flex items-center gap-2">
+                                        <span class="material-symbols-outlined text-base animate-pulse">edit_location</span>
+                                        <span>Modo de Desenho: Clique no mapa para marcar os pontos do condomínio.</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Coluna Lateral: Formulário / Lista de Perímetros (4 colunas) -->
+                            <div class="lg:col-span-4 flex flex-col space-y-4">
+                                
+                                <!-- Card Formulário de Salvar Perímetro -->
+                                <div id="card-form-perimetro" class="bg-surface-container-low border border-outline-variant/60 rounded-xl p-4 space-y-3">
+                                    <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40">
+                                        <span class="text-xs font-bold uppercase tracking-wider text-on-surface flex items-center gap-1.5" id="form-perimetro-titulo">
+                                            <span class="material-symbols-outlined text-base text-rose-600">bookmark_add</span>
+                                            Dados do Perímetro
+                                        </span>
+                                        <span class="text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200" id="badge-status-desenho">
+                                            Aguardando desenho
+                                        </span>
+                                    </div>
+
+                                    <input type="hidden" id="perimetro-id-edicao" value="" />
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-on-surface mb-1">Nome do Condomínio / Área *</label>
+                                        <input type="text" id="perimetro-nome-input" placeholder="Ex: Condomínio Damha I" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:border-rose-600 focus:ring-1 focus:ring-rose-600" />
+                                    </div>
+
+                                    <div>
+                                        <label class="block text-xs font-semibold text-on-surface mb-1">Justificativa do Bloqueio *</label>
+                                        <textarea id="perimetro-justificativa-input" rows="3" placeholder="Ex: Condomínio particular fechado. Iluminação interna sob responsabilidade da administração do condomínio." class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-medium focus:border-rose-600 focus:ring-1 focus:ring-rose-600 leading-relaxed"></textarea>
+                                        <span class="text-[10px] text-on-surface-variant block mt-0.5">Esta mensagem será mostrada ao operador/cidadão ao tentar abrir uma OS neste local.</span>
+                                    </div>
+
+                                    <div class="flex items-center justify-between pt-1">
+                                        <label class="text-xs font-semibold text-on-surface">Bloqueio Ativo:</label>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="perimetro-ativo-input" checked class="sr-only peer">
+                                            <div class="w-9 h-5 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-rose-600"></div>
+                                        </label>
+                                    </div>
+
+                                    <div class="pt-2 flex items-center gap-2">
+                                        <button type="button" id="btn-salvar-perimetro" onclick="salvarPerimetroUI()" class="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-sm transition active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                                            <span class="material-symbols-outlined text-base">save</span>
+                                            <span>Salvar Perímetro</span>
+                                        </button>
+                                        <button type="button" onclick="cancelarEdicaoPerimetroUI()" class="px-3 py-2 rounded-xl border border-outline-variant hover:bg-surface-container-high text-xs font-semibold text-on-surface transition cursor-pointer">
+                                            Cancelar
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <!-- Lista de Perímetros Já Cadastrados -->
+                                <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-4 flex-1 flex flex-col min-h-[220px]">
+                                    <div class="flex items-center justify-between pb-2 border-b border-outline-variant/40 mb-3">
+                                        <span class="text-xs font-bold uppercase tracking-wider text-on-surface flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-base text-secondary">format_list_bulleted</span>
+                                            Perímetros Cadastrados
+                                        </span>
+                                        <span class="text-xs text-on-surface-variant font-semibold" id="contador-perimetros-cadastrados">0 cadastrado(s)</span>
+                                    </div>
+
+                                    <div id="lista-perimetros-container" class="space-y-2.5 overflow-y-auto max-h-[260px] pr-1">
+                                        <!-- Itens gerados dinamicamente via JS -->
+                                        <div class="text-center py-6 text-on-surface-variant text-xs">
+                                            <span class="material-symbols-outlined text-2xl animate-spin text-secondary block mx-auto mb-1">sync</span>
+                                            Carregando perímetros...
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div>
+                    </div>
+                </section>
+
             </form>
         </div>
 
     </main>
+
+    <!-- Modal de Redefinição de Senha -->
+    <div id="modal-reset-senha" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+        <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col text-on-surface transform transition-all duration-200 scale-95 opacity-0" id="modal-reset-senha-card">
+            
+            <!-- Header do Modal -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/40 bg-surface-container-low/50">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-secondary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">lock_reset</span>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-on-surface">Redefinir Senha</h3>
+                        <p class="text-xs text-on-surface-variant" id="modal-reset-subtitulo">Alterar credencial de acesso</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalResetSenha()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-lg transition">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <!-- Corpo do Modal -->
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="reset-target-user-id" />
+
+                <!-- Dados do Usuário Selecionado -->
+                <div class="p-3.5 bg-surface-container-low rounded-xl border border-outline-variant/40 space-y-1">
+                    <div class="text-xs text-on-surface-variant font-medium">Usuário Selecionado:</div>
+                    <div class="font-semibold text-sm text-on-surface flex items-center gap-2">
+                        <span class="material-symbols-outlined text-base text-secondary">person</span>
+                        <span id="modal-reset-nome-display">-</span>
+                    </div>
+                    <div class="text-xs text-on-surface-variant" id="modal-reset-email-display">-</div>
+                </div>
+
+                <!-- Campo Nova Senha -->
+                <div>
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider">Nova Senha Provisória</label>
+                        <button type="button" onclick="gerarSenhaSegura()" class="text-xs text-secondary hover:underline font-semibold flex items-center gap-1">
+                            <span class="material-symbols-outlined text-sm">casino</span>
+                            Gerar Aleatória
+                        </button>
+                    </div>
+                    <div class="relative">
+                        <input type="text" id="input-nova-senha-admin" placeholder="Mínimo 6 caracteres..." class="w-full py-2.5 pl-3.5 pr-20 bg-surface-container-lowest border border-outline-variant rounded-xl text-sm font-mono focus:border-secondary focus:ring-1 focus:ring-secondary font-medium">
+                        <button type="button" onclick="copiarSenhaProvisoria()" class="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 text-xs bg-surface-container-high hover:bg-surface-container-highest text-on-surface rounded-lg font-medium transition flex items-center gap-1 cursor-pointer" title="Copiar para área de transferência">
+                            <span class="material-symbols-outlined text-sm" id="icon-copiar-senha">content_copy</span>
+                            <span id="label-copiar-senha">Copiar</span>
+                        </button>
+                    </div>
+                    <span class="text-[11px] text-on-surface-variant mt-1.5 block">
+                        Copie esta senha e envie diretamente para o usuário via WhatsApp ou canal interno seguro.
+                    </span>
+                </div>
+
+                <!-- Aviso de Segurança -->
+                <div class="p-3 bg-amber-50 border border-amber-200/80 rounded-xl text-amber-900 text-xs flex items-start gap-2.5">
+                    <span class="material-symbols-outlined text-amber-600 text-base mt-0.5 flex-shrink-0">shield_lock</span>
+                    <span>A redefinição substitui a senha anterior imediatamente no Supabase Auth. Esta ação é auditada.</span>
+                </div>
+            </div>
+
+            <!-- Rodapé do Modal -->
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant/40 bg-surface-container-low/30">
+                <button type="button" onclick="fecharModalResetSenha()" class="px-4 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm font-semibold hover:bg-surface-container-high transition">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-confirmar-reset" onclick="confirmarRedefinicaoSenha()" class="px-5 py-2 rounded-xl bg-secondary text-white text-sm font-semibold hover:bg-blue-700 transition flex items-center gap-2 active:scale-95 shadow-sm">
+                    <span class="material-symbols-outlined text-lg" id="icon-confirmar-reset">check</span>
+                    <span id="label-confirmar-reset">Salvar Senha</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Padrão de Confirmação HTML -->
+    <div id="modal-confirmacao" class="fixed inset-0 z-[60] hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+        <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col text-on-surface transform transition-all duration-200 scale-95 opacity-0" id="modal-confirmacao-card">
+            <div class="p-6">
+                <div class="flex items-start gap-4">
+                    <div id="modal-confirm-icon-bg" class="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 bg-emerald-100 text-emerald-700 shadow-sm">
+                        <span id="modal-confirm-icon" class="material-symbols-outlined text-2xl">check_circle</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 id="modal-confirm-titulo" class="text-base font-bold text-on-surface mb-1">Confirmar Ação</h3>
+                        <p id="modal-confirm-mensagem" class="text-xs sm:text-sm text-on-surface-variant leading-relaxed">Deseja realmente prosseguir?</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant/40 bg-surface-container-low/30">
+                <button type="button" id="btn-cancelar-confirmacao" class="px-4 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm font-semibold hover:bg-surface-container-high transition cursor-pointer">
+                    Cancelar
+                </button>
+                <button type="button" id="btn-acao-confirmacao" class="px-5 py-2 rounded-xl text-white text-sm font-semibold transition flex items-center gap-2 active:scale-95 shadow-sm cursor-pointer bg-emerald-600 hover:bg-emerald-700">
+                    <span class="material-symbols-outlined text-lg" id="icon-acao-confirmacao">check</span>
+                    <span id="label-acao-confirmacao">Confirmar</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Seleção de Condomínio da Base QGIS -->
+    <div id="modal-selecionar-condominio-base" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+        <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col text-on-surface transform transition-all duration-200 scale-95 opacity-0" id="modal-condominio-base-card">
+            
+            <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/40 bg-surface-container-low/50">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-blue-50 text-secondary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">holiday_village</span>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-on-surface">Importar do QGIS</h3>
+                        <p class="text-xs text-on-surface-variant">Selecione um condomínio mapeado para bloquear</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalSelecionarCondominioBase()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-lg transition">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <!-- Campo de Busca Rápida -->
+                <div class="relative">
+                    <span class="material-symbols-outlined absolute left-3 top-2.5 text-on-surface-variant text-lg">search</span>
+                    <input type="text" id="filtro-busca-condominios-base" oninput="filtrarCondominiosBaseUI(this.value)" placeholder="Digite o nome do condomínio (ex: Damha, Spazio, Buona Vita)..." class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl pl-9 pr-3 py-2 text-xs font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                </div>
+
+                <!-- Lista com scroll de condomínios -->
+                <div class="border border-outline-variant/40 rounded-xl max-h-72 overflow-y-auto divide-y divide-outline-variant/20" id="lista-condominios-base-container">
+                    <div class="p-6 text-center text-xs text-on-surface-variant">Carregando base do QGIS...</div>
+                </div>
+                
+                <div class="text-[11px] text-on-surface-variant flex items-center gap-1.5 bg-surface-container-low p-2.5 rounded-lg">
+                    <span class="material-symbols-outlined text-sm text-secondary">info</span>
+                    <span>Ao selecionar, os limites do condomínio serão carregados e você poderá customizar a justificativa antes de salvar.</span>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant/40 bg-surface-container-low/30">
+                <button type="button" onclick="fecharModalSelecionarCondominioBase()" class="px-4 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-sm font-semibold hover:bg-surface-container-high transition cursor-pointer">
+                    Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Toast de Notificação -->
     <div id="toast-notificacao" class="fixed bottom-6 right-6 z-50 bg-neutral-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 transform translate-y-24 opacity-0 transition-all duration-300">
@@ -574,6 +1041,8 @@
     </div>
 
     <script>
+        let listaUsuariosCache = [];
+
         function trocarAba(abaId, btnElement) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
@@ -581,6 +1050,616 @@
             const target = document.getElementById('tab-' + abaId);
             if (target) target.classList.remove('hidden');
             if (btnElement) btnElement.classList.add('active');
+
+            if (abaId === 'usuarios') {
+                carregarUsuariosSistema();
+            } else if (abaId === 'perimetros') {
+                inicializarAbaPerimetros();
+            }
+        }
+
+        // =========================================================================
+        // GESTÃO DE USUÁRIOS E REDEFINIÇÃO DE SENHA (ADMIN)
+        // =========================================================================
+        async function carregarUsuariosSistema() {
+            const tbody = document.getElementById('tabela-usuarios-corpo');
+            const iconRefresh = document.getElementById('icon-refresh-users');
+            if (iconRefresh) iconRefresh.classList.add('animate-spin');
+
+            try {
+                const client = window.supabaseClient || window.supabase;
+                if (!client) throw new Error('Cliente Supabase não inicializado.');
+
+                const { data, error } = await client
+                    .from('profiles')
+                    .select('id, nome, email, role, status, ativo, created_at')
+                    .order('nome', { ascending: true });
+
+                if (error) throw error;
+
+                listaUsuariosCache = data || [];
+                renderizarTabelaUsuarios(listaUsuariosCache);
+            } catch (err) {
+                console.error('❌ Erro ao listar usuários de profiles:', err);
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="py-6 text-center text-red-500 font-medium">
+                            <span class="material-symbols-outlined text-2xl block mb-1">warning</span>
+                            Erro ao carregar usuários: ${err.message}
+                        </td>
+                    </tr>
+                `;
+            } finally {
+                if (iconRefresh) iconRefresh.classList.remove('animate-spin');
+            }
+        }
+
+        function formatarBadgeRole(role) {
+            const r = String(role || '').toLowerCase();
+            if (r.includes('admin') || r.includes('gestor')) {
+                return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">Administrador</span>';
+            } else if (r.includes('ouvidor')) {
+                return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Ouvidoria</span>';
+            } else if (r.includes('manutentor')) {
+                return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">Manutentor</span>';
+            } else if (r.includes('campo') || r.includes('operador') || r.includes('tecnico')) {
+                return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200">Operador</span>';
+            }
+            return `<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">${role || 'Padrão'}</span>`;
+        }
+
+        function identificarOrigemUsuario(u) {
+            const role = String(u.role || '').toLowerCase();
+            const email = String(u.email || '').toLowerCase();
+            // Identifica usuários gov.br: role 'cidadao', e-mails sem domínio corporativo oficial ou com flag govbr
+            const isGovBr = role.includes('cidadao') || 
+                            role.includes('citizen') || 
+                            role.includes('govbr') ||
+                            (!email.endsWith('@araraquara.sp.gov.br') && !email.endsWith('@ilumiterra.com'));
+
+            if (isGovBr) {
+                return {
+                    tipo: 'govbr',
+                    badge: '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-[#1351B4] border border-blue-200" title="Usuário Cidadão autenticado via gov.br"><span class="w-1.5 h-1.5 rounded-full bg-[#1351B4]"></span> gov.br</span>'
+                };
+            }
+
+            return {
+                tipo: 'servidor',
+                badge: '<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-800 border border-slate-300" title="Servidor Público / Colaborador Operacional"><span class="material-symbols-outlined text-[13px] text-slate-600">badge</span> Servidor</span>'
+            };
+        }
+
+        function renderizarTabelaUsuarios(usuarios) {
+            const tbody = document.getElementById('tabela-usuarios-corpo');
+            if (!usuarios || usuarios.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="6" class="py-8 text-center text-on-surface-variant">
+                            Nenhum usuário encontrado com os filtros aplicados.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = usuarios.map(u => {
+                const isAtivo = (u.ativo === true || u.status === 'aprovado' || u.status === 'ativo');
+                
+                const statusBadge = isAtivo
+                    ? '<span class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Liberado</span>'
+                    : '<span class="inline-flex items-center gap-1 text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-0.5 rounded-full text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span> Pendente</span>';
+
+                const safeNome = (u.nome || 'Sem Nome').replace(/"/g, '&quot;');
+                const safeEmail = (u.email || '').replace(/"/g, '&quot;');
+                const infoOrigem = identificarOrigemUsuario(u);
+
+                // Botão de alternar status (Autorizar / Bloquear)
+                const toggleStatusBtn = isAtivo
+                    ? `<button type="button" onclick="alternarStatusUsuario('${u.id}', false)" class="px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 font-semibold text-xs transition inline-flex items-center gap-1 active:scale-95 cursor-pointer" title="Bloquear acesso deste usuário">
+                           <span class="material-symbols-outlined text-sm">block</span>
+                           Bloquear
+                       </button>`
+                    : `<button type="button" onclick="alternarStatusUsuario('${u.id}', true)" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition inline-flex items-center gap-1 active:scale-95 shadow-sm cursor-pointer" title="Aprovar e liberar acesso deste usuário">
+                           <span class="material-symbols-outlined text-sm">check_circle</span>
+                           Liberar Acesso
+                       </button>`;
+
+                // Usuários gov.br não possuem senha gerenciada no Supabase
+                const btnResetSenha = (infoOrigem.tipo === 'govbr')
+                    ? `<span class="px-2 py-1.5 text-[11px] text-on-surface-variant/60 font-medium inline-flex items-center gap-1 cursor-not-allowed select-none" title="Senha gerenciada pelo portal gov.br">
+                           <span class="material-symbols-outlined text-sm text-on-surface-variant/40">lock</span>
+                           gov.br
+                       </span>`
+                    : `<button type="button" onclick="abrirModalResetSenha('${u.id}')" class="px-2 py-1.5 rounded-lg border border-outline-variant bg-surface-container-lowest hover:bg-surface-container-high text-secondary font-semibold text-xs transition inline-flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer" title="Redefinir Senha do Servidor">
+                           <span class="material-symbols-outlined text-sm">lock_reset</span>
+                           Senha
+                       </button>`;
+
+                return `
+                    <tr class="hover:bg-surface-container-high/40 transition">
+                        <td class="py-2.5 px-3 font-medium text-on-surface">
+                            <div class="flex items-center gap-2">
+                                <div class="w-7 h-7 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center font-bold text-xs uppercase flex-shrink-0">
+                                    ${(u.nome || u.email || '?').charAt(0)}
+                                </div>
+                                <div>
+                                    <span class="truncate max-w-[180px] block font-semibold text-xs sm:text-sm" title="${safeNome}">${safeNome}</span>
+                                    <span class="text-[11px] text-on-surface-variant font-mono sm:hidden">${safeEmail}</span>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-2.5 px-3 text-on-surface-variant font-mono text-xs hidden sm:table-cell">
+                            ${safeEmail}
+                        </td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            ${infoOrigem.badge}
+                        </td>
+                        <td class="py-2.5 px-3 whitespace-nowrap">
+                            <select onchange="alterarRoleUsuario('${u.id}', this.value)" class="bg-surface-container-low border border-outline-variant/60 rounded-lg px-2 py-1 text-xs font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary cursor-pointer">
+                                <option value="ouvidoria" ${String(u.role).toLowerCase() === 'ouvidoria' ? 'selected' : ''}>Ouvidoria</option>
+                                <option value="operador" ${['campo', 'operador', 'tecnico', 'executor'].includes(String(u.role).toLowerCase()) ? 'selected' : ''}>Operador de Campo</option>
+                                <option value="manutentor" ${String(u.role).toLowerCase() === 'manutentor' ? 'selected' : ''}>Manutentor</option>
+                                <option value="admin" ${['admin', 'gestor'].includes(String(u.role).toLowerCase()) ? 'selected' : ''}>Administrador</option>
+                                <option value="cidadao" ${String(u.role).toLowerCase() === 'cidadao' ? 'selected' : ''}>Cidadão</option>
+                            </select>
+                        </td>
+                        <td class="py-2.5 px-3 text-center whitespace-nowrap">
+                            ${statusBadge}
+                        </td>
+                        <td class="py-2.5 px-3 text-right whitespace-nowrap">
+                            <div class="flex items-center justify-end gap-1.5">
+                                ${toggleStatusBtn}
+                                ${btnResetSenha}
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Estado ativo dos filtros de cabeçalho
+        const headerFiltersState = {
+            busca: '',
+            origem: '',
+            role: '',
+            status: ''
+        };
+
+        function toggleHeaderFilter(dropdownId) {
+            const dropdown = document.getElementById(dropdownId);
+            const isHidden = dropdown.classList.contains('hidden');
+
+            // Fecha outros abertos
+            document.querySelectorAll('.filtro-header-dropdown').forEach(d => d.classList.add('hidden'));
+
+            if (isHidden) {
+                dropdown.classList.remove('hidden');
+                // Se for o de busca, foca automaticamente
+                if (dropdownId === 'filter-dropdown-nome') {
+                    const input = document.getElementById('filtro-usuarios-busca');
+                    if (input) setTimeout(() => input.focus(), 50);
+                }
+            }
+        }
+
+        function selecionarFiltroHeader(tipo, valor) {
+            headerFiltersState[tipo] = valor;
+
+            // Atualiza checks visuais nos botões do dropdown
+            document.querySelectorAll(`.check-${tipo}`).forEach(check => {
+                const val = check.getAttribute('data-val');
+                if (val === valor) {
+                    check.classList.remove('hidden');
+                } else {
+                    check.classList.add('hidden');
+                }
+            });
+
+            // Atualiza indicador de filtro ativo (bolinha azul)
+            const indicator = document.getElementById(`indicator-filtro-${tipo}`);
+            if (indicator) {
+                if (valor !== '') {
+                    indicator.classList.remove('hidden');
+                } else {
+                    indicator.classList.add('hidden');
+                }
+            }
+
+            // Fecha dropdown após seleção
+            document.querySelectorAll('.filtro-header-dropdown').forEach(d => d.classList.add('hidden'));
+
+            aplicarFiltrosUsuariosHeader();
+        }
+
+        function aplicarFiltrosUsuariosHeader() {
+            const inputBusca = document.getElementById('filtro-usuarios-busca');
+            const termoBusca = (inputBusca?.value || '').toLowerCase().trim();
+            headerFiltersState.busca = termoBusca;
+
+            const indicatorBusca = document.getElementById('indicator-filtro-nome');
+            if (indicatorBusca) {
+                if (termoBusca !== '') {
+                    indicatorBusca.classList.remove('hidden');
+                } else {
+                    indicatorBusca.classList.add('hidden');
+                }
+            }
+
+            const filtrados = listaUsuariosCache.filter(u => {
+                // 1. Busca por nome ou e-mail
+                const matchBusca = !headerFiltersState.busca || 
+                    (u.nome && u.nome.toLowerCase().includes(headerFiltersState.busca)) || 
+                    (u.email && u.email.toLowerCase().includes(headerFiltersState.busca));
+
+                // 2. Filtro de Função (Role)
+                const uRole = (u.role || '').toLowerCase();
+                let matchRole = true;
+                if (headerFiltersState.role === 'admin') matchRole = uRole.includes('admin') || uRole.includes('gestor');
+                else if (headerFiltersState.role === 'ouvidoria') matchRole = uRole.includes('ouvidor');
+                else if (headerFiltersState.role === 'manutentor') matchRole = uRole.includes('manutentor');
+                else if (headerFiltersState.role === 'operador') matchRole = uRole.includes('campo') || uRole.includes('operador') || uRole.includes('tecnico');
+                else if (headerFiltersState.role === 'cidadao') matchRole = uRole.includes('cidadao');
+
+                // 3. Filtro de Status
+                const isAtivo = (u.ativo === true || u.status === 'aprovado' || u.status === 'ativo');
+                let matchStatus = true;
+                if (headerFiltersState.status === 'ativo') matchStatus = isAtivo;
+                else if (headerFiltersState.status === 'pendente') matchStatus = !isAtivo;
+
+                // 4. Filtro de Origem
+                const infoOrigem = identificarOrigemUsuario(u);
+                let matchOrigem = true;
+                if (headerFiltersState.origem) {
+                    matchOrigem = (infoOrigem.tipo === headerFiltersState.origem);
+                }
+
+                return matchBusca && matchRole && matchStatus && matchOrigem;
+            });
+
+            renderizarTabelaUsuarios(filtrados);
+        }
+
+        function limparFiltroHeader(tipo) {
+            if (tipo === 'busca') {
+                const input = document.getElementById('filtro-usuarios-busca');
+                if (input) input.value = '';
+                headerFiltersState.busca = '';
+                const ind = document.getElementById('indicator-filtro-nome');
+                if (ind) ind.classList.add('hidden');
+            }
+            document.querySelectorAll('.filtro-header-dropdown').forEach(d => d.classList.add('hidden'));
+            aplicarFiltrosUsuariosHeader();
+        }
+
+        // Fecha os menus dropdown do cabeçalho ao clicar fora
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.filtro-header-dropdown') && !e.target.closest('button[onclick*="toggleHeaderFilter"]')) {
+                document.querySelectorAll('.filtro-header-dropdown').forEach(d => d.classList.add('hidden'));
+            }
+        });
+
+        let confirmacaoModalCallback = null;
+
+        function abrirConfirmacaoModal({ titulo, mensagem, icone, iconeCor, btnTexto, btnCor, onConfirm }) {
+            const modal = document.getElementById('modal-confirmacao');
+            const card = document.getElementById('modal-confirmacao-card');
+            const tituloEl = document.getElementById('modal-confirm-titulo');
+            const mensagemEl = document.getElementById('modal-confirm-mensagem');
+            const iconBgEl = document.getElementById('modal-confirm-icon-bg');
+            const iconEl = document.getElementById('modal-confirm-icon');
+            const btnAcao = document.getElementById('btn-acao-confirmacao');
+            const labelAcao = document.getElementById('label-acao-confirmacao');
+            const iconAcao = document.getElementById('icon-acao-confirmacao');
+            const btnCancelar = document.getElementById('btn-cancelar-confirmacao');
+
+            if (tituloEl) tituloEl.textContent = titulo || 'Confirmar Ação';
+            if (mensagemEl) mensagemEl.innerHTML = mensagem || 'Deseja realmente prosseguir?';
+            if (iconEl) iconEl.textContent = icone || 'help';
+
+            // Configuração visual de cores do ícone
+            if (iconBgEl) {
+                iconBgEl.className = 'w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ' + (iconeCor || 'bg-emerald-100 text-emerald-700');
+            }
+
+            // Configuração do botão de ação
+            if (labelAcao) labelAcao.textContent = btnTexto || 'Confirmar';
+            if (iconAcao) iconAcao.textContent = icone === 'lock' || icone === 'block' ? 'lock' : 'check';
+            if (btnAcao) {
+                btnAcao.className = 'px-5 py-2 rounded-xl text-white text-sm font-semibold transition flex items-center gap-2 active:scale-95 shadow-sm cursor-pointer ' + (btnCor || 'bg-emerald-600 hover:bg-emerald-700');
+            }
+
+            confirmacaoModalCallback = onConfirm;
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                card.classList.remove('scale-95', 'opacity-0');
+                card.classList.add('scale-100', 'opacity-100');
+            }, 10);
+
+            const fechar = () => {
+                card.classList.remove('scale-100', 'opacity-100');
+                card.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                }, 200);
+            };
+
+            btnCancelar.onclick = fechar;
+            btnAcao.onclick = async () => {
+                fechar();
+                if (typeof confirmacaoModalCallback === 'function') {
+                    await confirmacaoModalCallback();
+                }
+            };
+        }
+
+        function escapeHtmlSafe(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        async function alternarStatusUsuario(userId, novoStatusAtivo, fallbackNome) {
+            const userObj = listaUsuariosCache.find(u => u.id === userId);
+            const nomeUsuario = userObj?.nome || fallbackNome || 'Usuário';
+            const acaoNome = novoStatusAtivo ? 'liberar o acesso de' : 'bloquear o acesso de';
+            const nomeEscapado = escapeHtmlSafe(nomeUsuario);
+            
+            abrirConfirmacaoModal({
+                titulo: novoStatusAtivo ? 'Liberar Acesso' : 'Bloquear Acesso',
+                mensagem: `Deseja realmente ${acaoNome} <strong>"${nomeEscapado}"</strong>?`,
+                icone: novoStatusAtivo ? 'lock_open' : 'block',
+                iconeCor: novoStatusAtivo ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600',
+                btnTexto: novoStatusAtivo ? 'Liberar Acesso' : 'Bloquear Usuário',
+                btnCor: novoStatusAtivo ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700',
+                onConfirm: async () => {
+                    await executarAlternarStatusUsuario(userId, novoStatusAtivo, nomeUsuario);
+                }
+            });
+        }
+
+        async function executarAlternarStatusUsuario(userId, novoStatusAtivo, nomeUsuario) {
+            try {
+                const client = window.supabaseClient || window.supabase;
+                if (!client) throw new Error('Cliente Supabase não inicializado.');
+
+                const { data: sessionData } = await client.auth.getSession();
+                const token = sessionData?.session?.access_token;
+                if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
+                const updatePayload = {
+                    ativo: novoStatusAtivo,
+                    status: novoStatusAtivo ? 'ativo' : 'bloqueado'
+                };
+
+                // Envia via endpoint administrativo do Node.js (com permissão de Service Role, superando RLS)
+                const response = await fetch('/api/admin-update-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        targetUserId: userId,
+                        updates: updatePayload
+                    })
+                });
+
+                const rawText = await response.text();
+                let resJson = {};
+                try {
+                    resJson = JSON.parse(rawText);
+                } catch (e) {
+                    if (rawText.includes('404')) {
+                        throw new Error('Servidor não reconheceu a rota /api/admin-update-user. Reinicie o servidor Node.js.');
+                    }
+                    throw new Error('Resposta inválida do servidor: ' + rawText.substring(0, 120));
+                }
+
+                if (!response.ok || !resJson.success) {
+                    throw new Error(resJson.error || 'Falha ao atualizar no servidor.');
+                }
+
+                // Atualizar cache local imediatamente
+                const userNoCache = listaUsuariosCache.find(u => u.id === userId);
+                if (userNoCache) {
+                    userNoCache.ativo = novoStatusAtivo;
+                    userNoCache.status = novoStatusAtivo ? 'ativo' : 'bloqueado';
+                }
+
+                aplicarFiltrosUsuariosHeader();
+                mostrarToast(`Status de "${nomeUsuario}" atualizado com sucesso!`);
+            } catch (err) {
+                console.error('❌ Erro ao alterar status do usuário:', err);
+                mostrarToast('Erro ao atualizar status: ' + (err.message || 'Falha na requisição'), false);
+            }
+        }
+
+        async function alterarRoleUsuario(userId, novaRole, fallbackNome) {
+            const userObj = listaUsuariosCache.find(u => u.id === userId);
+            const nomeUsuario = userObj?.nome || fallbackNome || 'Usuário';
+
+            try {
+                const client = window.supabaseClient || window.supabase;
+                if (!client) throw new Error('Cliente Supabase não inicializado.');
+
+                const { data: sessionData } = await client.auth.getSession();
+                const token = sessionData?.session?.access_token;
+                if (!token) throw new Error('Sessão expirada. Faça login novamente.');
+
+                // Envia via endpoint administrativo do Node.js
+                const response = await fetch('/api/admin-update-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        targetUserId: userId,
+                        updates: { role: novaRole }
+                    })
+                });
+
+                const rawText = await response.text();
+                let resJson = {};
+                try {
+                    resJson = JSON.parse(rawText);
+                } catch (e) {
+                    if (rawText.includes('404')) {
+                        throw new Error('Servidor não reconheceu a rota /api/admin-update-user. Reinicie o servidor Node.js.');
+                    }
+                    throw new Error('Resposta inválida do servidor: ' + rawText.substring(0, 120));
+                }
+
+                if (!response.ok || !resJson.success) {
+                    throw new Error(resJson.error || 'Falha ao atualizar função no servidor.');
+                }
+
+                const userNoCache = listaUsuariosCache.find(u => u.id === userId);
+                if (userNoCache) {
+                    userNoCache.role = novaRole;
+                }
+
+                mostrarToast(`Função de "${nomeUsuario}" alterada para "${novaRole.toUpperCase()}"!`);
+            } catch (err) {
+                console.error('❌ Erro ao alterar função do usuário:', err);
+                mostrarToast('Erro ao alterar função: ' + (err.message || 'Falha na requisição'), false);
+                carregarUsuariosSistema(); // Reverte visualmente
+            }
+        }
+
+        function abrirModalResetSenha(userId, fallbackNome, fallbackEmail) {
+            const userObj = listaUsuariosCache.find(u => u.id === userId);
+            const nome = userObj?.nome || fallbackNome || 'Sem Nome';
+            const email = userObj?.email || fallbackEmail || 'Sem e-mail cadastrado';
+
+            document.getElementById('reset-target-user-id').value = userId;
+            document.getElementById('modal-reset-nome-display').textContent = nome;
+            document.getElementById('modal-reset-email-display').textContent = email;
+            
+            // Sugere uma senha padrão segura aleatória logo ao abrir
+            gerarSenhaSegura();
+
+            const modal = document.getElementById('modal-reset-senha');
+            const card = document.getElementById('modal-reset-senha-card');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                card.classList.remove('scale-95', 'opacity-0');
+                card.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        }
+
+        function fecharModalResetSenha() {
+            const modal = document.getElementById('modal-reset-senha');
+            const card = document.getElementById('modal-reset-senha-card');
+            card.classList.remove('scale-100', 'opacity-100');
+            card.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        }
+
+        function gerarSenhaSegura() {
+            const caracteres = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+            let senha = '';
+            for (let i = 0; i < 8; i++) {
+                senha += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+            }
+            // Garante ao menos um número e um caractere especial amigável
+            const senhaFinal = 'Luz@' + Math.floor(1000 + Math.random() * 9000);
+            document.getElementById('input-nova-senha-admin').value = senhaFinal;
+        }
+
+        async function copiarSenhaProvisoria() {
+            const input = document.getElementById('input-nova-senha-admin');
+            const val = input?.value;
+            if (!val) return;
+
+            try {
+                await navigator.clipboard.writeText(val);
+                const label = document.getElementById('label-copiar-senha');
+                const icon = document.getElementById('icon-copiar-senha');
+                label.textContent = 'Copiado!';
+                icon.textContent = 'check';
+                setTimeout(() => {
+                    label.textContent = 'Copiar';
+                    icon.textContent = 'content_copy';
+                }, 2000);
+            } catch (e) {
+                input.select();
+                document.execCommand('copy');
+                mostrarToast('Senha copiada para a área de transferência!');
+            }
+        }
+
+        async function confirmarRedefinicaoSenha() {
+            const userId = document.getElementById('reset-target-user-id')?.value;
+            const newPassword = document.getElementById('input-nova-senha-admin')?.value?.trim();
+            const btn = document.getElementById('btn-confirmar-reset');
+            const icon = document.getElementById('icon-confirmar-reset');
+            const label = document.getElementById('label-confirmar-reset');
+
+            if (!userId || !newPassword) {
+                mostrarToast('Por favor, informe a nova senha.', false);
+                return;
+            }
+
+            if (newPassword.length < 6) {
+                mostrarToast('A senha deve conter no mínimo 6 caracteres.', false);
+                return;
+            }
+
+            try {
+                btn.disabled = true;
+                icon.textContent = 'progress_activity';
+                icon.classList.add('animate-spin');
+                label.textContent = 'Salvando...';
+
+                // 1. Obter o JWT do usuário logado (Admin)
+                const client = window.supabaseClient || window.supabase;
+                const { data: sessionData, error: sessionErr } = await client.auth.getSession();
+                
+                if (sessionErr || !sessionData?.session?.access_token) {
+                    throw new Error('Sessão do administrador expirada. Faça login novamente.');
+                }
+
+                const accessToken = sessionData.session.access_token;
+
+                // 2. Chamar o endpoint seguro no Node.js
+                const response = await fetch('/api/admin-reset-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${accessToken}`
+                    },
+                    body: JSON.stringify({
+                        targetUserId: userId,
+                        newPassword: newPassword
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(result.error || 'Falha ao redefinir senha no servidor.');
+                }
+
+                mostrarToast('Senha alterada com sucesso! Copie e envie ao usuário.', true);
+                fecharModalResetSenha();
+            } catch (err) {
+                console.error('❌ Erro na redefinição de senha:', err);
+                mostrarToast(err.message || 'Erro ao comunicar com o servidor.', false);
+            } finally {
+                btn.disabled = false;
+                icon.textContent = 'check';
+                icon.classList.remove('animate-spin');
+                label.textContent = 'Salvar Senha';
+            }
         }
 
         function mostrarToast(mensagem, sucesso = true) {
@@ -749,14 +1828,767 @@
         }
 
         function restaurarPadroes() {
-            if (confirm('Deseja restaurar as configurações para os valores padrões?')) {
-                popularFormulario(window.ConfiguracoesService.defaultValues);
-                if (document.getElementById('janela_dia_inicio')) document.getElementById('janela_dia_inicio').value = 21;
-                if (document.getElementById('janela_dia_fim')) document.getElementById('janela_dia_fim').value = 20;
-                if (document.getElementById('janela_mesmo_mes')) document.getElementById('janela_mesmo_mes').value = 'false';
-                atualizarPreviaJanela();
-                mostrarToast('Valores padrões carregados. Clique em Salvar para persistir.');
+            abrirConfirmacaoModal({
+                titulo: 'Restaurar Configurações',
+                mensagem: 'Deseja realmente restaurar os parâmetros para os valores padrões de fábrica?',
+                icone: 'restart_alt',
+                iconeCor: 'bg-amber-100 text-amber-700',
+                btnTexto: 'Restaurar Padrões',
+                btnCor: 'bg-amber-600 hover:bg-amber-700',
+                onConfirm: () => {
+                    popularFormulario(window.ConfiguracoesService.defaultValues);
+                    if (document.getElementById('janela_dia_inicio')) document.getElementById('janela_dia_inicio').value = 21;
+                    if (document.getElementById('janela_dia_fim')) document.getElementById('janela_dia_fim').value = 20;
+                    if (document.getElementById('janela_mesmo_mes')) document.getElementById('janela_mesmo_mes').value = 'false';
+                    atualizarPreviaJanela();
+                    mostrarToast('Valores padrões carregados. Clique em Salvar para persistir.');
+                }
+            });
+        }
+
+        // =========================================================================
+        // GESTÃO DE PERÍMETROS BLOQUEADOS NO MAPA (MAPBOX GL + DRAW)
+        // =========================================================================
+        let mapaPerimetrosInstance = null;
+        let mapboxDrawInstance = null;
+        let perimetrosCarregados = [];
+        let coordenadasPoligonoAtual = null;
+        let condominiosBaseQgis = []; // Armazena os 384 condomínios do QGIS
+        const MAPBOX_TOKEN_CONFIG = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
+
+        async function carregarBaseCondominiosQgis() {
+            if (condominiosBaseQgis.length > 0) return condominiosBaseQgis;
+            try {
+                const res = await fetch('condominios_base.geojson');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.features) {
+                        condominiosBaseQgis = data.features;
+                    }
+                }
+            } catch (e) {
+                console.warn('Erro ao carregar condominios_base.geojson:', e);
             }
+            return condominiosBaseQgis;
+        }
+
+        async function abrirModalSelecionarCondominioBase() {
+            const modal = document.getElementById('modal-selecionar-condominio-base');
+            const card = document.getElementById('modal-condominio-base-card');
+            if (modal && card) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    card.classList.remove('scale-95', 'opacity-0');
+                    card.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            }
+            await carregarBaseCondominiosQgis();
+            filtrarCondominiosBaseUI('');
+            const input = document.getElementById('filtro-busca-condominios-base');
+            if (input) {
+                input.value = '';
+                input.focus();
+            }
+        }
+
+        function fecharModalSelecionarCondominioBase() {
+            const modal = document.getElementById('modal-selecionar-condominio-base');
+            const card = document.getElementById('modal-condominio-base-card');
+            if (modal && card) {
+                card.classList.remove('scale-100', 'opacity-100');
+                card.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+            }
+        }
+
+        function filtrarCondominiosBaseUI(termo) {
+            const container = document.getElementById('lista-condominios-base-container');
+            if (!container) return;
+
+            const t = (termo || '').toLowerCase().trim();
+            const filtrados = condominiosBaseQgis.filter(f => {
+                const nome = (f.properties.nome || f.properties.NOME || '').toLowerCase();
+                return !t || nome.includes(t);
+            });
+
+            if (filtrados.length === 0) {
+                container.innerHTML = `
+                    <div class="p-6 text-center text-xs text-on-surface-variant">
+                        Nenhum condomínio encontrado com o termo informado.
+                    </div>
+                `;
+                return;
+            }
+
+            // Mapeia os que já estão cadastrados/bloqueados
+            const nomesBloqueados = new Set(perimetrosCarregados.map(p => (p.nome || '').toLowerCase().trim()));
+
+            container.innerHTML = filtrados.slice(0, 100).map((f, idx) => {
+                const nome = f.properties.nome || f.properties.NOME || `Condomínio #${idx + 1}`;
+                const jaCadastrado = nomesBloqueados.has(nome.toLowerCase().trim());
+
+                return `
+                    <div class="p-3 hover:bg-surface-container-high transition flex items-center justify-between gap-3 text-xs">
+                        <div class="min-w-0 flex-1">
+                            <div class="font-bold text-on-surface truncate flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-sm ${jaCadastrado ? 'text-rose-600' : 'text-secondary'}">domain</span>
+                                <span>${nome}</span>
+                            </div>
+                            <span class="text-[10px] text-on-surface-variant block mt-0.5">
+                                ${jaCadastrado ? '⚠️ Já possui regra de bloqueio ativa' : 'Pronto para importação de delimitação'}
+                            </span>
+                        </div>
+                        <button type="button" onclick="selecionarCondominioDaBase('${encodeURIComponent(nome)}')" class="px-3 py-1.5 rounded-lg ${jaCadastrado ? 'bg-surface-container-lowest border border-outline-variant text-on-surface hover:bg-rose-50' : 'bg-secondary hover:bg-blue-700 text-white font-semibold'} transition cursor-pointer active:scale-95 flex items-center gap-1 flex-shrink-0">
+                            <span class="material-symbols-outlined text-xs">check</span>
+                            <span>${jaCadastrado ? 'Carregar' : 'Selecionar'}</span>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selecionarCondominioDaBase(nomeEncoded) {
+            const nome = decodeURIComponent(nomeEncoded);
+            const feature = condominiosBaseQgis.find(f => (f.properties.nome || f.properties.NOME) === nome);
+            if (!feature || !feature.geometry) return;
+
+            fecharModalSelecionarCondominioBase();
+
+            // Preenche o formulário
+            document.getElementById('perimetro-id-edicao').value = '';
+            document.getElementById('perimetro-nome-input').value = nome;
+            
+            // Justificativa sugerida específica
+            const inputJust = document.getElementById('perimetro-justificativa-input');
+            if (inputJust && !inputJust.value) {
+                inputJust.value = `Condomínio fechado (${nome}). Iluminação interna particular e de responsabilidade condominial.`;
+            }
+
+            document.getElementById('perimetro-ativo-input').checked = true;
+            document.getElementById('form-perimetro-titulo').innerHTML = `
+                <span class="material-symbols-outlined text-base text-secondary">domain_verification</span>
+                Importado do QGIS: ${nome}
+            `;
+
+            // Extrai as coordenadas do polígono (GeoJSON Polygon: coordinates[0])
+            let coords = feature.geometry.coordinates;
+            if (coords && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) {
+                coords = coords[0];
+            }
+
+            coordenadasPoligonoAtual = coords;
+
+            if (mapboxDrawInstance && coords && coords.length >= 3) {
+                mapboxDrawInstance.deleteAll();
+                mapboxDrawInstance.add({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [coords]
+                    }
+                });
+                document.getElementById('badge-status-desenho').textContent = `${coords.length - 1} pontos importados ✓`;
+                document.getElementById('badge-status-desenho').className = 'text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200';
+            }
+
+            // Dá zoom no mapa para o condomínio selecionado
+            if (mapaPerimetrosInstance && coords && coords.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                coords.forEach(c => bounds.extend(c));
+                mapaPerimetrosInstance.fitBounds(bounds, { padding: 60, maxZoom: 16.5, duration: 1000 });
+            }
+
+            mostrarToast(`Limites de "${nome}" carregados! Revise e clique em Salvar.`);
+        }
+
+        async function inicializarAbaPerimetros() {
+            // 1. Carrega os perímetros do banco primeiro para garantir que a lista esteja pronta
+            await carregarListaPerimetrosUI();
+
+            // 2. Se o mapa ainda não foi instanciado, inicia-o
+            if (!mapaPerimetrosInstance) {
+                inicializarMapaPerimetros();
+            } else {
+                // Se já foi instanciado, redimensiona e renderiza as geometrias
+                setTimeout(() => {
+                    if (mapaPerimetrosInstance) {
+                        mapaPerimetrosInstance.resize();
+                        renderizarTodosPerimetrosNoMapa();
+                    }
+                }, 100);
+            }
+        }
+
+        function inicializarMapaPerimetros() {
+            const container = document.getElementById('mapaPerimetrosConfig');
+            if (!container) return;
+
+            mapboxgl.accessToken = MAPBOX_TOKEN_CONFIG;
+            mapaPerimetrosInstance = new mapboxgl.Map({
+                container: 'mapaPerimetrosConfig',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [-48.1766, -21.7946], // Araraquara centro
+                zoom: 12.5
+            });
+
+            // Controles de navegação
+            mapaPerimetrosInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+
+            // Mapbox Draw Plugin
+            mapboxDrawInstance = new MapboxDraw({
+                displayControlsDefault: false,
+                controls: {
+                    polygon: false,
+                    trash: false
+                },
+                defaultMode: 'simple_select',
+                styles: [
+                    // Linha do polígono ativo
+                    {
+                        'id': 'gl-draw-polygon-stroke-active',
+                        'type': 'line',
+                        'filter': ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'true']],
+                        'layout': { 'line-cap': 'round', 'line-join': 'round' },
+                        'paint': { 'line-color': '#e11d48', 'line-dasharray': [0.2, 2], 'line-width': 3 }
+                    },
+                    // Preenchimento do polígono ativo
+                    {
+                        'id': 'gl-draw-polygon-fill-active',
+                        'type': 'fill',
+                        'filter': ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'true']],
+                        'paint': { 'fill-color': '#f43f5e', 'fill-opacity': 0.3 }
+                    },
+                    // Linha do polígono inativo
+                    {
+                        'id': 'gl-draw-polygon-stroke-inactive',
+                        'type': 'line',
+                        'filter': ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'false']],
+                        'layout': { 'line-cap': 'round', 'line-join': 'round' },
+                        'paint': { 'line-color': '#e11d48', 'line-width': 2 }
+                    },
+                    // Preenchimento do polígono inativo
+                    {
+                        'id': 'gl-draw-polygon-fill-inactive',
+                        'type': 'fill',
+                        'filter': ['all', ['==', '$type', 'Polygon'], ['==', 'active', 'false']],
+                        'paint': { 'fill-color': '#e11d48', 'fill-opacity': 0.15 }
+                    },
+                    // Vértices
+                    {
+                        'id': 'gl-draw-polygon-and-line-vertex-active',
+                        'type': 'circle',
+                        'filter': ['all', ['==', 'meta', 'vertex'], ['==', '$type', 'Point']],
+                        'paint': { 'circle-radius': 6, 'circle-color': '#e11d48', 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' }
+                    }
+                ]
+            });
+
+            mapaPerimetrosInstance.addControl(mapboxDrawInstance, 'top-left');
+
+            // Eventos do Draw
+            const atualizarCoordenadasDoDraw = (e) => {
+                const data = mapboxDrawInstance.getAll();
+                if (data && data.features && data.features.length > 0) {
+                    const feature = data.features[data.features.length - 1];
+                    if (feature.geometry && feature.geometry.type === 'Polygon') {
+                        coordenadasPoligonoAtual = feature.geometry.coordinates[0];
+                        document.getElementById('badge-status-desenho').textContent = `${coordenadasPoligonoAtual.length - 1} pontos marcados ✓`;
+                        document.getElementById('badge-status-desenho').className = 'text-[11px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200';
+                        document.getElementById('badge-instrucao-desenho').classList.add('hidden');
+                    }
+                }
+            };
+
+            mapaPerimetrosInstance.on('draw.create', atualizarCoordenadasDoDraw);
+            mapaPerimetrosInstance.on('draw.update', atualizarCoordenadasDoDraw);
+            mapaPerimetrosInstance.on('draw.selectionchange', (e) => {
+                if (e.features && e.features.length > 0) {
+                    const feat = e.features[0];
+                    const id = feat.properties && feat.properties.id ? feat.properties.id : feat.id;
+                    const idAtual = document.getElementById('perimetro-id-edicao').value;
+                    if (id && String(id) !== String(idAtual) && !String(id).startsWith('editando_')) {
+                        editarPerimetroUI(Number(id));
+                        mostrarToast(`Perímetro selecionado para edição!`, true);
+                    }
+                }
+            });
+
+            const onMapReady = () => {
+                mapaPerimetrosInstance.resize();
+                renderizarTodosPerimetrosNoMapa();
+            };
+
+            if (mapaPerimetrosInstance.isStyleLoaded()) {
+                onMapReady();
+            } else {
+                mapaPerimetrosInstance.once('load', onMapReady);
+                mapaPerimetrosInstance.once('idle', onMapReady);
+            }
+        }
+
+        function ativarDesenhoPoligono() {
+            if (!mapboxDrawInstance) return;
+            mapboxDrawInstance.deleteAll();
+            coordenadasPoligonoAtual = null;
+
+            mapboxDrawInstance.changeMode('draw_polygon');
+            document.getElementById('badge-instrucao-desenho').classList.remove('hidden');
+            document.getElementById('badge-status-desenho').textContent = 'Desenhando no mapa...';
+            document.getElementById('badge-status-desenho').className = 'text-[11px] text-rose-700 font-semibold bg-rose-50 px-2 py-0.5 rounded border border-rose-200 animate-pulse';
+        }
+
+        function cancelarDesenhoOuEdicao() {
+            coordenadasPoligonoAtual = null;
+            if (mapboxDrawInstance) {
+                mapboxDrawInstance.deleteAll();
+            }
+            document.getElementById('badge-instrucao-desenho').classList.add('hidden');
+            document.getElementById('badge-status-desenho').textContent = 'Aguardando desenho';
+            document.getElementById('badge-status-desenho').className = 'text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200';
+            renderizarTodosPerimetrosNoMapa();
+        }
+
+        function iniciarNovoPerimetroUI() {
+            cancelarEdicaoPerimetroUI();
+            ativarDesenhoPoligono();
+            const inputNome = document.getElementById('perimetro-nome-input');
+            if (inputNome) inputNome.focus();
+        }
+
+        function cancelarEdicaoPerimetroUI() {
+            document.getElementById('perimetro-id-edicao').value = '';
+            document.getElementById('perimetro-nome-input').value = '';
+            document.getElementById('perimetro-justificativa-input').value = '';
+            document.getElementById('perimetro-ativo-input').checked = true;
+            document.getElementById('form-perimetro-titulo').innerHTML = `
+                <span class="material-symbols-outlined text-base text-rose-600">bookmark_add</span>
+                Dados do Perímetro
+            `;
+            cancelarDesenhoOuEdicao();
+        }
+
+        async function carregarListaPerimetrosUI() {
+            const container = document.getElementById('lista-perimetros-container');
+            if (!container) return;
+
+            try {
+                perimetrosCarregados = await window.PerimetrosBloqueadosService.listarPerimetros(true);
+                
+                // Atualizar badges
+                const total = perimetrosCarregados.length;
+                const badgeHeader = document.getElementById('badge-total-perimetros');
+                if (badgeHeader) badgeHeader.textContent = total;
+                const contador = document.getElementById('contador-perimetros-cadastrados');
+                if (contador) contador.textContent = `${total} cadastrado(s)`;
+
+                renderizarTodosPerimetrosNoMapa();
+
+                if (total === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-6 text-on-surface-variant text-xs space-y-1">
+                            <span class="material-symbols-outlined text-3xl text-rose-300 block mx-auto">fence</span>
+                            <span class="font-medium text-on-surface block">Nenhum perímetro restrito cadastrado</span>
+                            <span>Clique em "Desenhar Novo Perímetro" para demarcar um condomínio proibido.</span>
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = perimetrosCarregados.map(peri => {
+                    const isAtivo = peri.ativo !== false;
+                    return `
+                        <div class="p-3 bg-surface-container-low rounded-xl border ${isAtivo ? 'border-outline-variant/50' : 'border-neutral-300 opacity-60'} hover:border-rose-400 transition flex flex-col gap-2">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="material-symbols-outlined text-base ${isAtivo ? 'text-rose-600' : 'text-neutral-400'} flex-shrink-0">domain</span>
+                                    <h4 class="text-xs font-bold text-on-surface truncate" title="${peri.nome}">${peri.nome}</h4>
+                                </div>
+                                <span class="px-2 py-0.5 rounded text-[10px] font-semibold ${isAtivo ? 'bg-rose-100 text-rose-800' : 'bg-neutral-200 text-neutral-600'}">
+                                    ${isAtivo ? 'Bloqueio Ativo' : 'Inativo'}
+                                </span>
+                            </div>
+
+                            <p class="text-[11px] text-on-surface-variant line-clamp-2 leading-tight" title="${peri.justificativa || ''}">
+                                <strong>Motivo:</strong> ${peri.justificativa || 'Área privada sem permissão para abertura de OS.'}
+                            </p>
+
+                            <div class="flex items-center justify-between pt-1 border-t border-outline-variant/30 text-[11px]">
+                                <button type="button" onclick="focarPerimetroNoMapa(${peri.id})" class="text-secondary hover:underline flex items-center gap-1 font-semibold cursor-pointer">
+                                    <span class="material-symbols-outlined text-sm">my_location</span>
+                                    Ver no Mapa
+                                </button>
+                                <div class="flex items-center gap-1">
+                                    <button type="button" onclick="editarPerimetroUI(${peri.id})" title="Editar Perímetro" class="p-1 hover:bg-surface-container-high rounded text-on-surface-variant hover:text-secondary transition cursor-pointer">
+                                        <span class="material-symbols-outlined text-base">edit</span>
+                                    </button>
+                                    <button type="button" onclick="excluirPerimetroUI(${peri.id}, '${peri.nome.replace(/'/g, "\\'")}')" title="Excluir Perímetro" class="p-1 hover:bg-rose-100 rounded text-on-surface-variant hover:text-rose-600 transition cursor-pointer">
+                                        <span class="material-symbols-outlined text-base">delete</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (err) {
+                console.error('Erro ao listar perímetros:', err);
+                container.innerHTML = `
+                    <div class="p-3 text-center text-xs text-rose-600">
+                        Erro ao carregar perímetros do banco de dados.
+                    </div>
+                `;
+            }
+        }
+
+        function renderizarTodosPerimetrosNoMapa() {
+            if (!mapaPerimetrosInstance) return;
+
+            if (!mapaPerimetrosInstance.isStyleLoaded()) {
+                mapaPerimetrosInstance.once('load', () => renderizarTodosPerimetrosNoMapa());
+                mapaPerimetrosInstance.once('styledata', () => renderizarTodosPerimetrosNoMapa());
+                return;
+            }
+
+            const sourceId = 'perimetros-cadastrados-source';
+            const layerFillId = 'perimetros-cadastrados-fill';
+            const layerLineId = 'perimetros-cadastrados-line';
+            const layerLabelsId = 'perimetros-cadastrados-labels';
+
+            // Monta GeoJSON FeatureCollection (oculta o perímetro que estiver sendo editado no momento para não duplicar/ficar fantasma no draw)
+            const idEdicaoAtual = document.getElementById('perimetro-id-edicao') ? Number(document.getElementById('perimetro-id-edicao').value) : null;
+            const features = perimetrosCarregados
+                .filter(p => !idEdicaoAtual || p.id !== idEdicaoAtual)
+                .map(p => {
+                    let coords = p.coordenadas;
+                    if (coords && coords.coordinates) coords = coords.coordinates[0];
+                    else if (Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) coords = coords[0];
+
+                    if (!Array.isArray(coords) || coords.length < 3) return null;
+
+                    // Garante anel linear fechado
+                    const coordsFechadas = [...coords];
+                    const first = coordsFechadas[0];
+                    const last = coordsFechadas[coordsFechadas.length - 1];
+                    if (first[0] !== last[0] || first[1] !== last[1]) {
+                        coordsFechadas.push(first);
+                    }
+
+                    return {
+                        type: 'Feature',
+                        properties: {
+                            id: p.id,
+                            nome: p.nome,
+                            justificativa: p.justificativa,
+                            ativo: p.ativo !== false
+                        },
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: [coordsFechadas]
+                        }
+                    };
+                }).filter(Boolean);
+
+            const geojsonData = {
+                type: 'FeatureCollection',
+                features: features
+            };
+
+            const source = mapaPerimetrosInstance.getSource(sourceId);
+            if (source) {
+                source.setData(geojsonData);
+            } else {
+                mapaPerimetrosInstance.addSource(sourceId, {
+                    type: 'geojson',
+                    data: geojsonData
+                });
+
+                // Camada de preenchimento
+                mapaPerimetrosInstance.addLayer({
+                    id: layerFillId,
+                    type: 'fill',
+                    source: sourceId,
+                    paint: {
+                        'fill-color': [
+                            'case',
+                            ['==', ['get', 'ativo'], true],
+                            '#e11d48', // Vermelho/Rose para ativo
+                            '#94a3b8'  // Cinza para inativo
+                        ],
+                        'fill-opacity': 0.28
+                    }
+                });
+
+                // Camada de borda
+                mapaPerimetrosInstance.addLayer({
+                    id: layerLineId,
+                    type: 'line',
+                    source: sourceId,
+                    paint: {
+                        'line-color': [
+                            'case',
+                            ['==', ['get', 'ativo'], true],
+                            '#be123c',
+                            '#64748b'
+                        ],
+                        'line-width': 2.5
+                    }
+                });
+
+                // Camada de texto com o nome do condomínio (sem emojis que causam erro glyphs > 65535)
+                mapaPerimetrosInstance.addLayer({
+                    id: layerLabelsId,
+                    type: 'symbol',
+                    source: sourceId,
+                    layout: {
+                        'text-field': ['get', 'nome'],
+                        'text-size': 13,
+                        'text-anchor': 'center',
+                        'text-allow-overlap': true,
+                        'text-ignore-placement': true
+                    },
+                    paint: {
+                        'text-color': '#881337',
+                        'text-halo-color': '#ffffff',
+                        'text-halo-width': 2.5
+                    }
+                });
+
+                // Clique para abrir os dados do perímetro e habilitar edição diretamente
+                const handlePerimetroClick = (e) => {
+                    if (e.features && e.features[0]) {
+                        const id = e.features[0].properties.id;
+                        if (id) {
+                            editarPerimetroUI(Number(id));
+                            mostrarToast(`Perímetro carregado para edição!`, true);
+                        }
+                    }
+                };
+
+                mapaPerimetrosInstance.on('click', layerFillId, handlePerimetroClick);
+                mapaPerimetrosInstance.on('click', layerLabelsId, handlePerimetroClick);
+
+                // Cursor pointer ao passar o mouse
+                const handleMouseEnter = () => {
+                    mapaPerimetrosInstance.getCanvas().style.cursor = 'pointer';
+                };
+                const handleMouseLeave = () => {
+                    mapaPerimetrosInstance.getCanvas().style.cursor = '';
+                };
+
+                mapaPerimetrosInstance.on('mouseenter', layerFillId, handleMouseEnter);
+                mapaPerimetrosInstance.on('mouseleave', layerFillId, handleMouseLeave);
+                mapaPerimetrosInstance.on('mouseenter', layerLabelsId, handleMouseEnter);
+                mapaPerimetrosInstance.on('mouseleave', layerLabelsId, handleMouseLeave);
+            }
+
+            // Garante que o rótulo com o nome do condomínio fique sempre acima das camadas
+            if (mapaPerimetrosInstance.getLayer(layerLabelsId)) {
+                mapaPerimetrosInstance.moveLayer(layerLabelsId);
+            }
+
+            // Centraliza o mapa abrangendo os perímetros cadastrados se não estiver desenhando/editando
+            if (!coordenadasPoligonoAtual && features.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                features.forEach(f => {
+                    if (f.geometry && f.geometry.coordinates && f.geometry.coordinates[0]) {
+                        f.geometry.coordinates[0].forEach(c => bounds.extend(c));
+                    }
+                });
+                if (!bounds.isEmpty()) {
+                    mapaPerimetrosInstance.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 800 });
+                }
+            }
+        }
+
+        function focarPerimetroNoMapa(id) {
+            const peri = perimetrosCarregados.find(p => p.id === id);
+            if (!peri || !mapaPerimetrosInstance) return;
+
+            let coords = peri.coordenadas;
+            if (coords && coords.coordinates) coords = coords.coordinates[0];
+            else if (Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) coords = coords[0];
+
+            if (coords && coords.length > 0) {
+                const bounds = new mapboxgl.LngLatBounds();
+                coords.forEach(c => bounds.extend(c));
+                mapaPerimetrosInstance.fitBounds(bounds, { padding: 60, maxZoom: 16.5, duration: 1200 });
+            }
+        }
+
+        function editarPerimetroUI(id) {
+            const peri = perimetrosCarregados.find(p => p.id === id);
+            if (!peri) return;
+
+            document.getElementById('perimetro-id-edicao').value = peri.id;
+            document.getElementById('perimetro-nome-input').value = peri.nome || '';
+            document.getElementById('perimetro-justificativa-input').value = peri.justificativa || '';
+            document.getElementById('perimetro-ativo-input').checked = peri.ativo !== false;
+
+            document.getElementById('form-perimetro-titulo').innerHTML = `
+                <span class="material-symbols-outlined text-base text-rose-600">edit_square</span>
+                Editar: ${peri.nome}
+            `;
+
+            let coords = peri.coordenadas;
+            if (coords && coords.coordinates) coords = coords.coordinates[0];
+            else if (Array.isArray(coords) && Array.isArray(coords[0]) && Array.isArray(coords[0][0])) coords = coords[0];
+
+            if (Array.isArray(coords) && coords.length >= 3) {
+                const coordsFechadas = [...coords];
+                const first = coordsFechadas[0];
+                const last = coordsFechadas[coordsFechadas.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    coordsFechadas.push(first);
+                }
+
+                coordenadasPoligonoAtual = coordsFechadas;
+
+                if (mapboxDrawInstance) {
+                    mapboxDrawInstance.deleteAll();
+                    const featureIds = mapboxDrawInstance.add({
+                        type: 'Feature',
+                        id: 'editando_' + peri.id,
+                        properties: { id: peri.id },
+                        geometry: {
+                            type: 'Polygon',
+                            coordinates: [coordsFechadas]
+                        }
+                    });
+
+                    // Coloca o polígono no modo de seleção direta para mostrar os vértices editáveis
+                    if (featureIds && featureIds.length > 0) {
+                        try {
+                            mapboxDrawInstance.changeMode('direct_select', { featureId: featureIds[0] });
+                        } catch (e) {
+                            console.warn('Não foi possível ativar direct_select:', e);
+                        }
+                    }
+
+                    document.getElementById('badge-status-desenho').textContent = `${coordsFechadas.length - 1} pontos carregados (Editando) ✓`;
+                    document.getElementById('badge-status-desenho').className = 'text-[11px] text-blue-700 font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200';
+                }
+            }
+
+            // Atualiza a camada GeoJSON de fundo para remover o polígono estático enquanto está sendo editado no Draw
+            renderizarTodosPerimetrosNoMapa();
+
+            focarPerimetroNoMapa(id);
+        }
+
+        async function salvarPerimetroUI() {
+            const idEdicao = document.getElementById('perimetro-id-edicao').value;
+            const nome = document.getElementById('perimetro-nome-input').value.trim();
+            const justificativa = document.getElementById('perimetro-justificativa-input').value.trim();
+            const ativo = document.getElementById('perimetro-ativo-input').checked;
+
+            if (!nome) {
+                mostrarToast('Por favor, informe o nome do condomínio ou área.', false);
+                document.getElementById('perimetro-nome-input').focus();
+                return;
+            }
+
+            if (!justificativa) {
+                mostrarToast('Por favor, preencha a justificativa do bloqueio.', false);
+                document.getElementById('perimetro-justificativa-input').focus();
+                return;
+            }
+
+            // Obter as coordenadas mais recentes diretamente do MapboxDraw se estiver ativo
+            if (mapboxDrawInstance) {
+                const drawData = mapboxDrawInstance.getAll();
+                if (drawData && drawData.features && drawData.features.length > 0) {
+                    const feat = drawData.features[0];
+                    if (feat.geometry && feat.geometry.type === 'Polygon' && feat.geometry.coordinates[0]) {
+                        coordenadasPoligonoAtual = feat.geometry.coordinates[0];
+                    }
+                }
+            }
+
+            // Validar coordenadas do Draw
+            if (!coordenadasPoligonoAtual || coordenadasPoligonoAtual.length < 3) {
+                mostrarToast('Desenhe a demarcação da área no mapa antes de salvar!', false);
+                ativarDesenhoPoligono();
+                return;
+            }
+
+            const btn = document.getElementById('btn-salvar-perimetro');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="material-symbols-outlined text-base animate-spin">progress_activity</span> Gravando...';
+
+            try {
+                // Fechar polígono se o primeiro e último ponto não coincidirem
+                const coordsFinal = [...coordenadasPoligonoAtual];
+                const first = coordsFinal[0];
+                const last = coordsFinal[coordsFinal.length - 1];
+                if (first[0] !== last[0] || first[1] !== last[1]) {
+                    coordsFinal.push(first);
+                }
+
+                const payload = {
+                    nome: nome,
+                    justificativa: justificativa,
+                    tipo: 'condominio',
+                    coordenadas: coordsFinal,
+                    ativo: ativo
+                };
+
+                if (idEdicao) {
+                    payload.id = parseInt(idEdicao, 10);
+                }
+
+                await window.PerimetrosBloqueadosService.salvarPerimetro(payload);
+                mostrarToast(idEdicao ? 'Perímetro atualizado com sucesso!' : 'Novo perímetro restrito cadastrado!', true);
+                
+                // Reseta variáveis de controle e limpa o editor MapboxDraw
+                document.getElementById('perimetro-id-edicao').value = '';
+                document.getElementById('perimetro-nome-input').value = '';
+                document.getElementById('perimetro-justificativa-input').value = '';
+                document.getElementById('perimetro-ativo-input').checked = true;
+                document.getElementById('form-perimetro-titulo').innerHTML = `
+                    <span class="material-symbols-outlined text-base text-rose-600">bookmark_add</span>
+                    Dados do Perímetro
+                `;
+                coordenadasPoligonoAtual = null;
+                if (mapboxDrawInstance) {
+                    mapboxDrawInstance.deleteAll();
+                }
+                document.getElementById('badge-instrucao-desenho').classList.add('hidden');
+                document.getElementById('badge-status-desenho').textContent = 'Aguardando desenho';
+                document.getElementById('badge-status-desenho').className = 'text-[11px] text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200';
+
+                // Recarrega os dados mais recentes do banco e renderiza as novas coordenadas no mapa
+                await carregarListaPerimetrosUI();
+            } catch (err) {
+                console.error('Erro ao salvar perímetro:', err);
+                mostrarToast('Erro ao salvar perímetro: ' + (err.message || 'Verifique se executou o script SQL.'), false);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<span class="material-symbols-outlined text-base">save</span> Salvar Perímetro';
+            }
+        }
+
+        function excluirPerimetroUI(id, nome) {
+            abrirConfirmacaoModal({
+                titulo: 'Excluir Perímetro Bloqueado',
+                mensagem: `Deseja realmente remover o perímetro "${nome}"? A partir da remoção, a abertura de OS nessa área voltará a ser permitida.`,
+                icone: 'delete_forever',
+                iconeCor: 'bg-rose-100 text-rose-700',
+                btnTexto: 'Excluir Perímetro',
+                btnCor: 'bg-rose-600 hover:bg-rose-700',
+                onConfirm: async () => {
+                    try {
+                        if (document.getElementById('perimetro-id-edicao').value == id) {
+                            cancelarEdicaoPerimetroUI();
+                        }
+                        await window.PerimetrosBloqueadosService.excluirPerimetro(id);
+                        mostrarToast('Perímetro removido com sucesso!', true);
+                        await carregarListaPerimetrosUI();
+                    } catch (err) {
+                        mostrarToast('Erro ao excluir perímetro.', false);
+                    }
+                }
+            });
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
@@ -775,6 +2607,14 @@
                 }
                 const configs = await window.ConfiguracoesService.obterConfiguracoes();
                 popularFormulario(configs);
+                
+                // Pré-carrega contagem de perímetros para o badge da aba
+                if (window.PerimetrosBloqueadosService) {
+                    window.PerimetrosBloqueadosService.listarPerimetros().then(lista => {
+                        const badge = document.getElementById('badge-total-perimetros');
+                        if (badge) badge.textContent = lista ? lista.length : 0;
+                    }).catch(() => {});
+                }
             } catch (e) {
                 console.warn('Iniciando com padrões:', e);
                 popularFormulario(window.ConfiguracoesService.defaultValues);

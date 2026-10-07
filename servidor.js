@@ -24,7 +24,37 @@ const MIME_TYPES = {
     '.ttf': 'font/ttf'
 };
 
+// Carrega variáveis do arquivo .env se existir
+try {
+    require('dotenv').config();
+} catch (e) {}
+
+const adminResetPasswordHandler = require('./api/admin-reset-password.js');
+const adminUpdateUserHandler = require('./api/admin-update-user.js');
+
 const server = http.createServer((req, res) => {
+    // Rota API para redefinição de senha pelo Administrador
+    if (req.url.startsWith('/api/admin-reset-password')) {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            req.body = body;
+            adminResetPasswordHandler(req, res);
+        });
+        return;
+    }
+
+    // Rota API para aprovar/bloquear ou alterar papel de usuários pelo Administrador
+    if (req.url.startsWith('/api/admin-update-user')) {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            req.body = body;
+            adminUpdateUserHandler(req, res);
+        });
+        return;
+    }
+
     // Rota API para registrar assinaturas de Web Push localmente
     if (req.method === 'POST' && req.url.startsWith('/api/register-push')) {
         let body = '';
