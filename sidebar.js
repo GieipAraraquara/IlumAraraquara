@@ -345,6 +345,16 @@ window.closeFinalizarOSModal = function() {
         modal.classList.add('hidden');
         try { sessionStorage.removeItem('os_para_finalizar'); } catch(e) {}
     }, 200);
+
+    // Se estiver no Painel ou Auditoria, assegura atualização com forceRefresh
+    try {
+        if (window.painelController && typeof window.painelController.loadData === 'function') {
+            window.painelController.loadData(true);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            window.auditoriaController.loadData(true);
+        }
+    } catch(e) {}
 };
 
 // Escuta mensagens globais dos iframes (Abrir.html e Finalizar.html)
@@ -354,11 +364,21 @@ window.addEventListener('message', (event) => {
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
         } else if (event.data.action === 'FECHAR_MODAL_FINALIZAR') {
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
-        } else if (event.data.action === 'OS_CRIADA_SILENCIOSO') {
-            // A OS foi cadastrada no banco e o formulário exibiu o popup com o número do protocolo.
-            // Atualiza os dados das telas em segundo plano SEM fechar o modal, permitindo que o usuário visualize o protocolo com calma.
+        } else if (event.data.action === 'OS_CRIADA_SILENCIOSO' || event.data.action === 'OS_CONCLUIDA_SILENCIOSO') {
+            // A OS foi cadastrada/concluída no banco e o formulário exibiu o popup de confirmação.
+            // Limpa chaves de cache e atualiza os dados das telas em segundo plano SEM fechar o modal.
+            try {
+                sessionStorage.removeItem('chamados_repo_cache_v1');
+                sessionStorage.removeItem('chamados_repo_meta_v1');
+                sessionStorage.removeItem('chamados_repo_cache_v2');
+                sessionStorage.removeItem('chamados_repo_meta_v2');
+                sessionStorage.removeItem('auditoria_repo_cache_v1');
+                sessionStorage.removeItem('auditoria_repo_meta_v1');
+                localStorage.removeItem('os_cached_chamados');
+            } catch(e) {}
+
             if (window.painelController && typeof window.painelController.loadData === 'function') {
-                window.painelController.loadData();
+                window.painelController.loadData(true);
             } else if (typeof window.carregarChamados === 'function') {
                 window.carregarChamados();
             } else if (typeof window.applyCombinedFilters === 'function') {
@@ -366,7 +386,7 @@ window.addEventListener('message', (event) => {
             }
 
             if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                window.auditoriaController.loadData();
+                window.auditoriaController.loadData(true);
             } else if (typeof window.carregarDadosAuditoria === 'function') {
                 window.carregarDadosAuditoria();
             }
@@ -381,11 +401,21 @@ window.addEventListener('message', (event) => {
             event.data.action === 'OS_CANCELADA_SUCESSO'
         ) {
             // Fechamento definitivo do modal após confirmação do usuário no popup
+            try {
+                sessionStorage.removeItem('chamados_repo_cache_v1');
+                sessionStorage.removeItem('chamados_repo_meta_v1');
+                sessionStorage.removeItem('chamados_repo_cache_v2');
+                sessionStorage.removeItem('chamados_repo_meta_v2');
+                sessionStorage.removeItem('auditoria_repo_cache_v1');
+                sessionStorage.removeItem('auditoria_repo_meta_v1');
+                localStorage.removeItem('os_cached_chamados');
+            } catch(e) {}
+
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
 
             if (window.painelController && typeof window.painelController.loadData === 'function') {
-                window.painelController.loadData();
+                window.painelController.loadData(true);
             } else if (typeof window.carregarChamados === 'function') {
                 window.carregarChamados();
             } else if (typeof window.applyCombinedFilters === 'function') {
@@ -393,7 +423,7 @@ window.addEventListener('message', (event) => {
             }
 
             if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                window.auditoriaController.loadData();
+                window.auditoriaController.loadData(true);
             } else if (typeof window.carregarDadosAuditoria === 'function') {
                 window.carregarDadosAuditoria();
             }

@@ -1022,6 +1022,7 @@
                             </div>
                             <span class="font-mono text-[11px] text-amber-800 break-all" id="comp-panel-os-coords">-</span>
                             <span class="text-[10px] text-slate-500 block mt-0.5" id="comp-panel-os-op">Técnico: ---</span>
+                            <div id="comp-panel-os-poste-badge" class="mt-1 hidden"></div>
                         </div>
                     </div>
                     <!-- Ponto 3: Poste Aéreo Selecionado (Snap) -->
@@ -1030,11 +1031,18 @@
                             <div class="w-3.5 h-3.5 rounded-full bg-purple-600 mt-0.5 flex-shrink-0 ring-4 ring-purple-100 flex items-center justify-center text-[8px] text-white font-bold">⚡</div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between">
-                                    <span class="font-bold text-purple-900 text-[11px]">Poste da Base Aérea (Snap Ativo)</span>
-                                    <button type="button" onclick="window.deselecionarPosteAereo()" class="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer">Remover</button>
+                                    <span class="font-bold text-purple-900 text-[11px]" id="comp-panel-poste-titulo">Poste da Base Aérea (Snap Ativo)</span>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" id="btn-poste-streetview" onclick="window.abrirStreetViewPoste()" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer" title="Ver este poste no Google Street View (360°)">
+                                            <span class="material-symbols-outlined text-[13px]">streetview</span>
+                                            <span>Street View</span>
+                                        </button>
+                                        <button type="button" onclick="window.deselecionarPosteAereo()" class="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer">Remover</button>
+                                    </div>
                                 </div>
                                 <span class="font-mono text-[11px] text-purple-800 break-all block" id="comp-panel-poste-coords">-</span>
                                 <span class="text-[10px] text-purple-600 block mt-0.5" id="comp-panel-poste-dist">A 0m do ponto da OS</span>
+                                <div id="comp-panel-poste-alerta-vinculo" class="hidden mt-1.5 p-1 rounded bg-amber-100/80 border border-amber-300 text-[10px] text-amber-900 font-medium"></div>
                             </div>
                         </div>
                     </div>
@@ -1063,8 +1071,12 @@
 
                 <!-- Botões de Ação -->
                 <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="window.fecharModalComparativoCoords()" class="flex-1 py-2 px-3 rounded-xl border border-slate-200 font-semibold text-slate-700 hover:bg-slate-100 transition-all text-xs text-center cursor-pointer">
+                    <button type="button" onclick="window.fecharModalComparativoCoords()" class="py-2 px-3 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-100 transition-all text-xs text-center cursor-pointer" title="Fechar este modal sem alterar nada">
                         Cancelar
+                    </button>
+                    <button type="button" id="btn-descartar-modal-comp" onclick="window.confirmarDescarteModalComparativo()" class="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold text-rose-700 transition-all text-xs text-center flex items-center justify-center gap-1 cursor-pointer" title="Descartar a sugestão da OS e manter a coordenada original da plaqueta">
+                        <span class="material-symbols-outlined text-[15px]">close</span>
+                        <span>Descartar</span>
                     </button>
                     <button type="button" id="btn-aprovar-modal-comp" onclick="window.confirmarAprovacaoModalComparativo()" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white transition-all text-xs text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer">
                         <span class="material-symbols-outlined text-[16px]">check</span>
@@ -2719,55 +2731,111 @@
                     return null;
                 };
 
-                // Filtrar apenas OSs que tenham plaqueta e coordenada de reparo válidas
+                // Consultar OSs e plaquetas que já foram deliberadas (Aprovadas, Calibradas em Poste ou Descartadas)
+                const deliberadasSet = new Set();
+                try {
+                    const { data: resHistAudit } = await client
+                        .from('historico_localizacao_plaquetas')
+                        .select('numero_os, identificacao')
+                        .in('origem', ['SNAP_POSTE_AEREO', 'APROVACAO_OS', 'DESCARTE_OS'])
+                        .not('numero_os', 'is', null);
+
+                    if (resHistAudit && resHistAudit.length > 0) {
+                        resHistAudit.forEach(h => {
+                            if (h.numero_os) {
+                                const protClean = String(h.numero_os).trim().toUpperCase();
+                                const plqClean = h.identificacao ? String(h.identificacao).trim().toUpperCase() : '';
+                                if (plqClean) {
+                                    deliberadasSet.add(`${protClean}__${plqClean}`);
+                                } else {
+                                    deliberadasSet.add(protClean);
+                                }
+                            }
+                        });
+                        console.log(`🛡️ [Aprovação Coordenadas] ${deliberadasSet.size} registros já auditados/deliberados ignorados na fila.`);
+                    }
+                } catch (eHist) {
+                    console.warn("⚠️ Aviso ao consultar registros já auditados:", eHist);
+                }
+
+                // Filtrar apenas pontos_final com plaqueta e coordenada de reparo válidas
                 const osComCoord = [];
                 const plaquetasNecessarias = new Set();
 
                 listaOS.forEach(os => {
-                    let plq = (os.plaqueta_final || os.plaqueta_inicial || '').trim();
-                    let cRep = (os.coordenada_reparo || os.coordenada || '').trim();
-
+                    const prot = String(os.protocolo || os.id || '').trim().toUpperCase();
                     const ptsFinal = parseArrayJson(os.pontos_final);
-                    const ptsInicial = parseArrayJson(os.pontos_inicial);
 
-                    // Extração dos pontos_final caso as colunas diretas estejam em branco
-                    if (ptsFinal && ptsFinal.length > 0) {
-                        const p0Fin = ptsFinal[0] || {};
-                        if (!plq) plq = (p0Fin.plaqueta || p0Fin.plaqueta_final || p0Fin.identificacao || '').trim();
-                        if (!cRep) {
-                            if (p0Fin.coordenada || p0Fin.coordenada_reparo) cRep = String(p0Fin.coordenada || p0Fin.coordenada_reparo).trim();
-                            else if (p0Fin.lat && p0Fin.lng) cRep = `${p0Fin.lat}, ${p0Fin.lng}`;
-                        }
-                    }
+                    if (ptsFinal && Array.isArray(ptsFinal) && ptsFinal.length > 0) {
+                        // Iterar exclusivamente por todos os pontos de fechamento (pontos_final)
+                        ptsFinal.forEach((pt, idx) => {
+                            const plq = String(pt.plaqueta || pt.plaqueta_final || pt.identificacao || '').trim().toUpperCase();
+                            if (!plq) return;
 
-                    // Fallback para pontos_inicial
-                    if (ptsInicial && ptsInicial.length > 0) {
-                        const p0Ini = ptsInicial[0] || {};
-                        if (!plq) plq = (p0Ini.plaqueta || p0Ini.plaqueta_inicial || p0Ini.identificacao || '').trim();
-                        if (!cRep) {
-                            if (p0Ini.coordenada || p0Ini.coordenada_inicial) cRep = String(p0Ini.coordenada || p0Ini.coordenada_inicial).trim();
-                            else if (p0Ini.lat && p0Ini.lng) cRep = `${p0Ini.lat}, ${p0Ini.lng}`;
-                        }
-                    }
+                            // Ignorar pseudo-itens que são apenas fotos complementares ou anexos de evidência
+                            if (plq.includes('FOTO') || plq.includes('COMPLEMENTAR') || plq === 'NENHUMA' || plq === 'SEM_PLAQUETA') return;
 
-                    if (plq && cRep) {
-                        const parsedRep = extrairLatLng(cRep);
-                        if (parsedRep) {
-                            osComCoord.push({
-                                osId: os.id,
-                                protocolo: os.protocolo || String(os.id),
-                                plaquetaId: plq,
-                                coordReparoRaw: cRep,
-                                coordReparoParsed: parsedRep,
-                                dataFechamento: os.data_fechamento || os.data_abertura,
-                                operador: os.operador_finalizacao || 'Técnico'
-                            });
-                            plaquetasNecessarias.add(plq);
+                            // Ignora se este ponto específico já foi deliberado
+                            if (deliberadasSet.has(`${prot}__${plq}`) || deliberadasSet.has(prot)) return;
+
+                            let cRep = '';
+                            if (pt.coordenada || pt.coordenada_reparo) {
+                                cRep = String(pt.coordenada || pt.coordenada_reparo).trim();
+                            } else if (pt.lat && pt.lng) {
+                                cRep = `${pt.lat}, ${pt.lng}`;
+                            }
+
+                            if (!cRep) return;
+                            const parsedRep = extrairLatLng(cRep);
+                            if (parsedRep) {
+                                const itemKey = `${prot}__${plq}`;
+                                osComCoord.push({
+                                    itemKey: itemKey,
+                                    osId: os.id,
+                                    protocolo: prot,
+                                    pontoNumero: pt.ponto || (idx + 1),
+                                    plaquetaId: plq,
+                                    coordReparoRaw: cRep,
+                                    coordReparoParsed: parsedRep,
+                                    posteIdSelecionado: pt.poste_id_selecionado || null,
+                                    posteNaoEncontrado: Boolean(pt.poste_nao_encontrado),
+                                    conflitoPlaquetaPoste: Boolean(pt.conflito_plaqueta_poste),
+                                    postePlaquetaVinculada: pt.poste_plaqueta_vinculada || null,
+                                    distanciaGpsPosteMetros: pt.distancia_gps_poste_metros !== undefined ? pt.distancia_gps_poste_metros : null,
+                                    dataFechamento: os.data_fechamento || os.data_abertura,
+                                    operador: os.operador_finalizacao || 'Técnico'
+                                });
+                                plaquetasNecessarias.add(plq);
+                            }
+                        });
+                    } else {
+                        // Fallback: OS com campos simples diretos (caso não tenha o array pontos_final)
+                        const plq = String(os.plaqueta_final || '').trim().toUpperCase();
+                        if (plq && !plq.includes('FOTO') && !plq.includes('COMPLEMENTAR') && plq !== 'NENHUMA' && plq !== 'SEM_PLAQUETA' && !deliberadasSet.has(`${prot}__${plq}`) && !deliberadasSet.has(prot)) {
+                            const cRep = String(os.coordenada_reparo || os.coordenada || '').trim();
+                            if (cRep) {
+                                const parsedRep = extrairLatLng(cRep);
+                                if (parsedRep) {
+                                    const itemKey = `${prot}__${plq}`;
+                                    osComCoord.push({
+                                        itemKey: itemKey,
+                                        osId: os.id,
+                                        protocolo: prot,
+                                        pontoNumero: 1,
+                                        plaquetaId: plq,
+                                        coordReparoRaw: cRep,
+                                        coordReparoParsed: parsedRep,
+                                        dataFechamento: os.data_fechamento || os.data_abertura,
+                                        operador: os.operador_finalizacao || 'Técnico'
+                                    });
+                                    plaquetasNecessarias.add(plq);
+                                }
+                            }
                         }
                     }
                 });
 
-                console.log(`📌 [Aprovação Coordenadas] ${osComCoord.length} OSs com plaqueta e coordenada extraídas. Plaquetas únicas: ${plaquetasNecessarias.size}`);
+                console.log(`📌 [Aprovação Coordenadas] ${osComCoord.length} pontos de OS com plaqueta e coordenada extraídas. Plaquetas únicas: ${plaquetasNecessarias.size}`);
 
                 if (plaquetasNecessarias.size === 0) {
                     filaAprovacaoCache = [];
@@ -2944,10 +3012,11 @@
                 return `
                     <tr class="hover:bg-slate-50/70 transition-colors">
                         <td class="py-3 px-3 text-center align-middle">
-                            <input type="checkbox" onchange="window.toggleSelecionarItemAprovacao('${item.protocolo}', this.checked)" ${item.selecionado ? 'checked' : ''} class="chk-item-aprov rounded text-secondary focus:ring-secondary cursor-pointer">
+                            <input type="checkbox" onchange="window.toggleSelecionarItemAprovacao('${item.itemKey}', this.checked)" ${item.selecionado ? 'checked' : ''} class="chk-item-aprov rounded text-secondary focus:ring-secondary cursor-pointer">
                         </td>
                         <td class="py-3 px-4 font-bold text-slate-900 align-middle">
                             <span class="font-mono text-xs">${item.protocolo}</span>
+                            ${item.pontoNumero ? `<span class="ml-1 text-[10px] text-slate-500 font-normal bg-slate-100 px-1 py-0.5 rounded border border-slate-200">Pt ${item.pontoNumero}</span>` : ''}
                         </td>
                         <td class="py-3 px-4 align-middle">
                             <div class="flex items-center gap-1.5 flex-wrap">
@@ -2967,7 +3036,28 @@
                             ${item.coordCadastradaRaw}
                         </td>
                         <td class="py-3 px-4 font-mono text-amber-900 font-medium align-middle">
-                            ${item.coordReparoRaw}
+                            <div class="flex flex-col gap-1">
+                                <span>${item.coordReparoRaw}</span>
+                                ${item.posteIdSelecionado ? `
+                                    <div class="flex items-center gap-1 flex-wrap">
+                                        <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs" title="Operador selecionou o Poste #${item.posteIdSelecionado} no mapa da OS">
+                                            <span class="material-symbols-outlined text-[12px] text-purple-700">electric_bolt</span>
+                                            <span>Poste #${item.posteIdSelecionado}</span>
+                                        </span>
+                                        ${item.conflitoPlaquetaPoste ? `
+                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Atenção: O poste selecionado pertence à plaqueta #${item.postePlaquetaVinculada || 'outra'} no cadastro">
+                                                <span class="material-symbols-outlined text-[12px] text-amber-700">warning</span>
+                                                <span>Conflito: #${item.postePlaquetaVinculada}</span>
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                ` : (item.posteNaoEncontrado ? `
+                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-300 w-fit">
+                                        <span class="material-symbols-outlined text-[12px] text-slate-500">location_off</span>
+                                        <span>Poste não encontrado no mapa</span>
+                                    </span>
+                                ` : '')}
+                            </div>
                         </td>
                         <td class="py-3 px-4 text-center align-middle">
                             <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${badgeDistClass}">
@@ -2984,13 +3074,13 @@
                                 <button type="button" onclick="window.abrirDetalhesOSModal('${item.protocolo}')" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all cursor-pointer" title="Inspecionar Detalhes & Fotos da OS">
                                     <span class="material-symbols-outlined text-[17px]">visibility</span>
                                 </button>
-                                <button type="button" onclick="window.abrirModalComparativoCoords('${item.protocolo}')" class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all cursor-pointer" title="Ver Comparativo no Mapa">
+                                <button type="button" onclick="window.abrirModalComparativoCoords('${item.itemKey}')" class="p-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-all cursor-pointer" title="Ver Comparativo no Mapa">
                                     <span class="material-symbols-outlined text-[17px]">map</span>
                                 </button>
-                                <button type="button" onclick="window.aprovarCoordenadaOS('${item.protocolo}')" class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer" title="Aprovar Modificação">
+                                <button type="button" onclick="window.aprovarCoordenadaOS('${item.itemKey}')" class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer" title="Aprovar Modificação">
                                     <span class="material-symbols-outlined text-[17px]">check</span>
                                 </button>
-                                <button type="button" onclick="window.descartarCoordenadaOS('${item.protocolo}')" class="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 transition-all cursor-pointer" title="Descartar / Manter Atual">
+                                <button type="button" onclick="window.descartarCoordenadaOS('${item.itemKey}')" class="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 transition-all cursor-pointer" title="Descartar / Manter Atual">
                                     <span class="material-symbols-outlined text-[17px]">close</span>
                                 </button>
                             </div>
@@ -3002,8 +3092,8 @@
             atualizarBotaoAprovarLote();
         }
 
-        window.toggleSelecionarItemAprovacao = function(protocolo, checked) {
-            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+        window.toggleSelecionarItemAprovacao = function(itemKey, checked) {
+            const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
             if (item) item.selecionado = checked;
             atualizarBotaoAprovarLote();
         };
@@ -3031,8 +3121,8 @@
          * - Update sem .select('*')
          * - Mescla/remoção local de estado
          */
-        window.aprovarCoordenadaOS = async function(protocolo) {
-            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+        window.aprovarCoordenadaOS = async function(itemKey) {
+            const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
             if (!item) return;
 
             const confirmar = confirm(`Deseja aprovar a coordenada da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId}?\n\n` +
@@ -3121,16 +3211,31 @@
                         identificacao: item.plaquetaId,
                         latitude: newLat,
                         longitude: newLng,
+                        numero_os: item.protocolo,
                         origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
                         usuario: userNome,
                         observacao: obsTexto
                     }]);
                 } catch (hErr) { console.warn("Aviso ao gravar histórico:", hErr); }
 
-                // 4. Atualizar estado local em memória (Remover da fila)
-                filaAprovacaoCache = filaAprovacaoCache.filter(i => i.protocolo !== item.protocolo);
+                // 4. Atualizar estado local em memória (Remover da fila este ponto específico)
+                filaAprovacaoCache = filaAprovacaoCache.filter(i => {
+                    if (item.itemKey) return i.itemKey !== item.itemKey;
+                    return i.protocolo !== item.protocolo || i.plaquetaId !== item.plaquetaId;
+                });
                 atualizarKPIsAprovacao();
                 renderizarFilaAprovacao();
+
+                // 5. Sincronizar cache da listagem principal de plaquetas se já estiver carregado
+                const plqPrincipal = plaquetasCache.find(p => p.identificacao && p.identificacao.toUpperCase() === item.plaquetaId.toUpperCase());
+                if (plqPrincipal) {
+                    plqPrincipal.latitude = newLat;
+                    plqPrincipal.longitude = newLng;
+                    plqPrincipal.hasCoords = true;
+                    if (typeof carregarPlaquetas === 'function') {
+                        carregarPlaquetas(paginaAtual);
+                    }
+                }
 
                 return true;
             } catch (err) {
@@ -3139,11 +3244,36 @@
             }
         }
 
-        window.descartarCoordenadaOS = function(protocolo) {
-            const confirmar = confirm(`Deseja descartar a sugestão da OS #${protocolo} e manter a localização cadastrada atual da plaqueta?`);
+        window.descartarCoordenadaOS = async function(itemKey) {
+            const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
+            if (!item) return;
+
+            const confirmar = confirm(`Deseja descartar a sugestão da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId} e manter a localização cadastrada atual?`);
             if (!confirmar) return;
 
-            filaAprovacaoCache = filaAprovacaoCache.filter(i => i.protocolo !== protocolo);
+            // Grava o descarte no histórico para que este par (OS, Plaqueta) não retorne na fila em recarregamentos futuros
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (client && item) {
+                try {
+                    const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
+                    await client.from('historico_localizacao_plaquetas').insert([{
+                        identificacao: item.plaquetaId,
+                        latitude: item.coordCadastradaParsed ? item.coordCadastradaParsed.lat : null,
+                        longitude: item.coordCadastradaParsed ? item.coordCadastradaParsed.lng : null,
+                        numero_os: item.protocolo,
+                        origem: 'DESCARTE_OS',
+                        usuario: userNome,
+                        observacao: `Sugestão de coordenada da OS #${item.protocolo} (Plaqueta #${item.plaquetaId}) descartada na auditoria (mantido cadastro original)`
+                    }]);
+                } catch (dErr) {
+                    console.warn("Aviso ao registrar descarte de OS no histórico:", dErr);
+                }
+            }
+
+            filaAprovacaoCache = filaAprovacaoCache.filter(i => {
+                if (item.itemKey) return i.itemKey !== item.itemKey;
+                return i.protocolo !== item.protocolo || i.plaquetaId !== item.plaquetaId;
+            });
             atualizarKPIsAprovacao();
             renderizarFilaAprovacao();
         };
@@ -3171,8 +3301,8 @@
         // =========================================================================
         // MODAL COMPARATIVO NO MAPBOX
         // =========================================================================
-        window.abrirModalComparativoCoords = function(protocolo) {
-            const item = filaAprovacaoCache.find(i => i.protocolo === protocolo);
+        window.abrirModalComparativoCoords = function(itemKey) {
+            const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
             if (!item) return;
 
             itemEmComparacaoModal = item;
@@ -3189,6 +3319,38 @@
             document.getElementById('comp-panel-orig-coords').innerText = item.coordCadastradaRaw;
             document.getElementById('comp-panel-os-coords').innerText = item.coordReparoRaw;
             document.getElementById('comp-panel-os-op').innerText = `Técnico: ${item.operador}`;
+
+            const badgeOpPosteEl = document.getElementById('comp-panel-os-poste-badge');
+            if (badgeOpPosteEl) {
+                if (item.posteIdSelecionado) {
+                    badgeOpPosteEl.classList.remove('hidden');
+                    badgeOpPosteEl.innerHTML = `
+                        <div class="flex items-center gap-1 flex-wrap">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-100 text-purple-900 border border-purple-300 shadow-2xs">
+                                <span class="material-symbols-outlined text-[13px] text-purple-700">electric_bolt</span>
+                                <span>Poste Escolhido: #${item.posteIdSelecionado}</span>
+                            </span>
+                            ${item.conflitoPlaquetaPoste ? `
+                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Atenção: O poste selecionado pertence à plaqueta #${item.postePlaquetaVinculada || 'outra'} no cadastro">
+                                    <span class="material-symbols-outlined text-[12px] text-amber-700">warning</span>
+                                    <span>Conflito: #${item.postePlaquetaVinculada}</span>
+                                </span>
+                            ` : ''}
+                        </div>
+                    `;
+                } else if (item.posteNaoEncontrado) {
+                    badgeOpPosteEl.classList.remove('hidden');
+                    badgeOpPosteEl.innerHTML = `
+                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-300">
+                            <span class="material-symbols-outlined text-[13px] text-slate-500">location_off</span>
+                            <span>Poste não encontrado no mapa</span>
+                        </span>
+                    `;
+                } else {
+                    badgeOpPosteEl.classList.add('hidden');
+                    badgeOpPosteEl.innerHTML = '';
+                }
+            }
 
             modal.classList.remove('hidden');
             setTimeout(() => {
@@ -3256,7 +3418,7 @@
                     const isMelhor = (dup.id === item.idRegistroPlaqueta);
                     const elDup = document.createElement('div');
                     elDup.id = `marker-duplicata-${dup.id}`;
-                    elDup.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all ${isMelhor ? 'bg-blue-600 ring-4 ring-blue-300 z-20 scale-110' : 'bg-sky-500 ring-2 ring-sky-200 z-10'}`;
+                    elDup.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer ${isMelhor ? 'bg-blue-600 ring-4 ring-blue-300 z-20' : 'bg-sky-500 ring-2 ring-sky-200 z-10'}`;
                     elDup.title = `Ponto Cadastrado #${idx + 1} (${dup.empresa}) - Clique para selecionar`;
                     elDup.innerHTML = `<span>${idx + 1}</span>`;
 
@@ -3287,7 +3449,7 @@
 
                 // Plaqueta única normal
                 const elOrig = document.createElement('div');
-                elOrig.className = 'w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-blue-300';
+                elOrig.className = 'w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-blue-300 z-10';
                 elOrig.innerHTML = '<span class="material-symbols-outlined text-[14px]">pin_drop</span>';
                 const mOrig = new mapboxgl.Marker({ element: elOrig, anchor: 'center' })
                     .setLngLat(cOrig)
@@ -3299,7 +3461,7 @@
 
             // Adicionar Marcador Âmbar (Ponto da OS)
             const elOS = document.createElement('div');
-            elOS.className = 'w-6 h-6 rounded-full bg-amber-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-300';
+            elOS.className = 'w-6 h-6 rounded-full bg-amber-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-300 z-20';
             elOS.innerHTML = '<span class="material-symbols-outlined text-[14px]">build</span>';
             const mOS = new mapboxgl.Marker({ element: elOS, anchor: 'center' })
                 .setLngLat(cOS)
@@ -3311,8 +3473,16 @@
                 compMapboxInstance.resize();
                 compMapboxInstance.fitBounds(bounds, { padding: 90, maxZoom: 18 });
 
-                // Carregar postes aéreos num raio de ~70m ao redor do ponto da OS
-                carregarPostesAereosProximos(item.coordReparoParsed.lat, item.coordReparoParsed.lng);
+                // Carregar postes aéreos num raio que engloba a coordenada da OS e o cadastro atual
+                const coordsParaBusca = [item.coordReparoParsed];
+                if (item.coordCadastradaParsed && item.coordCadastradaParsed.lat && item.coordCadastradaParsed.lng) {
+                    coordsParaBusca.push(item.coordCadastradaParsed);
+                }
+                if (item.instanciasDuplicadas && item.instanciasDuplicadas.length > 0) {
+                    item.instanciasDuplicadas.forEach(d => coordsParaBusca.push({ lat: d.lat, lng: d.lng }));
+                }
+
+                carregarPostesAereosProximos(coordsParaBusca, item);
             }, 300);
         };
 
@@ -3321,61 +3491,201 @@
             compPostesMarkers = [];
         }
 
-        async function carregarPostesAereosProximos(latCenter, lngCenter) {
+        async function carregarPostesAereosProximos(coordsArray, itemAtual) {
             const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
             if (!client || !compMapboxInstance) return;
 
             try {
-                // Bounding box de ~70 metros (delta ~0.0007 graus)
-                const delta = 0.0007;
-                const { data: postes, error } = await client
-                    .from('postes_base_aerea')
-                    .select('id, latitude, longitude, id_plaqueta_vinculada')
-                    .gte('latitude', latCenter - delta)
-                    .lte('latitude', latCenter + delta)
-                    .gte('longitude', lngCenter - delta)
-                    .lte('longitude', lngCenter + delta)
-                    .limit(30);
+                const delta = 0.00113; // ~125 metros
+                const listaPontos = (Array.isArray(coordsArray) ? coordsArray : [coordsArray])
+                    .filter(c => c && typeof c.lat === 'number' && typeof c.lng === 'number');
 
-                if (error || !postes) {
-                    console.warn("⚠️ Aviso ao buscar postes da base aérea:", error);
-                    return;
-                }
+                if (listaPontos.length === 0) return;
 
-                console.log(`⚡ [Base Aérea] ${postes.length} postes elétricos encontrados no raio da OS.`);
+                // Fazer busca local em cada ponto de interesse (ex: ao redor da OS e ao redor do Cadastro Atual)
+                const promessas = listaPontos.map(pt => {
+                    return client
+                        .from('postes_base_aerea')
+                        .select('id, latitude, longitude, id_plaqueta_vinculada')
+                        .gte('latitude', pt.lat - delta)
+                        .lte('latitude', pt.lat + delta)
+                        .gte('longitude', pt.lng - delta)
+                        .lte('longitude', pt.lng + delta)
+                        .limit(50);
+                });
+
+                const resultados = await Promise.all(promessas);
+                const postesMap = new Map();
+
+                resultados.forEach(res => {
+                    if (res && res.data) {
+                        res.data.forEach(p => postesMap.set(p.id, p));
+                    }
+                });
+
+                const postes = Array.from(postesMap.values());
+                console.log(`⚡ [Base Aérea] ${postes.length} postes elétricos únicos encontrados.`);
 
                 postes.forEach(poste => {
+                    const pLat = parseFloat(poste.latitude);
+                    const pLng = parseFloat(poste.longitude);
+                    const plaquetaVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+
+                    const isPosteEscolhidoPeloOperador = Boolean(itemAtual && itemAtual.posteIdSelecionado && String(itemAtual.posteIdSelecionado) === String(poste.id));
+
+                    let isPosteDaPropriaPlaqueta = false;
+                    let isPosteDeOutraPlaqueta = false;
+
+                    if (itemAtual) {
+                        const plaquetaAlvo = String(itemAtual.plaquetaId).trim().toUpperCase();
+                        if (plaquetaVinculada === plaquetaAlvo) {
+                            isPosteDaPropriaPlaqueta = true;
+                        } else if (itemAtual.coordCadastradaParsed) {
+                            const dCad = calcularDistanciaHaversine({ lat: pLat, lng: pLng }, itemAtual.coordCadastradaParsed);
+                            if (dCad !== null && dCad <= 1.5) {
+                                isPosteDaPropriaPlaqueta = true;
+                            }
+                        }
+
+                        if (!isPosteDaPropriaPlaqueta && plaquetaVinculada) {
+                            isPosteDeOutraPlaqueta = true;
+                        }
+                    }
+
                     const elPoste = document.createElement('div');
                     elPoste.id = `marker-poste-${poste.id}`;
-                    elPoste.className = 'w-6 h-6 rounded-full bg-purple-700 hover:bg-purple-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300 cursor-pointer';
-                    elPoste.title = `Poste Aéreo #${poste.id} (Clique para vincular)`;
-                    elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+                    
+                    if (isPosteEscolhidoPeloOperador) {
+                        // Estado Especial: O poste exato que o operador selecionou no mapa ao finalizar a OS!
+                        elPoste.className = 'w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-2xl flex items-center justify-center text-white text-[12px] font-bold ring-4 ring-emerald-300 animate-pulse cursor-pointer z-40';
+                        elPoste.title = `🎯 Poste #${poste.id} [ESCOLHIDO PELO OPERADOR NO MAPA DA OS]`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span>';
+                    } else if (isPosteDaPropriaPlaqueta) {
+                        // Estado 1: Poste que já pertence à própria plaqueta em revisão
+                        elPoste.className = 'w-7 h-7 rounded-full bg-indigo-700 hover:bg-indigo-800 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-indigo-300 cursor-pointer z-30';
+                        elPoste.title = `⚡ Poste da Base Aérea (Oficial da Plaqueta #${itemAtual.plaquetaId})`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[15px]">verified</span>';
+                    } else if (isPosteDeOutraPlaqueta) {
+                        // Estado 2: Poste já vinculado a OUTRA plaqueta
+                        elPoste.className = 'w-6 h-6 rounded-full bg-sky-700 hover:bg-sky-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300 cursor-pointer z-20';
+                        elPoste.title = `⚡ Poste da Base Aérea [Ocupado por #${plaquetaVinculada}]`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
+                    } else {
+                        // Estado 3: Poste livre (sem nenhuma plaqueta associada)
+                        elPoste.className = 'w-6 h-6 rounded-full bg-purple-700 hover:bg-purple-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300 cursor-pointer z-10';
+                        elPoste.title = `⚡ Poste da Base Aérea (Disponível - Clique para vincular)`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+                    }
 
                     elPoste.onclick = (e) => {
                         e.stopPropagation();
                         window.selecionarPosteAereo(poste);
                     };
 
-                    const m = new mapboxgl.Marker({ element: elPoste, anchor: 'center' })
-                        .setLngLat([poste.longitude, poste.latitude])
-                        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`
-                            <div class="text-xs p-1 text-slate-800">
-                                <strong class="text-purple-700 flex items-center gap-1 font-bold">⚡ Poste Aéreo #${poste.id}</strong>
-                                <div class="text-[11px] text-slate-500 font-mono mt-0.5">${poste.latitude.toFixed(6)}, ${poste.longitude.toFixed(6)}</div>
-                                <button type="button" onclick="window.selecionarPosteAereo({id: ${poste.id}, latitude: ${poste.latitude}, longitude: ${poste.longitude}})" class="mt-2 w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-1 px-2 rounded text-[11px] cursor-pointer">
-                                    Vincular Plaqueta a Este Poste
+                    let badgeStatusHtml = '';
+                    let corTitulo = 'text-purple-700';
+                    let corBtn = 'bg-purple-600 hover:bg-purple-700';
+                    let labelBtn = 'Vincular';
+
+                    if (isPosteEscolhidoPeloOperador) {
+                        corTitulo = 'text-emerald-700';
+                        corBtn = 'bg-emerald-600 hover:bg-emerald-700';
+                        labelBtn = 'Confirmar Escolha';
+                        badgeStatusHtml = `
+                            <div class="bg-emerald-50 border border-emerald-300 text-emerald-900 px-2 py-1 rounded text-[10.5px] font-bold flex items-center gap-1.5 shadow-2xs">
+                                <span class="material-symbols-outlined text-[14px] text-emerald-600">verified</span>
+                                <span>🎯 Selecionado pelo Operador em Campo</span>
+                            </div>
+                        `;
+                    } else if (isPosteDaPropriaPlaqueta) {
+                        corTitulo = 'text-indigo-700';
+                        corBtn = 'bg-indigo-600 hover:bg-indigo-700';
+                        labelBtn = 'Confirmar Este';
+                        badgeStatusHtml = `
+                            <div class="bg-indigo-50 border border-indigo-200 text-indigo-800 px-2 py-1 rounded text-[10.5px] font-medium flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[14px]">verified</span>
+                                <span>Posição oficial da Plaqueta <strong>#${itemAtual.plaquetaId}</strong></span>
+                            </div>
+                        `;
+                    } else if (isPosteDeOutraPlaqueta) {
+                        corTitulo = 'text-sky-800';
+                        corBtn = 'bg-sky-700 hover:bg-sky-800';
+                        labelBtn = 'Substituir Vínculo';
+                        badgeStatusHtml = `
+                            <div class="bg-sky-50 border border-sky-200 text-sky-900 px-2 py-1 rounded text-[10.5px] font-medium flex items-center justify-between">
+                                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">sell</span> Ocupado:</span>
+                                <strong class="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px] text-sky-800">#${plaquetaVinculada}</strong>
+                            </div>
+                        `;
+                    } else {
+                        badgeStatusHtml = `
+                            <div class="text-[10px] text-slate-500 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span>Disponível para vinculação</span>
+                            </div>
+                        `;
+                    }
+
+                    const popupHtml = `
+                        <div class="text-xs p-1 text-slate-800 space-y-1.5 min-w-[200px]">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                                <strong class="${corTitulo} flex items-center gap-1 font-bold">
+                                    ⚡ Poste da Base Aérea
+                                </strong>
+                            </div>
+                            ${badgeStatusHtml}
+                            <div class="text-[11px] text-slate-500 font-mono">${poste.latitude.toFixed(6)}, ${poste.longitude.toFixed(6)}</div>
+                            <div class="flex items-center gap-1.5 pt-1">
+                                <button type="button" onclick="window.abrirStreetViewPoste(${poste.latitude}, ${poste.longitude})" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-1 px-2 rounded text-[10.5px] cursor-pointer flex items-center justify-center gap-1 shadow-2xs" title="Visualização 360° no Google Street View">
+                                    <span class="material-symbols-outlined text-[13px]">streetview</span>
+                                    <span>Street View</span>
+                                </button>
+                                <button type="button" onclick="window.selecionarPosteAereo({id: ${poste.id}, latitude: ${poste.latitude}, longitude: ${poste.longitude}, id_plaqueta_vinculada: '${poste.id_plaqueta_vinculada || ''}'})" class="flex-1 ${corBtn} text-white font-bold py-1 px-2 rounded text-[10.5px] cursor-pointer flex items-center justify-center gap-1 shadow-2xs">
+                                    <span class="material-symbols-outlined text-[13px]">check</span>
+                                    <span>${labelBtn}</span>
                                 </button>
                             </div>
-                        `))
+                        </div>
+                    `;
+
+                    const m = new mapboxgl.Marker({ element: elPoste, anchor: 'center' })
+                        .setLngLat([poste.longitude, poste.latitude])
+                        .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(popupHtml))
                         .addTo(compMapboxInstance);
 
                     compPostesMarkers.push(m);
+
+                    // Se for o poste escolhido pelo operador em campo, já pré-seleciona para facilitar conferência imediata
+                    if (isPosteEscolhidoPeloOperador && !compPosteSelecionado) {
+                        window.selecionarPosteAereo(poste);
+                    }
                 });
 
             } catch (err) {
                 console.warn("Erro ao plotar postes aéreos:", err);
             }
         }
+
+        window.abrirStreetViewPoste = function(lat, lng) {
+            let targetLat = lat;
+            let targetLng = lng;
+
+            if (targetLat === undefined || targetLng === undefined) {
+                if (compPosteSelecionado) {
+                    targetLat = compPosteSelecionado.latitude;
+                    targetLng = compPosteSelecionado.longitude;
+                }
+            }
+
+            if (!targetLat || !targetLng) {
+                alert("Nenhum poste com coordenadas selecionado para o Street View.");
+                return;
+            }
+
+            // URL oficial da API do Google Maps para Street View panorâmico
+            const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${targetLat},${targetLng}`;
+            window.open(streetViewUrl, '_blank');
+        };
 
         window.selecionarPosteAereo = function(poste) {
             compPosteSelecionado = poste;
@@ -3393,32 +3703,64 @@
 
             // Atualizar Painel
             const box = document.getElementById('comp-panel-poste-box');
+            const tituloEl = document.getElementById('comp-panel-poste-titulo');
             const coordsEl = document.getElementById('comp-panel-poste-coords');
             const distEl = document.getElementById('comp-panel-poste-dist');
+            const alertaEl = document.getElementById('comp-panel-poste-alerta-vinculo');
             const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
+
+            const plaquetaVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            const plaquetaAlvo = (itemEmComparacaoModal && itemEmComparacaoModal.plaquetaId) ? String(itemEmComparacaoModal.plaquetaId).trim().toUpperCase() : '';
+            const isOutraPlaqueta = plaquetaVinculada && (plaquetaVinculada !== plaquetaAlvo);
+            const isMesmaPlaqueta = plaquetaVinculada && (plaquetaVinculada === plaquetaAlvo);
 
             if (box && coordsEl && distEl) {
                 box.classList.remove('hidden');
                 coordsEl.innerText = `${poste.latitude.toFixed(6)}, ${poste.longitude.toFixed(6)}`;
+
+                if (tituloEl) {
+                    if (isMesmaPlaqueta) tituloEl.innerText = `Poste Oficial da Plaqueta`;
+                    else if (isOutraPlaqueta) tituloEl.innerText = `Poste Ocupado [Plaqueta #${plaquetaVinculada}]`;
+                    else tituloEl.innerText = `Poste da Base Aérea (Disponível)`;
+                }
 
                 if (itemEmComparacaoModal) {
                     const distOS = calcularDistanciaHaversine({ lat: poste.latitude, lng: poste.longitude }, itemEmComparacaoModal.coordReparoParsed);
                     const distCad = calcularDistanciaHaversine({ lat: poste.latitude, lng: poste.longitude }, itemEmComparacaoModal.coordCadastradaParsed);
                     distEl.innerText = `A ${distOS.toFixed(1)}m da coordenada da OS (desvio do cadastro antigo: ${distCad.toFixed(1)}m)`;
                 }
+
+                if (alertaEl) {
+                    if (isOutraPlaqueta) {
+                        alertaEl.classList.remove('hidden');
+                        alertaEl.innerHTML = `⚠️ <strong>Atenção:</strong> Este poste já está vinculado à Plaqueta <strong>#${plaquetaVinculada}</strong>. Ao aprovar, o vínculo será transferido para a Plaqueta <strong>#${plaquetaAlvo}</strong>.`;
+                    } else if (isMesmaPlaqueta) {
+                        alertaEl.classList.remove('hidden');
+                        alertaEl.className = 'mt-1.5 p-1 rounded bg-indigo-100/90 border border-indigo-300 text-[10px] text-indigo-900 font-medium';
+                        alertaEl.innerHTML = `✅ Este poste já é o ponto cadastrado oficial da Plaqueta <strong>#${plaquetaAlvo}</strong>.`;
+                    } else {
+                        alertaEl.classList.add('hidden');
+                    }
+                }
             }
 
             if (btnLabel) {
-                btnLabel.innerText = `Aprovar no Poste #${poste.id}`;
+                if (isOutraPlaqueta) {
+                    btnLabel.innerText = `Substituir Vínculo no Poste`;
+                } else {
+                    btnLabel.innerText = `Aprovar no Poste`;
+                }
             }
         };
 
         window.deselecionarPosteAereo = function() {
             compPosteSelecionado = null;
             const box = document.getElementById('comp-panel-poste-box');
+            const alertaEl = document.getElementById('comp-panel-poste-alerta-vinculo');
             const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
 
             if (box) box.classList.add('hidden');
+            if (alertaEl) alertaEl.classList.add('hidden');
             if (btnLabel) btnLabel.innerText = 'Aprovar Alteração';
 
             document.querySelectorAll('[id^="marker-poste-"]').forEach(el => {
@@ -3481,6 +3823,10 @@
             if (!itemEmComparacaoModal) return;
             const item = itemEmComparacaoModal;
 
+            const btn = document.getElementById('btn-aprovar-modal-comp');
+            const lbl = document.getElementById('btn-aprovar-modal-comp-label');
+            const originalText = lbl ? lbl.innerText : 'Aprovar Alteração';
+
             let coordOverride = null;
             let posteAereoId = null;
 
@@ -3493,11 +3839,48 @@
             const limparDuplicatasObsoletas = Boolean(chkLimpar && chkLimpar.checked);
             const idRegistroAlvo = compInstanciaSelecionadaId || item.idRegistroPlaqueta;
 
-            window.fecharModalComparativoCoords();
-            await executarAprovacao(item, coordOverride, posteAereoId, {
-                idRegistroAlvo,
-                limparDuplicatasObsoletas
-            });
+            if (btn) btn.disabled = true;
+            if (lbl) lbl.innerText = "Salvando no banco...";
+
+            try {
+                const sucesso = await executarAprovacao(item, coordOverride, posteAereoId, {
+                    idRegistroAlvo,
+                    limparDuplicatasObsoletas
+                });
+
+                if (sucesso) {
+                    window.fecharModalComparativoCoords();
+                    console.log(`✅ [Aprovação] Plaqueta #${item.plaquetaId} salva no banco com sucesso.`);
+                }
+            } catch (err) {
+                console.error("❌ Falha na aprovação comparativa:", err);
+                alert("Erro ao salvar no banco: " + (err.message || err));
+            } finally {
+                if (btn) btn.disabled = false;
+                if (lbl) lbl.innerText = originalText;
+            }
+        };
+
+        window.confirmarDescarteModalComparativo = async function() {
+            if (!itemEmComparacaoModal) return;
+            const item = itemEmComparacaoModal;
+
+            const confirmar = confirm(`Deseja descartar a sugestão da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId} e manter a localização cadastrada atual?`);
+            if (!confirmar) return;
+
+            const btn = document.getElementById('btn-descartar-modal-comp');
+            if (btn) btn.disabled = true;
+
+            try {
+                const targetKey = item.itemKey || item.protocolo;
+                await window.descartarCoordenadaOS(targetKey);
+                window.fecharModalComparativoCoords();
+            } catch (err) {
+                console.error("❌ Erro ao descartar do modal:", err);
+                alert("Erro ao descartar: " + (err.message || err));
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         };
 
         // =========================================================================

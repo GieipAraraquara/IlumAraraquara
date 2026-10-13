@@ -920,9 +920,10 @@
     <!-- SCRIPT DE LÓGICA E INTEGRAÇÃO SUPABASE                                    -->
     <!-- ========================================================================= -->
     <script>
-      // Telemetria Mapbox
+      // Token oficial Mapbox do projeto
+      const MAPBOX_TOKEN = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbXJ5dnE0cGgwZXM4MnpwbWEzOHY0NGMxIn0.2zn9iSNiZe4Vd8yuwYYp-A';
       if (window.mapboxgl) {
-        mapboxgl.accessToken = 'pk.eyJ1IjoiaW9jb3N0YSIsImEiOiJjbTdoZm01dDQwOHk0MmpzYnd5bWQ3YjZqIn0.fC4X5P74vP7f0qSgX-90rA';
+        mapboxgl.accessToken = MAPBOX_TOKEN;
         if (mapboxgl.config) mapboxgl.config.SEND_EVENTS = false;
       }
 
@@ -1505,18 +1506,38 @@
         html += '    </div>';
         html += '  </div>';
 
-        // COORDENADAS GPS E BOTÃO DE CAPTURA DO PONTO
+        // COORDENADAS GPS E BOTÃO DE CAPTURA DO PONTO COM MAPBOX E POSTES AÉREOS
         html += '  <div class="space-y-1.5 border-t border-slate-100 pt-3">';
         html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) <span class="text-red-500 font-bold">*</span></label>';
         html += '    <div class="flex flex-col sm:flex-row gap-2 items-center">';
         html += '      <input type="text" id="lat_' + idx + '" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
         html += '      <input type="text" id="lng_' + idx + '" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
-        html += '      <button type="button" onclick="capturarLocalizacaoGPS(' + idx + ')" class="w-full sm:w-auto px-3.5 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs rounded-lg border border-blue-200 transition-all flex items-center justify-center gap-1 shadow-sm">';
+        html += '      <button type="button" onclick="capturarLocalizacaoGPS(' + idx + ')" class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">';
         html += '        <span class="material-symbols-outlined text-[16px]">my_location</span>';
         html += '        <span>Puxar GPS</span>';
         html += '      </button>';
         html += '    </div>';
-        html += '    <div id="mapaCanvasPonto_' + idx + '" class="w-full h-36 rounded-xl border border-slate-200 mt-2 hidden relative overflow-hidden bg-slate-100 z-0"></div>';
+        
+        // CONTAINER DO MAPA MAPBOX + SELEÇÃO DO POSTE
+        html += '    <div id="mapaWrapperPonto_' + idx + '" class="hidden mt-3 space-y-2">';
+        html += '      <div class="flex items-center justify-between text-xs text-slate-600">';
+        html += '        <span class="font-bold flex items-center gap-1 text-slate-700"><span class="material-symbols-outlined text-[16px] text-blue-600">touch_app</span> Selecione o poste no mapa:</span>';
+        html += '        <span id="mapaStatusPostes_' + idx + '" class="text-[11px] text-slate-500 font-medium">Buscando postes próximos...</span>';
+        html += '      </div>';
+        html += '      <div id="mapaCanvasPonto_' + idx + '" class="w-full h-56 rounded-xl border border-slate-300 relative overflow-hidden bg-slate-100 z-0 shadow-inner"></div>';
+        
+        // BARRA INFORMATIVA DO POSTE SELECIONADO & BOTÃO "POSTE NÃO ENCONTRADO"
+        html += '      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 border border-slate-200">';
+        html += '        <div id="infoPosteSelecionado_' + idx + '" class="text-xs font-medium text-slate-600 flex items-center gap-1.5">';
+        html += '          <span class="material-symbols-outlined text-[18px] text-amber-500">info</span>';
+        html += '          <span>Nenhum poste selecionado no mapa.</span>';
+        html += '        </div>';
+        html += '        <button type="button" id="btnNaoEncontrado_' + idx + '" onclick="marcarPosteNaoEncontrado(' + idx + ')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 transition-all flex items-center justify-center gap-1 shadow-2xs cursor-pointer">';
+        html += '          <span class="material-symbols-outlined text-[15px] text-slate-500">location_off</span>';
+        html += '          <span>Poste não encontrado no mapa</span>';
+        html += '        </button>';
+        html += '      </div>';
+        html += '    </div>';
         html += '  </div>';
 
         // UPLOAD DE FOTOS E EVIDÊNCIAS
@@ -1578,47 +1599,287 @@
 
       var mapsPontos = {};
       var markersPontos = {};
+      var postesPontosLayers = {};
 
-      function atualizarMapaPonto(idx) {
+      function calcularDistanciaMetros(lat1, lon1, lat2, lon2) {
+        if (!lat1 || !lon1 || !lat2 || !lon2) return null;
+        var R = 6371e3;
+        var rad = Math.PI / 180;
+        var phi1 = lat1 * rad;
+        var phi2 = lat2 * rad;
+        var deltaPhi = (lat2 - lat1) * rad;
+        var deltaLambda = (lon2 - lon1) * rad;
+        var a = Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+                Math.cos(phi1) * Math.cos(phi2) *
+                Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+        var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return Math.round(R * c);
+      }
+
+      function marcarPosteNaoEncontrado(idx) {
+        if (!pontosData[idx]) inicializarStatePonto(idx);
+        pontosData[idx].posteSelecionado = null;
+        pontosData[idx].posteNaoEncontrado = true;
+
+        var infoEl = document.getElementById('infoPosteSelecionado_' + idx);
+        if (infoEl) {
+          infoEl.innerHTML = `
+            <span class="material-symbols-outlined text-[18px] text-amber-600">location_off</span>
+            <span class="text-amber-800 font-bold">Poste não encontrado no mapa (usando localização bruta do GPS).</span>
+          `;
+        }
+
+        var btnNaoEnc = document.getElementById('btnNaoEncontrado_' + idx);
+        if (btnNaoEnc) {
+          btnNaoEnc.classList.remove('bg-white', 'text-slate-700');
+          btnNaoEnc.classList.add('bg-amber-100', 'text-amber-800', 'border-amber-300');
+        }
+
+        // Remove estilo selecionado dos marcadores de poste
+        atualizarVisualMarcadoresPostes(idx, null);
+      }
+
+      function selecionarPostePonto(idx, poste) {
+        if (!pontosData[idx]) inicializarStatePonto(idx);
+        pontosData[idx].posteSelecionado = poste;
+        pontosData[idx].posteNaoEncontrado = false;
+
+        var pLat = parseFloat(poste.latitude);
+        var pLng = parseFloat(poste.longitude);
+        var plaqVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+
+        // Distância do GPS capturado até o poste
+        var distGps = null;
+        if (pontosData[idx].latGps && pontosData[idx].lngGps) {
+          distGps = calcularDistanciaMetros(pontosData[idx].latGps, pontosData[idx].lngGps, pLat, pLng);
+        }
+
+        var infoEl = document.getElementById('infoPosteSelecionado_' + idx);
+        if (infoEl) {
+          var msgHtml = '<span class="material-symbols-outlined text-[18px] text-emerald-600">check_circle</span>';
+          msgHtml += '<span class="text-emerald-800 font-bold">Poste Selecionado</span>';
+          if (distGps !== null) {
+            msgHtml += ' <span class="text-[11px] text-slate-500 font-medium">(' + distGps + 'm do seu GPS)</span>';
+          }
+          if (plaqVinculada) {
+            msgHtml += ' <span class="ml-1 text-[10.5px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold border border-sky-300">Plaqueta: ' + plaqVinculada + '</span>';
+          }
+          infoEl.innerHTML = msgHtml;
+        }
+
+        var btnNaoEnc = document.getElementById('btnNaoEncontrado_' + idx);
+        if (btnNaoEnc) {
+          btnNaoEnc.classList.remove('bg-amber-100', 'text-amber-800', 'border-amber-300');
+          btnNaoEnc.classList.add('bg-white', 'text-slate-700');
+        }
+
+        atualizarVisualMarcadoresPostes(idx, poste.id);
+      }
+
+      function atualizarVisualMarcadoresPostes(idx, posteIdSelecionado) {
+        if (!postesPontosLayers[idx]) return;
+        postesPontosLayers[idx].forEach(function(item) {
+          var iconEl = item.iconElement || item.element;
+          var poste = item.poste;
+          var isSel = (posteIdSelecionado && String(poste.id) === String(posteIdSelecionado));
+          var temVinculo = Boolean(poste.id_plaqueta_vinculada);
+
+          if (isSel) {
+            iconEl.className = 'w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-emerald-300';
+            iconEl.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span>';
+            if (item.element) item.element.style.zIndex = '30';
+          } else if (temVinculo) {
+            iconEl.className = 'w-6 h-6 rounded-full bg-sky-600 hover:bg-sky-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300';
+            iconEl.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
+            if (item.element) item.element.style.zIndex = '20';
+          } else {
+            iconEl.className = 'w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300';
+            iconEl.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+            if (item.element) item.element.style.zIndex = '10';
+          }
+        });
+      }
+
+      var postesPontosCache = {};
+
+      async function carregarPostesAereosPonto(idx, lat, lng, forcarBusca) {
+        var statusEl = document.getElementById('mapaStatusPostes_' + idx);
+        
+        // Se já temos postes em cache para esta coordenada (com distância < 15m) e não é busca forçada, não recarrega do banco
+        if (!forcarBusca && postesPontosCache[idx] && postesPontosCache[idx].latRef && postesPontosCache[idx].lngRef) {
+          var dShift = calcularDistanciaMetros(postesPontosCache[idx].latRef, postesPontosCache[idx].lngRef, lat, lng);
+          if (dShift !== null && dShift < 15) {
+            atualizarVisualMarcadoresPostes(idx, (pontosData[idx] && pontosData[idx].posteSelecionado) ? pontosData[idx].posteSelecionado.id : null);
+            return;
+          }
+        }
+
+        if (statusEl) statusEl.innerText = 'Buscando postes próximos...';
+
+        var client = obterSupabaseClient();
+        if (!client) {
+          if (statusEl) statusEl.innerText = 'Supabase offline';
+          return;
+        }
+
+        // Bounding box de ~120m (delta = 0.00113 graus)
+        var delta = 0.00113;
+        try {
+          var res = await client
+            .from('postes_base_aerea')
+            .select('id, latitude, longitude, id_plaqueta_vinculada')
+            .gte('latitude', lat - delta)
+            .lte('latitude', lat + delta)
+            .gte('longitude', lng - delta)
+            .lte('longitude', lng + delta)
+            .limit(60);
+
+          var postes = (res && res.data) ? res.data : [];
+          console.log(`⚡ [Ponto #${idx + 1}] ${postes.length} postes aéreos encontrados no raio.`);
+
+          postesPontosCache[idx] = {
+            latRef: lat,
+            lngRef: lng,
+            postes: postes
+          };
+
+          if (statusEl) {
+            statusEl.innerText = postes.length > 0 
+              ? `${postes.length} poste(s) no mapa` 
+              : 'Nenhum poste no raio de 100m';
+          }
+
+          // Limpa marcadores anteriores
+          if (postesPontosLayers[idx]) {
+            postesPontosLayers[idx].forEach(function(item) {
+              if (item.marker) item.marker.remove();
+            });
+          }
+          postesPontosLayers[idx] = [];
+
+          var map = mapsPontos[idx];
+          if (!map) return;
+
+          var posteJaSelecionadoId = (pontosData[idx] && pontosData[idx].posteSelecionado) ? pontosData[idx].posteSelecionado.id : null;
+
+          postes.forEach(function(poste) {
+            var pLat = parseFloat(poste.latitude);
+            var pLng = parseFloat(poste.longitude);
+            if (isNaN(pLat) || isNaN(pLng)) return;
+
+            var plaqVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            var isSel = (posteJaSelecionadoId && String(poste.id) === String(posteJaSelecionadoId));
+            var elWrapper = document.createElement('div');
+            elWrapper.id = `poste_marker_${idx}_${poste.id}`;
+            elWrapper.style.cursor = 'pointer';
+            elWrapper.style.padding = '4px';
+
+            var elIcon = document.createElement('div');
+            elIcon.id = `poste_icon_${idx}_${poste.id}`;
+
+            if (isSel) {
+              elIcon.className = 'w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-emerald-300';
+              elWrapper.title = `⚡ Poste Selecionado`;
+              elIcon.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span>';
+            } else if (plaqVinculada) {
+              elIcon.className = 'w-6 h-6 rounded-full bg-sky-600 hover:bg-sky-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300';
+              elWrapper.title = `⚡ Poste da Base Aérea [Plaqueta #${plaqVinculada}]`;
+              elIcon.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
+            } else {
+              elIcon.className = 'w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300';
+              elWrapper.title = `⚡ Poste da Base Aérea (Disponível)`;
+              elIcon.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+            }
+
+            elWrapper.appendChild(elIcon);
+
+            elWrapper.onclick = function(e) {
+              e.stopPropagation();
+              e.preventDefault();
+              selecionarPostePonto(idx, poste);
+            };
+
+            var m = new mapboxgl.Marker({ element: elWrapper, anchor: 'center' })
+              .setLngLat([pLng, pLat])
+              .addTo(map);
+
+            postesPontosLayers[idx].push({
+              poste: poste,
+              marker: m,
+              element: elWrapper,
+              iconElement: elIcon
+            });
+          });
+
+        } catch (errPostes) {
+          console.warn(`⚠️ [Ponto #${idx + 1}] Erro ao buscar postes base aérea:`, errPostes);
+          if (statusEl) statusEl.innerText = 'Falha ao buscar postes';
+        }
+      }
+
+      function atualizarMapaPonto(idx, forcarBuscaPostes) {
         var latInput = document.getElementById('lat_' + idx);
         var lngInput = document.getElementById('lng_' + idx);
         if (!latInput || !lngInput) return;
 
         var latVal = parseFloat(latInput.value.replace(',', '.'));
         var lngVal = parseFloat(lngInput.value.replace(',', '.'));
+        var wrapper = document.getElementById('mapaWrapperPonto_' + idx);
         var container = document.getElementById('mapaCanvasPonto_' + idx);
-        if (!container) return;
+        if (!wrapper || !container) return;
 
         if (!isNaN(latVal) && !isNaN(lngVal) && latVal !== 0 && lngVal !== 0 && Math.abs(latVal) <= 90 && Math.abs(lngVal) <= 180) {
-          container.classList.remove('hidden');
-          if (typeof L !== 'undefined') {
+          wrapper.classList.remove('hidden');
+
+          if (window.mapboxgl) {
+            mapboxgl.accessToken = MAPBOX_TOKEN;
             if (mapsPontos[idx]) {
               var domNode = mapsPontos[idx].getContainer ? mapsPontos[idx].getContainer() : null;
               if (!domNode || domNode !== container || !document.body.contains(domNode)) {
                 try { mapsPontos[idx].remove(); } catch(e) {}
                 delete mapsPontos[idx];
                 delete markersPontos[idx];
+                if (postesPontosLayers[idx]) delete postesPontosLayers[idx];
               }
             }
 
             if (!mapsPontos[idx]) {
-              mapsPontos[idx] = L.map('mapaCanvasPonto_' + idx).setView([latVal, lngVal], 17);
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-              }).addTo(mapsPontos[idx]);
-              markersPontos[idx] = L.marker([latVal, lngVal]).addTo(mapsPontos[idx]);
+              mapsPontos[idx] = new mapboxgl.Map({
+                container: 'mapaCanvasPonto_' + idx,
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [lngVal, latVal],
+                zoom: 18,
+                attributionControl: false
+              });
+
+              // Marcador do Operador (GPS) - Ponto Azul com pulso
+              var elGps = document.createElement('div');
+              elGps.className = 'w-5 h-5 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center ring-4 ring-blue-300/60 animate-pulse';
+              elGps.title = 'Sua localização atual via GPS';
+
+              markersPontos[idx] = new mapboxgl.Marker({ element: elGps, anchor: 'center' })
+                .setLngLat([lngVal, latVal])
+                .addTo(mapsPontos[idx]);
+
+              mapsPontos[idx].on('load', function() {
+                mapsPontos[idx].resize();
+                carregarPostesAereosPonto(idx, latVal, lngVal, true);
+              });
             } else {
-              mapsPontos[idx].setView([latVal, lngVal], 17);
               if (markersPontos[idx]) {
-                markersPontos[idx].setLatLng([latVal, lngVal]);
+                markersPontos[idx].setLngLat([lngVal, latVal]);
+              }
+              if (forcarBuscaPostes) {
+                mapsPontos[idx].easeTo({ center: [lngVal, latVal], zoom: 18 });
+                carregarPostesAereosPonto(idx, latVal, lngVal, true);
               }
             }
-            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 100);
-            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].invalidateSize(); }, 400);
+
+            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].resize(); }, 150);
+            setTimeout(function() { if (mapsPontos[idx]) mapsPontos[idx].resize(); }, 400);
           }
         } else {
-          container.classList.add('hidden');
+          wrapper.classList.add('hidden');
         }
       }
 
@@ -1638,12 +1899,17 @@
 
         navigator.geolocation.getCurrentPosition(
           function(pos) {
-            var lat = pos.coords.latitude.toFixed(6);
-            var lng = pos.coords.longitude.toFixed(6);
+            var latNum = parseFloat(pos.coords.latitude.toFixed(6));
+            var lngNum = parseFloat(pos.coords.longitude.toFixed(6));
 
-            if (latInput) latInput.value = lat;
-            if (lngInput) lngInput.value = lng;
-            atualizarMapaPonto(idx);
+            if (!pontosData[idx]) inicializarStatePonto(idx);
+            pontosData[idx].latGps = latNum;
+            pontosData[idx].lngGps = lngNum;
+
+            if (latInput) latInput.value = latNum.toFixed(6);
+            if (lngInput) lngInput.value = lngNum.toFixed(6);
+
+            atualizarMapaPonto(idx, true);
           }, 
           function(err) {
             if (latInput) latInput.value = "";
@@ -1885,13 +2151,8 @@
             }
           } catch(eCache) {}
 
-          var error = null;
           if (!data) {
-            var colunasMat = 'id, codigo, "Marca", marca, "Material/Serviço", "Material", "Serviço", descricao, nome, material, "Unidade de Medida", "Unidade", unidade, valor_unitario';
-            var resMat = await client.from('materiais_contrato').select(colunasMat);
-            if (resMat.error && resMat.error.message && resMat.error.message.includes('column')) {
-                resMat = await client.from('materiais_contrato').select('id, codigo, marca, descricao, unidade, valor_unitario');
-            }
+            var resMat = await client.from('materiais_contrato').select('*');
             data = resMat.data;
             error = resMat.error;
 
@@ -2316,7 +2577,14 @@
             faltantesPonto.push('Coordenadas GPS');
           }
 
-          // 3. Validação das 3 Fotos
+          // 3. Validação da Seleção do Poste no Mapa
+          var posteSel = stObj.posteSelecionado;
+          var posteNaoEnc = Boolean(stObj.posteNaoEncontrado);
+          if (!posteSel && !posteNaoEnc) {
+            faltantesPonto.push('Seleção do Poste no Mapa (ou clicar em "Poste não encontrado no mapa")');
+          }
+
+          // 4. Validação das 3 Fotos
           var probValPonto = document.getElementById('tipoProblema_' + i) ? document.getElementById('tipoProblema_' + i).value : '';
           estagiosObrigatorios.forEach(function(estagio) {
             if (probValPonto === 'Nenhum' && estagio === 'Reparo Efetuado') {
@@ -2337,13 +2605,13 @@
 
         if (pontosComPendencia.length > 0) {
           var detalheErros = pontosComPendencia.map(function(item) {
-            return '• Ponto #' + item.ponto + ': falta ' + item.faltantes.join(', ');
-          }).join('\n');
+            return '• Ponto #' + item.ponto + ':\n   ' + item.faltantes.join('\n   ');
+          }).join('\n\n');
 
-          var mensagemErro = 'Para finalizar a Ordem de Serviço, é obrigatório preencher a Plaqueta, as Coordenadas GPS e anexar as fotos de evidência para cada ponto:\n\n' + detalheErros;
+          var mensagemErro = 'Para finalizar a Ordem de Serviço, é obrigatório preencher a Plaqueta, as Coordenadas GPS, selecionar o Poste no mapa (ou marcar "Poste não encontrado") e anexar as fotos de evidência para cada ponto:\n\n' + detalheErros;
 
           exibirModalAlertaValidacao("Campos Obrigatórios Pendentes", mensagemErro);
-          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ É obrigatório preencher Plaqueta, Coordenadas GPS e anexar as fotos para cada ponto.</span>';
+          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ É obrigatório preencher Plaqueta, GPS, selecionar o Poste no mapa e anexar as fotos para cada ponto.</span>';
           return;
         }
 
@@ -2512,6 +2780,23 @@
 
             var ocrTexto = stObj.textoAuditoriaOCR || null;
 
+            // Metadados do Poste da Base Aérea selecionado no mapa
+            var posteSel = stObj.posteSelecionado || null;
+            var posteId = posteSel ? posteSel.id : null;
+            var postePlaqVinculada = (posteSel && posteSel.id_plaqueta_vinculada) ? String(posteSel.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            var conflitoPlaquetaPoste = false;
+            if (postePlaqVinculada && plaq && postePlaqVinculada !== plaq) {
+              conflitoPlaquetaPoste = true;
+            }
+
+            var latGpsVal = stObj.latGps ? stObj.latGps.toString() : latVal;
+            var lngGpsVal = stObj.lngGps ? stObj.lngGps.toString() : lngVal;
+            var coordGpsStr = (latGpsVal && lngGpsVal) ? (latGpsVal + ', ' + lngGpsVal) : coordStr;
+            var distGpsPoste = null;
+            if (posteSel && latGpsVal && lngGpsVal) {
+              distGpsPoste = calcularDistanciaMetros(parseFloat(latGpsVal), parseFloat(lngGpsVal), parseFloat(posteSel.latitude), parseFloat(posteSel.longitude));
+            }
+
             arrPontosPayload.push({
               fechamento: proximoNum,
               ponto: i + 1,
@@ -2520,6 +2805,14 @@
               lat: latVal,
               lng: lngVal,
               coordenada: coordStr,
+              lat_gps_operador: latGpsVal,
+              lng_gps_operador: lngGpsVal,
+              coordenada_gps: coordGpsStr,
+              poste_id_selecionado: posteId,
+              poste_plaqueta_vinculada: postePlaqVinculada,
+              poste_nao_encontrado: Boolean(stObj.posteNaoEncontrado),
+              conflito_plaqueta_poste: conflitoPlaquetaPoste,
+              distancia_gps_poste_metros: distGpsPoste,
               data_reparo: dataReparo,
               evidencias: evidenciasUrls,
               texto_auditoria_ocr: ocrTexto
@@ -2585,7 +2878,6 @@
             data_fechamento: new Date().toISOString(),
             operador_finalizacao: nomeOperadorFinalizacao,
             materiais: carrinhoMateriais,
-            observacao_final: obsFinalTexto,
             pontos_final: pontosFinalAcumulados,
             status_auditoria: "Pendente",
             texto_auditoria_ocr: ocrGeral
@@ -2709,18 +3001,44 @@
                 if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) {
                   var plaqUpper = String(pt.plaqueta).trim().toUpperCase();
                   
-                  // 1. Atualizar ou Inserir na tabela principal localizacao_plaquetas
+                  // 1. Verificar se a plaqueta já existe no cadastro oficial
                   var resPlaq = await client.from('localizacao_plaquetas')
-                    .select('identificacao')
+                    .select('id, identificacao, Latitude, Longitude')
                     .ilike('identificacao', plaqUpper)
                     .maybeSingle();
 
                   if (resPlaq && resPlaq.data) {
+                    var latCad = parseFloat(String(resPlaq.data.Latitude || '').replace(',', '.'));
+                    var lngCad = parseFloat(String(resPlaq.data.Longitude || '').replace(',', '.'));
+
+                    var temCoordValida = !isNaN(latCad) && !isNaN(lngCad) && latCad !== 0 && lngCad !== 0;
+                    var distM = temCoordValida ? calcularDistanciaMetros(latCad, lngCad, pLat, pLng) : null;
+
+                    // REGRA DE OURO: Se já existe com coordenada e a distância for superior a 15 metros,
+                    // NÃO atualiza a localização da plaqueta diretamente.
+                    // A OS é salva com a coordenada de reparo para entrar na fila de aprovação de coordenadas no Controle-Plaquetas.html.
+                    if (temCoordValida && distM !== null && distM > 15) {
+                      console.log(`⚠️ [Plaqueta #${plaqUpper}] Desvio de ${distM}m (> 15m). Mantendo coordenada cadastrada e enviando para fila de aprovação no Controle de Plaquetas.`);
+                      continue;
+                    }
+
+                    // Se a distância for <= 15 metros (ou não tinha coordenada anterior válida), calibra a posição
                     await client.from('localizacao_plaquetas').update({
                       Latitude: pLat,
                       Longitude: pLng
-                    }).ilike('identificacao', plaqUpper);
+                    }).eq('id', resPlaq.data.id);
+
+                    await client.from('historico_localizacao_plaquetas').insert([{
+                      identificacao: plaqUpper,
+                      latitude: pLat,
+                      longitude: pLng,
+                      numero_os: protFinal,
+                      origem: 'FINALIZAR_OS',
+                      usuario: nomeOperadorFinalizacao,
+                      observacao: 'Calibração fina (desvio <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal
+                    }]);
                   } else {
+                    // Plaqueta não existia no cadastro: insere o novo registro
                     await client.from('localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
                       Latitude: pLat,
@@ -2729,22 +3047,21 @@
                       Empresa: 'FORTNORT',
                       Observação: 'Cadastrada via Finalização OS #' + protFinal
                     }]);
-                  }
 
-                  // 2. Gravar no histórico de posições com metadados do protocolo e técnico
-                  await client.from('historico_localizacao_plaquetas').insert([{
-                    identificacao: plaqUpper,
-                    latitude: pLat,
-                    longitude: pLng,
-                    numero_os: protFinal,
-                    origem: 'FINALIZAR_OS',
-                    usuario: nomeOperadorFinalizacao,
-                    observacao: 'Posição atualizada ao finalizar OS #' + protFinal
-                  }]);
+                    await client.from('historico_localizacao_plaquetas').insert([{
+                      identificacao: plaqUpper,
+                      latitude: pLat,
+                      longitude: pLng,
+                      numero_os: protFinal,
+                      origem: 'FINALIZAR_OS',
+                      usuario: nomeOperadorFinalizacao,
+                      observacao: 'Nova plaqueta cadastrada ao finalizar OS #' + protFinal
+                    }]);
+                  }
                 }
               }
             }
-            console.log('✅ Localização e histórico das plaquetas gravados com sucesso!');
+            console.log('✅ Verificação e gravação de localização das plaquetas concluída!');
           } catch(errPlaqHist) {
             console.warn('⚠️ Não foi possível atualizar localização/histórico das plaquetas:', errPlaqHist);
           }
@@ -2753,11 +3070,26 @@
             window.offlineSyncService.cacheOSRecord(protFinal, osAtual || payloadUpdate);
           }
 
+          // Invalida cache de sessão do Painel e repositórios para recarregar com status Concluída
+          try {
+            sessionStorage.removeItem('chamados_repo_cache_v1');
+            sessionStorage.removeItem('chamados_repo_meta_v1');
+            sessionStorage.removeItem('chamados_repo_cache_v2');
+            sessionStorage.removeItem('chamados_repo_meta_v2');
+            sessionStorage.removeItem('auditoria_repo_cache_v1');
+            sessionStorage.removeItem('auditoria_repo_meta_v1');
+            localStorage.removeItem('os_cached_chamados');
+          } catch(eCacheClear) {}
+
           btn.disabled = false;
           btnTexto.innerText = "Finalizar Ordem de Serviço";
 
           document.getElementById('msgSucessoTexto').innerHTML = "O protocolo <strong class='text-blue-600 font-bold'>" + protFinal + "</strong> (" + qtdAtual + " ponto/s) foi finalizado e enviado para auditoria com sucesso!";
           document.getElementById('modalSucesso').classList.remove('hidden');
+
+          if (window.parent && window.parent !== window) {
+            window.parent.postMessage({ action: 'OS_CONCLUIDA_SILENCIOSO', protocolo: protFinal }, '*');
+          }
 
           limparFormularioTotal();
 
@@ -3666,6 +3998,17 @@
           if (colunasRemovidas.length > 0) {
             htmlSucesso += "<br><br><div class='p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-800 text-left text-xs'><strong>⚠️ Atenção (Banco de Dados):</strong> As colunas <code>" + colunasRemovidas.join(', ') + "</code> ainda não existem na tabela <code>ordens_servico_pracas</code> do Supabase.<br>Por favor, execute o script SQL <strong>'atualizar_estrutura_pracas_sessoes.sql'</strong> no Editor SQL do Supabase para habilitar o salvamento persistente destas informações.</div>";
           }
+
+          // Invalida cache de sessão do Painel e repositórios
+          try {
+            sessionStorage.removeItem('chamados_repo_cache_v1');
+            sessionStorage.removeItem('chamados_repo_meta_v1');
+            sessionStorage.removeItem('chamados_repo_cache_v2');
+            sessionStorage.removeItem('chamados_repo_meta_v2');
+            sessionStorage.removeItem('auditoria_repo_cache_v1');
+            sessionStorage.removeItem('auditoria_repo_meta_v1');
+            localStorage.removeItem('os_cached_chamados');
+          } catch(eCacheClear) {}
 
           document.getElementById('msgSucessoTexto').innerHTML = htmlSucesso;
           document.getElementById('modalSucesso').classList.remove('hidden');

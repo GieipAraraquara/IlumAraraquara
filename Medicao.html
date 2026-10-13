@@ -24,7 +24,9 @@
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="js/controllers/PainelController.js?v=40"></script>
-    <script src="js/controllers/MedicaoController.js?v=20"></script>
+    <!-- ExcelJS para geração avançada de relatórios XLSX com comentários/notas em células -->
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+    <script src="js/controllers/MedicaoController.js?v=25"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -383,10 +385,22 @@
                     <span>Parâmetros TR</span>
                 </button>
 
-                <!-- Botão Unificado de Exportação CSV para a Aba Ativa -->
-                <button id="btn-exportar-medicao" type="button" onclick="window.medicaoController.exportarAbaAtivaCSV()" class="h-9 bg-purple-700 hover:bg-purple-800 text-white px-4 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar dados da aba atual em formato CSV">
+                <!-- Botão Unificado de Exportação CSV Padrão -->
+                <button id="btn-exportar-medicao" type="button" onclick="window.medicaoController.exportarAbaAtivaCSV()" class="h-9 bg-purple-700 hover:bg-purple-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar consolidado simples de materiais ou aba ativa em CSV">
                     <span class="material-symbols-outlined text-[18px]">download</span>
-                    <span id="txt-btn-exportar-medicao">Exportar (CSV)</span>
+                    <span id="txt-btn-exportar-medicao">Exportar CSV (Padrão)</span>
+                </button>
+
+                <!-- Botão de Exportação CSV Detalhado com Glosas do TR -->
+                <button id="btn-exportar-medicao-glosas-tr" type="button" onclick="window.medicaoController.exportarMedicaoMensalDetalhadaCSV()" class="h-9 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar consolidado de materiais com detalhamento de glosas do TR em formato CSV">
+                    <span class="material-symbols-outlined text-[18px]">fact_check</span>
+                    <span>CSV (Glosas TR)</span>
+                </button>
+
+                <!-- Botão de Exportação XLSX Avançado com Notas em Células de QTD -->
+                <button id="btn-exportar-medicao-xlsx" type="button" onclick="window.medicaoController.exportarMedicaoMensalDetalhadaXLSX()" class="h-9 bg-teal-700 hover:bg-teal-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar planilha Excel (.xlsx) com notas/comentários de protocolos nas colunas de quantidade">
+                    <span class="material-symbols-outlined text-[18px]">description</span>
+                    <span>Exportar Excel (XLSX)</span>
                 </button>
             </div>
         </div>

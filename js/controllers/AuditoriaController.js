@@ -729,6 +729,35 @@ class AuditoriaController {
                         </div>
                     `;
 
+                case 11: // Poste/Plaqueta Divergente
+                    let postePlaqVinculada = '';
+                    let plaqInformada = item.plaquetaFinal || item.plaquetaInicial || '';
+                    if (item.pontosDetalhados && item.pontosDetalhados.length > 0) {
+                        for (const pt of item.pontosDetalhados) {
+                            if (pt.postePlaquetaVinculada || pt.poste_plaqueta_vinculada) {
+                                postePlaqVinculada = pt.postePlaquetaVinculada || pt.poste_plaqueta_vinculada;
+                                if (pt.plaquetaFinal || pt.plaqueta) plaqInformada = pt.plaquetaFinal || pt.plaqueta;
+                                break;
+                            }
+                        }
+                    }
+                    if (!postePlaqVinculada && item.rawPontosFinal && Array.isArray(item.rawPontosFinal)) {
+                        for (const pt of item.rawPontosFinal) {
+                            if (pt && pt.poste_plaqueta_vinculada) {
+                                postePlaqVinculada = pt.poste_plaqueta_vinculada;
+                                if (pt.plaqueta) plaqInformada = pt.plaqueta;
+                                break;
+                            }
+                        }
+                    }
+                    return makeCompareHtml(
+                        'Plaqueta do Poste Selecionado', 
+                        postePlaqVinculada || 'Plaqueta A (Vinculada)', 
+                        'Plaqueta Digitada pelo Técnico', 
+                        plaqInformada || 'Plaqueta B', 
+                        'O poste aéreo clicado pelo operador já possuía uma plaqueta vinculada diferente da digitada.'
+                    );
+
                 default:
                     return '';
             }
@@ -786,6 +815,7 @@ class AuditoriaController {
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="8">${renderBadge(item.isMaterialDivergente, 8)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="9">${renderBadge(item.isProblemaExterno, 9)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="10">${renderBadge(item.isReincidencia30d, 10)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="11">${renderBadge(item.isPostePlaquetaDivergente, 11)}</td>
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">

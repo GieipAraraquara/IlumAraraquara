@@ -2713,16 +2713,28 @@
         if (contEnd) contEnd.style.display = (modo === 'endereco') ? 'block' : 'none';
 
         if (modo === 'gps') {
+          estadoPontoRapido.plaqueta = '';
+          estadoPontoRapido.endereco = '';
           iniciarGpsRealTimeRapido();
           if (currentGpsPosRapido) {
             estadoPontoRapido.lat = currentGpsPosRapido.lat;
             estadoPontoRapido.lng = currentGpsPosRapido.lng;
             estadoPontoRapido.validado = true;
+          } else {
+            estadoPontoRapido.lat = null;
+            estadoPontoRapido.lng = null;
+            estadoPontoRapido.validado = false;
           }
           if (mapGpsRapido) setTimeout(function() { mapGpsRapido.resize(); }, 150);
         } else {
           pararGpsRealTimeRapido();
-          estadoPontoRapido.validado = (modo === 'plaqueta') ? Boolean(estadoPontoRapido.plaqueta) : Boolean(estadoPontoRapido.endereco);
+          if (modo === 'plaqueta') {
+            estadoPontoRapido.endereco = '';
+            estadoPontoRapido.validado = Boolean(estadoPontoRapido.plaqueta && estadoPontoRapido.lat);
+          } else if (modo === 'endereco') {
+            estadoPontoRapido.plaqueta = '';
+            estadoPontoRapido.validado = Boolean(estadoPontoRapido.endereco && estadoPontoRapido.lat);
+          }
         }
       }
 
@@ -6436,7 +6448,7 @@
 
            var latVal = ptState.latAtual ? Number(ptState.latAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.latAtual ? Number(pontosData[0].latAtual).toFixed(6) : null);
            var lngVal = ptState.lngAtual ? Number(ptState.lngAtual).toFixed(6) : (ptState.usarMesmoEndereco && pontosData[0]?.lngAtual ? Number(pontosData[0].lngAtual).toFixed(6) : null);
-           if (modoSel === 'plaqueta' || modoSel === 'coordenadas') {
+           if (modoSel === 'plaqueta' || modoSel === 'coordenadas' || modoSel === 'mapa') {
                end = "";
            } else {
                end = await garantirEnderecoGeocodificado(latVal, lngVal, end);
@@ -6748,6 +6760,7 @@
         ajustarPontos(); 
 
         // Reset Modo Rápido
+        estadoPontoRapido = { lat: null, lng: null, plaqueta: '', endereco: '', validado: false };
         if (typeof resetarValidacaoPlaquetaRapida === 'function') resetarValidacaoPlaquetaRapida();
         var inEndR = document.getElementById('inputEnderecoRapido');
         if (inEndR) { inEndR.value = ''; inEndR.classList.remove('input-validado', 'input-invalido'); }

@@ -2097,8 +2097,10 @@
             let totalValorLiquido = 0;
             let countItensComGlosa = 0;
 
-            // Pré-calcular percentual de glosa de cada OS para aplicar aos materiais
+            // Pré-calcular percentual e perfil detalhado de glosas de cada OS para aplicar aos materiais
             const glosaPorOS = {};
+            const perfilGlosaPorOS = {}; // { [prot]: { percTotal: number, regrasLabel: string, chaveFaixa: string } }
+            const faixasDeGlosasDoMes = new Map(); // chaveFaixa -> { percTotal: number, labelRegras: string }
             const infoReunioes = this.medicaoService ? this.medicaoService.calcularGlosasReuniaoSemanal(this.chamadosList || [], selectedMonth) : {};
             const protocolosGlosadosPorReuniao = (infoReunioes && infoReunioes.protocolosGlosadosPorReuniao) || {};
             const temReincidenciaReunioes = Boolean(infoReunioes && infoReunioes.temReincidencia);
@@ -2106,11 +2108,21 @@
             listToMeasure.forEach(item => {
                 const prot = item.protocolo || 'OS-SEM-PROT';
                 let perc = 0;
+                const infracoesAtivas = [];
+
                 if (this.medicaoService) {
                     const infracoes = this.medicaoService.avaliarInfracoesOS(item);
                     infracoes.forEach(inf => {
                         if (!inf.anistiado) {
-                            perc += (Number(inf.percentualGlosa) || 0);
+                            const pInf = Number(inf.percentualGlosa) || 0;
+                            perc += pInf;
+                            const artLabel = inf.artigoTR || (inf.regraId && inf.regraId.includes('atraso') ? 'Item 7.1.4' : 'Outros');
+                            infracoesAtivas.push({
+                                regraId: inf.regraId || 'infracao',
+                                artigoTR: artLabel,
+                                percentualGlosa: pInf,
+                                label: `${artLabel} (${pInf}%)`
+                            });
                         }
                     });
 
@@ -2118,7 +2130,14 @@
                     if (protocolosGlosadosPorReuniao[prot]) {
                         const isAnistiado = this.medicaoService.overrides[prot]?.['reuniao_semanal_8_7']?.ignorarGlosa;
                         if (!isAnistiado) {
-                            perc += (Number(protocolosGlosadosPorReuniao[prot].percentualGlosa) || 10.0);
+                            const pReuniao = Number(protocolosGlosadosPorReuniao[prot].percentualGlosa) || 10.0;
+                            perc += pReuniao;
+                            infracoesAtivas.push({
+                                regraId: 'reuniao_semanal_8_7',
+                                artigoTR: 'Item 8.7.1',
+                                percentualGlosa: pReuniao,
+                                label: 'Item 8.7.1'
+                            });
                         }
                     }
 
@@ -2127,13 +2146,50 @@
                         const isAnistiadoReinc = this.medicaoService.overrides[prot]?.['reuniao_reincidencia_8_7_2']?.ignorarGlosa;
                         if (!isAnistiadoReinc) {
                             perc += 15.0;
+                            infracoesAtivas.push({
+                                regraId: 'reuniao_reincidencia_8_7_2',
+                                artigoTR: 'Item 8.7.2',
+                                percentualGlosa: 15.0,
+                                label: 'Item 8.7.2'
+                            });
                         }
                     }
 
                     if (perc > 100) perc = 100;
                 }
+
                 glosaPorOS[prot] = perc;
+
+                if (perc > 0) {
+                    // Ordenar os rótulos de regras para consistência (ex: Item 8.7.1 + Item 8.7.2)
+                    const regrasNomes = infracoesAtivas.map(inf => inf.label || inf.artigoTR);
+                    const regrasUnicas = Array.from(new Set(regrasNomes)).sort();
+                    const labelRegras = regrasUnicas.length > 0 ? regrasUnicas.join(' + ') : 'Glosas Diversas';
+                    const chaveFaixa = `${perc.toFixed(1)}%||${labelRegras}`;
+
+                    perfilGlosaPorOS[prot] = {
+                        percTotal: perc,
+                        labelRegras: labelRegras,
+                        chaveFaixa: chaveFaixa
+                    };
+
+                    if (!faixasDeGlosasDoMes.has(chaveFaixa)) {
+                        faixasDeGlosasDoMes.set(chaveFaixa, {
+                            chaveFaixa: chaveFaixa,
+                            percTotal: perc,
+                            labelRegras: labelRegras
+                        });
+                    }
+                } else {
+                    perfilGlosaPorOS[prot] = {
+                        percTotal: 0,
+                        labelRegras: '',
+                        chaveFaixa: null
+                    };
+                }
             });
+
+            const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
 
             const registrarMaterial = (rawNome, qtd, protocolo, defaultUnidade = 'UN', categoria = 'Material Aplicado') => {
                 if (!rawNome) return;
@@ -2148,8 +2204,9 @@
                         descricao: desc,
                         unidade: finalUnidade,
                         quantidadeTotal: 0,
-                        valorUnitario: Number(valorUnitario) || 0,
-                        valorUnitarioBdi: Number(valorUnitarioBdi) || 0,
+                        quantidadeSemGlosa: 0,
+                        valorUnitario: round2(valorUnitario),
+                        valorUnitarioBdi: round2(valorUnitarioBdi),
                         valorTotalSemBdi: 0,
                         valorTotalComBdi: 0,
                         valorTotalGlosa: 0,
@@ -2158,21 +2215,46 @@
                         qtdOSsSet: new Set(),
                         protocolosSet: new Set(),
                         protocolosDetalhados: {}, // { [prot]: { qtd, percGlosa, valorBruto, valorGlosa, valorLiquido } }
-                        categoria: categoria
+                        categoria: categoria,
+                        // Quantidades distribuídas por cada faixa/combinação de glosa do mês: { [chaveFaixa]: qtd }
+                        qtdPorFaixaGlosa: {},
+                        // Rastreamento de protocolos por faixa para notas do Excel: { [chaveFaixa]: { [prot]: qtd } }
+                        protocolosPorFaixaGlosa: {},
+                        // Rastreamento de protocolos sem glosa: { [prot]: qtd }
+                        protocolosSemGlosa: {}
                     };
                 }
 
-                const numQtd = Number(qtd) || 1;
+                const numQtd = finalUnidade === 'H' ? round2(qtd) : (Number(qtd) || 1);
                 const percGlosa = glosaPorOS[protocolo] || 0;
                 const vBdi = materiaisMap[key].valorUnitarioBdi;
-                const valorBrutoDesteRegistro = numQtd * vBdi;
-                const valorGlosaDesteRegistro = valorBrutoDesteRegistro * (percGlosa / 100);
+                const valorBrutoDesteRegistro = round2(numQtd * vBdi);
+                const valorGlosaDesteRegistro = round2(valorBrutoDesteRegistro * (percGlosa / 100));
+                const valorLiquidoDesteRegistro = Math.max(0, round2(valorBrutoDesteRegistro - valorGlosaDesteRegistro));
 
-                materiaisMap[key].quantidadeTotal += numQtd;
-                materiaisMap[key].valorTotalSemBdi = materiaisMap[key].quantidadeTotal * materiaisMap[key].valorUnitario;
-                materiaisMap[key].valorTotalComBdi = materiaisMap[key].quantidadeTotal * vBdi;
-                materiaisMap[key].valorTotalGlosa += valorGlosaDesteRegistro;
-                materiaisMap[key].valorTotalLiquido = Math.max(0, materiaisMap[key].valorTotalComBdi - materiaisMap[key].valorTotalGlosa);
+                materiaisMap[key].quantidadeTotal = finalUnidade === 'H' ? round2(materiaisMap[key].quantidadeTotal + numQtd) : (materiaisMap[key].quantidadeTotal + numQtd);
+                if (percGlosa === 0) {
+                    materiaisMap[key].quantidadeSemGlosa = finalUnidade === 'H' ? round2(materiaisMap[key].quantidadeSemGlosa + numQtd) : (materiaisMap[key].quantidadeSemGlosa + numQtd);
+                    materiaisMap[key].protocolosSemGlosa[protocolo] = finalUnidade === 'H' ? round2((materiaisMap[key].protocolosSemGlosa[protocolo] || 0) + numQtd) : ((materiaisMap[key].protocolosSemGlosa[protocolo] || 0) + numQtd);
+                } else {
+                    const perfilOS = perfilGlosaPorOS[protocolo];
+                    if (perfilOS && perfilOS.chaveFaixa) {
+                        materiaisMap[key].qtdPorFaixaGlosa[perfilOS.chaveFaixa] = finalUnidade === 'H'
+                            ? round2((materiaisMap[key].qtdPorFaixaGlosa[perfilOS.chaveFaixa] || 0) + numQtd)
+                            : ((materiaisMap[key].qtdPorFaixaGlosa[perfilOS.chaveFaixa] || 0) + numQtd);
+                        if (!materiaisMap[key].protocolosPorFaixaGlosa[perfilOS.chaveFaixa]) {
+                            materiaisMap[key].protocolosPorFaixaGlosa[perfilOS.chaveFaixa] = {};
+                        }
+                        materiaisMap[key].protocolosPorFaixaGlosa[perfilOS.chaveFaixa][protocolo] = finalUnidade === 'H'
+                            ? round2((materiaisMap[key].protocolosPorFaixaGlosa[perfilOS.chaveFaixa][protocolo] || 0) + numQtd)
+                            : ((materiaisMap[key].protocolosPorFaixaGlosa[perfilOS.chaveFaixa][protocolo] || 0) + numQtd);
+                    }
+                }
+
+                materiaisMap[key].valorTotalSemBdi = round2(materiaisMap[key].quantidadeTotal * materiaisMap[key].valorUnitario);
+                materiaisMap[key].valorTotalComBdi = round2(materiaisMap[key].quantidadeTotal * vBdi);
+                materiaisMap[key].valorTotalGlosa = round2(materiaisMap[key].valorTotalGlosa + valorGlosaDesteRegistro);
+                materiaisMap[key].valorTotalLiquido = Math.max(0, round2(materiaisMap[key].valorTotalComBdi - materiaisMap[key].valorTotalGlosa));
                 
                 if (!materiaisMap[key].protocolosDetalhados[protocolo]) {
                     materiaisMap[key].protocolosDetalhados[protocolo] = {
@@ -2184,10 +2266,10 @@
                         valorLiquido: 0
                     };
                 }
-                materiaisMap[key].protocolosDetalhados[protocolo].qtd += numQtd;
-                materiaisMap[key].protocolosDetalhados[protocolo].valorBruto += valorBrutoDesteRegistro;
-                materiaisMap[key].protocolosDetalhados[protocolo].valorGlosa += valorGlosaDesteRegistro;
-                materiaisMap[key].protocolosDetalhados[protocolo].valorLiquido = Math.max(0, materiaisMap[key].protocolosDetalhados[protocolo].valorBruto - materiaisMap[key].protocolosDetalhados[protocolo].valorGlosa);
+                materiaisMap[key].protocolosDetalhados[protocolo].qtd = finalUnidade === 'H' ? round2(materiaisMap[key].protocolosDetalhados[protocolo].qtd + numQtd) : (materiaisMap[key].protocolosDetalhados[protocolo].qtd + numQtd);
+                materiaisMap[key].protocolosDetalhados[protocolo].valorBruto = round2(materiaisMap[key].protocolosDetalhados[protocolo].valorBruto + valorBrutoDesteRegistro);
+                materiaisMap[key].protocolosDetalhados[protocolo].valorGlosa = round2(materiaisMap[key].protocolosDetalhados[protocolo].valorGlosa + valorGlosaDesteRegistro);
+                materiaisMap[key].protocolosDetalhados[protocolo].valorLiquido = Math.max(0, round2(materiaisMap[key].protocolosDetalhados[protocolo].valorBruto - materiaisMap[key].protocolosDetalhados[protocolo].valorGlosa));
 
                 materiaisMap[key].qtdOSsSet.add(protocolo);
                 materiaisMap[key].protocolosSet.add(protocolo);
@@ -2279,16 +2361,16 @@
 
             const arrayMateriais = Object.values(materiaisMap).sort((a, b) => b.quantidadeTotal - a.quantidadeTotal);
 
-            totalValorSemBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalSemBdi || 0), 0);
-            totalValorComBdi = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalComBdi || 0), 0);
-            totalValorGlosa = arrayMateriais.reduce((acc, m) => acc + (m.valorTotalGlosa || 0), 0);
+            totalValorSemBdi = round2(arrayMateriais.reduce((acc, m) => acc + (m.valorTotalSemBdi || 0), 0));
+            totalValorComBdi = round2(arrayMateriais.reduce((acc, m) => acc + (m.valorTotalComBdi || 0), 0));
+            totalValorGlosa = round2(arrayMateriais.reduce((acc, m) => acc + (m.valorTotalGlosa || 0), 0));
             // Multa de Reincidência de Reuniões Semanais (Item 8.7.2): representativa de 15% s/ total da medição
             let valorMultaReincidenciaMensal = 0;
             if (infoReunioes && infoReunioes.temReincidencia) {
-                valorMultaReincidenciaMensal = totalValorComBdi * 0.15;
+                valorMultaReincidenciaMensal = round2(totalValorComBdi * 0.15);
             }
 
-            totalValorLiquido = Math.max(0, totalValorComBdi - totalValorGlosa);
+            totalValorLiquido = Math.max(0, round2(totalValorComBdi - totalValorGlosa));
 
             return {
                 items: arrayMateriais,
@@ -2303,7 +2385,8 @@
                 glosaPorOS: glosaPorOS,
                 periodLabelBR: periodLabelBR,
                 valorMultaReincidenciaMensal: valorMultaReincidenciaMensal,
-                temReincidenciaReunioes: Boolean(infoReunioes && infoReunioes.temReincidencia)
+                temReincidenciaReunioes: Boolean(infoReunioes && infoReunioes.temReincidencia),
+                faixasDeGlosas: Array.from(faixasDeGlosasDoMes.values()).sort((a, b) => a.percTotal - b.percTotal)
             };
         }
 
@@ -2468,11 +2551,11 @@
                 const glosaFmt = item.valorTotalGlosa > 0 ? `- ${formatCurrency(item.valorTotalGlosa)}` : '<span class="text-slate-300">—</span>';
                 const liquidoFmt = formatCurrency(item.valorTotalLiquido);
 
-                somaFiltradaQtd += item.quantidadeTotal;
-                somaFiltradaSemBdi += (item.valorTotalSemBdi || 0);
-                somaFiltradaComBdi += (item.valorTotalComBdi || 0);
-                somaFiltradaGlosa += (item.valorTotalGlosa || 0);
-                somaFiltradaLiquido += (item.valorTotalLiquido || 0);
+                somaFiltradaQtd = isHoras ? Math.round((somaFiltradaQtd + item.quantidadeTotal) * 100) / 100 : (somaFiltradaQtd + item.quantidadeTotal);
+                somaFiltradaSemBdi = Math.round((somaFiltradaSemBdi + (item.valorTotalSemBdi || 0)) * 100) / 100;
+                somaFiltradaComBdi = Math.round((somaFiltradaComBdi + (item.valorTotalComBdi || 0)) * 100) / 100;
+                somaFiltradaGlosa = Math.round((somaFiltradaGlosa + (item.valorTotalGlosa || 0)) * 100) / 100;
+                somaFiltradaLiquido = Math.round((somaFiltradaLiquido + (item.valorTotalLiquido || 0)) * 100) / 100;
 
                 let badgeCategory = 'bg-blue-100 text-blue-800 border border-blue-200';
                 if (isHoras) badgeCategory = 'bg-purple-100 text-purple-900 border border-purple-300 font-bold';
@@ -3743,6 +3826,408 @@
             const periodLabel = this.filtroMesAno || 'Mes_Atual';
             const dateStr = new Date().toISOString().split('T')[0];
             this.downloadCSV(`Medicao_Mensal_Materiais_E_Sessoes_${periodLabel}_${dateStr}.csv`, csvLines.join('\n'));
+        }
+
+        exportarMedicaoMensalDetalhadaCSV() {
+            const medicaoData = this.calcularMedicaoMensal();
+            const items = this.medicaoConsolidadoFilteredItems || medicaoData.items;
+            if (!items || items.length === 0) {
+                alert('Nenhum dado de medição disponível para o mês/filtro selecionado.');
+                return;
+            }
+
+            const faixasDeGlosas = medicaoData.faixasDeGlosas || [];
+
+            // Montagem Dinâmica dos Cabeçalhos
+            const headers = [
+                'Marca',
+                'Descrição do Item de Contrato / Material',
+                'Unidade',
+                'Quantidade Sem Glosa',
+                'Valor Unitário sem Glosa (c/ BDI)'
+            ];
+
+            // Para cada combinação única de percentual + regras ocorrida no mês
+            faixasDeGlosas.forEach(faixa => {
+                const percFmt = Number.isInteger(faixa.percTotal) ? `${faixa.percTotal}%` : `${faixa.percTotal.toFixed(1)}%`;
+                headers.push(`QTD GLOSADA ${percFmt} (${faixa.labelRegras})`);
+                headers.push(`Valor Unitário com Glosa ${percFmt} (c/ BDI)`);
+            });
+
+            // Colunas finais fixas
+            headers.push('Quantidade Total Medida');
+            headers.push('Valor Total Bruto (c/ BDI)');
+            headers.push('Glosa Total Contratual TR');
+            headers.push('Valor Total Líquido Final');
+            headers.push('Qtd. OSs com Glosa');
+            headers.push('Protocolos de Ordens de Serviço');
+
+            let csvLines = [headers.join(';')];
+
+            items.forEach(item => {
+                const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
+                const qtdTotalFmt = isHoras ? item.quantidadeTotal.toFixed(2) : item.quantidadeTotal;
+                const qtdSemGlosaFmt = isHoras ? (item.quantidadeSemGlosa || 0).toFixed(2) : (item.quantidadeSemGlosa || 0);
+
+                const vUnitBdi = item.valorUnitarioBdi || 0;
+                const unitComBdiFmt = vUnitBdi.toFixed(2).replace('.', ',');
+
+                const row = [
+                    this.escapeCSVCell(item.marca),
+                    this.escapeCSVCell(item.descricao),
+                    this.escapeCSVCell(item.unidade),
+                    this.escapeCSVCell(qtdSemGlosaFmt),
+                    this.escapeCSVCell(`R$ ${unitComBdiFmt}`)
+                ];
+
+                // Preencher valores de cada faixa dinâmica
+                const qtdPorFaixa = item.qtdPorFaixaGlosa || {};
+                faixasDeGlosas.forEach(faixa => {
+                    const rawQtd = qtdPorFaixa[faixa.chaveFaixa] || 0;
+                    const qtdFaixaFmt = isHoras ? rawQtd.toFixed(2) : rawQtd;
+
+                    // O valor unitário calcula sempre o preço correspondente àquela faixa com desconto, mesmo que Qtd seja 0
+                    const percDesc = Number(faixa.percTotal) || 0;
+                    const vUnitarioFaixa = Math.max(0, vUnitBdi * (1 - (percDesc / 100)));
+                    const vUnitarioFaixaFmt = vUnitarioFaixa.toFixed(2).replace('.', ',');
+
+                    row.push(this.escapeCSVCell(qtdFaixaFmt));
+                    row.push(this.escapeCSVCell(`R$ ${vUnitarioFaixaFmt}`));
+                });
+
+                // Totais
+                const totalComBdiFmt = (item.valorTotalComBdi || 0).toFixed(2).replace('.', ',');
+                const totalGlosaFmt = (item.valorTotalGlosa || 0).toFixed(2).replace('.', ',');
+                const totalLiquidoFmt = (item.valorTotalLiquido !== undefined ? item.valorTotalLiquido : item.valorTotalComBdi).toFixed(2).replace('.', ',');
+
+                row.push(this.escapeCSVCell(qtdTotalFmt));
+                row.push(this.escapeCSVCell(`R$ ${totalComBdiFmt}`));
+                row.push(this.escapeCSVCell(`R$ ${totalGlosaFmt}`));
+                row.push(this.escapeCSVCell(`R$ ${totalLiquidoFmt}`));
+                row.push(this.escapeCSVCell(item.qtdOSsGlosadas || 0));
+                row.push(this.escapeCSVCell(Array.from(item.protocolosSet).join(' | ')));
+
+                csvLines.push(row.join(';'));
+            });
+
+            const periodLabel = this.filtroMesAno || 'Mes_Atual';
+            const dateStr = new Date().toISOString().split('T')[0];
+            this.downloadCSV(`Medicao_Detalhada_Glosas_TR_${periodLabel}_${dateStr}.csv`, csvLines.join('\n'));
+        }
+
+        async exportarMedicaoMensalDetalhadaXLSX() {
+            if (typeof ExcelJS === 'undefined') {
+                alert('⚠️ A biblioteca ExcelJS não pôde ser carregada. Verifique sua conexão com a internet.');
+                return;
+            }
+
+            const medicaoData = this.calcularMedicaoMensal();
+            const items = this.medicaoConsolidadoFilteredItems || medicaoData.items;
+            if (!items || items.length === 0) {
+                alert('Nenhum dado de medição disponível para o mês/filtro selecionado.');
+                return;
+            }
+
+            this.exibirLoading(true);
+
+            try {
+                const faixasDeGlosas = medicaoData.faixasDeGlosas || [];
+                const workbook = new ExcelJS.Workbook();
+                workbook.creator = 'Sistema OS - Medição Contratual';
+                workbook.lastModifiedBy = 'Sistema OS';
+                workbook.created = new Date();
+                workbook.modified = new Date();
+
+                const sheet = workbook.addWorksheet('Consolidado Medição', {
+                    views: [{ state: 'frozen', ySplit: 1 }]
+                });
+
+                // Definição das Colunas
+                const columnsDef = [
+                    { header: 'Marca', key: 'marca', width: 16 },
+                    { header: 'Descrição do Item de Contrato / Material', key: 'descricao', width: 38 },
+                    { header: 'Unidade', key: 'unidade', width: 10 },
+                    { header: 'Quantidade Sem Glosa', key: 'qtdSemGlosa', width: 22 },
+                    { header: 'Valor Unitário sem Glosa (c/ BDI)', key: 'vUnitSemGlosa', width: 26 }
+                ];
+
+                // Colunas Dinâmicas de Glosa
+                faixasDeGlosas.forEach((faixa, fIdx) => {
+                    const percFmt = Number.isInteger(faixa.percTotal) ? `${faixa.percTotal}%` : `${faixa.percTotal.toFixed(1)}%`;
+                    columnsDef.push({
+                        header: `QTD GLOSADA ${percFmt} (${faixa.labelRegras})`,
+                        key: `qtdFaixa_${fIdx}`,
+                        width: 28
+                    });
+                    columnsDef.push({
+                        header: `Valor Unitário com Glosa ${percFmt} (c/ BDI)`,
+                        key: `vUnitFaixa_${fIdx}`,
+                        width: 28
+                    });
+                });
+
+                // Colunas Finais
+                columnsDef.push(
+                    { header: 'Quantidade Total Medida', key: 'qtdTotal', width: 22 },
+                    { header: 'Valor Total Bruto (c/ BDI)', key: 'vTotalBruto', width: 22 },
+                    { header: 'Glosa Total Contratual TR', key: 'vTotalGlosa', width: 22 },
+                    { header: 'Valor Total Líquido Final', key: 'vTotalLiquido', width: 22 },
+                    { header: 'Qtd. OSs com Glosa', key: 'qtdOSsGlosadas', width: 18 },
+                    { header: 'Protocolos de Ordens de Serviço', key: 'protocolos', width: 36 }
+                );
+
+                sheet.columns = columnsDef;
+
+                // Estilização do Cabeçalho
+                const headerRow = sheet.getRow(1);
+                headerRow.height = 30;
+                headerRow.eachCell((cell, colNumber) => {
+                    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                    
+                    // Cores por seção:
+                    // 1 a 3: Identificação (Slate)
+                    // 4 a 5: Sem Glosa (Azul Marinho)
+                    // Dinâmicas: Glosas TR (Vinho/Rose escuro)
+                    // Finais: Verde Escuro para Líquido/Totais
+                    const totalCols = columnsDef.length;
+                    if (colNumber <= 3) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } };
+                    } else if (colNumber <= 5) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+                    } else if (colNumber > totalCols - 6) {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF065F46' } };
+                    } else {
+                        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF881337' } };
+                    }
+                    cell.border = {
+                        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+                        bottom: { style: 'medium', color: { argb: 'FF0F172A' } },
+                        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+                    };
+                });
+
+                // Função auxiliar para formatar lista de protocolos em texto de comentário
+                const formatarComentarioProtocolos = (titulo, objProts) => {
+                    if (!objProts || Object.keys(objProts).length === 0) return null;
+                    const linhas = [`📌 ${titulo}:`];
+                    let totalP = 0;
+                    Object.entries(objProts).forEach(([p, q]) => {
+                        linhas.push(`• ${p}: ${q} un.`);
+                        totalP += q;
+                    });
+                    linhas.splice(1, 0, `Total: ${totalP} un.`);
+                    return linhas.join('\n');
+                };
+
+                // Inserir Linhas de Dados
+                items.forEach((item, rIdx) => {
+                    const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
+                    const qtdTotalNum = isHoras ? Number(item.quantidadeTotal.toFixed(2)) : Number(item.quantidadeTotal);
+                    const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+                    const vUnitBdi = round2(item.valorUnitarioBdi || 0);
+                    const vBruto = round2(item.valorTotalComBdi || 0);
+                    const vGlosa = round2(item.valorTotalGlosa || 0);
+                    const vLiquido = item.valorTotalLiquido !== undefined ? round2(item.valorTotalLiquido) : round2(vBruto - vGlosa);
+
+                    const rowData = {
+                        marca: item.marca || '',
+                        descricao: item.descricao || '',
+                        unidade: item.unidade || 'UN',
+                        qtdSemGlosa: qtdSemGlosaNum,
+                        vUnitSemGlosa: vUnitBdi
+                    };
+
+                    const qtdPorFaixa = item.qtdPorFaixaGlosa || {};
+                    faixasDeGlosas.forEach((faixa, fIdx) => {
+                        const rawQtd = qtdPorFaixa[faixa.chaveFaixa] || 0;
+                        const qtdFaixaNum = isHoras ? Number(rawQtd.toFixed(2)) : Number(rawQtd);
+
+                        const percDesc = Number(faixa.percTotal) || 0;
+                        const vUnitarioFaixa = Math.max(0, round2(vUnitBdi * (1 - (percDesc / 100))));
+
+                        rowData[`qtdFaixa_${fIdx}`] = qtdFaixaNum;
+                        rowData[`vUnitFaixa_${fIdx}`] = vUnitarioFaixa;
+                    });
+
+                    rowData.qtdTotal = qtdTotalNum;
+                    rowData.vTotalBruto = vBruto;
+                    rowData.vTotalGlosa = vGlosa;
+                    rowData.vTotalLiquido = vLiquido;
+                    rowData.qtdOSsGlosadas = item.qtdOSsGlosadas || 0;
+                    rowData.protocolos = Array.from(item.protocolosSet || []).join(', ');
+
+                    const newRow = sheet.addRow(rowData);
+                    newRow.height = 20;
+
+                    // Adicionar Notas / Comentários nas Células de Quantidade
+                    // 1. Quantidade Sem Glosa (coluna 4)
+                    const cellSemGlosa = newRow.getCell('qtdSemGlosa');
+                    cellSemGlosa.numFmt = isHoras ? '#,##0.00' : '#,##0';
+                    cellSemGlosa.alignment = { horizontal: 'right', vertical: 'middle' };
+                    if (item.protocolosSemGlosa && Object.keys(item.protocolosSemGlosa).length > 0) {
+                        const txtNota = formatarComentarioProtocolos('Protocolos Sem Glosa', item.protocolosSemGlosa);
+                        if (txtNota) {
+                            cellSemGlosa.note = {
+                                texts: [{ font: { size: 9, name: 'Calibri' }, text: txtNota }]
+                            };
+                        }
+                    }
+
+                    // 2. Coluna Valor Unitário sem Glosa
+                    const cellUnitSemGlosa = newRow.getCell('vUnitSemGlosa');
+                    cellUnitSemGlosa.numFmt = '"R$" #,##0.00';
+                    cellUnitSemGlosa.alignment = { horizontal: 'right', vertical: 'middle' };
+
+                    // 3. Colunas de Faixas Dinâmicas
+                    faixasDeGlosas.forEach((faixa, fIdx) => {
+                        const cellQtd = newRow.getCell(`qtdFaixa_${fIdx}`);
+                        cellQtd.numFmt = isHoras ? '#,##0.00' : '#,##0';
+                        cellQtd.alignment = { horizontal: 'right', vertical: 'middle' };
+
+                        const protsDestaFaixa = (item.protocolosPorFaixaGlosa && item.protocolosPorFaixaGlosa[faixa.chaveFaixa]) || {};
+                        if (Object.keys(protsDestaFaixa).length > 0) {
+                            const percFmt = Number.isInteger(faixa.percTotal) ? `${faixa.percTotal}%` : `${faixa.percTotal.toFixed(1)}%`;
+                            const txtNotaFaixa = formatarComentarioProtocolos(`Protocolos c/ Glosa ${percFmt} (${faixa.labelRegras})`, protsDestaFaixa);
+                            if (txtNotaFaixa) {
+                                cellQtd.note = {
+                                    texts: [{ font: { size: 9, name: 'Calibri' }, text: txtNotaFaixa }]
+                                };
+                            }
+                        }
+
+                        const cellVUnit = newRow.getCell(`vUnitFaixa_${fIdx}`);
+                        cellVUnit.numFmt = '"R$" #,##0.00';
+                        cellVUnit.alignment = { horizontal: 'right', vertical: 'middle' };
+                    });
+
+                    // 4. Quantidade Total Medida
+                    const cellQtdTotal = newRow.getCell('qtdTotal');
+                    cellQtdTotal.numFmt = isHoras ? '#,##0.00' : '#,##0';
+                    cellQtdTotal.alignment = { horizontal: 'right', vertical: 'middle' };
+                    
+                    // Mapear todos os protocolos com quantidades
+                    if (item.protocolosDetalhados && Object.keys(item.protocolosDetalhados).length > 0) {
+                        const objTodosProts = {};
+                        Object.entries(item.protocolosDetalhados).forEach(([p, det]) => {
+                            objTodosProts[p] = det.qtd;
+                        });
+                        const txtNotaTotal = formatarComentarioProtocolos('Todos os Protocolos Medidos', objTodosProts);
+                        if (txtNotaTotal) {
+                            cellQtdTotal.note = {
+                                texts: [{ font: { size: 9, name: 'Calibri' }, text: txtNotaTotal }]
+                            };
+                        }
+                    }
+
+                    // 5. Formatar Células de Moeda Totais
+                    ['vTotalBruto', 'vTotalGlosa', 'vTotalLiquido'].forEach(colKey => {
+                        const c = newRow.getCell(colKey);
+                        c.numFmt = '"R$" #,##0.00';
+                        c.alignment = { horizontal: 'right', vertical: 'middle' };
+                    });
+
+                    newRow.getCell('qtdOSsGlosadas').alignment = { horizontal: 'center', vertical: 'middle' };
+                    newRow.getCell('unidade').alignment = { horizontal: 'center', vertical: 'middle' };
+
+                    // Linhas zebradas suaves
+                    if (rIdx % 2 === 1) {
+                        newRow.eachCell({ includeEmpty: true }, c => {
+                            c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+                        });
+                    }
+                });
+
+                // Linha de Totalização Geral no XLSX
+                const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+                let somaXlsxQtdSemGlosa = 0;
+                let somaXlsxQtdTotal = 0;
+                let somaXlsxBruto = 0;
+                let somaXlsxGlosa = 0;
+                let somaXlsxLiquido = 0;
+                const somaQtdPorFaixa = {};
+
+                items.forEach(item => {
+                    somaXlsxQtdSemGlosa = round2(somaXlsxQtdSemGlosa + (item.quantidadeSemGlosa || 0));
+                    somaXlsxQtdTotal = round2(somaXlsxQtdTotal + (item.quantidadeTotal || 0));
+                    somaXlsxBruto = round2(somaXlsxBruto + (item.valorTotalComBdi || 0));
+                    somaXlsxGlosa = round2(somaXlsxGlosa + (item.valorTotalGlosa || 0));
+                    somaXlsxLiquido = round2(somaXlsxLiquido + (item.valorTotalLiquido !== undefined ? item.valorTotalLiquido : (item.valorTotalComBdi - item.valorTotalGlosa)));
+                    
+                    const qF = item.qtdPorFaixaGlosa || {};
+                    faixasDeGlosas.forEach(f => {
+                        somaQtdPorFaixa[f.chaveFaixa] = round2((somaQtdPorFaixa[f.chaveFaixa] || 0) + (qF[f.chaveFaixa] || 0));
+                    });
+                });
+
+                const totalRowData = {
+                    marca: 'TOTAL GERAL',
+                    descricao: `Totalização de ${items.length} itens medidos`,
+                    unidade: '',
+                    qtdSemGlosa: somaXlsxQtdSemGlosa,
+                    vUnitSemGlosa: null
+                };
+
+                faixasDeGlosas.forEach((f, fIdx) => {
+                    totalRowData[`qtdFaixa_${fIdx}`] = somaQtdPorFaixa[f.chaveFaixa] || 0;
+                    totalRowData[`vUnitFaixa_${fIdx}`] = null;
+                });
+
+                totalRowData.qtdTotal = somaXlsxQtdTotal;
+                totalRowData.vTotalBruto = somaXlsxBruto;
+                totalRowData.vTotalGlosa = somaXlsxGlosa;
+                totalRowData.vTotalLiquido = somaXlsxLiquido;
+                totalRowData.qtdOSsGlosadas = medicaoData.totalOSsMedidas || 0;
+                totalRowData.protocolos = '';
+
+                const totalRow = sheet.addRow(totalRowData);
+                totalRow.height = 24;
+                totalRow.eachCell({ includeEmpty: true }, (c, colNumber) => {
+                    c.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } };
+                    c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+                    c.border = {
+                        top: { style: 'medium', color: { argb: 'FF475569' } },
+                        bottom: { style: 'double', color: { argb: 'FF0F172A' } }
+                    };
+                });
+
+                totalRow.getCell('qtdSemGlosa').numFmt = '#,##0.00';
+                totalRow.getCell('qtdSemGlosa').alignment = { horizontal: 'right', vertical: 'middle' };
+                faixasDeGlosas.forEach((f, fIdx) => {
+                    const cQ = totalRow.getCell(`qtdFaixa_${fIdx}`);
+                    cQ.numFmt = '#,##0.00';
+                    cQ.alignment = { horizontal: 'right', vertical: 'middle' };
+                });
+                totalRow.getCell('qtdTotal').numFmt = '#,##0.00';
+                totalRow.getCell('qtdTotal').alignment = { horizontal: 'right', vertical: 'middle' };
+
+                ['vTotalBruto', 'vTotalGlosa', 'vTotalLiquido'].forEach(colKey => {
+                    const c = totalRow.getCell(colKey);
+                    c.numFmt = '"R$" #,##0.00';
+                    c.alignment = { horizontal: 'right', vertical: 'middle' };
+                });
+
+                // Gerar buffer e download
+                const buffer = await workbook.xlsx.writeBuffer();
+                const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                const periodLabel = this.filtroMesAno || 'Mes_Atual';
+                const dateStr = new Date().toISOString().split('T')[0];
+                const filename = `Medicao_Detalhada_Glosas_TR_${periodLabel}_${dateStr}.xlsx`;
+
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+            } catch (err) {
+                console.error('❌ [MedicaoController] Erro ao gerar XLSX de medição:', err);
+                alert(`⚠️ Ocorreu um erro ao gerar a planilha Excel: ${err.message}`);
+            } finally {
+                this.exibirLoading(false);
+            }
         }
 
         exportarMedicaoPorProtocoloCSV() {

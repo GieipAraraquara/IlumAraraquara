@@ -103,24 +103,43 @@ class ChamadosRepository {
             const cachedMeta = JSON.parse(cachedMetaRaw);
             if (!cachedMeta || !cachedMeta.lastTimestamp) return null;
 
-            // Tenta consultar a coluna mais apropriada de ordenação temporal (updated_at ou data_abertura)
+            // Tenta consultar as colunas mais apropriadas de ordenação temporal (data_abertura e data_fechamento)
             let hbRes = await client
                 .from(this.viewName)
-                .select('data_abertura')
+                .select('data_abertura, data_fechamento')
                 .order('data_abertura', { ascending: false })
+                .limit(1);
+
+            let hbFechRes = await client
+                .from(this.viewName)
+                .select('data_fechamento')
+                .not('data_fechamento', 'is', null)
+                .order('data_fechamento', { ascending: false })
                 .limit(1);
 
             if (hbRes.error || !hbRes.data || hbRes.data.length === 0) {
                 hbRes = await client
                     .from(this.primaryTable)
-                    .select('data_abertura')
+                    .select('data_abertura, data_fechamento')
                     .order('data_abertura', { ascending: false })
                     .limit(1);
             }
 
+            if (hbFechRes.error || !hbFechRes.data || hbFechRes.data.length === 0) {
+                hbFechRes = await client
+                    .from(this.primaryTable)
+                    .select('data_fechamento')
+                    .not('data_fechamento', 'is', null)
+                    .order('data_fechamento', { ascending: false })
+                    .limit(1);
+            }
+
             if (!hbRes.error && hbRes.data && hbRes.data.length > 0) {
-                const latestDbTimestamp = hbRes.data[0].data_abertura || hbRes.data[0].updated_at || null;
-                if (latestDbTimestamp && latestDbTimestamp === cachedMeta.lastTimestamp) {
+                const latestDbAbertura = hbRes.data[0].data_abertura || hbRes.data[0].updated_at || '';
+                const latestDbFechamento = (hbFechRes && !hbFechRes.error && hbFechRes.data && hbFechRes.data[0]) ? (hbFechRes.data[0].data_fechamento || '') : '';
+                const latestDbSignature = `${latestDbAbertura}_${latestDbFechamento}`;
+
+                if (latestDbSignature && latestDbSignature === cachedMeta.lastTimestamp) {
                     console.log(`⚡ [ChamadosRepository Heartbeat Hit] Nenhuma OS nova/alterada detectada. Reutilizando cache local.`);
                     const parsedData = JSON.parse(cachedDataRaw);
                     if (Array.isArray(parsedData) && parsedData.length > 0) {
@@ -344,18 +363,24 @@ class ChamadosRepository {
             // Persistência em cache com timestamp do registro mais recente para Heartbeat
             if (data && data.length > 0) {
                 try {
-                    let maxTimestamp = null;
+                    let maxAbertura = null;
+                    let maxFechamento = null;
                     for (const r of data) {
-                        const ts = r.data_abertura || r.updated_at;
-                        if (ts && (!maxTimestamp || ts > maxTimestamp)) {
-                            maxTimestamp = ts;
+                        const tsAbertura = r.data_abertura || r.updated_at;
+                        if (tsAbertura && (!maxAbertura || tsAbertura > maxAbertura)) {
+                            maxAbertura = tsAbertura;
+                        }
+                        const tsFech = r.data_fechamento;
+                        if (tsFech && (!maxFechamento || tsFech > maxFechamento)) {
+                            maxFechamento = tsFech;
                         }
                     }
+                    const signature = `${maxAbertura || ''}_${maxFechamento || ''}`;
 
                     sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
                     sessionStorage.setItem(CACHE_META_KEY, JSON.stringify({
                         timestamp: Date.now(),
-                        lastTimestamp: maxTimestamp
+                        lastTimestamp: signature
                     }));
                 } catch (eSave) {
                     console.warn('⚠️ [ChamadosRepository] QuotaExceededError ou falha ao salvar cache no sessionStorage:', eSave);

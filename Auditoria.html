@@ -725,8 +725,21 @@
                                 <div class="resizer"></div>
                             </th>
 
-                            <!-- Column 14 (Ações com Filtro Pendentes/Concluídas) -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="14">
+                            <!-- Audit Column 12 (Exclusivo Admin) -->
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="14" data-audit-col="11" title="Aponta SIM quando: O operador selecionou no mapa um poste vinculado à Plaqueta A mas digitou a Plaqueta B.">
+                                <div class="vertical-header-text">
+                                    <div>Poste/Plaqueta</div>
+                                    <div>Divergente?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>O operador selecionou no mapa um poste da base aérea previamente vinculado à Plaqueta A, porém digitou a Plaqueta B na finalização.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 15 (Ações com Filtro Pendentes/Concluídas) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="15">
                                 <div class="relative inline-block text-left group/action-filter">
                                     <button class="flex items-center justify-center gap-1 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary mx-auto" id="action-filter-trigger" title="Filtrar por Status de Conclusão">
                                         <span class="font-label-md uppercase tracking-wider">Ações</span>
@@ -2463,12 +2476,12 @@
         // Inicializa redimensionamento da Tabela de Auditoria
         initTableResizer('os-table', {
             '0': 90, '1': 60, '2': 120, 
-            '3': 30, '4': 30, '5': 30, '6': 30, '7': 30, '8': 30, '9': 30, '10': 30, '11': 30, '12': 30,
-            '13': 60 
+            '3': 30, '4': 30, '5': 30, '6': 30, '7': 30, '8': 30, '9': 30, '10': 30, '11': 30, '12': 30, '13': 30, '14': 30,
+            '15': 60 
         }, { 
             '0': 200, '1': 120, '2': 400, 
-            '3': 70, '4': 70, '5': 70, '6': 70, '7': 70, '8': 70, '9': 70, '10': 70, '11': 70, '12': 70,
-            '13': 130 
+            '3': 70, '4': 70, '5': 70, '6': 70, '7': 70, '8': 70, '9': 70, '10': 70, '11': 70, '12': 70, '13': 70, '14': 70,
+            '15': 130 
         }, 'tableColWidths');
 
         // Inicializa redimensionamento da Tabela de Serviços em Praças
@@ -2511,12 +2524,13 @@
         { index: 7, colIndex: 10, label: 'Anexo Faltante?', short: 'Anexo Faltante' },
         { index: 8, colIndex: 11, label: 'Material Divergente?', short: 'Material Divergente' },
         { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' },
-        { index: 10, colIndex: 13, label: 'Reincidência 30d?', short: 'Reincidência 30d' }
+        { index: 10, colIndex: 13, label: 'Reincidência 30d?', short: 'Reincidência 30d' },
+        { index: 11, colIndex: 14, label: 'Poste/Plaqueta Divergente?', short: 'Poste/Plaqueta Div.' }
     ];
 
     // Colunas restritas que NÃO devem ser disponibilizadas nem exibidas para o Manutentor
-    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante, 10: Reincidência 30d
-    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7, 10];
+    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante, 10: Reincidência 30d, 11: Poste/Plaqueta Divergente
+    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7, 10, 11];
 
     function getAuditColsDefs() {
         if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
@@ -2526,7 +2540,7 @@
     }
 
     // Estado global de índices de colunas ativas
-    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
     function renderAuditColsCheckboxes() {
         const container = document.getElementById('audit-cols-checkboxes-container');

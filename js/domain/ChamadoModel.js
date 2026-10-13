@@ -1462,7 +1462,8 @@ class ChamadoModel {
                this.isAnexoFaltante ||
                this.isMaterialDivergente ||
                this.isProblemaExterno ||
-               this.isReincidencia30d;
+               this.isReincidencia30d ||
+               this.isPostePlaquetaDivergente;
     }
 
     /**
@@ -2499,6 +2500,40 @@ class ChamadoModel {
         return list;
     }
 
+    get isPostePlaquetaDivergente() {
+        if (this.isDireto || this.isPraca) return false;
+        
+        // Verifica se algum ponto final possui poste com plaqueta vinculada diferente da digitada
+        const pts = this.pontosDetalhados;
+        if (pts && pts.length > 0) {
+            for (const p of pts) {
+                if (p.conflitoPlaquetaPoste === true) return true;
+                const postePlaq = String(p.postePlaquetaVinculada || p.poste_plaqueta_vinculada || '').trim().toUpperCase();
+                const plaqDigitada = String(p.plaquetaFinal || p.plaqueta || '').trim().toUpperCase();
+                if (postePlaq && plaqDigitada && postePlaq !== plaqDigitada) {
+                    return true;
+                }
+            }
+        }
+
+        // Verifica na lista bruta de pontos_final caso disponível
+        const rawPts = (this.rawPontosFinal && Array.isArray(this.rawPontosFinal)) ? this.rawPontosFinal : [];
+        for (const p of rawPts) {
+            if (p && p.conflito_plaqueta_poste === true) return true;
+            const postePlaq = String(p.poste_plaqueta_vinculada || '').trim().toUpperCase();
+            const plaqDigitada = String(p.plaqueta || '').trim().toUpperCase();
+            if (postePlaq && plaqDigitada && postePlaq !== plaqDigitada) {
+                return true;
+            }
+        }
+
+        if (this.audit && this.audit.conflito_plaqueta_poste !== undefined && this.audit.conflito_plaqueta_poste !== null) {
+            return Boolean(this.audit.conflito_plaqueta_poste);
+        }
+
+        return false;
+    }
+
     /**
      * Tabela centralizada de regras e descrições de auditoria (fonte única de verdade)
      */
@@ -2590,6 +2625,14 @@ class ChamadoModel {
             headerText2: '30d?',
             modelProperty: 'isReincidencia30d',
             explicacao: 'Alguma das plaquetas informadas nos fechamentos desta OS já foi reparada nos 30 dias anteriores a este fechamento.'
+        },
+        {
+            key: 'postePlaquetaDivergente',
+            label: 'Poste/Plaqueta Div.',
+            headerText1: 'Poste/Plaqueta',
+            headerText2: 'Divergente?',
+            modelProperty: 'isPostePlaquetaDivergente',
+            explicacao: 'O operador selecionou no mapa um poste da base aérea previamente vinculado à Plaqueta A, porém digitou a Plaqueta B na finalização.'
         }
     ];
 }
