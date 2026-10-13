@@ -4024,8 +4024,9 @@
                 // Inserir Linhas de Dados
                 items.forEach((item, rIdx) => {
                     const isHoras = item.unidade === 'H' || (item.descricao && item.descricao.toUpperCase().includes('ELETRICISTA'));
-                    const qtdTotalNum = isHoras ? Number(item.quantidadeTotal.toFixed(2)) : Number(item.quantidadeTotal);
                     const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+                    const qtdTotalNum = isHoras ? round2(item.quantidadeTotal) : Number(item.quantidadeTotal);
+                    const qtdSemGlosaNum = isHoras ? round2(item.quantidadeSemGlosa || 0) : Number(item.quantidadeSemGlosa || 0);
                     const vUnitBdi = round2(item.valorUnitarioBdi || 0);
                     const vBruto = round2(item.valorTotalComBdi || 0);
                     const vGlosa = round2(item.valorTotalGlosa || 0);
