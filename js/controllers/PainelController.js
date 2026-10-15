@@ -411,14 +411,14 @@ class PainelController {
             if (hasMotivo) {
                 const motivoConteudo = this.formatarMotivoComLinks(item.motivoAprovacao, { isTable: true, stopPropagation: true });
                 tdStatus.innerHTML = `
-                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs" title="${motivoFull}">
-                        <span class="material-symbols-outlined text-[15px] text-amber-600 shrink-0">info</span>
-                        <div class="truncate flex items-center gap-1">${motivoConteudo}</div>
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] leading-tight font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs" style="font-size: 11px;" title="${motivoFull}">
+                        <span class="material-symbols-outlined text-[14px] text-amber-600 shrink-0" style="font-size: 14px;">info</span>
+                        <div class="truncate flex items-center gap-1 text-[11px]" style="font-size: 11px;">${motivoConteudo}</div>
                     </div>
                 `;
             } else {
                 tdStatus.innerHTML = `
-                    <span class="text-on-surface-variant/60 text-xs font-normal italic">Sem motivo informado</span>
+                    <span class="text-on-surface-variant/60 text-[11px] font-normal italic" style="font-size: 11px;">Sem motivo informado</span>
                 `;
             }
         } else {
@@ -1801,7 +1801,14 @@ class PainelController {
                     const endIniVal = p.enderecoInicial || isAddrValid || '';
                     const endFinVal = p.enderecoFinal || '';
                     const hasIni = p.hasInicialData || (pIdx === 0 && Boolean(p.plaquetaInicial || item.plaquetaInicial || item.plaqueta));
-                    const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, endIniVal) : (p.coordenadaInicial ? buildNavLinks(p.coordenadaInicial, endIniVal) : { hasNav: false });
+                    const rawIniList = Array.isArray(item.rawPontosInicial) 
+                        ? item.rawPontosInicial 
+                        : (typeof item.rawPontosInicial === 'string' ? (JSON.parse(item.rawPontosInicial || '[]') || []) : []);
+                    const qtdAbertura = parseInt(item.quantidade || (item.raw && item.raw.quantidade), 10) || (item.qtdInicial || 1);
+                    const totalPtsAbertura = Math.max(rawIniList.length, qtdAbertura);
+                    const isAberturaCompartilhada = !hasIni && (totalPtsAbertura > 1);
+
+                    const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, endIniVal) : (isAberturaCompartilhada && p.coordenadaInicial ? buildNavLinks(p.coordenadaInicial, endIniVal) : { hasNav: false });
                     const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, endFinVal) : { hasNav: false };
 
                     // Cálculo da distância individual do ponto (abertura -> fechamento)
@@ -1871,7 +1878,7 @@ class PainelController {
                                     </div>
                                     ` : ''}
                                 </div>
-                            ` : `
+                            ` : (isAberturaCompartilhada ? `
                                 <div class="p-2.5 rounded-lg bg-slate-100/60 border border-dashed border-slate-300 text-xs flex flex-col justify-between h-full space-y-1">
                                     <div class="space-y-1">
                                         <div class="font-bold text-slate-600 text-xs border-b border-slate-200/60 pb-1 flex items-center justify-between">
@@ -1886,7 +1893,13 @@ class PainelController {
                                         Ponto adicional atendido na mesma ordem de serviço.
                                     </div>
                                 </div>
-                            `}
+                            ` : `
+                                <div class="p-2.5 rounded-lg bg-slate-50/70 border border-dashed border-slate-200 text-xs flex flex-col items-center justify-center text-center space-y-1 text-slate-400 italic h-full py-4">
+                                    <span class="material-symbols-outlined text-[20px] text-slate-300">location_off</span>
+                                    <span class="font-medium text-slate-500 text-xs">Sem dados de abertura</span>
+                                    <span class="text-[10px] text-slate-400">Ponto atendido no fechamento #${p.fechamento || p.numeroFechamento || 1}</span>
+                                </div>
+                            `)}
                             ${p.hasFinalData ? `
                                  <div class="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-200/80 space-y-1 text-xs flex flex-col justify-between h-full">
                                     <div class="space-y-1">

@@ -1142,6 +1142,14 @@
                   atualizarMapaPonto(idx);
                 }
 
+                if (pData.posteSelecionado) {
+                  selecionarPostePonto(idx, pData.posteSelecionado);
+                  restaurouAlgo = true;
+                } else if (pData.posteNaoEncontrado) {
+                  marcarPosteNaoEncontrado(idx);
+                  restaurouAlgo = true;
+                }
+
                 if (pData.fotosEstagios) {
                   for (var estagio in pData.fotosEstagios) {
                     var base64 = pData.fotosEstagios[estagio];
@@ -1447,6 +1455,13 @@
           atualizarMapaPonto(idx);
         }
 
+        // Restaura status visual da seleção de poste
+        if (pData.posteSelecionado) {
+          selecionarPostePonto(idx, pData.posteSelecionado);
+        } else if (pData.posteNaoEncontrado) {
+          marcarPosteNaoEncontrado(idx);
+        }
+
         if (pData.fotosEstagios) {
           for (var estagio in pData.fotosEstagios) {
             var base64 = pData.fotosEstagios[estagio];
@@ -1637,6 +1652,7 @@
 
         // Remove estilo selecionado dos marcadores de poste
         atualizarVisualMarcadoresPostes(idx, null);
+        salvarRascunhoFinalizar();
       }
 
       function selecionarPostePonto(idx, poste) {
@@ -1661,9 +1677,6 @@
           if (distGps !== null) {
             msgHtml += ' <span class="text-[11px] text-slate-500 font-medium">(' + distGps + 'm do seu GPS)</span>';
           }
-          if (plaqVinculada) {
-            msgHtml += ' <span class="ml-1 text-[10.5px] px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-mono font-bold border border-sky-300">Plaqueta: ' + plaqVinculada + '</span>';
-          }
           infoEl.innerHTML = msgHtml;
         }
 
@@ -1674,6 +1687,7 @@
         }
 
         atualizarVisualMarcadoresPostes(idx, poste.id);
+        salvarRascunhoFinalizar();
       }
 
       function atualizarVisualMarcadoresPostes(idx, posteIdSelecionado) {
@@ -1682,16 +1696,12 @@
           var iconEl = item.iconElement || item.element;
           var poste = item.poste;
           var isSel = (posteIdSelecionado && String(poste.id) === String(posteIdSelecionado));
-          var temVinculo = Boolean(poste.id_plaqueta_vinculada);
 
+          // Operador cego: todos os postes são neutros (roxos). Apenas o selecionado fica verde esmeralda.
           if (isSel) {
             iconEl.className = 'w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-emerald-300';
             iconEl.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span>';
             if (item.element) item.element.style.zIndex = '30';
-          } else if (temVinculo) {
-            iconEl.className = 'w-6 h-6 rounded-full bg-sky-600 hover:bg-sky-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300';
-            iconEl.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
-            if (item.element) item.element.style.zIndex = '20';
           } else {
             iconEl.className = 'w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300';
             iconEl.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
@@ -1781,13 +1791,9 @@
               elIcon.className = 'w-7 h-7 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-emerald-300';
               elWrapper.title = `⚡ Poste Selecionado`;
               elIcon.innerHTML = '<span class="material-symbols-outlined text-[16px]">check</span>';
-            } else if (plaqVinculada) {
-              elIcon.className = 'w-6 h-6 rounded-full bg-sky-600 hover:bg-sky-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300';
-              elWrapper.title = `⚡ Poste da Base Aérea [Plaqueta #${plaqVinculada}]`;
-              elIcon.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
             } else {
               elIcon.className = 'w-6 h-6 rounded-full bg-purple-600 hover:bg-purple-700 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300';
-              elWrapper.title = `⚡ Poste da Base Aérea (Disponível)`;
+              elWrapper.title = `⚡ Poste da Base Aérea`;
               elIcon.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
             }
 
@@ -1936,7 +1942,55 @@
         atualizarMapaPonto(targetIdx);
       }
 
-      function processarFotoEstagio(pontoIdx, estagio, event) {
+      // Processador de imagem leve e direto via HTML5 Canvas (evita OOM ao voltar da câmera)
+      function otimizarEComprimirFoto(file, maxDim, quality) {
+        maxDim = maxDim || 1200;
+        quality = quality || 0.75;
+        return new Promise(function(resolve) {
+          if (!file) return resolve(null);
+          var blobUrl = URL.createObjectURL(file);
+          var img = new Image();
+          img.onload = function() {
+            try {
+              var w = img.naturalWidth || img.width;
+              var h = img.naturalHeight || img.height;
+              if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                  h = Math.round((h * maxDim) / w);
+                  w = maxDim;
+                } else {
+                  w = Math.round((w * maxDim) / h);
+                  h = maxDim;
+                }
+              }
+              var canvas = document.createElement('canvas');
+              canvas.width = w;
+              canvas.height = h;
+              var ctx = canvas.getContext('2d');
+              ctx.imageSmoothingEnabled = true;
+              ctx.imageSmoothingQuality = 'medium';
+              ctx.drawImage(img, 0, 0, w, h);
+              var compressedB64 = canvas.toDataURL('image/jpeg', quality);
+              URL.revokeObjectURL(blobUrl);
+              resolve(compressedB64);
+            } catch(e) {
+              console.warn('⚠️ Falha ao comprimir imagem via canvas:', e);
+              URL.revokeObjectURL(blobUrl);
+              var reader = new FileReader();
+              reader.onload = function(re) { resolve(re.target.result); };
+              reader.onerror = function() { resolve(null); };
+              reader.readAsDataURL(file);
+            }
+          };
+          img.onerror = function() {
+            URL.revokeObjectURL(blobUrl);
+            resolve(null);
+          };
+          img.src = blobUrl;
+        });
+      }
+
+      async function processarFotoEstagio(pontoIdx, estagio, event) {
         var file = event.target.files[0];
         if (!file) return;
 
@@ -1948,38 +2002,27 @@
         var imgEl = document.getElementById(idImg);
         var boxEl = document.getElementById(idBox);
 
-        // 1. Carrega o preview na tela IMEDIATAMENTE (0ms delay)
-        var reader = new FileReader();
-        reader.onload = function(e) {
-          var rawBase64 = e.target.result;
+        // Preview imediato e econômico usando ObjectURL
+        var tempUrl = URL.createObjectURL(file);
+        if (containerEl && imgEl) {
+          imgEl.src = tempUrl;
+          containerEl.classList.remove('hidden');
+        }
+        if (boxEl) {
+          boxEl.classList.remove('border-slate-200', 'bg-slate-50');
+          boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
+        }
+
+        // Comprime diretamente da memória e persiste de imediato no rascunho
+        var b64Comprimido = await otimizarEComprimirFoto(file, 1200, 0.75);
+        URL.revokeObjectURL(tempUrl);
+
+        if (b64Comprimido) {
           if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
-          pontosData[pontoIdx].fotosEstagios[estagio] = rawBase64;
-
-          if (containerEl && imgEl) {
-            imgEl.src = rawBase64;
-            containerEl.classList.remove('hidden');
-          }
-          if (boxEl) {
-            boxEl.classList.remove('border-slate-200', 'bg-slate-50');
-            boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
-          }
+          pontosData[pontoIdx].fotosEstagios[estagio] = b64Comprimido;
+          if (imgEl) imgEl.src = b64Comprimido;
           salvarRascunhoFinalizar();
-
-          // 2. Comprime em segundo plano para otimizar o rascunho e o envio final
-          var service = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-          if (service && typeof service.compressImage === 'function') {
-            service.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
-              if (compressedBase64 && pontosData[pontoIdx]) {
-                pontosData[pontoIdx].fotosEstagios[estagio] = compressedBase64;
-                if (imgEl) imgEl.src = compressedBase64;
-                salvarRascunhoFinalizar();
-              }
-            }).catch(function(err) {
-              console.warn('⚠️ Compressão de segundo plano falhou, mantendo foto original:', err);
-            });
-          }
-        };
-        reader.readAsDataURL(file);
+        }
       }
 
       function removerFotoEstagio(pontoIdx, estagio) {
@@ -2006,47 +2049,19 @@
       // =========================================================================
       // GERENCIAMENTO DE FOTOS COMPLEMENTARES (OS VIÁRIA)
       // =========================================================================
-      function adicionarFotoComplementarViaria(event) {
+      async function adicionarFotoComplementarViaria(event) {
         var files = event.target.files;
         if (!files || files.length === 0) return;
 
-        var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-        var pendingCount = files.length;
+        for (var i = 0; i < files.length; i++) {
+          var b64 = await otimizarEComprimirFoto(files[i], 1200, 0.75);
+          if (b64) {
+            fotosComplementaresViariaBase64Arr.push(b64);
+          }
+        }
 
-        Array.from(files).forEach(function(file) {
-          var reader = new FileReader();
-          reader.onload = function(e) {
-            var rawBase64 = e.target.result;
-            
-            if (cdnService && typeof cdnService.compressImage === 'function') {
-              cdnService.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
-                fotosComplementaresViariaBase64Arr.push(compressedBase64 || rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) {
-                  renderizarPreviewsComplementaresViaria();
-                  salvarRascunhoFinalizar();
-                }
-              }).catch(function(err) {
-                console.warn('⚠️ Compressão de foto complementar viária falhou:', err);
-                fotosComplementaresViariaBase64Arr.push(rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) {
-                  renderizarPreviewsComplementaresViaria();
-                  salvarRascunhoFinalizar();
-                }
-              });
-            } else {
-              fotosComplementaresViariaBase64Arr.push(rawBase64);
-              pendingCount--;
-              if (pendingCount === 0) {
-                renderizarPreviewsComplementaresViaria();
-                salvarRascunhoFinalizar();
-              }
-            }
-          };
-          reader.readAsDataURL(file);
-        });
-
+        renderizarPreviewsComplementaresViaria();
+        salvarRascunhoFinalizar();
         event.target.value = "";
       }
 
@@ -2783,9 +2798,16 @@
             // Metadados do Poste da Base Aérea selecionado no mapa
             var posteSel = stObj.posteSelecionado || null;
             var posteId = posteSel ? posteSel.id : null;
-            var postePlaqVinculada = (posteSel && posteSel.id_plaqueta_vinculada) ? String(posteSel.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            var postePlaqVinculadaRaw = (posteSel && posteSel.id_plaqueta_vinculada) ? String(posteSel.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            
+            // Suporte a múltiplas plaquetas no mesmo poste (separadas por vírgula)
+            var plaquetasDoPosteArr = postePlaqVinculadaRaw 
+              ? postePlaqVinculadaRaw.split(',').map(p => p.trim()).filter(Boolean)
+              : [];
+
             var conflitoPlaquetaPoste = false;
-            if (postePlaqVinculada && plaq && postePlaqVinculada !== plaq) {
+            // Se o poste já tem plaqueta(s) vinculada(s) e a plaqueta informada NÃO está entre elas
+            if (plaquetasDoPosteArr.length > 0 && plaq && !plaquetasDoPosteArr.includes(plaq)) {
               conflitoPlaquetaPoste = true;
             }
 
@@ -2809,7 +2831,9 @@
               lng_gps_operador: lngGpsVal,
               coordenada_gps: coordGpsStr,
               poste_id_selecionado: posteId,
-              poste_plaqueta_vinculada: postePlaqVinculada,
+              poste_lat: (posteSel && posteSel.latitude) ? parseFloat(posteSel.latitude) : null,
+              poste_lng: (posteSel && posteSel.longitude) ? parseFloat(posteSel.longitude) : null,
+              poste_plaqueta_vinculada: postePlaqVinculadaRaw,
               poste_nao_encontrado: Boolean(stObj.posteNaoEncontrado),
               conflito_plaqueta_poste: conflitoPlaquetaPoste,
               distancia_gps_poste_metros: distGpsPoste,
@@ -3001,61 +3025,170 @@
                 if (!isNaN(pLat) && !isNaN(pLng) && pLat !== 0 && pLng !== 0) {
                   var plaqUpper = String(pt.plaqueta).trim().toUpperCase();
                   
-                  // 1. Verificar se a plaqueta já existe no cadastro oficial
+                  // 1. Verificar se a plaqueta já existe no cadastro oficial (busca todas as ocorrências para detectar duplicatas)
                   var resPlaq = await client.from('localizacao_plaquetas')
                     .select('id, identificacao, Latitude, Longitude')
-                    .ilike('identificacao', plaqUpper)
-                    .maybeSingle();
+                    .ilike('identificacao', plaqUpper);
 
-                  if (resPlaq && resPlaq.data) {
-                    var latCad = parseFloat(String(resPlaq.data.Latitude || '').replace(',', '.'));
-                    var lngCad = parseFloat(String(resPlaq.data.Longitude || '').replace(',', '.'));
+                  var plaquetasCadastradas = (resPlaq && resPlaq.data) ? resPlaq.data : [];
+
+                  // CONFLITO 2: Se a plaqueta tem 2 ou mais registros no banco (duplicada)
+                  if (plaquetasCadastradas.length > 1) {
+                    console.log(`⚠️ [Plaqueta #${plaqUpper}] Plaqueta com ${plaquetasCadastradas.length} registros duplicados no banco. Não atualiza automaticamente para permitir unificação/aprovação.`);
+                    continue;
+                  }
+
+                  // CONFLITO 1: Se o operador selecionou um poste que já tem uma plaqueta DIFERENTE vinculada
+                  if (pt.conflito_plaqueta_poste) {
+                    console.log(`⚠️ [Plaqueta #${plaqUpper}] Poste #${pt.poste_id_selecionado} já vinculado à plaqueta #${pt.poste_plaqueta_vinculada}. Não atualiza automaticamente e requer aprovação.`);
+                    continue;
+                  }
+
+                  // CONFLITO 3: Se essa plaqueta já foi vinculada ou registrada anteriormente em OUTRO poste na base aérea
+                  var resPosteAnterior = await client.from('postes_base_aerea')
+                    .select('id, id_plaqueta_vinculada')
+                    .ilike('id_plaqueta_vinculada', '%' + plaqUpper + '%')
+                    .limit(10);
+                  var postesVinculadosAntes = (resPosteAnterior && resPosteAnterior.data) ? resPosteAnterior.data : [];
+                  var outroPosteVinculado = postesVinculadosAntes.find(p => {
+                    var pArr = String(p.id_plaqueta_vinculada || '').toUpperCase().split(',').map(s => s.trim());
+                    return pArr.includes(plaqUpper) && (!pt.poste_id_selecionado || String(p.id) !== String(pt.poste_id_selecionado));
+                  });
+                  if (outroPosteVinculado) {
+                    console.log(`⚠️ [Plaqueta #${plaqUpper}] Plaqueta já esteve vinculada ao Poste #${outroPosteVinculado.id} anteriormente. Requer aprovação.`);
+                    continue;
+                  }
+
+                  // 0. Determinar as coordenadas alvo para calibração da plaqueta:
+                  // Se o técnico selecionou um poste na base aérea, a plaqueta DEVE ser cravada nas coordenadas EXATAS do poste!
+                  var temPosteSelecionadoValido = Boolean(pt.poste_id_selecionado && !pt.poste_nao_encontrado);
+                  var pLatCalib = pLat;
+                  var pLngCalib = pLng;
+                  var ehSnapPoste = false;
+
+                  if (temPosteSelecionadoValido) {
+                    if (pt.poste_lat && pt.poste_lng && !isNaN(pt.poste_lat) && !isNaN(pt.poste_lng) && pt.poste_lat !== 0 && pt.poste_lng !== 0) {
+                      pLatCalib = pt.poste_lat;
+                      pLngCalib = pt.poste_lng;
+                      ehSnapPoste = true;
+                    } else {
+                      // Se não veio no payload, busca as coordenadas exatas do poste selecionado
+                      try {
+                        var resPosteCoord = await client.from('postes_base_aerea')
+                          .select('id, latitude, longitude')
+                          .eq('id', pt.poste_id_selecionado)
+                          .maybeSingle();
+                        if (resPosteCoord && resPosteCoord.data) {
+                          var pstLat = parseFloat(resPosteCoord.data.latitude);
+                          var pstLng = parseFloat(resPosteCoord.data.longitude);
+                          if (!isNaN(pstLat) && !isNaN(pstLng) && pstLat !== 0 && pstLng !== 0) {
+                            pLatCalib = pstLat;
+                            pLngCalib = pstLng;
+                            ehSnapPoste = true;
+                          }
+                        }
+                      } catch (ePosteCoord) {
+                        console.warn('Aviso ao consultar coordenadas do poste selecionado:', ePosteCoord);
+                      }
+                    }
+                  }
+
+                  if (plaquetasCadastradas.length === 1) {
+                    var registroPlaq = plaquetasCadastradas[0];
+                    var latCad = parseFloat(String(registroPlaq.Latitude || '').replace(',', '.'));
+                    var lngCad = parseFloat(String(registroPlaq.Longitude || '').replace(',', '.'));
 
                     var temCoordValida = !isNaN(latCad) && !isNaN(lngCad) && latCad !== 0 && lngCad !== 0;
-                    var distM = temCoordValida ? calcularDistanciaMetros(latCad, lngCad, pLat, pLng) : null;
+                    
+                    // O desvio de 15 metros é calculado em cima da distância do poste (ou GPS se sem poste) para a posição original cadastrada da plaqueta
+                    var distM = temCoordValida ? calcularDistanciaMetros(latCad, lngCad, pLatCalib, pLngCalib) : null;
 
-                    // REGRA DE OURO: Se já existe com coordenada e a distância for superior a 15 metros,
-                    // NÃO atualiza a localização da plaqueta diretamente.
-                    // A OS é salva com a coordenada de reparo para entrar na fila de aprovação de coordenadas no Controle-Plaquetas.html.
+                    // REGRA DE DISTÂNCIA (> 15 metros entre o poste/alvo e o ponto original cadastrado)
                     if (temCoordValida && distM !== null && distM > 15) {
-                      console.log(`⚠️ [Plaqueta #${plaqUpper}] Desvio de ${distM}m (> 15m). Mantendo coordenada cadastrada e enviando para fila de aprovação no Controle de Plaquetas.`);
+                      console.log(`⚠️ [Plaqueta #${plaqUpper}] Desvio de ${distM}m (> 15m) entre a posição cadastrada original e o poste/alvo. Mantendo cadastro atual e enviando para fila de aprovação.`);
                       continue;
                     }
 
-                    // Se a distância for <= 15 metros (ou não tinha coordenada anterior válida), calibra a posição
+                    // Se a distância for <= 15 metros (ou não tinha coordenada anterior válida) e sem conflitos, calibra na posição exata do poste
                     await client.from('localizacao_plaquetas').update({
-                      Latitude: pLat,
-                      Longitude: pLng
-                    }).eq('id', resPlaq.data.id);
+                      Latitude: pLatCalib,
+                      Longitude: pLngCalib
+                    }).eq('id', registroPlaq.id);
+
+                    // Atualiza o vínculo do poste na base aérea caso tenha sido selecionado
+                    if (ehSnapPoste && pt.poste_id_selecionado) {
+                      try {
+                        var resPstVinc = await client.from('postes_base_aerea')
+                          .select('id, id_plaqueta_vinculada')
+                          .eq('id', pt.poste_id_selecionado)
+                          .maybeSingle();
+                        if (resPstVinc && resPstVinc.data) {
+                          var vincExistente = String(resPstVinc.data.id_plaqueta_vinculada || '').trim().toUpperCase();
+                          var vincArr = vincExistente ? vincExistente.split(',').map(s => s.trim()).filter(Boolean) : [];
+                          if (!vincArr.includes(plaqUpper)) {
+                            vincArr.push(plaqUpper);
+                            await client.from('postes_base_aerea')
+                              .update({ id_plaqueta_vinculada: vincArr.join(', ') })
+                              .eq('id', pt.poste_id_selecionado);
+                          }
+                        }
+                      } catch (eUpPoste) {
+                        console.warn('Aviso ao vincular plaqueta ao poste na base aérea:', eUpPoste);
+                      }
+                    }
+
+                    var obsHist = ehSnapPoste
+                      ? 'Calibração em Poste Aéreo #' + pt.poste_id_selecionado + ' (desvio original <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal
+                      : 'Calibração fina (desvio <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal;
 
                     await client.from('historico_localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
-                      latitude: pLat,
-                      longitude: pLng,
+                      latitude: pLatCalib,
+                      longitude: pLngCalib,
                       numero_os: protFinal,
-                      origem: 'FINALIZAR_OS',
+                      origem: ehSnapPoste ? 'SNAP_POSTE_AEREO' : 'FINALIZAR_OS',
                       usuario: nomeOperadorFinalizacao,
-                      observacao: 'Calibração fina (desvio <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal
+                      observacao: obsHist
                     }]);
                   } else {
-                    // Plaqueta não existia no cadastro: insere o novo registro
+                    // Plaqueta não existia no cadastro: insere o novo registro cravado na posição do poste/alvo
                     await client.from('localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
-                      Latitude: pLat,
-                      Longitude: pLng,
+                      Latitude: pLatCalib,
+                      Longitude: pLngCalib,
                       "QTD. Lum.": 1,
                       Empresa: 'FORTNORT',
-                      Observação: 'Cadastrada via Finalização OS #' + protFinal
+                      Observação: (ehSnapPoste ? 'Cadastrada no Poste #' + pt.poste_id_selecionado : 'Cadastrada') + ' via Finalização OS #' + protFinal
                     }]);
+
+                    if (ehSnapPoste && pt.poste_id_selecionado) {
+                      try {
+                        var resPstVincNova = await client.from('postes_base_aerea')
+                          .select('id, id_plaqueta_vinculada')
+                          .eq('id', pt.poste_id_selecionado)
+                          .maybeSingle();
+                        if (resPstVincNova && resPstVincNova.data) {
+                          var vincArrNova = String(resPstVincNova.data.id_plaqueta_vinculada || '').toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
+                          if (!vincArrNova.includes(plaqUpper)) {
+                            vincArrNova.push(plaqUpper);
+                            await client.from('postes_base_aerea')
+                              .update({ id_plaqueta_vinculada: vincArrNova.join(', ') })
+                              .eq('id', pt.poste_id_selecionado);
+                          }
+                        }
+                      } catch (eUpPosteNova) {
+                        console.warn('Aviso ao vincular nova plaqueta ao poste:', eUpPosteNova);
+                      }
+                    }
 
                     await client.from('historico_localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
-                      latitude: pLat,
-                      longitude: pLng,
+                      latitude: pLatCalib,
+                      longitude: pLngCalib,
                       numero_os: protFinal,
-                      origem: 'FINALIZAR_OS',
+                      origem: ehSnapPoste ? 'SNAP_POSTE_AEREO' : 'CADASTRO_NOVA_PLAQUETA',
                       usuario: nomeOperadorFinalizacao,
-                      observacao: 'Nova plaqueta cadastrada ao finalizar OS #' + protFinal
+                      observacao: (ehSnapPoste ? 'Nova plaqueta cadastrada no Poste #' + pt.poste_id_selecionado : 'Nova plaqueta cadastrada') + ' ao finalizar OS #' + protFinal
                     }]);
                   }
                 }
@@ -3304,32 +3437,23 @@
         }
       }
 
-      function previewFotoEntradaPraca(event) {
+      async function previewFotoEntradaPraca(event) {
         var file = event.target.files[0];
         if (!file) return;
         fotoEntradaPracaNome = file.name || "foto_entrada.jpg";
 
-        var reader = new FileReader();
-        reader.onload = function(e) {
-          fotoEntradaPracaBase64 = e.target.result;
-          document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
-          document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
-          salvarRascunhoFinalizar();
+        var tempUrl = URL.createObjectURL(file);
+        document.getElementById('imgPreviewEntradaPraca').src = tempUrl;
+        document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
 
-          var service = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-          if (service && typeof service.compressImage === 'function') {
-            service.compressImage(fotoEntradaPracaBase64, 1200, 0.75).then(function(compressedBase64) {
-              if (compressedBase64) {
-                fotoEntradaPracaBase64 = compressedBase64;
-                document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
-                salvarRascunhoFinalizar();
-              }
-            }).catch(function(err) {
-              console.warn('⚠️ Compressão de segundo plano da praça falhou:', err);
-            });
-          }
-        };
-        reader.readAsDataURL(file);
+        var b64 = await otimizarEComprimirFoto(file, 1200, 0.75);
+        URL.revokeObjectURL(tempUrl);
+
+        if (b64) {
+          fotoEntradaPracaBase64 = b64;
+          document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+          salvarRascunhoFinalizar();
+        }
       }
 
       function removerFotoEntradaPraca() {
@@ -3341,47 +3465,19 @@
         salvarRascunhoFinalizar();
       }
 
-      function adicionarFotoAndamentoPraca(event) {
+      async function adicionarFotoAndamentoPraca(event) {
         var files = event.target.files;
         if (!files || files.length === 0) return;
 
-        var cdnService = window.cloudinaryService || (window.CloudinaryService ? new window.CloudinaryService() : null);
-        var pendingCount = files.length;
+        for (var i = 0; i < files.length; i++) {
+          var b64 = await otimizarEComprimirFoto(files[i], 1200, 0.75);
+          if (b64) {
+            fotosAndamentoPracaBase64Arr.push(b64);
+          }
+        }
 
-        Array.from(files).forEach(function(file) {
-          var reader = new FileReader();
-          reader.onload = function(e) {
-            var rawBase64 = e.target.result;
-            
-            if (cdnService && typeof cdnService.compressImage === 'function') {
-              cdnService.compressImage(rawBase64, 1200, 0.75).then(function(compressedBase64) {
-                fotosAndamentoPracaBase64Arr.push(compressedBase64 || rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) {
-                  renderizarPreviewsAndamentoPraca();
-                  salvarRascunhoFinalizar();
-                }
-              }).catch(function(err) {
-                console.warn('⚠️ Compressão de foto do andamento falhou:', err);
-                fotosAndamentoPracaBase64Arr.push(rawBase64);
-                pendingCount--;
-                if (pendingCount === 0) {
-                  renderizarPreviewsAndamentoPraca();
-                  salvarRascunhoFinalizar();
-                }
-              });
-            } else {
-              fotosAndamentoPracaBase64Arr.push(rawBase64);
-              pendingCount--;
-              if (pendingCount === 0) {
-                renderizarPreviewsAndamentoPraca();
-                salvarRascunhoFinalizar();
-              }
-            }
-          };
-          reader.readAsDataURL(file);
-        });
-
+        renderizarPreviewsAndamentoPraca();
+        salvarRascunhoFinalizar();
         event.target.value = "";
       }
 

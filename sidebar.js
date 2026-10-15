@@ -749,6 +749,11 @@ window.navigateSPA = async function(targetUrl, pushState = true) {
         // Reiniciar controller correspondente
         reinitPageControllers(targetUrl);
 
+        // Se Tailwind CDN estiver ativo, solicitar releitura das novas classes injetadas
+        if (window.tailwind && typeof window.tailwind.refresh === 'function') {
+            try { window.tailwind.refresh(); } catch (e) {}
+        }
+
         // Re-inicializar botão flutuante de scroll
         if (typeof window.initScrollToBottomButton === 'function') {
             window.initScrollToBottomButton();

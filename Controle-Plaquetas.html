@@ -201,6 +201,17 @@
         .resizer.resizing::after {
             background-color: #0051d5;
         }
+
+        /* Mapbox GL Marker Precision Fix: previne que transitions ou transforms CSS atrasem/desloquem a posição do marcador no zoom */
+        .mapboxgl-marker {
+            transition: none !important;
+            will-change: transform;
+        }
+        .mapboxgl-marker,
+        .mapboxgl-marker * {
+            transition: none !important;
+            animation: none !important;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
@@ -314,6 +325,11 @@
             <span class="material-symbols-outlined text-[19px] text-amber-600">verified</span>
             <span>Aprovação de Coordenadas de OS</span>
             <span id="badge-contador-pendentes-aprovacao" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-300 ml-1">0</span>
+        </button>
+        <button type="button" id="tab-btn-historico" onclick="window.alternarAbaPlaquetas('historico')" 
+                class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high">
+            <span class="material-symbols-outlined text-[19px] text-purple-600">history</span>
+            <span>Histórico de Alterações</span>
         </button>
     </div>
 
@@ -587,75 +603,79 @@
         <!-- KPI Grid de Auditoria de Coordenadas -->
         <div class="grid grid-cols-12 gap-card-gap mb-4">
             <!-- Card 1: Pendentes de Aprovação -->
-            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
                     <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Pendentes</span>
-                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
                         <span class="material-symbols-outlined text-[20px]">pending_actions</span>
                     </div>
                 </div>
-                <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-total-pendentes">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">OSs concluídas aguardando revisão</div>
+                <div class="font-headline-lg text-headline-lg text-indigo-600 font-bold" id="kpi-aprov-total-pendentes">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Total aguardando revisão</div>
             </div>
 
-            <!-- Card 2: Divergência Baixa (< 15m) -->
+            <!-- Card 2: Conflitos de Poste / Plaqueta -->
             <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Baixa (&le; 15m)</span>
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Conflitos de Poste</span>
+                    <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">electric_bolt</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-purple-600 font-bold" id="kpi-aprov-conflito-postes">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Poste ocupado ou plaqueta migrada</div>
+            </div>
+
+            <!-- Card 3: Plaqueta Duplicada no Banco -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Plaquetas Duplicadas</span>
+                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">content_copy</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-duplicadas-banco">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">2+ pontos no cadastro oficial</div>
+            </div>
+
+            <!-- Card 4: Desvio Geodésico Alto (> 15m) -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Desvio > 15m</span>
+                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">near_me_disabled</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-rose-600 font-bold" id="kpi-aprov-alta-dist">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Acima do limite automático</div>
+            </div>
+
+            <!-- Card 5: Desvio Baixo (<= 15m) -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Desvio &le; 15m</span>
                     <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
                         <span class="material-symbols-outlined text-[20px]">check_circle</span>
                     </div>
                 </div>
                 <div class="font-headline-lg text-headline-lg text-emerald-600 font-bold" id="kpi-aprov-baixa-dist">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Variação natural de GPS</div>
-            </div>
-
-            <!-- Card 3: Divergência Média (15m a 50m) -->
-            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Média (15m - 50m)</span>
-                    <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-[20px]">warning</span>
-                    </div>
-                </div>
-                <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-media-dist">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Requer conferência visual</div>
-            </div>
-
-            <!-- Card 4: Divergência Alta (> 50m) -->
-            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
-                <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Alta (> 50m)</span>
-                    <div class="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center">
-                        <span class="material-symbols-outlined text-[20px]">error</span>
-                    </div>
-                </div>
-                <div class="font-headline-lg text-headline-lg text-rose-600 font-bold" id="kpi-aprov-alta-dist">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Possível plaqueta incorreta</div>
+                <div class="text-on-surface-variant text-xs mt-1">Calibração fina com alerta</div>
             </div>
         </div>
 
         <!-- Tabela de Aprovação -->
         <div class="bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] overflow-hidden">
-            <!-- Header da Tabela com Filtros e Ações em Lote -->
+            <!-- Header da Tabela com Ações em Lote e Atualizar -->
             <div class="px-5 py-3.5 border-b border-outline-variant bg-[#F8FAFC]/80 flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-amber-600 text-[22px]">published_with_changes</span>
                     <div>
                         <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Fila de Aprovação de Coordenadas de OS</h3>
-                        <p class="text-xs text-on-surface-variant">Comparativo geodésico entre o cadastro e o reparo em campo.</p>
+                        <p class="text-xs text-on-surface-variant">Comparativo geodésico, vínculos de postes e validação de duplicatas.</p>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2 flex-wrap">
-                    <!-- Filtro de Divergência -->
-                    <select id="filtro-aprov-faixa" onchange="window.aplicarFiltrosAprovacao()" class="text-xs font-semibold bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5 text-on-surface focus:outline-none cursor-pointer">
-                        <option value="todas">Todas as distâncias</option>
-                        <option value="baixa">&le; 15 metros (Alta confiança)</option>
-                        <option value="media">15m a 50m (Média divergência)</option>
-                        <option value="alta">&gt; 50 metros (Alta divergência)</option>
-                    </select>
-
                     <!-- Botão Aprovar Selecionadas -->
                     <button type="button" id="btn-aprovar-lote-coord" onclick="window.aprovarCoordenadasSelecionadasLote()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-40 disabled:pointer-events-none" disabled>
                         <span class="material-symbols-outlined text-[17px]">done_all</span>
@@ -677,12 +697,167 @@
                             <th class="py-3 px-3 w-10 text-center">
                                 <input type="checkbox" id="chk-aprov-todos" onchange="window.toggleSelecionarTodasAprovacoes(this.checked)" class="rounded text-secondary focus:ring-secondary cursor-pointer">
                             </th>
-                            <th class="py-3 px-4">OS / Protocolo</th>
-                            <th class="py-3 px-4">Plaqueta</th>
+                            
+                            <!-- Coluna OS / Protocolo -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-os-filter-trigger" title="Filtrar por OS / Protocolo">
+                                        <span class="font-label-md uppercase tracking-wider">OS / Protocolo</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="aprov-os-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de OS -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="aprov-os-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar por Protocolo / OS</span>
+                                            <div class="relative">
+                                                <input type="text" id="aprov-search-os-input" placeholder="Ex: 517439..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroOSAprovacao()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna Plaqueta -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 150px; min-width: 150px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-placa-filter-trigger" title="Filtrar por Plaqueta">
+                                        <span class="font-label-md uppercase tracking-wider">Plaqueta</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="aprov-placa-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Plaqueta -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="aprov-placa-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Plaqueta</span>
+                                            <div class="relative">
+                                                <input type="text" id="aprov-search-placa-input" placeholder="Ex: 12345..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroPlacaAprovacao()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna Motivo / Alerta (Substitui o antigo select avulso) -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 220px; min-width: 220px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-motivo-filter-trigger" title="Filtrar por Motivo de Aprovação">
+                                        <span class="font-label-md uppercase tracking-wider">Motivo / Alerta</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="aprov-motivo-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Motivos -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="aprov-motivo-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Motivo / Alerta</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors font-medium">
+                                                <input type="radio" name="aprov-motivo-radio" value="todas" checked class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>Todos os motivos</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="conflito_poste" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>⚡ Conflitos de Poste / Vínculo</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="duplicata_banco" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>📑 Plaquetas Duplicadas (2+ pontos)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="desvio_alto" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>📍 Desvio Geodésico &gt; 15m</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="baixa" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>&le; 15 metros</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="alta" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>&gt; 50 metros</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.limparFiltroMotivoAprovacao()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna Coord. Cadastrada -->
                             <th class="py-3 px-4">Coord. Cadastrada</th>
+
+                            <!-- Coluna Coord. da OS (Campo) -->
                             <th class="py-3 px-4">Coord. da OS (Campo)</th>
-                            <th class="py-3 px-4 text-center">Distância / Desvio</th>
-                            <th class="py-3 px-4">Conclusão / Operador</th>
+
+                            <!-- Coluna Distância / Desvio -->
+                            <th class="py-3 px-4 text-center whitespace-nowrap relative overflow-visible" style="width: 160px; min-width: 160px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-dist-filter-trigger" title="Filtrar por Faixa de Desvio">
+                                        <span class="font-label-md uppercase tracking-wider">Distância / Desvio</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="aprov-dist-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Desvio -->
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="aprov-dist-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Faixa de Desvio</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors font-medium">
+                                                <input type="radio" name="aprov-dist-radio" value="todas" checked class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>Todas as distâncias</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-dist-radio" value="baixa" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>Até 15 metros (&le; 15m)</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-dist-radio" value="media" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>Entre 15m e 50m</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-dist-radio" value="alta" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
+                                                <span>Acima de 50 metros (&gt; 50m)</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.limparFiltroDistAprovacao()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna Operador -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-operador-filter-trigger" title="Filtrar por Operador">
+                                        <span class="font-label-md uppercase tracking-wider">OPERADOR</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-amber-600 hidden" id="aprov-operador-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Operador -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="aprov-operador-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar por Operador</span>
+                                            <div class="relative">
+                                                <input type="text" id="aprov-search-operador-input" placeholder="Ex: João, Silva..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-amber-600 focus:border-amber-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroOperadorAprovacao()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna Ações -->
                             <th class="py-3 px-4 text-center">Ações</th>
                         </tr>
                     </thead>
@@ -704,6 +879,246 @@
         </div>
     </div>
     <!-- FIM SEÇÃO 2: Aprovação de Coordenadas -->
+
+    <!-- SEÇÃO 3: Histórico de Alterações de Plaquetas (Audit Log Geodésico) -->
+    <div id="secao-historico-plaquetas" class="space-y-4 max-w-max-width-content mx-auto hidden" style="display: none;">
+        <!-- Tabela de Histórico -->
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xs overflow-hidden">
+            <!-- Loading Indicator -->
+            <div id="hist-tabela-loading" class="hidden py-14 text-center">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-3 border-purple-600 border-t-transparent mb-3"></div>
+                <p class="text-xs text-on-surface-variant font-medium">Consultando registros no Supabase...</p>
+            </div>
+
+            <!-- Empty State -->
+            <div id="hist-tabela-empty" class="hidden py-16 text-center text-on-surface-variant">
+                <span class="material-symbols-outlined text-[48px] text-slate-300 mb-2">find_in_page</span>
+                <p class="text-sm font-semibold text-on-surface">Nenhum registro de movimentação encontrado</p>
+                <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Tente ajustar os filtros no cabeçalho da tabela.</p>
+            </div>
+
+            <!-- Container da Tabela -->
+            <div id="hist-tabela-wrapper" class="w-full min-h-[320px] overflow-x-auto">
+                <table class="w-full text-left border-collapse text-xs" id="tabela-historico-movimentacoes">
+                    <thead>
+                        <tr class="bg-[#F8FAFC]/90 border-b border-outline-variant font-semibold text-on-surface-variant uppercase tracking-wider select-none">
+                            <!-- Coluna 1: Data / Período -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-date-filter-trigger" title="Filtrar por Período">
+                                        <span class="font-label-md uppercase tracking-wider">Data / Hora</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="hist-date-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Período / Data -->
+                                    <div class="absolute left-0 mt-2 w-72 min-w-[280px] bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-4 animate-fade-in-up hidden" id="hist-date-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold px-1 mb-1">Filtrar por Período</span>
+                                            <button type="button" data-hist-periodo="7" class="hist-quick-periodo-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded-lg transition-all cursor-pointer flex items-center justify-between" onclick="window.aplicarFiltroPeriodoHistorico('7')">
+                                                <span>Últimos 7 dias</span>
+                                                <span class="material-symbols-outlined text-[16px] text-purple-600 check-icon hidden">check</span>
+                                            </button>
+                                            <button type="button" data-hist-periodo="30" class="hist-quick-periodo-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded-lg transition-all cursor-pointer flex items-center justify-between" onclick="window.aplicarFiltroPeriodoHistorico('30')">
+                                                <span>Últimos 30 dias</span>
+                                                <span class="material-symbols-outlined text-[16px] text-purple-600 check-icon">check</span>
+                                            </button>
+                                            <button type="button" data-hist-periodo="90" class="hist-quick-periodo-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded-lg transition-all cursor-pointer flex items-center justify-between" onclick="window.aplicarFiltroPeriodoHistorico('90')">
+                                                <span>Últimos 90 dias</span>
+                                                <span class="material-symbols-outlined text-[16px] text-purple-600 check-icon hidden">check</span>
+                                            </button>
+                                            <button type="button" data-hist-periodo="todos" class="hist-quick-periodo-btn w-full text-left px-3 py-2 hover:bg-surface-container-low text-on-surface font-body-md rounded-lg transition-all cursor-pointer flex items-center justify-between" onclick="window.aplicarFiltroPeriodoHistorico('todos')">
+                                                <span>Todo o Histórico</span>
+                                                <span class="material-symbols-outlined text-[16px] text-purple-600 check-icon hidden">check</span>
+                                            </button>
+                                            
+                                            <div class="border-t border-outline-variant my-1 pt-1.5">
+                                                <button type="button" class="text-error font-label-md hover:underline cursor-pointer text-left px-1" onclick="window.limparFiltroDataHistorico()">Restaurar Padrão (30 dias)</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna 2: Plaqueta com busca rápida integrada -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 140px; min-width: 140px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-placa-filter-trigger" title="Filtrar por Plaqueta">
+                                        <span class="font-label-md uppercase tracking-wider">Plaqueta</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="hist-placa-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Plaqueta -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="hist-placa-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Plaqueta</span>
+                                            <div class="relative">
+                                                <input type="text" id="hist-search-plaqueta-input" placeholder="Ex: 12345..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-purple-600 focus:border-purple-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroPlaquetaHistorico()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna 3: Tipo de Movimentação com filtro de checklist/seleção -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 220px; min-width: 220px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-origem-filter-trigger" title="Filtrar por Tipo de Movimentação">
+                                        <span class="font-label-md uppercase tracking-wider">Tipo de Movimentação</span>
+                                        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="hist-origem-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Origem -->
+                                    <div class="absolute left-0 mt-2 w-64 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="hist-origem-filter-dropdown">
+                                        <div class="flex flex-col gap-1.5 font-normal normal-case text-on-surface text-body-md">
+                                            <span class="text-label-sm text-on-surface-variant font-semibold uppercase px-2 mb-1">Filtrar Movimentações</span>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors font-medium">
+                                                <input type="radio" name="hist-origem-radio" value="" checked class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Todas as Movimentações</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="APROVACAO_OS" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Aprovação de OS</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="SNAP_POSTE_AEREO" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Ajuste Poste Aéreo</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="TRIGGER_UPDATE" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Trigger Banco de Dados</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="EDICAO_MAPA" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Edição via Mapa</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="EDICAO_FORMULARIO" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Edição Formulário</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="CADASTRO_NOVA_PLAQUETA" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Nova Plaqueta</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="DESCARTE_OS" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Descarte de OS</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="FINALIZAR_OS" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Finalização de OS</span>
+                                            </label>
+                                            <div class="border-t border-outline-variant my-1 pt-1">
+                                                <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.limparFiltroOrigemHistorico()">Limpar Filtro</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna 4: Desvio / Distância -->
+                            <th class="py-3 px-4 whitespace-nowrap text-center">Desvio / Distância</th>
+
+                            <!-- Coluna 5: Ordem de Serviço (OS) com filtro de busca rápida -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-os-filter-trigger" title="Filtrar por Ordem de Serviço">
+                                        <span class="font-label-md uppercase tracking-wider">Ordem de Serviço (OS)</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="hist-os-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de OS -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="hist-os-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar por Ordem de Serviço</span>
+                                            <div class="relative">
+                                                <input type="text" id="hist-search-os-input" placeholder="Ex: 517439..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-purple-600 focus:border-purple-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroOSHistorico()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna 6: Usuário Responsável com filtro de busca rápida -->
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                                <div class="relative inline-block text-left">
+                                    <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-usuario-filter-trigger" title="Filtrar por Usuário">
+                                        <span class="font-label-md uppercase tracking-wider">Usuário Responsável</span>
+                                        <span class="material-symbols-outlined text-[18px]">search</span>
+                                        <span class="w-2 h-2 rounded-full bg-purple-600 hidden" id="hist-usuario-filter-indicator"></span>
+                                    </button>
+
+                                    <!-- Dropdown Flutuante de Usuário -->
+                                    <div class="absolute left-0 mt-2 w-72 bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl z-50 p-3 animate-fade-in-up hidden" id="hist-usuario-filter-dropdown">
+                                        <div class="flex flex-col gap-2">
+                                            <span class="text-label-sm text-on-surface-variant uppercase font-semibold">Buscar Usuário Responsável</span>
+                                            <div class="relative">
+                                                <input type="text" id="hist-search-usuario-input" placeholder="Ex: João, Sistema..." class="w-full text-xs border border-outline-variant rounded-lg px-3 py-1.5 pl-8 focus:ring-1 focus:ring-purple-600 focus:border-purple-600 outline-none bg-surface-container-lowest text-on-surface" />
+                                                <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-[16px] text-on-surface-variant/60">search</span>
+                                            </div>
+                                            <button type="button" class="text-error font-label-md hover:underline text-left cursor-pointer" onclick="window.limparFiltroUsuarioHistorico()">Limpar Filtro</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </th>
+
+                            <!-- Coluna 7: Observações -->
+                            <th class="py-3 px-4">Observações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbody-historico-movimentacoes" class="divide-y divide-outline-variant/60 bg-surface-container-lowest">
+                        <!-- Linhas geradas via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Rodapé com Paginação e Contadores -->
+            <div class="px-5 py-3 border-t border-outline-variant bg-[#F8FAFC]/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-on-surface-variant select-none">
+                <div class="flex items-center gap-3">
+                    <button type="button" onclick="window.recarregarHistoricoPlaquetas(true)" 
+                            class="p-1.5 rounded-lg border border-outline-variant bg-white hover:bg-slate-100 text-on-surface transition-all active:scale-95 cursor-pointer flex items-center justify-center text-purple-600" 
+                            title="Atualizar Histórico">
+                        <span id="hist-btn-refresh-icon" class="material-symbols-outlined text-[17px]">refresh</span>
+                    </button>
+                    <div id="hist-info-paginacao" class="font-medium text-slate-600">
+                        Carregando histórico...
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-3 mr-12 sm:mr-16">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-slate-500">Por página:</span>
+                        <select id="hist-itens-por-pagina" onchange="window.mudarTamanhoPaginaHistorico(this.value)" class="text-xs py-1 px-2 rounded-lg border border-outline-variant bg-white text-slate-700 cursor-pointer">
+                            <option value="25">25</option>
+                            <option value="50" selected>50</option>
+                            <option value="100">100</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center gap-1">
+                        <button type="button" id="hist-btn-prev" onclick="window.mudarPaginaHistorico(-1)" 
+                                class="p-1.5 rounded-lg border border-outline-variant bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[16px]">chevron_left</span>
+                        </button>
+                        <span id="hist-indicador-pagina" class="px-2 py-1 font-semibold text-slate-800">1</span>
+                        <button type="button" id="hist-btn-next" onclick="window.mudarPaginaHistorico(1)" 
+                                class="p-1.5 rounded-lg border border-outline-variant bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- FIM SEÇÃO 3: Histórico de Alterações -->
 
     <!-- Botão Flutuante de Rolar até o Fundo / Topo (Scroll FAB) -->
     <button id="btn-scroll-bottom" 
@@ -910,8 +1325,8 @@
 </div>
 
 <!-- MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA -->
-<div id="modal-historico-plaqueta" onclick="if (event.target === this) window.fecharModalHistoricoPlaqueta()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
-    <div id="modal-historico-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-3xl w-full h-[85vh] max-h-[700px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+<div id="modal-historico-plaqueta" onclick="if (event.target === this) window.fecharModalHistoricoPlaqueta()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-historico-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[85vh] max-h-[700px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
         <!-- Header -->
         <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
             <div class="flex items-center gap-3">
@@ -929,7 +1344,7 @@
         </div>
 
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto p-5 space-y-4">
+        <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4">
             <div id="historico-loading" class="text-center py-8 text-slate-500 font-medium hidden">
                 <span class="material-symbols-outlined text-[32px] animate-spin text-purple-600 mb-2">sync</span>
                 <p>Carregando histórico do Supabase...</p>
@@ -941,14 +1356,14 @@
                 <p class="text-xs text-slate-400 mt-1">As alterações de posição desta plaqueta serão gravadas automaticamente aqui.</p>
             </div>
 
-            <div id="historico-content" class="hidden">
-                <table class="w-full text-left text-xs border-collapse">
+            <div id="historico-content" class="hidden w-full">
+                <table class="w-full text-left text-xs border-collapse table-fixed">
                     <thead>
                         <tr class="border-b border-slate-200 bg-slate-100 text-slate-700 font-bold uppercase tracking-wider">
-                            <th class="py-2.5 px-3">Data / Hora</th>
-                            <th class="py-2.5 px-3">Posição Registrada</th>
-                            <th class="py-2.5 px-3">Nº da OS</th>
-                            <th class="py-2.5 px-3">Usuário / Origem</th>
+                            <th class="py-2.5 px-3 w-36">Data / Hora</th>
+                            <th class="py-2.5 px-3 w-40">Posição</th>
+                            <th class="py-2.5 px-3 w-28">Nº da OS</th>
+                            <th class="py-2.5 px-3 w-36">Usuário</th>
                             <th class="py-2.5 px-3">Observação</th>
                         </tr>
                     </thead>
@@ -999,22 +1414,28 @@
                     <span id="comp-panel-dist-badge" class="px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">0 m</span>
                 </div>
 
+                <!-- Banner com o Motivo do Pedido de Aprovação -->
+                <div id="comp-panel-motivo-box" class="p-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">Motivo da Solicitação:</div>
+                    <div id="comp-panel-motivo-conteudo" class="flex flex-col gap-1"></div>
+                </div>
+
                 <div class="space-y-2">
-                    <!-- Ponto 1: Original -->
+                    <!-- Ponto 1: Original / Referência -->
                     <div class="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
                         <div class="w-3.5 h-3.5 rounded-full bg-blue-600 mt-0.5 flex-shrink-0 ring-4 ring-blue-100"></div>
                         <div class="min-w-0 flex-1">
-                            <span class="font-bold text-blue-900 text-[11px] block">Ponto Cadastrado Atual</span>
+                            <span class="font-bold text-blue-900 text-[11px] block" id="comp-panel-orig-label">Ponto Cadastrado Atual</span>
                             <span class="font-mono text-[11px] text-blue-700 break-all" id="comp-panel-orig-coords">-</span>
                         </div>
                     </div>
 
-                    <!-- Ponto 2: OS Campo -->
+                    <!-- Ponto 2: OS Campo / Esta Movimentação -->
                     <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 flex items-start gap-2.5">
                         <div class="w-3.5 h-3.5 rounded-full bg-amber-600 mt-0.5 flex-shrink-0 ring-4 ring-amber-100"></div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between">
-                                <span class="font-bold text-amber-900 text-[11px] block">Ponto Registrado na OS Concluída</span>
+                                <span class="font-bold text-amber-900 text-[11px] block" id="comp-panel-os-label">Ponto Registrado na OS Concluída</span>
                                 <button type="button" onclick="window.abrirDetalhesOSModalComparativo()" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer" title="Abrir modal completo de detalhes e fotos da OS">
                                     <span class="material-symbols-outlined text-[13px]">visibility</span>
                                     <span>Ver OS Completa</span>
@@ -1056,11 +1477,13 @@
                         <p class="text-[10px] text-amber-700 leading-tight">
                             Existem múltiplos registros para este código. Selecione no mapa qual ponto você deseja calibrar:
                         </p>
-                        <div id="comp-panel-duplicadas-lista" class="space-y-1.5 max-h-28 overflow-y-auto pr-1"></div>
-                        <label class="flex items-center gap-2 pt-1 border-t border-amber-200/80 text-[11px] font-semibold text-amber-900 cursor-pointer select-none">
-                            <input type="checkbox" id="chk-limpar-duplicatas-obsoletas" checked class="rounded text-amber-600 focus:ring-amber-500 cursor-pointer">
-                            <span>Remover as outras duplicatas obsoletas do banco ao aprovar</span>
-                        </label>
+                        <div id="comp-panel-duplicadas-lista" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+                        <div class="flex items-center justify-between pt-1 border-t border-amber-200/80 text-[10px] text-amber-900 font-medium">
+                            <span class="flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[13px] text-rose-600">delete_sweep</span>
+                                <span>Marque <strong class="text-rose-700">Remover</strong> nos pontos individuais que deseja excluir</span>
+                            </span>
+                        </div>
                     </div>
 
                     <div id="comp-panel-poste-dica" class="text-[10px] text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-200 flex items-center gap-1.5">
@@ -1070,18 +1493,33 @@
                 </div>
 
                 <!-- Botões de Ação -->
-                <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
-                    <button type="button" onclick="window.fecharModalComparativoCoords()" class="py-2 px-3 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-100 transition-all text-xs text-center cursor-pointer" title="Fechar este modal sem alterar nada">
-                        Cancelar
-                    </button>
-                    <button type="button" id="btn-descartar-modal-comp" onclick="window.confirmarDescarteModalComparativo()" class="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold text-rose-700 transition-all text-xs text-center flex items-center justify-center gap-1 cursor-pointer" title="Descartar a sugestão da OS e manter a coordenada original da plaqueta">
-                        <span class="material-symbols-outlined text-[15px]">close</span>
-                        <span>Descartar</span>
-                    </button>
-                    <button type="button" id="btn-aprovar-modal-comp" onclick="window.confirmarAprovacaoModalComparativo()" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white transition-all text-xs text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer">
-                        <span class="material-symbols-outlined text-[16px]">check</span>
-                        <span id="btn-aprovar-modal-comp-label">Aprovar Alteração</span>
-                    </button>
+                <div class="space-y-1.5 pt-2 border-t border-slate-100">
+                    <!-- Opções especiais quando o poste selecionado já possui outra(s) plaqueta(s) vinculada(s) -->
+                    <div id="comp-panel-botoes-compartilhado" class="hidden flex items-center gap-1.5">
+                        <button type="button" id="btn-somar-poste-modal-comp" onclick="window.confirmarAprovacaoModalComparativo('SOMAR')" class="flex-1 py-2 px-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 font-bold text-white transition-all text-[11px] text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer" title="Mantém as luminárias existentes e adiciona esta plaqueta como um novo braço deste poste">
+                            <span class="material-symbols-outlined text-[15px]">add_circle</span>
+                            <span>Somar ao Poste (Novo Braço)</span>
+                        </button>
+                        <button type="button" id="btn-substituir-poste-modal-comp" onclick="window.confirmarAprovacaoModalComparativo('SUBSTITUIR')" class="flex-1 py-2 px-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 font-bold text-white transition-all text-[11px] text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer" title="Substitui o vínculo anterior e deixa exclusivamente esta plaqueta no poste">
+                            <span class="material-symbols-outlined text-[15px]">sync_alt</span>
+                            <span>Substituir Vínculo</span>
+                        </button>
+                    </div>
+
+                    <!-- Botões padrão (Cancelar, Descartar e Aprovação Direta) -->
+                    <div id="comp-panel-botoes-padrao" class="flex items-center gap-2">
+                        <button type="button" onclick="window.fecharModalComparativoCoords()" class="py-2 px-3 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-100 transition-all text-xs text-center cursor-pointer" title="Fechar este modal sem alterar nada">
+                            Cancelar
+                        </button>
+                        <button type="button" id="btn-descartar-modal-comp" onclick="window.confirmarDescarteModalComparativo()" class="py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 font-bold text-rose-700 transition-all text-xs text-center flex items-center justify-center gap-1 cursor-pointer" title="Descartar a sugestão da OS e manter a coordenada original da plaqueta">
+                            <span class="material-symbols-outlined text-[15px]">close</span>
+                            <span>Descartar</span>
+                        </button>
+                        <button type="button" id="btn-aprovar-modal-comp" onclick="window.confirmarAprovacaoModalComparativo()" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 font-bold text-white transition-all text-xs text-center flex items-center justify-center gap-1 shadow-xs cursor-pointer">
+                            <span class="material-symbols-outlined text-[16px]">check</span>
+                            <span id="btn-aprovar-modal-comp-label">Aprovar Alteração</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2513,14 +2951,14 @@
                         <div class="text-[10px] text-slate-500 font-mono">${item.origem || 'FINALIZAR_OS'}</div>
                     </div>`;
 
-                    const obsHtml = `<span class="text-slate-600">${item.observacao || '---'}</span>`;
+                    const obsHtml = `<span class="text-slate-600 block break-words whitespace-normal text-xs" title="${(item.observacao || '').replace(/"/g, '&quot;')}">${item.observacao || '---'}</span>`;
 
                     tr.innerHTML = `
                         <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-600">${dt}</td>
                         <td class="py-2.5 px-3 whitespace-nowrap">${locHtml}</td>
                         <td class="py-2.5 px-3 whitespace-nowrap">${osHtml}</td>
-                        <td class="py-2.5 px-3">${userHtml}</td>
-                        <td class="py-2.5 px-3">${obsHtml}</td>
+                        <td class="py-2.5 px-3 truncate max-w-[140px]">${userHtml}</td>
+                        <td class="py-2.5 px-3 whitespace-normal break-words">${obsHtml}</td>
                     `;
 
                     tbody.appendChild(tr);
@@ -2562,27 +3000,31 @@
             abaAtiva = aba;
             const btnCad = document.getElementById('tab-btn-cadastro');
             const btnApr = document.getElementById('tab-btn-aprovacao');
+            const btnHist = document.getElementById('tab-btn-historico');
+
             const secCad = document.getElementById('secao-cadastro-plaquetas');
             const secApr = document.getElementById('secao-aprovacao-coordenadas');
+            const secHist = document.getElementById('secao-historico-plaquetas');
+
+            // Reset tab buttons
+            const defaultBtnClass = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high";
+            if (btnCad) btnCad.className = defaultBtnClass;
+            if (btnApr) btnApr.className = defaultBtnClass;
+            if (btnHist) btnHist.className = defaultBtnClass;
+
+            // Hide all sections
+            if (secCad) { secCad.classList.add('hidden'); secCad.style.display = 'none'; }
+            if (secApr) { secApr.classList.add('hidden'); secApr.style.display = 'none'; }
+            if (secHist) { secHist.classList.add('hidden'); secHist.style.display = 'none'; }
 
             if (aba === 'cadastro') {
                 if (btnCad) btnCad.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-secondary text-white shadow-xs";
-                if (btnApr) btnApr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high";
                 if (secCad) {
                     secCad.classList.remove('hidden');
                     secCad.style.display = 'block';
                 }
-                if (secApr) {
-                    secApr.classList.add('hidden');
-                    secApr.style.display = 'none';
-                }
-            } else {
+            } else if (aba === 'aprovacao') {
                 if (btnApr) btnApr.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-amber-600 text-white shadow-xs";
-                if (btnCad) btnCad.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-surface-container-lowest border border-outline-variant text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high";
-                if (secCad) {
-                    secCad.classList.add('hidden');
-                    secCad.style.display = 'none';
-                }
                 if (secApr) {
                     secApr.classList.remove('hidden');
                     secApr.style.display = 'block';
@@ -2593,6 +3035,16 @@
                 } else {
                     atualizarKPIsAprovacao();
                     renderizarFilaAprovacao();
+                }
+            } else if (aba === 'historico') {
+                if (btnHist) btnHist.className = "flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all cursor-pointer bg-purple-600 text-white shadow-xs";
+                if (secHist) {
+                    secHist.classList.remove('hidden');
+                    secHist.style.display = 'block';
+                }
+
+                if (typeof window.aoAbrirAbaHistorico === 'function') {
+                    window.aoAbrirAbaHistorico();
                 }
             }
         };
@@ -2617,6 +3069,22 @@
                 }
             }
             return null;
+        }
+
+        // Utilitários para suporte a múltiplos braços / múltiplas plaquetas no mesmo poste
+        function parsePlaquetasPoste(val) {
+            if (!val) return [];
+            if (Array.isArray(val)) return val.map(s => String(s).trim().toUpperCase()).filter(Boolean);
+            return String(val)
+                .split(',')
+                .map(s => s.trim().toUpperCase())
+                .filter(Boolean);
+        }
+
+        function formatarPlaquetasPoste(arr) {
+            if (!arr || !Array.isArray(arr)) return '';
+            const unicos = Array.from(new Set(arr.map(s => String(s).trim().toUpperCase()).filter(Boolean)));
+            return unicos.join(', ');
         }
 
         // Cálculo de distância geodésica em metros (Fórmula de Haversine)
@@ -2871,7 +3339,34 @@
 
                 console.log(`📍 [Aprovação Coordenadas] ${plaquetasMap.size} códigos únicos de plaquetas encontrados no cadastro.`);
 
-                // Cruzamento e cálculo de distância geodésica
+                // Buscar postes da base aérea que já contenham vínculo com as plaquetas necessárias
+                const postesVinculadosMap = new Map(); // plaquetaUpper -> Array<{ id: number, id_plaqueta_vinculada: string, plaquetasArr: string[] }>
+                for (let i = 0; i < plaquetasArray.length; i += CHUNK_SIZE) {
+                    const chunk = plaquetasArray.slice(i, i + CHUNK_SIZE);
+                    const { data: postesChunk, error: pstErr } = await client
+                        .from('postes_base_aerea')
+                        .select('id, id_plaqueta_vinculada')
+                        .in('id_plaqueta_vinculada', chunk);
+
+                    if (!pstErr && postesChunk) {
+                        postesChunk.forEach(pst => {
+                            if (pst.id_plaqueta_vinculada) {
+                                const arrPlaq = parsePlaquetasPoste(pst.id_plaqueta_vinculada);
+                                arrPlaq.forEach(plqCode => {
+                                    if (!postesVinculadosMap.has(plqCode)) {
+                                        postesVinculadosMap.set(plqCode, []);
+                                    }
+                                    postesVinculadosMap.get(plqCode).push({
+                                        ...pst,
+                                        plaquetasArr: arrPlaq
+                                    });
+                                });
+                            }
+                        });
+                    }
+                }
+
+                // Cruzamento e cálculo de distância geodésica e conflitos
                 const filaMontada = [];
                 osComCoord.forEach(item => {
                     const instsCadastradas = plaquetasMap.get(item.plaquetaId.toUpperCase());
@@ -2905,8 +3400,75 @@
                     instsValidas.sort((a, b) => a.distanciaMetros - b.distanciaMetros);
                     const melhorInstancia = instsValidas[0];
 
-                    // Ignorar OSs cuja menor distância seja praticamente 0 metros (já sincronizadas ou idênticas)
-                    if (melhorInstancia.distanciaMetros < 0.5 && instsValidas.length === 1) return;
+                    // Classificação de conflitos que exigem deliberação manual
+                    const temDuplicatasBanco = instsValidas.length > 1;
+                    const plaquetasDoPosteAtual = parsePlaquetasPoste(item.postePlaquetaVinculada);
+                    const temOutrasPlaquetasNoPoste = plaquetasDoPosteAtual.length > 0 && !plaquetasDoPosteAtual.includes(item.plaquetaId.toUpperCase());
+                    const temConflitoPosteOcupado = Boolean(item.conflitoPlaquetaPoste || temOutrasPlaquetasNoPoste);
+                    
+                    // Conflito de Poste Anterior: a plaqueta já foi vinculada a um poste diferente do atual
+                    const postAnteriores = postesVinculadosMap.get(item.plaquetaId.toUpperCase()) || [];
+                    const outroPosteVinculado = postAnteriores.find(p => !item.posteIdSelecionado || String(p.id) !== String(item.posteIdSelecionado));
+                    const temConflitoPosteMigrado = Boolean(outroPosteVinculado);
+
+                    // Conflito Geodésico: distância > 15m
+                    const temDesvioAlto = melhorInstancia.distanciaMetros > 15;
+
+                    // Lista detalhada dos motivos que geraram esta aprovação
+                    const motivosAprovacao = [];
+                    if (temConflitoPosteOcupado) {
+                        const rotuloPoste = plaquetasDoPosteAtual.length > 1 
+                            ? `Poste #${item.posteIdSelecionado} possui ${plaquetasDoPosteAtual.length} braços (${plaquetasDoPosteAtual.join(', ')})`
+                            : `Poste #${item.posteIdSelecionado} já vinculado à plaqueta #${plaquetasDoPosteAtual[0] || item.postePlaquetaVinculada || 'outra'}`;
+                        motivosAprovacao.push({
+                            tipo: 'POSTE_OCUPADO',
+                            titulo: plaquetasDoPosteAtual.length > 1 ? 'Múltiplos Braços' : 'Poste Ocupado',
+                            descricao: rotuloPoste,
+                            badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
+                            icon: 'electric_bolt'
+                        });
+                    }
+                    if (temConflitoPosteMigrado) {
+                        motivosAprovacao.push({
+                            tipo: 'POSTE_MIGRADO',
+                            titulo: 'Plaqueta Já Vinculada',
+                            descricao: `Plaqueta já estava associada ao Poste #${outroPosteVinculado.id} anteriormente`,
+                            badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
+                            icon: 'swap_horiz'
+                        });
+                    }
+                    if (temDuplicatasBanco) {
+                        motivosAprovacao.push({
+                            tipo: 'DUPLICATA_BANCO',
+                            titulo: 'Plaqueta Duplicada',
+                            descricao: `${instsValidas.length} registros cadastrados com o mesmo código`,
+                            badgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+                            icon: 'content_copy'
+                        });
+                    }
+                    if (temDesvioAlto) {
+                        motivosAprovacao.push({
+                            tipo: 'DESVIO_ALTO',
+                            titulo: 'Desvio > 15m',
+                            descricao: `Reparo em campo a ${melhorInstancia.distanciaMetros}m do ponto cadastrado`,
+                            badgeClass: 'bg-amber-50 text-amber-800 border-amber-200',
+                            icon: 'straighten'
+                        });
+                    }
+
+                    // Se a distância for < 0.5m e NÃO houver NENHUM conflito nem duplicata, ignora (já está em sincronia perfeita)
+                    const temAlgumConflito = temConflitoPosteOcupado || temConflitoPosteMigrado || temDuplicatasBanco || temDesvioAlto;
+                    if (melhorInstancia.distanciaMetros < 0.5 && !temAlgumConflito) return;
+
+                    if (motivosAprovacao.length === 0) {
+                        motivosAprovacao.push({
+                            tipo: 'CALIBRACAO_FINA',
+                            titulo: 'Calibração Fina',
+                            descricao: `Desvio de ${melhorInstancia.distanciaMetros}m conferindo com campo`,
+                            badgeClass: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                            icon: 'check_circle'
+                        });
+                    }
 
                     filaMontada.push({
                         ...item,
@@ -2917,11 +3479,17 @@
                         coordCadastradaParsed: { lat: melhorInstancia.lat, lng: melhorInstancia.lng },
                         distanciaMetros: melhorInstancia.distanciaMetros,
                         empresa: melhorInstancia.empresa,
+                        temConflitoPosteOcupado: temConflitoPosteOcupado,
+                        temConflitoPosteMigrado: temConflitoPosteMigrado,
+                        outroPosteAnteriorId: outroPosteVinculado ? outroPosteVinculado.id : null,
+                        temDuplicatasBanco: temDuplicatasBanco,
+                        temDesvioAlto: temDesvioAlto,
+                        motivosAprovacao: motivosAprovacao,
                         selecionado: false
                     });
                 });
 
-                console.log(`🎯 [Aprovação Coordenadas] ${filaMontada.length} divergências geodésicas calculadas.`);
+                console.log(`🎯 [Aprovação Coordenadas] ${filaMontada.length} divergências geodésicas e conflitos calculados.`);
 
                 // Ordenar por data de fechamento mais recente
                 filaMontada.sort((a, b) => new Date(b.dataFechamento) - new Date(a.dataFechamento));
@@ -2942,22 +3510,32 @@
 
         function atualizarKPIsAprovacao() {
             const total = filaAprovacaoCache.length;
-            const baixa = filaAprovacaoCache.filter(i => i.distanciaMetros <= 15).length;
-            const media = filaAprovacaoCache.filter(i => i.distanciaMetros > 15 && i.distanciaMetros <= 50).length;
-            const alta = filaAprovacaoCache.filter(i => i.distanciaMetros > 50).length;
+            const conflitosPoste = filaAprovacaoCache.filter(i => i.temConflitoPosteOcupado || i.temConflitoPosteMigrado).length;
+            const duplicadasBanco = filaAprovacaoCache.filter(i => i.temDuplicatasBanco).length;
+            const desvioAlto = filaAprovacaoCache.filter(i => i.temDesvioAlto).length;
+            const desvioBaixo = filaAprovacaoCache.filter(i => !i.temDesvioAlto).length;
 
             const elTotal = document.getElementById('kpi-aprov-total-pendentes');
-            const elBaixa = document.getElementById('kpi-aprov-baixa-dist');
-            const elMedia = document.getElementById('kpi-aprov-media-dist');
+            const elConfPostes = document.getElementById('kpi-aprov-conflito-postes');
+            const elDupBanco = document.getElementById('kpi-aprov-duplicadas-banco');
             const elAlta = document.getElementById('kpi-aprov-alta-dist');
+            const elBaixa = document.getElementById('kpi-aprov-baixa-dist');
             const badgeAba = document.getElementById('badge-contador-pendentes-aprovacao');
 
             if (elTotal) elTotal.innerText = total;
-            if (elBaixa) elBaixa.innerText = baixa;
-            if (elMedia) elMedia.innerText = media;
-            if (elAlta) elAlta.innerText = alta;
+            if (elConfPostes) elConfPostes.innerText = conflitosPoste;
+            if (elDupBanco) elDupBanco.innerText = duplicadasBanco;
+            if (elAlta) elAlta.innerText = desvioAlto;
+            if (elBaixa) elBaixa.innerText = desvioBaixo;
             if (badgeAba) badgeAba.innerText = total;
         }
+
+        // Estado dos Filtros Embutidos no Cabeçalho da Fila de Aprovação
+        let aprovFiltroOS = '';
+        let aprovFiltroPlaca = '';
+        let aprovFiltroMotivo = 'todas';
+        let aprovFiltroDist = 'todas';
+        let aprovFiltroOperador = '';
 
         window.aplicarFiltrosAprovacao = function() {
             renderizarFilaAprovacao();
@@ -2966,16 +3544,70 @@
         function renderizarFilaAprovacao() {
             const tbody = document.getElementById('tbody-aprovacao-coord');
             const infoRodape = document.getElementById('info-rodape-aprovacao');
-            const filtroFaixa = document.getElementById('filtro-aprov-faixa')?.value || 'todas';
             if (!tbody) return;
 
-            let itensFiltrados = filaAprovacaoCache;
-            if (filtroFaixa === 'baixa') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros <= 15);
-            else if (filtroFaixa === 'media') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros > 15 && i.distanciaMetros <= 50);
-            else if (filtroFaixa === 'alta') itensFiltrados = filaAprovacaoCache.filter(i => i.distanciaMetros > 50);
+            // Inicializar portais e ouvintes do cabeçalho da tabela de aprovação
+            if (typeof initAprovacaoHeaderFilters === 'function') {
+                initAprovacaoHeaderFilters();
+            }
+            if (typeof atualizarIndicadoresFiltroAprovacao === 'function') {
+                atualizarIndicadoresFiltroAprovacao();
+            }
+
+            // Aplicar combinação de filtros em memória
+            let itensFiltrados = filaAprovacaoCache.filter(item => {
+                // 1. Filtro de OS / Protocolo
+                if (aprovFiltroOS) {
+                    const termoOS = aprovFiltroOS.toLowerCase();
+                    const matchOS = (item.protocolo && String(item.protocolo).toLowerCase().includes(termoOS));
+                    if (!matchOS) return false;
+                }
+
+                // 2. Filtro de Plaqueta
+                if (aprovFiltroPlaca) {
+                    const termoPlaca = aprovFiltroPlaca.toLowerCase();
+                    const matchPlaca = (item.plaquetaId && String(item.plaquetaId).toLowerCase().includes(termoPlaca));
+                    if (!matchPlaca) return false;
+                }
+
+                // 3. Filtro de Motivo / Alerta
+                if (aprovFiltroMotivo && aprovFiltroMotivo !== 'todas') {
+                    if (aprovFiltroMotivo === 'conflito_poste') {
+                        if (!item.temConflitoPosteOcupado && !item.temConflitoPosteMigrado) return false;
+                    } else if (aprovFiltroMotivo === 'duplicata_banco') {
+                        if (!item.temDuplicatasBanco) return false;
+                    } else if (aprovFiltroMotivo === 'desvio_alto') {
+                        if (!item.temDesvioAlto) return false;
+                    } else if (aprovFiltroMotivo === 'baixa') {
+                        if (item.distanciaMetros > 15) return false;
+                    } else if (aprovFiltroMotivo === 'alta') {
+                        if (item.distanciaMetros <= 50) return false;
+                    }
+                }
+
+                // 4. Filtro de Faixa de Distância
+                if (aprovFiltroDist && aprovFiltroDist !== 'todas') {
+                    if (aprovFiltroDist === 'baixa') {
+                        if (item.distanciaMetros > 15) return false;
+                    } else if (aprovFiltroDist === 'media') {
+                        if (item.distanciaMetros <= 15 || item.distanciaMetros > 50) return false;
+                    } else if (aprovFiltroDist === 'alta') {
+                        if (item.distanciaMetros <= 50) return false;
+                    }
+                }
+
+                // 5. Filtro de Operador
+                if (aprovFiltroOperador) {
+                    const termoOp = aprovFiltroOperador.toLowerCase();
+                    const matchOp = (item.operador && String(item.operador).toLowerCase().includes(termoOp));
+                    if (!matchOp) return false;
+                }
+
+                return true;
+            });
 
             if (itensFiltrados.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center py-10 text-slate-500">
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center py-10 text-slate-500">
                     <span class="material-symbols-outlined text-[36px] text-slate-300 mb-1">task_alt</span>
                     <p class="font-bold text-slate-700">Nenhuma coordenada divergente pendente nesta categoria</p>
                     <p class="text-xs text-slate-400 mt-0.5">As coordenadas das plaquetas conferem com os reparos das OSs concluídas.</p>
@@ -3009,6 +3641,14 @@
                     ? new Date(item.dataFechamento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                     : '---';
 
+                // Badges da coluna Motivo / Alerta
+                const motivosHtml = (item.motivosAprovacao || []).map(m => `
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold border ${m.badgeClass} shadow-2xs" title="${m.descricao}">
+                        <span class="material-symbols-outlined text-[13px]">${m.icon}</span>
+                        <span>${m.titulo}</span>
+                    </span>
+                `).join('');
+
                 return `
                     <tr class="hover:bg-slate-50/70 transition-colors">
                         <td class="py-3 px-3 text-center align-middle">
@@ -3032,6 +3672,11 @@
                                 ` : ''}
                             </div>
                         </td>
+                        <td class="py-3 px-4 align-middle">
+                            <div class="flex flex-col gap-1 items-start">
+                                ${motivosHtml}
+                            </div>
+                        </td>
                         <td class="py-3 px-4 font-mono text-slate-600 align-middle">
                             ${item.coordCadastradaRaw}
                         </td>
@@ -3045,9 +3690,9 @@
                                             <span>Poste #${item.posteIdSelecionado}</span>
                                         </span>
                                         ${item.conflitoPlaquetaPoste ? `
-                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Atenção: O poste selecionado pertence à plaqueta #${item.postePlaquetaVinculada || 'outra'} no cadastro">
+                                            <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Atenção: Este poste já possui a(s) plaqueta(s) #${item.postePlaquetaVinculada || 'outra'} cadastrada(s)">
                                                 <span class="material-symbols-outlined text-[12px] text-amber-700">warning</span>
-                                                <span>Conflito: #${item.postePlaquetaVinculada}</span>
+                                                <span>Braços: #${item.postePlaquetaVinculada}</span>
                                             </span>
                                         ` : ''}
                                     </div>
@@ -3170,41 +3815,80 @@
                     return false;
                 }
 
-                // 1.1 Se o usuário optou por remover as duplicatas obsoletas
-                if (limparObsoletas) {
-                    const idsParaRemover = item.instanciasDuplicadas
+                // 1.1 Se o usuário optou por remover duplicatas obsoletas (suporte a seleção individual ou total)
+                let idsParaRemover = [];
+                if (Array.isArray(options.idsDuplicatasParaRemover)) {
+                    idsParaRemover = options.idsDuplicatasParaRemover.filter(id => id !== idRegistroAlvo);
+                } else if (limparObsoletas) {
+                    idsParaRemover = item.instanciasDuplicadas
                         .filter(inst => inst.id !== idRegistroAlvo)
                         .map(inst => inst.id);
+                }
 
-                    if (idsParaRemover.length > 0) {
-                        try {
-                            const { error: delErr } = await client.from('localizacao_plaquetas')
-                                .delete()
-                                .in('id', idsParaRemover);
-                            if (delErr) console.warn("Aviso ao remover duplicatas obsoletas:", delErr);
-                            else console.log(`🗑️ [Duplicatas] ${idsParaRemover.length} registro(s) obsoleto(s) de #${item.plaquetaId} removidos com sucesso.`);
-                        } catch (dErr) { console.warn("Erro ao deletar duplicatas:", dErr); }
-                    }
+                if (idsParaRemover.length > 0) {
+                    try {
+                        const { error: delErr } = await client.from('localizacao_plaquetas')
+                            .delete()
+                            .in('id', idsParaRemover);
+                        if (delErr) console.warn("Aviso ao remover duplicatas obsoletas:", delErr);
+                        else console.log(`🗑️ [Duplicatas] ${idsParaRemover.length} registro(s) obsoleto(s) de #${item.plaquetaId} removidos com sucesso.`);
+                    } catch (dErr) { console.warn("Erro ao deletar duplicatas:", dErr); }
                 }
 
                 // 2. Se foi vinculado a um poste aéreo, atualizar a tabela de postes
                 if (isSnapPoste) {
                     try {
+                        const modoVinculo = options.modoVinculoPoste || 'SUBSTITUIR'; // 'SOMAR' ou 'SUBSTITUIR'
+
+                        // 2.1 Desvincular esta plaqueta de qualquer OUTRO poste anterior onde ela pudesse estar
+                        const { data: outrosPostesComPlaq } = await client.from('postes_base_aerea')
+                            .select('id, id_plaqueta_vinculada')
+                            .ilike('id_plaqueta_vinculada', '%' + item.plaquetaId + '%')
+                            .neq('id', posteAereoId);
+
+                        if (outrosPostesComPlaq && outrosPostesComPlaq.length > 0) {
+                            for (const op of outrosPostesComPlaq) {
+                                const arrRestantes = parsePlaquetasPoste(op.id_plaqueta_vinculada).filter(p => p !== item.plaquetaId.toUpperCase());
+                                await client.from('postes_base_aerea')
+                                    .update({ id_plaqueta_vinculada: arrRestantes.length > 0 ? formatarPlaquetasPoste(arrRestantes) : null })
+                                    .eq('id', op.id);
+                            }
+                        }
+
+                        // 2.2 Buscar valor atual do poste alvo para somar ou substituir
+                        let novaListaPosteStr = item.plaquetaId.toUpperCase();
+                        if (modoVinculo === 'SOMAR') {
+                            const { data: postAlvoData } = await client.from('postes_base_aerea')
+                                .select('id_plaqueta_vinculada')
+                                .eq('id', posteAereoId)
+                                .maybeSingle();
+
+                            const plaqsAtuaisPoste = parsePlaquetasPoste(postAlvoData ? postAlvoData.id_plaqueta_vinculada : null);
+                            if (!plaqsAtuaisPoste.includes(item.plaquetaId.toUpperCase())) {
+                                plaqsAtuaisPoste.push(item.plaquetaId.toUpperCase());
+                            }
+                            novaListaPosteStr = formatarPlaquetasPoste(plaqsAtuaisPoste);
+                        }
+
+                        // 2.3 Atualizar o poste selecionado
                         await client.from('postes_base_aerea')
-                            .update({ id_plaqueta_vinculada: item.plaquetaId })
+                            .update({ id_plaqueta_vinculada: novaListaPosteStr })
                             .eq('id', posteAereoId);
+
+                        console.log(`⚡ [Poste #${posteAereoId}] Vínculo atualizado com sucesso (${modoVinculo}): ${novaListaPosteStr}`);
                     } catch (pErr) { console.warn("Aviso ao vincular poste:", pErr); }
                 }
 
                 // 3. Gravar no histórico de localização
                 try {
                     const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
+                    const modoTexto = options.modoVinculoPoste === 'SOMAR' ? ' [Luminária Adicional / Braço Somado]' : '';
                     let obsTexto = isSnapPoste
-                        ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId} (OS #${item.protocolo})`
+                        ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})`
                         : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`;
 
-                    if (limparObsoletas) {
-                        obsTexto += ` [Duplicatas obsoletas removidas]`;
+                    if (idsParaRemover.length > 0) {
+                        obsTexto += ` [${idsParaRemover.length} duplicata(s) removida(s)]`;
                     }
 
                     await client.from('historico_localizacao_plaquetas').insert([{
@@ -3299,6 +3983,266 @@
         };
 
         // =========================================================================
+        // CONTROLADORES DOS FILTROS EMBUTIDOS NO CABEÇALHO DA TABELA DE APROVAÇÃO
+        // (Conforme diretrizes de BOAS_PRATICAS_TABELAS_FILTROS.md)
+        // =========================================================================
+        let aprovHeadersInitialized = false;
+
+        function initAprovacaoHeaderFilters() {
+            if (aprovHeadersInitialized) return;
+            aprovHeadersInitialized = true;
+
+            const osTrigger = document.getElementById('aprov-os-filter-trigger');
+            const osDropdown = document.getElementById('aprov-os-filter-dropdown');
+            const osInput = document.getElementById('aprov-search-os-input');
+
+            const placaTrigger = document.getElementById('aprov-placa-filter-trigger');
+            const placaDropdown = document.getElementById('aprov-placa-filter-dropdown');
+            const placaInput = document.getElementById('aprov-search-placa-input');
+
+            const motivoTrigger = document.getElementById('aprov-motivo-filter-trigger');
+            const motivoDropdown = document.getElementById('aprov-motivo-filter-dropdown');
+
+            const distTrigger = document.getElementById('aprov-dist-filter-trigger');
+            const distDropdown = document.getElementById('aprov-dist-filter-dropdown');
+
+            const operadorTrigger = document.getElementById('aprov-operador-filter-trigger');
+            const operadorDropdown = document.getElementById('aprov-operador-filter-dropdown');
+            const operadorInput = document.getElementById('aprov-search-operador-input');
+
+            const dropdowns = [osDropdown, placaDropdown, motivoDropdown, distDropdown, operadorDropdown];
+
+            // Mover para o body portal para evitar corte pelo overflow da tabela
+            dropdowns.forEach(d => {
+                if (d && d.parentElement !== document.body) {
+                    document.body.appendChild(d);
+                }
+            });
+
+            function closeAllAprovDropdowns() {
+                dropdowns.forEach(d => {
+                    if (d) {
+                        d.classList.add('hidden');
+                        d.style.display = 'none';
+                    }
+                });
+            }
+
+            function openAprovDropdown(triggerBtn, dropdownEl, focusInput) {
+                if (!triggerBtn || !dropdownEl) return;
+
+                if (dropdownEl.parentElement !== document.body) {
+                    document.body.appendChild(dropdownEl);
+                }
+
+                const isHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+                closeAllAprovDropdowns();
+
+                if (isHidden) {
+                    dropdownEl.style.position = 'fixed';
+                    dropdownEl.style.zIndex = '99999';
+                    dropdownEl.style.display = 'block';
+                    dropdownEl.classList.remove('hidden');
+
+                    const rect = triggerBtn.getBoundingClientRect();
+                    const dropdownHeight = dropdownEl.offsetHeight || 260;
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+
+                    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                        dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 4)}px`;
+                    } else {
+                        dropdownEl.style.top = `${rect.bottom + 4}px`;
+                    }
+
+                    // Ajuste horizontal para não sair da tela
+                    const dropdownWidth = dropdownEl.offsetWidth || 280;
+                    if (rect.left + dropdownWidth > window.innerWidth - 16) {
+                        dropdownEl.style.left = 'auto';
+                        dropdownEl.style.right = `${Math.max(12, window.innerWidth - rect.right)}px`;
+                    } else {
+                        dropdownEl.style.left = `${Math.max(12, rect.left)}px`;
+                        dropdownEl.style.right = 'auto';
+                    }
+
+                    if (focusInput) {
+                        setTimeout(() => focusInput?.focus(), 50);
+                    }
+                }
+            }
+
+            // Triggers de abertura
+            osTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAprovDropdown(osTrigger, osDropdown, osInput);
+            });
+
+            placaTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAprovDropdown(placaTrigger, placaDropdown, placaInput);
+            });
+
+            motivoTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAprovDropdown(motivoTrigger, motivoDropdown);
+            });
+
+            distTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAprovDropdown(distTrigger, distDropdown);
+            });
+
+            operadorTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openAprovDropdown(operadorTrigger, operadorDropdown, operadorInput);
+            });
+
+            // Fechar ao clicar fora
+            document.addEventListener('click', (e) => {
+                const clickedInsideAny = dropdowns.some(d => d && d.contains(e.target));
+                const clickedOnTrigger = [osTrigger, placaTrigger, motivoTrigger, distTrigger, operadorTrigger].some(t => t && t.contains(e.target));
+                if (!clickedInsideAny && !clickedOnTrigger) {
+                    closeAllAprovDropdowns();
+                }
+            });
+
+            // Fechar no scroll fora dos dropdowns
+            window.addEventListener('scroll', () => {
+                const activeEl = document.activeElement;
+                if (activeEl && dropdowns.some(d => d && d.contains(activeEl))) return;
+                closeAllAprovDropdowns();
+            }, true);
+
+            window.addEventListener('resize', closeAllAprovDropdowns);
+
+            // Inputs com debounce para pesquisa em tempo real
+            let timeoutAprovSearch = null;
+            function dispararFiltroDebounced() {
+                clearTimeout(timeoutAprovSearch);
+                timeoutAprovSearch = setTimeout(() => {
+                    renderizarFilaAprovacao();
+                }, 200);
+            }
+
+            if (osInput) {
+                osInput.addEventListener('input', (e) => {
+                    aprovFiltroOS = e.target.value.trim();
+                    dispararFiltroDebounced();
+                });
+            }
+
+            if (placaInput) {
+                placaInput.addEventListener('input', (e) => {
+                    aprovFiltroPlaca = e.target.value.trim();
+                    dispararFiltroDebounced();
+                });
+            }
+
+            if (operadorInput) {
+                operadorInput.addEventListener('input', (e) => {
+                    aprovFiltroOperador = e.target.value.trim();
+                    dispararFiltroDebounced();
+                });
+            }
+
+            // Rádios de Motivo
+            document.querySelectorAll('input[name="aprov-motivo-radio"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    aprovFiltroMotivo = e.target.value;
+                    closeAllAprovDropdowns();
+                    renderizarFilaAprovacao();
+                });
+            });
+
+            // Rádios de Distância
+            document.querySelectorAll('input[name="aprov-dist-radio"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    aprovFiltroDist = e.target.value;
+                    closeAllAprovDropdowns();
+                    renderizarFilaAprovacao();
+                });
+            });
+        }
+
+        function atualizarIndicadoresFiltroAprovacao() {
+            const indOS = document.getElementById('aprov-os-filter-indicator');
+            if (indOS) indOS.classList.toggle('hidden', !aprovFiltroOS);
+
+            const indPlaca = document.getElementById('aprov-placa-filter-indicator');
+            if (indPlaca) indPlaca.classList.toggle('hidden', !aprovFiltroPlaca);
+
+            const indMotivo = document.getElementById('aprov-motivo-filter-indicator');
+            if (indMotivo) indMotivo.classList.toggle('hidden', aprovFiltroMotivo === 'todas');
+
+            const indDist = document.getElementById('aprov-dist-filter-indicator');
+            if (indDist) indDist.classList.toggle('hidden', aprovFiltroDist === 'todas');
+
+            const indOperador = document.getElementById('aprov-operador-filter-indicator');
+            if (indOperador) indOperador.classList.toggle('hidden', !aprovFiltroOperador);
+        }
+
+        // Funções para Limpar Filtros do Cabeçalho de Aprovação
+        window.limparFiltroOSAprovacao = function() {
+            aprovFiltroOS = '';
+            const input = document.getElementById('aprov-search-os-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('aprov-os-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            renderizarFilaAprovacao();
+        };
+
+        window.limparFiltroPlacaAprovacao = function() {
+            aprovFiltroPlaca = '';
+            const input = document.getElementById('aprov-search-placa-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('aprov-placa-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            renderizarFilaAprovacao();
+        };
+
+        window.limparFiltroMotivoAprovacao = function() {
+            aprovFiltroMotivo = 'todas';
+            const radioAll = document.querySelector('input[name="aprov-motivo-radio"][value="todas"]');
+            if (radioAll) radioAll.checked = true;
+            const dropdown = document.getElementById('aprov-motivo-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            renderizarFilaAprovacao();
+        };
+
+        window.limparFiltroDistAprovacao = function() {
+            aprovFiltroDist = 'todas';
+            const radioAll = document.querySelector('input[name="aprov-dist-radio"][value="todas"]');
+            if (radioAll) radioAll.checked = true;
+            const dropdown = document.getElementById('aprov-dist-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            renderizarFilaAprovacao();
+        };
+
+        window.limparFiltroOperadorAprovacao = function() {
+            aprovFiltroOperador = '';
+            const input = document.getElementById('aprov-search-operador-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('aprov-operador-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            renderizarFilaAprovacao();
+        };
+
+        // =========================================================================
         // MODAL COMPARATIVO NO MAPBOX
         // =========================================================================
         window.abrirModalComparativoCoords = function(itemKey) {
@@ -3318,7 +4262,37 @@
             document.getElementById('comp-panel-dist-badge').innerText = `${item.distanciaMetros.toFixed(1)} m`;
             document.getElementById('comp-panel-orig-coords').innerText = item.coordCadastradaRaw;
             document.getElementById('comp-panel-os-coords').innerText = item.coordReparoRaw;
-            document.getElementById('comp-panel-os-op').innerText = `Técnico: ${item.operador}`;
+            document.getElementById('comp-panel-os-op').innerText = item.isHistoricoViewer ? `Responsável: ${item.operador}` : `Técnico: ${item.operador}`;
+
+            const labelOrigEl = document.getElementById('comp-panel-orig-label');
+            const labelOsEl = document.getElementById('comp-panel-os-label');
+            if (labelOrigEl) {
+                labelOrigEl.innerText = item.isHistoricoViewer ? '📍 Posição Anterior / Referência' : 'Ponto Cadastrado Atual';
+            }
+            if (labelOsEl) {
+                labelOsEl.innerText = item.isHistoricoViewer ? '🛠️ Nova Posição Registrada' : 'Ponto Registrado na OS Concluída';
+            }
+
+            // Preencher o banner de motivos da solicitação de aprovação
+            const motivoBoxEl = document.getElementById('comp-panel-motivo-box');
+            const motivoConteudoEl = document.getElementById('comp-panel-motivo-conteudo');
+            if (motivoConteudoEl) {
+                if (item.motivosAprovacao && item.motivosAprovacao.length > 0) {
+                    if (motivoBoxEl) motivoBoxEl.classList.remove('hidden');
+                    motivoConteudoEl.innerHTML = item.motivosAprovacao.map(m => `
+                        <div class="flex items-start gap-1.5 p-1.5 rounded-lg border text-[11px] font-medium ${m.badgeClass}">
+                            <span class="material-symbols-outlined text-[15px] flex-shrink-0 mt-0.5">${m.icon}</span>
+                            <div class="flex-1 leading-snug">
+                                <strong class="block font-bold">${m.titulo}</strong>
+                                <span class="text-[10px] opacity-90">${m.descricao}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                } else {
+                    if (motivoBoxEl) motivoBoxEl.classList.add('hidden');
+                    motivoConteudoEl.innerHTML = '';
+                }
+            }
 
             const badgeOpPosteEl = document.getElementById('comp-panel-os-poste-badge');
             if (badgeOpPosteEl) {
@@ -3331,9 +4305,15 @@
                                 <span>Poste Escolhido: #${item.posteIdSelecionado}</span>
                             </span>
                             ${item.conflitoPlaquetaPoste ? `
-                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300" title="Atenção: O poste selecionado pertence à plaqueta #${item.postePlaquetaVinculada || 'outra'} no cadastro">
-                                    <span class="material-symbols-outlined text-[12px] text-amber-700">warning</span>
-                                    <span>Conflito: #${item.postePlaquetaVinculada}</span>
+                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-900 border border-rose-300" title="Atenção: O poste selecionado pertence à plaqueta #${item.postePlaquetaVinculada || 'outra'} no cadastro">
+                                    <span class="material-symbols-outlined text-[12px] text-rose-700">warning</span>
+                                    <span>Ocupado por #${item.postePlaquetaVinculada}</span>
+                                </span>
+                            ` : ''}
+                            ${item.temConflitoPosteMigrado ? `
+                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300" title="Atenção: Esta plaqueta estava no Poste #${item.outroPosteAnteriorId}">
+                                    <span class="material-symbols-outlined text-[12px] text-purple-700">swap_horiz</span>
+                                    <span>Antes no Poste #${item.outroPosteAnteriorId}</span>
                                 </span>
                             ` : ''}
                         </div>
@@ -3398,15 +4378,21 @@
                         const distOS = dup.distanciaMetros;
                         const distFmt = distOS < 1000 ? `${distOS.toFixed(1)}m` : `${(distOS / 1000).toFixed(2)}km`;
                         const isMelhor = (dup.id === item.idRegistroPlaqueta);
+                        // Por padrão, duplicatas que NÃO são o ponto selecionado vêm marcadas para remoção, mas podem ser desmarcadas individualmente
+                        const isRemoverChecked = !isMelhor;
                         return `
                             <div id="dup-item-${dup.id}" onclick="window.selecionarInstanciaDuplicada(${dup.id})" class="p-1.5 rounded-lg border text-[11px] flex items-center justify-between transition-all cursor-pointer ${isMelhor ? 'bg-blue-100/90 border-blue-400 font-bold text-blue-950' : 'bg-white border-amber-200 text-slate-700 hover:bg-amber-100/50'}">
-                                <div class="flex items-center gap-1.5">
-                                    <span class="w-2.5 h-2.5 rounded-full ${isMelhor ? 'bg-blue-600 ring-2 ring-blue-300' : 'bg-sky-400'}"></span>
-                                    <span>Ponto #${idx + 1} (${dup.empresa})</span>
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    <span class="w-2.5 h-2.5 rounded-full flex-shrink-0 ${isMelhor ? 'bg-blue-600 ring-2 ring-blue-300' : 'bg-sky-400'}"></span>
+                                    <span class="truncate">Ponto #${idx + 1} (${dup.empresa})</span>
                                 </div>
-                                <div class="flex items-center gap-1">
-                                    <span class="font-mono text-[10px] text-slate-500">${distFmt} da OS</span>
-                                    ${isMelhor ? '<span class="text-[9px] bg-blue-600 text-white px-1 rounded font-bold">Mais Próximo</span>' : ''}
+                                <div class="flex items-center gap-1.5 flex-shrink-0">
+                                    <span class="font-mono text-[10px] text-slate-500">${distFmt}</span>
+                                    ${isMelhor ? '<span id="dup-badge-manter-' + dup.id + '" class="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold">Ativo</span>' : ''}
+                                    <label id="dup-label-remover-${dup.id}" onclick="event.stopPropagation()" class="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer border select-none transition-colors ${isMelhor ? 'hidden' : (isRemoverChecked ? 'bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100')}">
+                                        <input type="checkbox" id="chk-del-dup-${dup.id}" value="${dup.id}" ${isRemoverChecked ? 'checked' : ''} onchange="window.toggleEstiloRemoverDuplicata(${dup.id})" class="w-3 h-3 rounded text-rose-600 focus:ring-rose-500 cursor-pointer">
+                                        <span>Excluir</span>
+                                    </label>
                                 </div>
                             </div>
                         `;
@@ -3416,13 +4402,25 @@
                 // Plotar marcadores para CADA duplicata existente
                 duplicatas.forEach((dup, idx) => {
                     const isMelhor = (dup.id === item.idRegistroPlaqueta);
+                    
+                    // Container neutro (wrapper) para que o Mapbox posicione as coordenadas perfeitamente sem colidir com borders/paddings
+                    const wrapperDup = document.createElement('div');
+                    wrapperDup.className = 'marker-anchor-center';
+                    wrapperDup.style.width = '24px';
+                    wrapperDup.style.height = '24px';
+                    wrapperDup.style.display = 'flex';
+                    wrapperDup.style.alignItems = 'center';
+                    wrapperDup.style.justifyContent = 'center';
+
                     const elDup = document.createElement('div');
                     elDup.id = `marker-duplicata-${dup.id}`;
                     elDup.className = `w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer ${isMelhor ? 'bg-blue-600 ring-4 ring-blue-300 z-20' : 'bg-sky-500 ring-2 ring-sky-200 z-10'}`;
                     elDup.title = `Ponto Cadastrado #${idx + 1} (${dup.empresa}) - Clique para selecionar`;
                     elDup.innerHTML = `<span>${idx + 1}</span>`;
 
-                    elDup.onclick = (e) => {
+                    wrapperDup.appendChild(elDup);
+
+                    wrapperDup.onclick = (e) => {
                         e.stopPropagation();
                         window.selecionarInstanciaDuplicada(dup.id);
                     };
@@ -3430,7 +4428,7 @@
                     const cDup = [dup.lng, dup.lat];
                     bounds.extend(cDup);
 
-                    const mDup = new mapboxgl.Marker({ element: elDup, anchor: 'center' })
+                    const mDup = new mapboxgl.Marker({ element: wrapperDup, anchor: 'center' })
                         .setLngLat(cDup)
                         .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(`
                             <div class="text-xs p-1 text-slate-800">
@@ -3447,25 +4445,83 @@
             } else {
                 if (boxDup) boxDup.classList.add('hidden');
 
-                // Plaqueta única normal
+                // Plaqueta única normal / Ponto de Referência
+                const isHist = Boolean(item.isHistoricoViewer);
+                const tituloOrig = isHist ? 'Posição Anterior / Ponto Antigo' : 'Cadastro Atual';
+                const subtituloOrig = isHist ? 'Posição antes desta movimentação' : `Plaqueta #${item.plaquetaId}`;
+
+                const wrapperOrig = document.createElement('div');
+                wrapperOrig.className = 'marker-anchor-center';
+                wrapperOrig.style.width = '24px';
+                wrapperOrig.style.height = '24px';
+                wrapperOrig.style.display = 'flex';
+                wrapperOrig.style.alignItems = 'center';
+                wrapperOrig.style.justifyContent = 'center';
+
                 const elOrig = document.createElement('div');
                 elOrig.className = 'w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-blue-300 z-10';
+                elOrig.title = tituloOrig;
                 elOrig.innerHTML = '<span class="material-symbols-outlined text-[14px]">pin_drop</span>';
-                const mOrig = new mapboxgl.Marker({ element: elOrig, anchor: 'center' })
+                wrapperOrig.appendChild(elOrig);
+
+                const mOrig = new mapboxgl.Marker({ element: wrapperOrig, anchor: 'center' })
                     .setLngLat(cOrig)
-                    .setPopup(new mapboxgl.Popup().setHTML(`<strong>Cadastro Atual</strong><br>Plaqueta #${item.plaquetaId}`))
+                    .setPopup(new mapboxgl.Popup().setHTML(`
+                        <div class="text-xs p-1">
+                            <strong class="text-blue-700 font-bold">📍 ${tituloOrig}</strong>
+                            <div class="text-[11px] text-slate-600 mt-0.5">${subtituloOrig}</div>
+                            <div class="text-[10.5px] font-mono text-slate-500 mt-0.5">${item.coordCadastradaRaw}</div>
+                        </div>
+                    `))
                     .addTo(compMapboxInstance);
                 compMarkers.push(mOrig);
                 bounds.extend(cOrig);
             }
 
-            // Adicionar Marcador Âmbar (Ponto da OS)
+            // Distância geodésica entre os dois pontos para verificar sobreposição
+            const distEntrePontos = (typeof calcularDistanciaHaversine === 'function') 
+                ? calcularDistanciaHaversine(item.coordCadastradaParsed, item.coordReparoParsed)
+                : item.distanciaMetros;
+
+            // Se os pontos forem idênticos ou extremamente próximos (< 0.5m), ajustamos visualmente
+            const saoPontosIdenticos = distEntrePontos < 0.5;
+
+            // Adicionar Marcador Âmbar (Ponto da OS / Nova Posição)
+            const isHist = Boolean(item.isHistoricoViewer);
+            const tituloOS = isHist ? 'Nova Posição / Movimentação' : `OS Concluída (#${item.protocolo})`;
+            const subtituloOS = isHist ? `Registrada por ${item.operador}` : `Distância: ${item.distanciaMetros.toFixed(1)}m`;
+
+            const wrapperOS = document.createElement('div');
+            wrapperOS.className = 'marker-anchor-center';
+            wrapperOS.style.width = '24px';
+            wrapperOS.style.height = '24px';
+            wrapperOS.style.display = 'flex';
+            wrapperOS.style.alignItems = 'center';
+            wrapperOS.style.justifyContent = 'center';
+
             const elOS = document.createElement('div');
-            elOS.className = 'w-6 h-6 rounded-full bg-amber-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-300 z-20';
-            elOS.innerHTML = '<span class="material-symbols-outlined text-[14px]">build</span>';
-            const mOS = new mapboxgl.Marker({ element: elOS, anchor: 'center' })
+            if (saoPontosIdenticos) {
+                // Se estiverem exatamente no mesmo local, aplicamos uma badge combinada destacada com as mesmas dimensões
+                elOS.className = 'w-6 h-6 rounded-full bg-amber-500 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-400 z-30';
+                elOS.title = `${tituloOS} (Mesma posição do ponto de referência)`;
+                elOS.innerHTML = '<span class="material-symbols-outlined text-[15px]">pin_drop</span>';
+            } else {
+                elOS.className = 'w-6 h-6 rounded-full bg-amber-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-amber-300 z-20';
+                elOS.title = tituloOS;
+                elOS.innerHTML = '<span class="material-symbols-outlined text-[14px]">build</span>';
+            }
+            wrapperOS.appendChild(elOS);
+
+            const mOS = new mapboxgl.Marker({ element: wrapperOS, anchor: 'center' })
                 .setLngLat(cOS)
-                .setPopup(new mapboxgl.Popup().setHTML(`<strong>OS Concluída (#${item.protocolo})</strong><br>Distância: ${item.distanciaMetros.toFixed(1)}m`))
+                .setPopup(new mapboxgl.Popup().setHTML(`
+                    <div class="text-xs p-1">
+                        <strong class="text-amber-700 font-bold">🛠️ ${tituloOS}</strong>
+                        <div class="text-[11px] text-slate-600 mt-0.5">${subtituloOS}</div>
+                        <div class="text-[10.5px] font-mono text-slate-500 mt-0.5">${item.coordReparoRaw}</div>
+                        ${saoPontosIdenticos ? '<div class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-semibold mt-1">⚠️ Coordenadas idênticas à posição anterior</div>' : `<div class="text-[11px] text-amber-700 font-bold mt-1">Desvio: ${item.distanciaMetros.toFixed(1)}m</div>`}
+                    </div>
+                `))
                 .addTo(compMapboxInstance);
             compMarkers.push(mOS);
 
@@ -3529,7 +4585,8 @@
                 postes.forEach(poste => {
                     const pLat = parseFloat(poste.latitude);
                     const pLng = parseFloat(poste.longitude);
-                    const plaquetaVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+                    const arrPlaquetasVinculadas = parsePlaquetasPoste(poste.id_plaqueta_vinculada);
+                    const totalBracos = arrPlaquetasVinculadas.length;
 
                     const isPosteEscolhidoPeloOperador = Boolean(itemAtual && itemAtual.posteIdSelecionado && String(itemAtual.posteIdSelecionado) === String(poste.id));
 
@@ -3538,7 +4595,7 @@
 
                     if (itemAtual) {
                         const plaquetaAlvo = String(itemAtual.plaquetaId).trim().toUpperCase();
-                        if (plaquetaVinculada === plaquetaAlvo) {
+                        if (arrPlaquetasVinculadas.includes(plaquetaAlvo)) {
                             isPosteDaPropriaPlaqueta = true;
                         } else if (itemAtual.coordCadastradaParsed) {
                             const dCad = calcularDistanciaHaversine({ lat: pLat, lng: pLng }, itemAtual.coordCadastradaParsed);
@@ -3547,7 +4604,7 @@
                             }
                         }
 
-                        if (!isPosteDaPropriaPlaqueta && plaquetaVinculada) {
+                        if (!isPosteDaPropriaPlaqueta && totalBracos > 0) {
                             isPosteDeOutraPlaqueta = true;
                         }
                     }
@@ -3566,10 +4623,10 @@
                         elPoste.title = `⚡ Poste da Base Aérea (Oficial da Plaqueta #${itemAtual.plaquetaId})`;
                         elPoste.innerHTML = '<span class="material-symbols-outlined text-[15px]">verified</span>';
                     } else if (isPosteDeOutraPlaqueta) {
-                        // Estado 2: Poste já vinculado a OUTRA plaqueta
+                        // Estado 2: Poste com outra(s) plaqueta(s) vinculada(s)
                         elPoste.className = 'w-6 h-6 rounded-full bg-sky-700 hover:bg-sky-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300 cursor-pointer z-20';
-                        elPoste.title = `⚡ Poste da Base Aérea [Ocupado por #${plaquetaVinculada}]`;
-                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">sell</span>';
+                        elPoste.title = `⚡ Poste da Base Aérea [${totalBracos} luminária(s): ${arrPlaquetasVinculadas.join(', ')}]`;
+                        elPoste.innerHTML = totalBracos > 1 ? `<span class="text-[10px] font-bold">${totalBracos}</span>` : '<span class="material-symbols-outlined text-[13px]">sell</span>';
                     } else {
                         // Estado 3: Poste livre (sem nenhuma plaqueta associada)
                         elPoste.className = 'w-6 h-6 rounded-full bg-purple-700 hover:bg-purple-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300 cursor-pointer z-10';
@@ -3610,11 +4667,13 @@
                     } else if (isPosteDeOutraPlaqueta) {
                         corTitulo = 'text-sky-800';
                         corBtn = 'bg-sky-700 hover:bg-sky-800';
-                        labelBtn = 'Substituir Vínculo';
+                        labelBtn = 'Vincular a Este';
                         badgeStatusHtml = `
-                            <div class="bg-sky-50 border border-sky-200 text-sky-900 px-2 py-1 rounded text-[10.5px] font-medium flex items-center justify-between">
-                                <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">sell</span> Ocupado:</span>
-                                <strong class="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px] text-sky-800">#${plaquetaVinculada}</strong>
+                            <div class="bg-sky-50 border border-sky-200 text-sky-900 px-2 py-1 rounded text-[10.5px] font-medium flex flex-col gap-0.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="flex items-center gap-1"><span class="material-symbols-outlined text-[13px]">hub</span> ${totalBracos > 1 ? totalBracos + ' braços vinculados:' : 'Luminária existente:'}</span>
+                                </div>
+                                <span class="bg-white px-1.5 py-0.5 rounded border border-sky-300 font-mono text-[10px] text-sky-800 font-bold truncate">#${arrPlaquetasVinculadas.join(', #')}</span>
                             </div>
                         `;
                     } else {
@@ -3648,7 +4707,22 @@
                         </div>
                     `;
 
-                    const m = new mapboxgl.Marker({ element: elPoste, anchor: 'center' })
+                    const wrapperPoste = document.createElement('div');
+                    wrapperPoste.className = 'marker-anchor-center';
+                    wrapperPoste.style.width = '24px';
+                    wrapperPoste.style.height = '24px';
+                    wrapperPoste.style.display = 'flex';
+                    wrapperPoste.style.alignItems = 'center';
+                    wrapperPoste.style.justifyContent = 'center';
+
+                    wrapperPoste.appendChild(elPoste);
+
+                    wrapperPoste.onclick = (e) => {
+                        e.stopPropagation();
+                        window.selecionarPosteAereo(poste);
+                    };
+
+                    const m = new mapboxgl.Marker({ element: wrapperPoste, anchor: 'center' })
                         .setLngLat([poste.longitude, poste.latitude])
                         .setPopup(new mapboxgl.Popup({ offset: 12 }).setHTML(popupHtml))
                         .addTo(compMapboxInstance);
@@ -3698,7 +4772,7 @@
             const selEl = document.getElementById(`marker-poste-${poste.id}`);
             if (selEl) {
                 selEl.classList.remove('bg-purple-700', 'ring-purple-300');
-                selEl.classList.add('bg-emerald-600', 'ring-4', 'ring-emerald-400', 'scale-125');
+                selEl.classList.add('bg-emerald-600', 'ring-4', 'ring-emerald-400');
             }
 
             // Atualizar Painel
@@ -3709,10 +4783,14 @@
             const alertaEl = document.getElementById('comp-panel-poste-alerta-vinculo');
             const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
 
-            const plaquetaVinculada = poste.id_plaqueta_vinculada ? String(poste.id_plaqueta_vinculada).trim().toUpperCase() : null;
+            const arrPlaquetasVinculadas = parsePlaquetasPoste(poste.id_plaqueta_vinculada);
+            const totalBracos = arrPlaquetasVinculadas.length;
             const plaquetaAlvo = (itemEmComparacaoModal && itemEmComparacaoModal.plaquetaId) ? String(itemEmComparacaoModal.plaquetaId).trim().toUpperCase() : '';
-            const isOutraPlaqueta = plaquetaVinculada && (plaquetaVinculada !== plaquetaAlvo);
-            const isMesmaPlaqueta = plaquetaVinculada && (plaquetaVinculada === plaquetaAlvo);
+            const isMesmaPlaqueta = arrPlaquetasVinculadas.includes(plaquetaAlvo);
+            const isOutraPlaqueta = totalBracos > 0 && !isMesmaPlaqueta;
+
+            const boxBotoesCompartilhado = document.getElementById('comp-panel-botoes-compartilhado');
+            const boxBotoesPadrao = document.getElementById('comp-panel-botoes-padrao');
 
             if (box && coordsEl && distEl) {
                 box.classList.remove('hidden');
@@ -3720,7 +4798,8 @@
 
                 if (tituloEl) {
                     if (isMesmaPlaqueta) tituloEl.innerText = `Poste Oficial da Plaqueta`;
-                    else if (isOutraPlaqueta) tituloEl.innerText = `Poste Ocupado [Plaqueta #${plaquetaVinculada}]`;
+                    else if (totalBracos > 1) tituloEl.innerText = `Poste Compartilhado (${totalBracos} braços)`;
+                    else if (isOutraPlaqueta) tituloEl.innerText = `Poste Ocupado [Plaqueta #${arrPlaquetasVinculadas[0]}]`;
                     else tituloEl.innerText = `Poste da Base Aérea (Disponível)`;
                 }
 
@@ -3733,23 +4812,33 @@
                 if (alertaEl) {
                     if (isOutraPlaqueta) {
                         alertaEl.classList.remove('hidden');
-                        alertaEl.innerHTML = `⚠️ <strong>Atenção:</strong> Este poste já está vinculado à Plaqueta <strong>#${plaquetaVinculada}</strong>. Ao aprovar, o vínculo será transferido para a Plaqueta <strong>#${plaquetaAlvo}</strong>.`;
+                        alertaEl.className = 'mt-1.5 p-1.5 rounded bg-sky-50 border border-sky-300 text-[10.5px] text-sky-950 font-medium space-y-1';
+                        alertaEl.innerHTML = `
+                            <div class="flex items-center gap-1 font-bold text-sky-900">
+                                <span class="material-symbols-outlined text-[15px] text-sky-700">hub</span>
+                                <span>Poste com luminária(s) existente(s): <strong>#${arrPlaquetasVinculadas.join(', #')}</strong></span>
+                            </div>
+                            <div class="text-[10px] text-sky-800">
+                                Escolha abaixo se deseja <strong>Somar (adicionar como novo braço)</strong> ou <strong>Substituir</strong> o vínculo anterior.
+                            </div>
+                        `;
                     } else if (isMesmaPlaqueta) {
                         alertaEl.classList.remove('hidden');
                         alertaEl.className = 'mt-1.5 p-1 rounded bg-indigo-100/90 border border-indigo-300 text-[10px] text-indigo-900 font-medium';
-                        alertaEl.innerHTML = `✅ Este poste já é o ponto cadastrado oficial da Plaqueta <strong>#${plaquetaAlvo}</strong>.`;
+                        alertaEl.innerHTML = `✅ Este poste já possui o cadastro oficial da Plaqueta <strong>#${plaquetaAlvo}</strong>.`;
                     } else {
                         alertaEl.classList.add('hidden');
                     }
                 }
             }
 
-            if (btnLabel) {
-                if (isOutraPlaqueta) {
-                    btnLabel.innerText = `Substituir Vínculo no Poste`;
-                } else {
-                    btnLabel.innerText = `Aprovar no Poste`;
-                }
+            // Exibir botões Somar vs Substituir se o poste tiver outra plaqueta vinculada
+            if (isOutraPlaqueta) {
+                if (boxBotoesCompartilhado) boxBotoesCompartilhado.classList.remove('hidden');
+                if (btnLabel) btnLabel.innerText = 'Substituir Vínculo no Poste';
+            } else {
+                if (boxBotoesCompartilhado) boxBotoesCompartilhado.classList.add('hidden');
+                if (btnLabel) btnLabel.innerText = isMesmaPlaqueta ? 'Confirmar Este Poste' : 'Aprovar no Poste';
             }
         };
 
@@ -3758,9 +4847,11 @@
             const box = document.getElementById('comp-panel-poste-box');
             const alertaEl = document.getElementById('comp-panel-poste-alerta-vinculo');
             const btnLabel = document.getElementById('btn-aprovar-modal-comp-label');
+            const boxBotoesCompartilhado = document.getElementById('comp-panel-botoes-compartilhado');
 
             if (box) box.classList.add('hidden');
             if (alertaEl) alertaEl.classList.add('hidden');
+            if (boxBotoesCompartilhado) boxBotoesCompartilhado.classList.add('hidden');
             if (btnLabel) btnLabel.innerText = 'Aprovar Alteração';
 
             document.querySelectorAll('[id^="marker-poste-"]').forEach(el => {
@@ -3784,6 +4875,17 @@
             }, 200);
         };
 
+        window.toggleEstiloRemoverDuplicata = function(dupId) {
+            const chk = document.getElementById(`chk-del-dup-${dupId}`);
+            const lbl = document.getElementById(`dup-label-remover-${dupId}`);
+            if (!chk || !lbl) return;
+            if (chk.checked) {
+                lbl.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer border select-none transition-colors bg-rose-50 border-rose-300 text-rose-700 hover:bg-rose-100';
+            } else {
+                lbl.className = 'flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold cursor-pointer border select-none transition-colors bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100';
+            }
+        };
+
         window.selecionarInstanciaDuplicada = function(dupId) {
             compInstanciaSelecionadaId = dupId;
             const dup = compDuplicatasList.find(d => d.id === dupId);
@@ -3798,13 +4900,41 @@
                 selItem.className = 'p-1.5 rounded-lg border text-[11px] flex items-center justify-between transition-all cursor-pointer bg-blue-100/90 border-blue-400 font-bold text-blue-950';
             }
 
-            // Destaque visual nos marcadores do mapa
+            // Atualizar visibilidade dos controles de Excluir vs Badge Ativo para cada duplicata
+            compDuplicatasList.forEach(d => {
+                const badgeManter = document.getElementById(`dup-badge-manter-${d.id}`);
+                const labelRemover = document.getElementById(`dup-label-remover-${d.id}`);
+                const chkRemover = document.getElementById(`chk-del-dup-${d.id}`);
+
+                if (d.id === dupId) {
+                    // O ponto que está sendo selecionado é o ATIVO: não pode ser marcado para exclusão
+                    if (chkRemover) chkRemover.checked = false;
+                    if (labelRemover) labelRemover.classList.add('hidden');
+                    if (badgeManter) {
+                        badgeManter.classList.remove('hidden');
+                    } else {
+                        // Se ainda não existia o elemento badge, injeta antes do label
+                        if (labelRemover) {
+                            labelRemover.insertAdjacentHTML('beforebegin', `<span id="dup-badge-manter-${d.id}" class="text-[9px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-bold">Ativo</span>`);
+                        }
+                    }
+                } else {
+                    // Os outros pontos podem ser excluídos ou mantidos individualmente
+                    if (badgeManter) badgeManter.classList.add('hidden');
+                    if (labelRemover) {
+                        labelRemover.classList.remove('hidden');
+                        window.toggleEstiloRemoverDuplicata(d.id);
+                    }
+                }
+            });
+
+            // Destaque visual nos marcadores do mapa (mantendo tamanho físico constante para estabilidade subpixel no Mapbox)
             document.querySelectorAll('[id^="marker-duplicata-"]').forEach(el => {
-                el.className = 'w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all bg-sky-500 ring-2 ring-sky-200 z-10';
+                el.className = 'w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer bg-sky-500 ring-2 ring-sky-200 z-10';
             });
             const selMarker = document.getElementById(`marker-duplicata-${dupId}`);
             if (selMarker) {
-                selMarker.className = 'w-6 h-6 rounded-full border-2 border-white shadow-lg flex items-center justify-center text-white text-[10px] font-bold cursor-pointer transition-all bg-blue-600 ring-4 ring-blue-300 z-20 scale-110';
+                selMarker.className = 'w-6 h-6 rounded-full border-2 border-white shadow-xl flex items-center justify-center text-white text-[10px] font-bold cursor-pointer bg-blue-600 ring-4 ring-blue-300 z-30';
             }
 
             // Atualizar os campos de exibição do ponto original
@@ -3813,13 +4943,19 @@
             if (origCoordsEl) origCoordsEl.innerText = `${dup.rawCoord} (${dup.empresa})`;
             if (distBadge) distBadge.innerText = `${dup.distanciaMetros.toFixed(1)} m`;
 
-            // Centralizar suavemente no ponto selecionado
+            // Atualizar os postes aéreos ao redor do ponto duplicado selecionado e da OS
+            if (itemEmComparacaoModal) {
+                const coordsAtualizadas = [itemEmComparacaoModal.coordReparoParsed, { lat: dup.lat, lng: dup.lng }];
+                carregarPostesAereosProximos(coordsAtualizadas, itemEmComparacaoModal);
+            }
+
+            // Centralizar no ponto selecionado
             if (compMapboxInstance) {
                 compMapboxInstance.flyTo({ center: [dup.lng, dup.lat], zoom: 17.5, speed: 1.2 });
             }
         };
 
-        window.confirmarAprovacaoModalComparativo = async function() {
+        window.confirmarAprovacaoModalComparativo = async function(modoForcado = null) {
             if (!itemEmComparacaoModal) return;
             const item = itemEmComparacaoModal;
 
@@ -3835,9 +4971,16 @@
                 posteAereoId = compPosteSelecionado.id;
             }
 
-            const chkLimpar = document.getElementById('chk-limpar-duplicatas-obsoletas');
-            const limparDuplicatasObsoletas = Boolean(chkLimpar && chkLimpar.checked);
             const idRegistroAlvo = compInstanciaSelecionadaId || item.idRegistroPlaqueta;
+
+            // Coleta de duplicatas marcadas individualmente para remoção
+            const checkboxesDel = document.querySelectorAll('input[id^="chk-del-dup-"]:checked');
+            const idsDuplicatasParaRemover = Array.from(checkboxesDel)
+                .map(cb => parseInt(cb.value, 10))
+                .filter(id => !isNaN(id) && id !== idRegistroAlvo);
+
+            // Determinar o modo de vínculo do poste ('SOMAR' ou 'SUBSTITUIR')
+            const modoVinculoPoste = modoForcado || 'SUBSTITUIR';
 
             if (btn) btn.disabled = true;
             if (lbl) lbl.innerText = "Salvando no banco...";
@@ -3845,12 +4988,13 @@
             try {
                 const sucesso = await executarAprovacao(item, coordOverride, posteAereoId, {
                     idRegistroAlvo,
-                    limparDuplicatasObsoletas
+                    idsDuplicatasParaRemover,
+                    modoVinculoPoste
                 });
 
                 if (sucesso) {
                     window.fecharModalComparativoCoords();
-                    console.log(`✅ [Aprovação] Plaqueta #${item.plaquetaId} salva no banco com sucesso.`);
+                    console.log(`✅ [Aprovação] Plaqueta #${item.plaquetaId} salva no banco com sucesso (Modo: ${modoVinculoPoste}).`);
                 }
             } catch (err) {
                 console.error("❌ Falha na aprovação comparativa:", err);
@@ -4042,6 +5186,761 @@
                 if (e.key === 'Escape') window.fecharDetalhesOSModal();
             }
         });
+
+        // =========================================================================
+        // MÓDULO: ABA HISTÓRICO GERAL DE MOVIMENTAÇÕES DE PLAQUETAS (AUDITORIA GEODÉSICA)
+        // Em conformidade estrita com INSTRUCOES_SUPABASE_EGRESS.md:
+        // - Projeção estrita de colunas (sem select *)
+        // - Paginação com .range() e limites definidos
+        // - Cache local em memória (não refaz query em trocas de abas)
+        // - Lazy loading acionado apenas quando a aba é aberta
+        // =========================================================================
+        let histCache = [];
+        let histCacheTotal = 0;
+        let histPaginaAtual = 1;
+        let histItensPorPagina = 50;
+        let histIsLoading = false;
+        let histUltimoCarregamento = null;
+        let histDebounceTimer = null;
+
+        // Estado dos Filtros Embutidos no Cabeçalho
+        let histFiltroPeriodo = '30';
+        let histFiltroPlaqueta = '';
+        let histFiltroOrigem = '';
+        let histFiltroOS = '';
+        let histFiltroUsuario = '';
+
+        window.aoAbrirAbaHistorico = function() {
+            // Inicializar portais e eventos dos filtros de cabeçalho
+            if (typeof initHistoricoHeaderFilters === 'function') {
+                initHistoricoHeaderFilters();
+            }
+
+            // Se já tiver registros carregados há menos de 2 minutos, aproveita o cache local sem gastar requisições
+            const agora = Date.now();
+            if (histCache.length > 0 && histUltimoCarregamento && (agora - histUltimoCarregamento < 120000)) {
+                window.renderizarTabelaHistorico();
+                return;
+            }
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.recarregarHistoricoPlaquetas = async function(forcar) {
+            if (histIsLoading) return;
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                console.warn("Cliente Supabase não disponível para histórico");
+                return;
+            }
+
+            histIsLoading = true;
+            const elLoading = document.getElementById('hist-tabela-loading');
+            const elEmpty = document.getElementById('hist-tabela-empty');
+            const elWrapper = document.getElementById('hist-tabela-wrapper');
+            const elRefreshIcon = document.getElementById('hist-btn-refresh-icon');
+
+            if (elRefreshIcon) elRefreshIcon.classList.add('animate-spin');
+            if (elLoading) elLoading.classList.remove('hidden');
+            if (elEmpty) elEmpty.classList.add('hidden');
+            if (elWrapper) elWrapper.classList.add('opacity-40');
+
+            try {
+                if (typeof atualizarIndicadoresFiltroHistorico === 'function') {
+                    atualizarIndicadoresFiltroHistorico();
+                }
+
+                // Projeção estrita conforme Mandamento 1 e 2 do Egress
+                let query = client
+                    .from('historico_localizacao_plaquetas')
+                    .select('id, identificacao, latitude, longitude, numero_os, origem, usuario, observacao, created_at', { count: 'exact' });
+
+                // 1. Filtro temporal para evitar egress de tabelas históricas completas
+                if (histFiltroPeriodo !== 'todos') {
+                    const dias = parseInt(histFiltroPeriodo, 10) || 30;
+                    const dataCorte = new Date(Date.now() - dias * 24 * 60 * 60 * 1000).toISOString();
+                    query = query.gte('created_at', dataCorte);
+                }
+
+                // 2. Filtro de Plaqueta
+                if (histFiltroPlaqueta) {
+                    query = query.ilike('identificacao', `%${histFiltroPlaqueta}%`);
+                }
+
+                // 3. Filtro de Origem
+                if (histFiltroOrigem) {
+                    query = query.eq('origem', histFiltroOrigem);
+                }
+
+                // 4. Filtro de OS
+                if (histFiltroOS) {
+                    query = query.ilike('numero_os', `%${histFiltroOS}%`);
+                }
+
+                // 5. Filtro de Usuário
+                if (histFiltroUsuario) {
+                    query = query.ilike('usuario', `%${histFiltroUsuario}%`);
+                }
+
+                // Ordenação cronológica decrescente
+                query = query.order('created_at', { ascending: false });
+
+                // Paginação via .range() para proteção de Egress
+                const from = (histPaginaAtual - 1) * histItensPorPagina;
+                const to = from + histItensPorPagina - 1;
+                query = query.range(from, to);
+
+                const { data, count, error } = await query;
+
+                if (error) {
+                    console.error("❌ Erro ao consultar histórico de plaquetas:", error);
+                    alert("Erro ao buscar histórico de movimentações: " + error.message);
+                    return;
+                }
+
+                histCache = Array.isArray(data) ? data : [];
+                histCacheTotal = count !== null ? count : histCache.length;
+                histUltimoCarregamento = Date.now();
+
+                // Consultar posições atuais de cadastro apenas das plaquetas desta página (chunks de até 50)
+                // Conforme INSTRUCOES_SUPABASE_EGRESS.md (Mandamentos 1, 2 e 5 - lote pequeno e projeção estrita)
+                const plaquetasIdsPagina = [...new Set(histCache.map(i => i.identificacao).filter(Boolean))];
+                const mapaPlaquetasCadastradas = {};
+
+                if (plaquetasIdsPagina.length > 0) {
+                    try {
+                        const { data: plaqData } = await client
+                            .from('localizacao_plaquetas')
+                            .select('identificacao, "Latitude", "Longitude", "Empresa"')
+                            .in('identificacao', plaquetasIdsPagina.slice(0, 50));
+
+                        if (Array.isArray(plaqData)) {
+                            plaqData.forEach(p => {
+                                const idNorm = String(p.identificacao || '').trim().toUpperCase();
+                                const lat = parseCoordinate(p.Latitude);
+                                const lng = parseCoordinate(p.Longitude);
+                                if (lat !== null && lng !== null) {
+                                    mapaPlaquetasCadastradas[idNorm] = {
+                                        lat,
+                                        lng,
+                                        empresa: p.Empresa || '---'
+                                    };
+                                }
+                            });
+                        }
+                    } catch (ePlaq) {
+                        console.warn("Aviso ao buscar coordenadas de cadastro para cálculo de distância:", ePlaq);
+                    }
+                }
+
+                // 1. Organizar histórico por plaqueta ordenado por data para obter a posição imediatamente anterior no tempo
+                const historicoPorPlaqueta = {};
+                histCache.forEach(item => {
+                    const idNorm = String(item.identificacao || '').trim().toUpperCase();
+                    if (!historicoPorPlaqueta[idNorm]) historicoPorPlaqueta[idNorm] = [];
+                    historicoPorPlaqueta[idNorm].push(item);
+                });
+
+                // Ordenar cada grupo por created_at decrescente
+                Object.keys(historicoPorPlaqueta).forEach(idNorm => {
+                    historicoPorPlaqueta[idNorm].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+                });
+
+                // 2. Anexar distância e dados de comparação geodésica em cada registro
+                histCache.forEach(item => {
+                    const idNorm = String(item.identificacao || '').trim().toUpperCase();
+                    const cadInfo = mapaPlaquetasCadastradas[idNorm];
+                    const itemLat = parseFloat(item.latitude);
+                    const itemLng = parseFloat(item.longitude);
+                    const hasItemCoord = !isNaN(itemLat) && !isNaN(itemLng) && itemLat !== 0 && itemLng !== 0;
+
+                    // A) Verificar se a própria movimentação gravou o desvio calculado na observação
+                    // Exemplo 1: "Aprovada coordenada da OS #1234 (Desvio: 24.5m)"
+                    // Exemplo 2: "Calibração fina (desvio <= 15m: 8.2m) via OS #1234"
+                    let desvioGravado = null;
+                    if (item.observacao) {
+                        const matchDesvio = item.observacao.match(/desvio(?:\s*<=\s*15m)?:\s*([0-9]+(?:\.[0-9]+)?)\s*m/i);
+                        if (matchDesvio && matchDesvio[1]) {
+                            const val = parseFloat(matchDesvio[1]);
+                            if (!isNaN(val)) desvioGravado = val;
+                        }
+                    }
+
+                    // B) Encontrar o registro de histórico imediatamente anterior deste item que tenha coordenada DIFERENTE
+                    // (Ignora logs duplicados/gêmeos como TRIGGER_UPDATE disparado no mesmo segundo da ação)
+                    const listaPlq = historicoPorPlaqueta[idNorm] || [];
+                    const indexItem = listaPlq.findIndex(x => x.id === item.id);
+                    
+                    let registroAnteriorDiferente = null;
+                    if (indexItem !== -1) {
+                        for (let k = indexItem + 1; k < listaPlq.length; k++) {
+                            const cand = listaPlq[k];
+                            const cLat = parseFloat(cand.latitude);
+                            const cLng = parseFloat(cand.longitude);
+                            if (!isNaN(cLat) && !isNaN(cLng) && cLat !== 0 && cLng !== 0) {
+                                // Se for exatamente a mesma coordenada desta movimentação (ex: trigger de banco duplicado), continua procurando o estado anterior real
+                                const distGemeo = (hasItemCoord) ? calcularDistanciaHaversine({ lat: cLat, lng: cLng }, { lat: itemLat, lng: itemLng }) : null;
+                                if (distGemeo !== null && distGemeo > 0.3) {
+                                    registroAnteriorDiferente = cand;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    let compCoord = null;
+                    let tipoComparacao = null; // 'gravado' | 'anterior' | 'cadastro'
+
+                    if (registroAnteriorDiferente) {
+                        const antLat = parseFloat(registroAnteriorDiferente.latitude);
+                        const antLng = parseFloat(registroAnteriorDiferente.longitude);
+                        compCoord = { lat: antLat, lng: antLng, label: `Posição Anterior (${registroAnteriorDiferente.origem || 'Histórico'})` };
+                        tipoComparacao = 'anterior';
+                        if (desvioGravado !== null) {
+                            item.distanciaMetros = desvioGravado;
+                        } else if (hasItemCoord) {
+                            item.distanciaMetros = calcularDistanciaHaversine(
+                                { lat: antLat, lng: antLng },
+                                { lat: itemLat, lng: itemLng }
+                            );
+                        }
+                    } else if (desvioGravado !== null) {
+                        item.distanciaMetros = desvioGravado;
+                        tipoComparacao = 'gravado';
+                        // Se não encontrou o ponto anterior na mesma página, usa a posição atual de cadastro ou a coordenada do item com label explicativo
+                        compCoord = cadInfo ? { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' } : { lat: itemLat, lng: itemLng, label: 'Posição Registrada' };
+                    } else if (cadInfo && hasItemCoord) {
+                        // C) Se não tinha desvio gravado e não há registro anterior diferente na página:
+                        const d = calcularDistanciaHaversine(
+                            { lat: cadInfo.lat, lng: cadInfo.lng },
+                            { lat: itemLat, lng: itemLng }
+                        );
+                        compCoord = { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Atual Cadastrada' };
+                        tipoComparacao = 'cadastro';
+                        item.distanciaMetros = d;
+                    }
+
+                    item.compCoord = compCoord;
+                    item.tipoComparacao = tipoComparacao;
+                    item.cadInfo = cadInfo || compCoord;
+                });
+
+                window.renderizarTabelaHistorico();
+
+            } catch (err) {
+                console.error("❌ Exceção ao carregar histórico:", err);
+            } finally {
+                histIsLoading = false;
+                if (elRefreshIcon) elRefreshIcon.classList.remove('animate-spin');
+                if (elLoading) elLoading.classList.add('hidden');
+                if (elWrapper) elWrapper.classList.remove('opacity-40');
+            }
+        };
+
+        window.renderizarTabelaHistorico = function() {
+            const tbody = document.getElementById('tbody-historico-movimentacoes');
+            const elEmpty = document.getElementById('hist-tabela-empty');
+            const elWrapper = document.getElementById('hist-tabela-wrapper');
+            const elInfo = document.getElementById('hist-info-paginacao');
+            const elPaginaIndicador = document.getElementById('hist-indicador-pagina');
+            const btnPrev = document.getElementById('hist-btn-prev');
+            const btnNext = document.getElementById('hist-btn-next');
+
+            if (!tbody) return;
+            tbody.innerHTML = '';
+
+            if (histCache.length === 0) {
+                if (elEmpty) elEmpty.classList.remove('hidden');
+                if (elWrapper) elWrapper.classList.add('hidden');
+                if (elInfo) elInfo.textContent = 'Nenhum registro encontrado.';
+                if (btnPrev) btnPrev.disabled = true;
+                if (btnNext) btnNext.disabled = true;
+                return;
+            }
+
+            if (elEmpty) elEmpty.classList.add('hidden');
+            if (elWrapper) elWrapper.classList.remove('hidden');
+
+            const totalPaginas = Math.ceil(histCacheTotal / histItensPorPagina) || 1;
+            const itemInicio = (histPaginaAtual - 1) * histItensPorPagina + 1;
+            const itemFim = Math.min(histPaginaAtual * histItensPorPagina, histCacheTotal);
+
+            if (elInfo) {
+                elInfo.innerHTML = `Mostrando <strong class="text-slate-800">${itemInicio}</strong> a <strong class="text-slate-800">${itemFim}</strong> de <strong class="text-slate-800">${histCacheTotal}</strong> movimentações`;
+            }
+            if (elPaginaIndicador) {
+                elPaginaIndicador.textContent = `${histPaginaAtual} de ${totalPaginas}`;
+            }
+            if (btnPrev) btnPrev.disabled = histPaginaAtual <= 1;
+            if (btnNext) btnNext.disabled = histPaginaAtual >= totalPaginas;
+
+            // Dicionário de Formatação de Movimentação (Badges com cores semânticas)
+            const badgesOrigem = {
+                'APROVACAO_OS': { label: 'Aprovação de OS', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'verified' },
+                'SNAP_POSTE_AEREO': { label: 'Ajuste Poste Aéreo', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'near_me' },
+                'TRIGGER_UPDATE': { label: 'Trigger Banco', bg: 'bg-violet-50 text-violet-700 border-violet-200', icon: 'database' },
+                'EDICAO_MAPA': { label: 'Edição via Mapa', bg: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'edit_location' },
+                'EDICAO_FORMULARIO': { label: 'Edição Formulário', bg: 'bg-sky-50 text-sky-700 border-sky-200', icon: 'edit_note' },
+                'CADASTRO_NOVA_PLAQUETA': { label: 'Nova Plaqueta', bg: 'bg-teal-50 text-teal-700 border-teal-200', icon: 'add_circle' },
+                'DESCARTE_OS': { label: 'Descarte de OS', bg: 'bg-rose-50 text-rose-700 border-rose-200', icon: 'cancel' },
+                'FINALIZAR_OS': { label: 'Finalização de OS', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'task_alt' }
+            };
+
+            const frag = document.createDocumentFragment();
+
+            histCache.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition-colors border-b border-outline-variant/40";
+
+                // 1. Data e Hora
+                const dataFormatada = item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '---';
+
+                // 2. Plaqueta
+                const plaquetaNum = item.identificacao || '---';
+
+                // 3. Origem / Badge
+                const configOrigem = badgesOrigem[item.origem] || { label: item.origem || 'Movimentação', bg: 'bg-slate-100 text-slate-700 border-slate-200', icon: 'sync_alt' };
+                const badgeHtml = `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border ${configOrigem.bg}">
+                    <span class="material-symbols-outlined text-[14px]">${configOrigem.icon}</span>
+                    <span>${configOrigem.label}</span>
+                </span>`;
+
+                // 4. Distância e Botão do Minimap Comparativo
+                let distHtml = `<span class="text-slate-400 font-normal text-[11px]">---</span>`;
+                if (item.distanciaMetros !== null && !isNaN(item.distanciaMetros)) {
+                    const distVal = item.distanciaMetros;
+                    const distTexto = distVal < 1000 ? `${distVal.toFixed(1)}m` : `${(distVal / 1000).toFixed(2)}km`;
+
+                    let corBadge = 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100';
+                    let corDot = 'bg-emerald-500';
+                    if (distVal > 50) {
+                        corBadge = 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100';
+                        corDot = 'bg-rose-500';
+                    } else if (distVal > 15) {
+                        corBadge = 'bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100';
+                        corDot = 'bg-amber-500';
+                    }
+
+                    let labelTipo = "Desvio medido:";
+                    if (item.tipoComparacao === 'gravado') labelTipo = "Desvio registrado na conclusão da OS:";
+                    else if (item.tipoComparacao === 'anterior') labelTipo = "Desvio em relação à posição anterior:";
+                    else if (item.origem === 'CADASTRO_NOVA_PLAQUETA') labelTipo = "Plaqueta nova (posição inicial):";
+
+                    distHtml = `
+                        <button type="button" onclick="window.abrirModalComparativoDoHistorico('${item.id}')" 
+                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-2xs ${corBadge}" 
+                                title="${labelTipo} ${distTexto}. Clique para abrir o minimapa comparativo.">
+                            <span class="w-2 h-2 rounded-full ${corDot} animate-pulse"></span>
+                            <span>${distTexto}</span>
+                            <span class="material-symbols-outlined text-[14px]">map</span>
+                        </button>
+                    `;
+                } else if (item.origem === 'CADASTRO_NOVA_PLAQUETA') {
+                    distHtml = `<span class="px-2 py-0.5 rounded text-[10.5px] font-semibold bg-slate-100 text-slate-600 border border-slate-200" title="Cadastro inicial da plaqueta">Nova Plaqueta</span>`;
+                }
+
+                // 5. Ordem de Serviço
+                const osHtml = item.numero_os 
+                    ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-bold border border-blue-200 font-mono text-[11px]">
+                        <span class="material-symbols-outlined text-[13px]">receipt_long</span>
+                        #${item.numero_os}
+                       </span>`
+                    : `<span class="text-slate-400 font-normal">---</span>`;
+
+                // 6. Usuário
+                const usuarioTxt = item.usuario || 'Sistema';
+
+                // 7. Observação
+                const obsTxt = item.observacao || '---';
+
+                tr.innerHTML = `
+                    <td class="py-3 px-4 whitespace-nowrap text-slate-600 font-medium">${dataFormatada}</td>
+                    <td class="py-3 px-4 whitespace-nowrap font-bold text-slate-900 font-mono">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-secondary font-semibold">#</span>
+                            <span>${plaquetaNum}</span>
+                            <button type="button" onclick="window.abrirModalHistoricoPlaqueta('${plaquetaNum}')" 
+                                    class="p-1 rounded hover:bg-slate-200 text-slate-500 hover:text-purple-600 transition-colors ml-1 cursor-pointer" 
+                                    title="Ver todas as posições desta plaqueta">
+                                <span class="material-symbols-outlined text-[14px]">visibility</span>
+                            </button>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 whitespace-nowrap">${badgeHtml}</td>
+                    <td class="py-3 px-4 whitespace-nowrap text-center">${distHtml}</td>
+                    <td class="py-3 px-4 whitespace-nowrap">${osHtml}</td>
+                    <td class="py-3 px-4 whitespace-nowrap">
+                        <div class="flex items-center gap-1 text-slate-800 font-medium">
+                            <span class="material-symbols-outlined text-[15px] text-slate-400">person</span>
+                            <span>${usuarioTxt}</span>
+                        </div>
+                    </td>
+                    <td class="py-3 px-4 text-slate-600 text-xs max-w-xs truncate" title="${obsTxt.replace(/"/g, '&quot;')}">${obsTxt}</td>
+                `;
+
+                frag.appendChild(tr);
+            });
+
+            tbody.appendChild(frag);
+        };
+
+        // Modal Comparativo Mapbox acionado pelo clique na Distância do Histórico
+        window.abrirModalComparativoDoHistorico = function(itemId) {
+            const histItem = histCache.find(i => String(i.id) === String(itemId));
+            const pontoReferencia = histItem?.compCoord || histItem?.cadInfo;
+            if (!histItem || !pontoReferencia) {
+                alert("Coordenadas de comparação não disponíveis para este registro.");
+                return;
+            }
+
+            const itemLat = parseFloat(histItem.latitude);
+            const itemLng = parseFloat(histItem.longitude);
+            if (isNaN(itemLat) || isNaN(itemLng) || itemLat === 0 || itemLng === 0) {
+                alert("Este histórico não possui coordenadas válidas para exibir no mapa.");
+                return;
+            }
+
+            const distMetros = histItem.distanciaMetros !== null ? histItem.distanciaMetros : 0;
+            const refLabel = pontoReferencia.label || (histItem.tipoComparacao === 'anterior' ? 'Posição Anterior' : 'Cadastro Atual');
+
+            // Montar objeto compatível com abrirModalComparativoCoords
+            const itemComp = {
+                itemKey: `hist_${histItem.id}`,
+                plaquetaId: histItem.identificacao,
+                protocolo: histItem.numero_os || 'HIST',
+                operador: histItem.usuario || 'Sistema',
+                distanciaMetros: distMetros,
+                coordCadastradaRaw: `${pontoReferencia.lat.toFixed(5)}, ${pontoReferencia.lng.toFixed(5)} (${refLabel})`,
+                coordCadastradaParsed: { lat: pontoReferencia.lat, lng: pontoReferencia.lng },
+                coordReparoRaw: `${itemLat.toFixed(5)}, ${itemLng.toFixed(5)} (Esta Movimentação)`,
+                coordReparoParsed: { lat: itemLat, lng: itemLng },
+                motivosAprovacao: [
+                    {
+                        titulo: `Movimentação Registrada (${histItem.origem || 'HISTÓRICO'})`,
+                        descricao: `Comparado com ${refLabel}. Desvio: ${distMetros.toFixed(1)}m. ${histItem.observacao || ''}`,
+                        badgeClass: 'bg-purple-50 text-purple-800 border-purple-200',
+                        icon: 'history'
+                    }
+                ],
+                isHistoricoViewer: true
+            };
+
+            // Injeta temporariamente no cache para o modal consumir
+            filaAprovacaoCache = filaAprovacaoCache.filter(f => f.itemKey !== itemComp.itemKey);
+            filaAprovacaoCache.push(itemComp);
+
+            window.abrirModalComparativoCoords(itemComp.itemKey);
+
+            // Ajustar botões do modal para modo somente-leitura quando for consulta do histórico
+            const btnDescartar = document.getElementById('btn-descartar-modal-comp');
+            const btnAprovar = document.getElementById('btn-aprovar-modal-comp');
+            if (btnDescartar) btnDescartar.style.display = 'none';
+            if (btnAprovar) btnAprovar.style.display = 'none';
+
+            // Restaurar visibilidade dos botões ao fechar
+            const originalFechar = window.fecharModalComparativoCoords;
+            window.fecharModalComparativoCoords = function() {
+                if (btnDescartar) btnDescartar.style.display = '';
+                if (btnAprovar) btnAprovar.style.display = '';
+                originalFechar();
+                window.fecharModalComparativoCoords = originalFechar;
+            };
+        };
+
+        window.mudarPaginaHistorico = function(delta) {
+            const totalPaginas = Math.ceil(histCacheTotal / histItensPorPagina) || 1;
+            const novaPagina = histPaginaAtual + delta;
+            if (novaPagina >= 1 && novaPagina <= totalPaginas) {
+                histPaginaAtual = novaPagina;
+                window.recarregarHistoricoPlaquetas(false);
+            }
+        };
+
+        window.mudarTamanhoPaginaHistorico = function(novoTam) {
+            histItensPorPagina = parseInt(novoTam, 10) || 50;
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.debouncedFiltrarHistorico = function() {
+            clearTimeout(histDebounceTimer);
+            histDebounceTimer = setTimeout(() => {
+                histPaginaAtual = 1;
+                window.recarregarHistoricoPlaquetas(false);
+            }, 350);
+        };
+
+        window.filtrarHistoricoAba = function() {
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        // =========================================================================
+        // CONTROLADORES DOS FILTROS EMBUTIDOS NO CABEÇALHO DA TABELA DE HISTÓRICO
+        // (Similar à tabela do Painel.html com botões de acionamento e dropdowns flutuantes)
+        // =========================================================================
+        let histHeadersInitialized = false;
+
+        function initHistoricoHeaderFilters() {
+            if (histHeadersInitialized) return;
+            histHeadersInitialized = true;
+
+            const dateTrigger = document.getElementById('hist-date-filter-trigger');
+            const dateDropdown = document.getElementById('hist-date-filter-dropdown');
+            const placaTrigger = document.getElementById('hist-placa-filter-trigger');
+            const placaDropdown = document.getElementById('hist-placa-filter-dropdown');
+            const placaInput = document.getElementById('hist-search-plaqueta-input');
+            const origemTrigger = document.getElementById('hist-origem-filter-trigger');
+            const origemDropdown = document.getElementById('hist-origem-filter-dropdown');
+            const osTrigger = document.getElementById('hist-os-filter-trigger');
+            const osDropdown = document.getElementById('hist-os-filter-dropdown');
+            const osInput = document.getElementById('hist-search-os-input');
+            const usuarioTrigger = document.getElementById('hist-usuario-filter-trigger');
+            const usuarioDropdown = document.getElementById('hist-usuario-filter-dropdown');
+            const usuarioInput = document.getElementById('hist-search-usuario-input');
+
+            const dropdowns = [dateDropdown, placaDropdown, origemDropdown, osDropdown, usuarioDropdown];
+
+            // Mover para o body portal para evitar corte pelo overflow da tabela
+            dropdowns.forEach(d => {
+                if (d && d.parentElement !== document.body) {
+                    document.body.appendChild(d);
+                }
+            });
+
+            function closeAllHistDropdowns() {
+                dropdowns.forEach(d => {
+                    if (d) {
+                        d.classList.add('hidden');
+                        d.style.display = 'none';
+                    }
+                });
+            }
+
+            function openHistDropdown(triggerBtn, dropdownEl, focusInput) {
+                if (!triggerBtn || !dropdownEl) return;
+
+                if (dropdownEl.parentElement !== document.body) {
+                    document.body.appendChild(dropdownEl);
+                }
+
+                const isHidden = dropdownEl.classList.contains('hidden') || dropdownEl.style.display === 'none';
+                closeAllHistDropdowns();
+
+                if (isHidden) {
+                    dropdownEl.style.position = 'fixed';
+                    dropdownEl.style.zIndex = '99999';
+                    dropdownEl.style.display = 'block';
+                    dropdownEl.classList.remove('hidden');
+
+                    const rect = triggerBtn.getBoundingClientRect();
+                    const dropdownHeight = dropdownEl.offsetHeight || 260;
+                    const spaceBelow = window.innerHeight - rect.bottom;
+                    const spaceAbove = rect.top;
+
+                    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+                        dropdownEl.style.top = `${Math.max(12, rect.top - dropdownHeight - 4)}px`;
+                    } else {
+                        dropdownEl.style.top = `${rect.bottom + 4}px`;
+                    }
+
+                    // Prevenir overflow horizontal à direita
+                    const dropdownWidth = dropdownEl.offsetWidth || 280;
+                    if (rect.left + dropdownWidth > window.innerWidth - 16) {
+                        dropdownEl.style.left = 'auto';
+                        dropdownEl.style.right = `${Math.max(12, window.innerWidth - rect.right)}px`;
+                    } else {
+                        dropdownEl.style.left = `${Math.max(12, rect.left)}px`;
+                        dropdownEl.style.right = 'auto';
+                    }
+
+                    if (focusInput) {
+                        setTimeout(() => focusInput?.focus(), 50);
+                    }
+                }
+            }
+
+            // Triggers de abertura
+            dateTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openHistDropdown(dateTrigger, dateDropdown);
+            });
+
+            placaTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openHistDropdown(placaTrigger, placaDropdown, placaInput);
+            });
+
+            origemTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openHistDropdown(origemTrigger, origemDropdown);
+            });
+
+            osTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openHistDropdown(osTrigger, osDropdown, osInput);
+            });
+
+            usuarioTrigger?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openHistDropdown(usuarioTrigger, usuarioDropdown, usuarioInput);
+            });
+
+            // Fechar ao clicar fora
+            document.addEventListener('click', (e) => {
+                const clickedInsideAny = dropdowns.some(d => d && d.contains(e.target));
+                const clickedOnTrigger = [dateTrigger, placaTrigger, origemTrigger, osTrigger, usuarioTrigger].some(t => t && t.contains(e.target));
+                if (!clickedInsideAny && !clickedOnTrigger) {
+                    closeAllHistDropdowns();
+                }
+            });
+
+            // Fechar no scroll fora dos dropdowns
+            window.addEventListener('scroll', () => {
+                const activeEl = document.activeElement;
+                if (activeEl && dropdowns.some(d => d && d.contains(activeEl))) return;
+                closeAllHistDropdowns();
+            }, true);
+
+            window.addEventListener('resize', closeAllHistDropdowns);
+
+            // Ouvintes de input com debounce
+            if (placaInput) {
+                placaInput.addEventListener('input', (e) => {
+                    histFiltroPlaqueta = e.target.value.trim();
+                    dispararRecarregamentoDebounced();
+                });
+            }
+
+            if (osInput) {
+                osInput.addEventListener('input', (e) => {
+                    histFiltroOS = e.target.value.trim();
+                    dispararRecarregamentoDebounced();
+                });
+            }
+
+            if (usuarioInput) {
+                usuarioInput.addEventListener('input', (e) => {
+                    histFiltroUsuario = e.target.value.trim();
+                    dispararRecarregamentoDebounced();
+                });
+            }
+
+            // Ouvinte de rádio para Origem
+            document.querySelectorAll('input[name="hist-origem-radio"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    histFiltroOrigem = e.target.value;
+                    histPaginaAtual = 1;
+                    closeAllHistDropdowns();
+                    window.recarregarHistoricoPlaquetas(false);
+                });
+            });
+        }
+
+        function dispararRecarregamentoDebounced() {
+            clearTimeout(histDebounceTimer);
+            histDebounceTimer = setTimeout(() => {
+                histPaginaAtual = 1;
+                window.recarregarHistoricoPlaquetas(false);
+            }, 350);
+        }
+
+        function atualizarIndicadoresFiltroHistorico() {
+            // Indicador de Período (ativo se diferente do padrão '30')
+            const indPeriodo = document.getElementById('hist-date-filter-indicator');
+            if (indPeriodo) indPeriodo.classList.toggle('hidden', histFiltroPeriodo === '30');
+
+            // Indicador de Plaqueta
+            const indPlaca = document.getElementById('hist-placa-filter-indicator');
+            if (indPlaca) indPlaca.classList.toggle('hidden', !histFiltroPlaqueta);
+
+            // Indicador de Origem
+            const indOrigem = document.getElementById('hist-origem-filter-indicator');
+            if (indOrigem) indOrigem.classList.toggle('hidden', !histFiltroOrigem);
+
+            // Indicador de OS
+            const indOS = document.getElementById('hist-os-filter-indicator');
+            if (indOS) indOS.classList.toggle('hidden', !histFiltroOS);
+
+            // Indicador de Usuário
+            const indUsuario = document.getElementById('hist-usuario-filter-indicator');
+            if (indUsuario) indUsuario.classList.toggle('hidden', !histFiltroUsuario);
+        }
+
+        // Funções de Aplicação e Limpeza de Filtros
+        window.aplicarFiltroPeriodoHistorico = function(periodo) {
+            histFiltroPeriodo = periodo;
+            document.querySelectorAll('.hist-quick-periodo-btn').forEach(btn => {
+                const btnPeriodo = btn.getAttribute('data-hist-periodo');
+                const check = btn.querySelector('.check-icon');
+                if (check) check.classList.toggle('hidden', btnPeriodo !== periodo);
+            });
+
+            const dropdown = document.getElementById('hist-date-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.limparFiltroDataHistorico = function() {
+            window.aplicarFiltroPeriodoHistorico('30');
+        };
+
+        window.limparFiltroPlaquetaHistorico = function() {
+            histFiltroPlaqueta = '';
+            const input = document.getElementById('hist-search-plaqueta-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('hist-placa-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.limparFiltroOrigemHistorico = function() {
+            histFiltroOrigem = '';
+            const radioAll = document.querySelector('input[name="hist-origem-radio"][value=""]');
+            if (radioAll) radioAll.checked = true;
+            const dropdown = document.getElementById('hist-origem-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.limparFiltroOSHistorico = function() {
+            histFiltroOS = '';
+            const input = document.getElementById('hist-search-os-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('hist-os-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
+
+        window.limparFiltroUsuarioHistorico = function() {
+            histFiltroUsuario = '';
+            const input = document.getElementById('hist-search-usuario-input');
+            if (input) input.value = '';
+            const dropdown = document.getElementById('hist-usuario-filter-dropdown');
+            if (dropdown) {
+                dropdown.classList.add('hidden');
+                dropdown.style.display = 'none';
+            }
+            histPaginaAtual = 1;
+            window.recarregarHistoricoPlaquetas(false);
+        };
 
     })();
 </script>

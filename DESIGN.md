@@ -153,7 +153,7 @@ The shape language is **Soft (0.25rem)**. This provides a balance between the "s
 
 ## Components
 - **KPI Cards:** Prominent display of numbers using `headline-lg` in Primary Blue, with a secondary label and a small trend indicator (Success/Danger arrows).
-- **Tables:** Compact density. Header row should have a subtle background tint (#F8FAFC) and `label-md` text. Rows should include a "Quick Action" hover state.
+- **Tables:** Compact density. Header row should have a subtle background tint (#F8FAFC) and `label-md` text. Rows should include a "Quick Action" hover state. **Filtros de Tabela:** Devem ser sempre incorporados aos cabeçalhos de coluna (`<th>`) com dropdowns flutuantes via portal no `body` (ver [BOAS_PRATICAS_TABELAS_FILTROS.md](BOAS_PRATICAS_TABELAS_FILTROS.md)). Nunca criar barras de filtros soltas sobre a tabela.
 - **Buttons:** 
   - *Primary:* Solid Secondary Blue background, white text.
   - *Secondary:* White background, 1px border (#CBD5E1), Primary Blue text.

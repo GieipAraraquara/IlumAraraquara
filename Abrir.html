@@ -886,6 +886,37 @@
       </div>
     </div>
 
+    <!-- MODAL DE BLOQUEIO DE DISTÂNCIA ENTRE PONTOS (MÁXIMO 100 METROS) -->
+    <div id="modalDistanciaExcedida" class="modal-overlay hidden" style="z-index: 60055; display: none;">
+      <div class="modal-content text-center max-w-md p-6 bg-white rounded-2xl shadow-2xl border border-amber-300">
+        <div class="w-16 h-16 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center mx-auto text-3xl mb-3 shadow-inner">
+          📏
+        </div>
+        <div class="inline-block px-3 py-1 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold uppercase rounded-full mb-2 tracking-wide">
+          Distância Máxima Excedida
+        </div>
+        <h3 class="text-slate-900 font-extrabold text-lg mb-1">Limite de 100 Metros Ultrapassado</h3>
+        <p class="text-xs text-slate-500 font-medium mb-4">Um único protocolo não pode conter endereços distantes entre si</p>
+
+        <div class="bg-amber-50/80 border border-amber-200 rounded-xl p-4 mb-5 text-left space-y-2">
+          <div class="text-[11px] font-bold uppercase text-amber-900 tracking-wider flex items-center gap-1">
+            <span>⚠️</span> Motivo da Restrição:
+          </div>
+          <p class="text-xs sm:text-sm text-slate-800 font-medium leading-relaxed" id="modalDistanciaDetalhes">
+            Os endereços selecionados possuem distância superior a 100 metros.
+          </p>
+          <div class="text-[11px] text-amber-800 bg-white/80 p-2.5 rounded-lg border border-amber-200/80">
+            💡 <strong>Como proceder:</strong> Cadastre um protocolo separado para cada endereço ou agrupe apenas pontos contíguos na mesma quadra/rua (até 100m).
+          </div>
+        </div>
+
+        <button type="button" class="w-full py-3 px-4 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-xl transition-all shadow-md active:scale-95 cursor-pointer flex items-center justify-center gap-2" onclick="fecharModalDistanciaExcedida()">
+          <span>Compreendi, corrigir pontos</span>
+          <span>✕</span>
+        </button>
+      </div>
+    </div>
+
     <div id="modalProximidade" class="modal-overlay" style="z-index: 60000;">
       <div class="modal-content">
         <div id="modalProximidadeHeader" class="modal-header text-amber-700">⚠️ PROTOCOLOS EXISTENTES NO LOCAL</div>
@@ -2262,6 +2293,33 @@
 
       function fecharModalPerimetroBloqueado() {
         var modal = document.getElementById('modalPerimetroBloqueado');
+        if (modal) {
+          modal.classList.add('hidden');
+          modal.style.display = 'none';
+        }
+      }
+
+      function alertarDistanciaExcedida(info) {
+        var modal = document.getElementById('modalDistanciaExcedida');
+        var elDetalhes = document.getElementById('modalDistanciaDetalhes');
+        if (elDetalhes) {
+          if (typeof info === 'string') {
+            elDetalhes.innerHTML = info;
+          } else if (info && info.pontoIdx !== undefined && info.distancia !== undefined) {
+            var numPonto = info.pontoIdx + 1;
+            elDetalhes.innerHTML = 'O <strong>Ponto ' + numPonto + '</strong> está a <strong>' + info.distancia + ' metros</strong> de distância do <strong>Ponto 1</strong>.<br><span class="text-rose-700 font-bold">O limite máximo permitido por protocolo é de 100 metros.</span>';
+          } else {
+            elDetalhes.innerHTML = 'Foram identificados endereços com distância <strong>superior a 100 metros</strong> entre si dentro do mesmo chamado.';
+          }
+        }
+        if (modal) {
+          modal.classList.remove('hidden');
+          modal.style.display = 'flex';
+        }
+      }
+
+      function fecharModalDistanciaExcedida() {
+        var modal = document.getElementById('modalDistanciaExcedida');
         if (modal) {
           modal.classList.add('hidden');
           modal.style.display = 'none';
@@ -4494,11 +4552,26 @@
         if (msgErr) msgErr.innerText = "";
 
         if (feature.place_name.toLowerCase().indexOf("araraquara") !== -1) {
+          var novoLat = feature.center[1];
+          var novoLng = feature.center[0];
+
+          var checkDist = checarDistanciaPonto1(novoLat, novoLng, idx);
+          if (!checkDist.valido) {
+            resetarValidacaoPonto(idx);
+            input.value = feature.place_name;
+            input.classList.add('input-invalido');
+            if (msgErr) {
+              msgErr.innerText = "Distância de " + checkDist.distancia + "m excede o limite de 100m em relação ao Ponto 1.";
+            }
+            alertarDistanciaExcedida({ pontoIdx: idx, distancia: checkDist.distancia });
+            return;
+          }
+
           resetarValidacaoPonto(idx); 
           pt.enderecoValidado = true;
           input.classList.add('input-validado');
-          pt.lngAtual = feature.center[0];
-          pt.latAtual = feature.center[1];
+          pt.lngAtual = novoLng;
+          pt.latAtual = novoLat;
           exibirMiniMapaPonto(pt.latAtual, pt.lngAtual, "📍 " + feature.place_name, idx);
           checarDuplicidadeBackend(pt.latAtual, pt.lngAtual, idx, false);
         } else {
@@ -4554,6 +4627,13 @@
             if (data && data.features && data.features.length > 0) {
               var endereco = data.features[0].place_name;
               if (endereco.toLowerCase().indexOf("araraquara") !== -1) {
+                var checkDist = checarDistanciaPonto1(latNum, lngNum, idx);
+                if (!checkDist.valido) {
+                  falhaValidacao(latInput, lngInput, btnV, idx, "Distância de " + checkDist.distancia + "m excede o limite de 100m em relação ao Ponto 1.", autoSave);
+                  alertarDistanciaExcedida({ pontoIdx: idx, distancia: checkDist.distancia });
+                  return;
+                }
+
                 resetarValidacaoPonto(idx); 
                 var pt = pontosData[idx];
                 pt.latAtual = latNum; pt.lngAtual = lngNum; pt.enderecoValidado = true;
@@ -4781,8 +4861,30 @@
               }
 
               if (coordenadas.length === 1) {
+                  var pLatUnico = parseFloat(coordenadas[0].lat);
+                  var pLngUnico = parseFloat(coordenadas[0].lng);
+
+                  var checkDist = checarDistanciaPonto1(pLatUnico, pLngUnico, idx);
+                  if (!checkDist.valido) {
+                      pt.enderecoValidado = false;
+                      pt.latAtual = null;
+                      pt.lngAtual = null;
+                      input.classList.remove('input-validado');
+                      input.classList.add('input-invalido');
+                      btn.classList.remove('btn-validado');
+                      btn.classList.add('btn-invalido');
+                      btn.innerText = "X Distante (>100m)";
+                      var elMsgErr = document.getElementById('msgErroPonto_' + idx);
+                      if (elMsgErr) {
+                          elMsgErr.innerHTML = '<span class="text-rose-600 font-semibold">Distância de ' + checkDist.distancia + 'm excede o limite de 100m em relação ao Ponto 1.</span>';
+                      }
+                      alertarDistanciaExcedida({ pontoIdx: idx, distancia: checkDist.distancia });
+                      if (autoSave) { resetarBotaoSalvar(); }
+                      return;
+                  }
+
                   pt.isPlaquetaDuplicadaOrigem = false;
-                  pt.latAtual = parseFloat(coordenadas[0].lat); pt.lngAtual = parseFloat(coordenadas[0].lng);
+                  pt.latAtual = pLatUnico; pt.lngAtual = pLngUnico;
                   pt.enderecoValidado = true;
 
                   input.classList.add('input-validado'); btn.classList.add('btn-validado'); btn.innerText = "✓ Validado";
@@ -4837,6 +4939,21 @@
       }
 
       function selecionarMapaDuplicado(lat, lng, wrapId, idx) {
+          var checkDist = checarDistanciaPonto1(lat, lng, idx);
+          if (!checkDist.valido) {
+              var btnErr = document.getElementById('btnValidarPlaq_' + idx);
+              if (btnErr) {
+                  btnErr.classList.add('btn-invalido');
+                  btnErr.innerText = "X Distante (>100m)";
+              }
+              var elMsg = document.getElementById('msgErroPonto_' + idx);
+              if (elMsg) {
+                  elMsg.innerHTML = '<span class="text-rose-600 font-semibold">Esta localização da plaqueta fica a ' + checkDist.distancia + 'm do Ponto 1 (limite máximo: 100m).</span>';
+              }
+              alertarDistanciaExcedida({ pontoIdx: idx, distancia: checkDist.distancia });
+              return;
+          }
+
           var container = document.getElementById('listaMapasDuplicados_' + idx);
           var todos = container.querySelectorAll('.mapa-opcao');
           for(var i=0; i<todos.length; i++) { todos[i].classList.remove('selecionado'); }
@@ -5063,6 +5180,14 @@
           .then(function(res) { return res.json(); })
           .then(function(data) {
             if (data && data.features && data.features[0] && data.features[0].place_name.toLowerCase().indexOf("araraquara") !== -1) {
+              var checkDist = checarDistanciaPonto1(lat, lng, idx);
+              if (!checkDist.valido) {
+                resetarValidacaoPonto(idx);
+                document.getElementById('infoMapa_' + idx).innerHTML = '<span class="erro">X Distância de ' + checkDist.distancia + 'm excede o limite de 100m do Ponto 1.</span>';
+                alertarDistanciaExcedida({ pontoIdx: idx, distancia: checkDist.distancia });
+                return;
+              }
+
               resetarValidacaoPonto(idx);
               var pt = pontosData[idx];
               pt.latAtual = lat; pt.lngAtual = lng; pt.enderecoValidado = true;
@@ -5092,6 +5217,49 @@
                 Math.sin(dLon / 2) * Math.sin(dLon / 2);
         var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return Math.round(R * c);
+      }
+
+      // Constante e Validador de Distância Máxima entre pontos de uma mesma OS (100 metros)
+      var LIMITE_DISTANCIA_PONTOS_METROS = 100;
+
+      function checarDistanciaPonto1(latNovo, lngNovo, idxAtual) {
+        if (idxAtual <= 0) return { valido: true, distancia: 0 };
+        var pt1 = pontosData[0];
+        if (!pt1 || !pt1.latAtual || !pt1.lngAtual) {
+          // Ponto 1 ainda não foi validado/localizado
+          return { valido: true, distancia: 0, aguardandoPonto1: true };
+        }
+        var dist = calcularDistanciaMetros(pt1.latAtual, pt1.lngAtual, latNovo, lngNovo);
+        if (dist > LIMITE_DISTANCIA_PONTOS_METROS) {
+          return { valido: false, distancia: dist, ponto1Lat: pt1.latAtual, ponto1Lng: pt1.lngAtual };
+        }
+        return { valido: true, distancia: dist };
+      }
+
+      function validarTodasDistanciasPontos() {
+        if (qtdAtual <= 1) return { valido: true };
+        var pt1 = pontosData[0];
+        if (!pt1) return { valido: true };
+        var lat1 = pt1.latAtual;
+        var lng1 = pt1.lngAtual;
+        if (!lat1 || !lng1) return { valido: true };
+
+        for (var i = 1; i < qtdAtual; i++) {
+          var pt = pontosData[i];
+          if (!pt || pt.usarMesmoEndereco) continue;
+          if (pt.latAtual && pt.lngAtual) {
+            var dist = calcularDistanciaMetros(lat1, lng1, pt.latAtual, pt.lngAtual);
+            if (dist > LIMITE_DISTANCIA_PONTOS_METROS) {
+              return {
+                valido: false,
+                pontoIdx: i,
+                distancia: dist,
+                msg: 'O Ponto ' + (i + 1) + ' está a ' + dist + 'm do Ponto 1 (limite máximo: ' + LIMITE_DISTANCIA_PONTOS_METROS + 'm).'
+              };
+            }
+          }
+        }
+        return { valido: true };
       }
 
       function normalizarTextoEndereco(txt) {
@@ -6239,7 +6407,26 @@
          ptsLocalsGrafico = [];
 
          var btn = document.getElementById('btnSalvar');
-         if (btn) { btn.disabled = true; btn.innerText = "Verificando restrições de perímetro..."; }
+         if (btn) { btn.disabled = true; btn.innerText = "Verificando distâncias entre pontos..."; }
+
+         // Trava de Distância Máxima entre Pontos (100 metros)
+         var checkDistGeral = validarTodasDistanciasPontos();
+         if (!checkDistGeral.valido) {
+             resetarBotaoSalvar();
+             var ptErrIdx = checkDistGeral.pontoIdx;
+             var elErrP = document.getElementById('msgErroPonto_' + ptErrIdx);
+             if (elErrP) {
+                 elErrP.innerHTML = '<span class="text-rose-600 font-semibold">' + checkDistGeral.msg + '</span>';
+             }
+             var msgElDist = document.getElementById('mensagem');
+             if (msgElDist) {
+                 msgElDist.innerHTML = '<span class="erro">' + checkDistGeral.msg + '</span>';
+             }
+             alertarDistanciaExcedida(checkDistGeral);
+             return;
+         }
+
+         if (btn) { btn.innerText = "Verificando restrições de perímetro..."; }
 
          // Checar se qualquer um dos pontos está em perímetro restrito
          for (var i = 0; i < qtdAtual; i++) {
