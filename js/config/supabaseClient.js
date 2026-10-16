@@ -8,7 +8,7 @@ const SUPABASE_ENVIRONMENTS = {
     LOCAL: {
         URL: (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
             ? 'http://localhost:8001'
-            : 'https://congested-synergy-affected.ngrok-free.dev',
+            : 'https://sistemaosararaquara.lluihs.workers.dev',
         KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlLWRlbW8iLCJpYXQiOjE2NDE3NjkyMDAsImV4cCI6MTc5OTUzNTYwMH0.ICKUfcc29vSnq8wme0GuMujaROsH5T-RlNtJVcAzFb4'
     },
 
