@@ -1481,7 +1481,7 @@
                         <div class="flex items-center justify-between pt-1 border-t border-amber-200/80 text-[10px] text-amber-900 font-medium">
                             <span class="flex items-center gap-1">
                                 <span class="material-symbols-outlined text-[13px] text-rose-600">delete_sweep</span>
-                                <span>Marque <strong class="text-rose-700">Remover</strong> nos pontos individuais que deseja excluir</span>
+                                <span>Marque <strong class="text-rose-700">Excluir</strong> nos pontos que deseja deletar do banco</span>
                             </span>
                         </div>
                     </div>
@@ -3794,7 +3794,30 @@
                 const limparObsoletas = Boolean(options.limparDuplicatasObsoletas && idRegistroAlvo && item.instanciasDuplicadas && item.instanciasDuplicadas.length > 1);
 
                 // 1. Atualizar localizacao_plaquetas
-                // Se temos o ID único da linha específica, atualizamos exatamente ela para não afetar registros errados
+                // Se o usuário selecionou um poste e marcou TODOS os pontos antigos para remoção,
+                // usamos um dos registros antigos para receber a coordenada do poste e removemos o resto,
+                // garantindo que fique exatamente 1 registro único no banco de dados na coordenada do poste.
+                let idParaPreservarEAtualizar = idRegistroAlvo;
+                let idsEfetivosParaRemover = [];
+
+                if (Array.isArray(options.idsDuplicatasParaRemover)) {
+                    const todosIds = item.instanciasDuplicadas ? item.instanciasDuplicadas.map(d => d.id) : [];
+                    const todosMarcadosParaRemover = todosIds.length > 0 && todosIds.every(id => options.idsDuplicatasParaRemover.includes(id));
+
+                    if (isSnapPoste && todosMarcadosParaRemover) {
+                        // O usuário quer que o poste seja o único registro existente.
+                        // Mantemos o idRegistroAlvo para receber a coordenada do poste e deletamos todos os outros.
+                        idParaPreservarEAtualizar = idRegistroAlvo;
+                        idsEfetivosParaRemover = options.idsDuplicatasParaRemover.filter(id => id !== idParaPreservarEAtualizar);
+                    } else {
+                        idsEfetivosParaRemover = options.idsDuplicatasParaRemover.filter(id => id !== idParaPreservarEAtualizar);
+                    }
+                } else if (limparObsoletas) {
+                    idsEfetivosParaRemover = item.instanciasDuplicadas
+                        .filter(inst => inst.id !== idRegistroAlvo)
+                        .map(inst => inst.id);
+                }
+
                 let queryUpdate = client.from('localizacao_plaquetas')
                     .update({
                         Latitude: newLat,
@@ -3802,8 +3825,8 @@
                         "Observação": limparObsoletas ? '' : undefined
                     });
 
-                if (idRegistroAlvo) {
-                    queryUpdate = queryUpdate.eq('id', idRegistroAlvo);
+                if (idParaPreservarEAtualizar) {
+                    queryUpdate = queryUpdate.eq('id', idParaPreservarEAtualizar);
                 } else {
                     queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
                 }
@@ -3815,23 +3838,14 @@
                     return false;
                 }
 
-                // 1.1 Se o usuário optou por remover duplicatas obsoletas (suporte a seleção individual ou total)
-                let idsParaRemover = [];
-                if (Array.isArray(options.idsDuplicatasParaRemover)) {
-                    idsParaRemover = options.idsDuplicatasParaRemover.filter(id => id !== idRegistroAlvo);
-                } else if (limparObsoletas) {
-                    idsParaRemover = item.instanciasDuplicadas
-                        .filter(inst => inst.id !== idRegistroAlvo)
-                        .map(inst => inst.id);
-                }
-
-                if (idsParaRemover.length > 0) {
+                // 1.1 Excluir as duplicatas selecionadas
+                if (idsEfetivosParaRemover.length > 0) {
                     try {
                         const { error: delErr } = await client.from('localizacao_plaquetas')
                             .delete()
-                            .in('id', idsParaRemover);
+                            .in('id', idsEfetivosParaRemover);
                         if (delErr) console.warn("Aviso ao remover duplicatas obsoletas:", delErr);
-                        else console.log(`🗑️ [Duplicatas] ${idsParaRemover.length} registro(s) obsoleto(s) de #${item.plaquetaId} removidos com sucesso.`);
+                        else console.log(`🗑️ [Duplicatas] ${idsEfetivosParaRemover.length} registro(s) obsoleto(s) de #${item.plaquetaId} removidos com sucesso.`);
                     } catch (dErr) { console.warn("Erro ao deletar duplicatas:", dErr); }
                 }
 
@@ -4840,6 +4854,20 @@
                 if (boxBotoesCompartilhado) boxBotoesCompartilhado.classList.add('hidden');
                 if (btnLabel) btnLabel.innerText = isMesmaPlaqueta ? 'Confirmar Este Poste' : 'Aprovar no Poste';
             }
+
+            // Quando um poste da Base Aérea é selecionado, ele passa a ser o destino das coordenadas!
+            // Portanto, todos os pontos cadastrados existentes podem ser marcados para exclusão se o usuário desejar.
+            if (compDuplicatasList && compDuplicatasList.length > 0) {
+                compDuplicatasList.forEach(d => {
+                    const badgeManter = document.getElementById(`dup-badge-manter-${d.id}`);
+                    const labelRemover = document.getElementById(`dup-label-remover-${d.id}`);
+                    if (badgeManter) badgeManter.classList.add('hidden');
+                    if (labelRemover) {
+                        labelRemover.classList.remove('hidden');
+                        window.toggleEstiloRemoverDuplicata(d.id);
+                    }
+                });
+            }
         };
 
         window.deselecionarPosteAereo = function() {
@@ -4858,6 +4886,11 @@
                 el.classList.remove('ring-4', 'ring-emerald-400', 'bg-emerald-600', 'scale-125');
                 el.classList.add('bg-purple-700', 'ring-purple-300');
             });
+
+            // Se desmarcou o poste, restaura a proteção do ponto cadastrado que estiver ativo
+            if (compDuplicatasList && compDuplicatasList.length > 0 && compInstanciaSelecionadaId) {
+                window.selecionarInstanciaDuplicada(compInstanciaSelecionadaId);
+            }
         };
 
         window.fecharModalComparativoCoords = function() {
@@ -4977,7 +5010,7 @@
             const checkboxesDel = document.querySelectorAll('input[id^="chk-del-dup-"]:checked');
             const idsDuplicatasParaRemover = Array.from(checkboxesDel)
                 .map(cb => parseInt(cb.value, 10))
-                .filter(id => !isNaN(id) && id !== idRegistroAlvo);
+                .filter(id => !isNaN(id) && (Boolean(compPosteSelecionado) || id !== idRegistroAlvo));
 
             // Determinar o modo de vínculo do poste ('SOMAR' ou 'SUBSTITUIR')
             const modoVinculoPoste = modoForcado || 'SUBSTITUIR';
