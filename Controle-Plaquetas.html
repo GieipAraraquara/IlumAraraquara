@@ -4526,6 +4526,10 @@
             }
             wrapperOS.appendChild(elOS);
 
+            const msgIdentico = (item.coordCadastradaRaw && item.coordCadastradaRaw.includes('Inicial'))
+                ? '<div class="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded font-semibold mt-1">ℹ️ Posição inicial de cadastro (sem movimentação anterior)</div>'
+                : '<div class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-semibold mt-1">⚠️ Coordenadas idênticas à posição anterior</div>';
+
             const mOS = new mapboxgl.Marker({ element: wrapperOS, anchor: 'center' })
                 .setLngLat(cOS)
                 .setPopup(new mapboxgl.Popup().setHTML(`
@@ -4533,7 +4537,7 @@
                         <strong class="text-amber-700 font-bold">🛠️ ${tituloOS}</strong>
                         <div class="text-[11px] text-slate-600 mt-0.5">${subtituloOS}</div>
                         <div class="text-[10.5px] font-mono text-slate-500 mt-0.5">${item.coordReparoRaw}</div>
-                        ${saoPontosIdenticos ? '<div class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-semibold mt-1">⚠️ Coordenadas idênticas à posição anterior</div>' : `<div class="text-[11px] text-amber-700 font-bold mt-1">Desvio: ${item.distanciaMetros.toFixed(1)}m</div>`}
+                        ${saoPontosIdenticos ? msgIdentico : `<div class="text-[11px] text-amber-700 font-bold mt-1">Desvio: ${item.distanciaMetros.toFixed(1)}m</div>`}
                     </div>
                 `))
                 .addTo(compMapboxInstance);
@@ -5379,7 +5383,50 @@
                     historicoPorPlaqueta[idNorm].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
                 });
 
-                // 2. Anexar distância e dados de comparação geodésica em cada registro
+                // 2. Para itens que não possuem o registro anterior na mesma página e não gravaram desvio na observação,
+                // fazemos uma busca única em lote no Supabase pelas movimentações anteriores dessas plaquetas
+                const plaquetasSemAnterior = [];
+                histCache.forEach(item => {
+                    const idNorm = String(item.identificacao || '').trim().toUpperCase();
+                    const listaPlq = historicoPorPlaqueta[idNorm] || [];
+                    const indexItem = listaPlq.findIndex(x => x.id === item.id);
+                    let achouLocal = false;
+                    if (indexItem !== -1 && indexItem < listaPlq.length - 1) {
+                        achouLocal = true;
+                    }
+                    if (!achouLocal && item.origem !== 'CADASTRO_NOVA_PLAQUETA' && idNorm) {
+                        plaquetasSemAnterior.push(idNorm);
+                    }
+                });
+
+                const mapaHistoricoAnteriorRemoto = {};
+                const plaquetasUnicasBusca = [...new Set(plaquetasSemAnterior)].slice(0, 50);
+                if (plaquetasUnicasBusca.length > 0) {
+                    try {
+                        const menorDataPagina = histCache[histCache.length - 1]?.created_at;
+                        if (menorDataPagina) {
+                            const { data: remData } = await client
+                                .from('historico_localizacao_plaquetas')
+                                .select('id, identificacao, latitude, longitude, origem, observacao, created_at')
+                                .in('identificacao', plaquetasUnicasBusca)
+                                .lt('created_at', menorDataPagina)
+                                .order('created_at', { ascending: false })
+                                .limit(100);
+
+                            if (Array.isArray(remData)) {
+                                remData.forEach(r => {
+                                    const idNorm = String(r.identificacao || '').trim().toUpperCase();
+                                    if (!mapaHistoricoAnteriorRemoto[idNorm]) mapaHistoricoAnteriorRemoto[idNorm] = [];
+                                    mapaHistoricoAnteriorRemoto[idNorm].push(r);
+                                });
+                            }
+                        }
+                    } catch (eRem) {
+                        console.warn("Aviso ao buscar registros anteriores de histórico:", eRem);
+                    }
+                }
+
+                // 3. Anexar distância e dados de comparação geodésica em cada registro
                 histCache.forEach(item => {
                     const idNorm = String(item.identificacao || '').trim().toUpperCase();
                     const cadInfo = mapaPlaquetasCadastradas[idNorm];
@@ -5392,7 +5439,7 @@
                     // Exemplo 2: "Calibração fina (desvio <= 15m: 8.2m) via OS #1234"
                     let desvioGravado = null;
                     if (item.observacao) {
-                        const matchDesvio = item.observacao.match(/desvio(?:\s*<=\s*15m)?:\s*([0-9]+(?:\.[0-9]+)?)\s*m/i);
+                        const matchDesvio = item.observacao.match(/desvio(?:\s*(?:original)?\s*<=\s*15m)?:\s*([0-9]+(?:\.[0-9]+)?)\s*m/i);
                         if (matchDesvio && matchDesvio[1]) {
                             const val = parseFloat(matchDesvio[1]);
                             if (!isNaN(val)) desvioGravado = val;
@@ -5400,7 +5447,7 @@
                     }
 
                     // B) Encontrar o registro de histórico imediatamente anterior deste item que tenha coordenada DIFERENTE
-                    // (Ignora logs duplicados/gêmeos como TRIGGER_UPDATE disparado no mesmo segundo da ação)
+                    // Procura primeiro no array local da página:
                     const listaPlq = historicoPorPlaqueta[idNorm] || [];
                     const indexItem = listaPlq.findIndex(x => x.id === item.id);
                     
@@ -5411,7 +5458,23 @@
                             const cLat = parseFloat(cand.latitude);
                             const cLng = parseFloat(cand.longitude);
                             if (!isNaN(cLat) && !isNaN(cLng) && cLat !== 0 && cLng !== 0) {
-                                // Se for exatamente a mesma coordenada desta movimentação (ex: trigger de banco duplicado), continua procurando o estado anterior real
+                                const distGemeo = (hasItemCoord) ? calcularDistanciaHaversine({ lat: cLat, lng: cLng }, { lat: itemLat, lng: itemLng }) : null;
+                                if (distGemeo !== null && distGemeo > 0.3) {
+                                    registroAnteriorDiferente = cand;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    // Se não achou na página, procura nos registros anteriores trazidos em lote do banco:
+                    if (!registroAnteriorDiferente && mapaHistoricoAnteriorRemoto[idNorm]) {
+                        const listaRemota = mapaHistoricoAnteriorRemoto[idNorm];
+                        for (let k = 0; k < listaRemota.length; k++) {
+                            const cand = listaRemota[k];
+                            const cLat = parseFloat(cand.latitude);
+                            const cLng = parseFloat(cand.longitude);
+                            if (!isNaN(cLat) && !isNaN(cLng) && cLat !== 0 && cLng !== 0) {
                                 const distGemeo = (hasItemCoord) ? calcularDistanciaHaversine({ lat: cLat, lng: cLng }, { lat: itemLat, lng: itemLng }) : null;
                                 if (distGemeo !== null && distGemeo > 0.3) {
                                     registroAnteriorDiferente = cand;
@@ -5422,7 +5485,7 @@
                     }
 
                     let compCoord = null;
-                    let tipoComparacao = null; // 'gravado' | 'anterior' | 'cadastro'
+                    let tipoComparacao = null; // 'gravado' | 'anterior' | 'inicial'
 
                     if (registroAnteriorDiferente) {
                         const antLat = parseFloat(registroAnteriorDiferente.latitude);
@@ -5440,17 +5503,30 @@
                     } else if (desvioGravado !== null) {
                         item.distanciaMetros = desvioGravado;
                         tipoComparacao = 'gravado';
-                        // Se não encontrou o ponto anterior na mesma página, usa a posição atual de cadastro ou a coordenada do item com label explicativo
-                        compCoord = cadInfo ? { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' } : { lat: itemLat, lng: itemLng, label: 'Posição Registrada' };
-                    } else if (cadInfo && hasItemCoord) {
-                        // C) Se não tinha desvio gravado e não há registro anterior diferente na página:
-                        const d = calcularDistanciaHaversine(
-                            { lat: cadInfo.lat, lng: cadInfo.lng },
-                            { lat: itemLat, lng: itemLng }
-                        );
-                        compCoord = { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Atual Cadastrada' };
-                        tipoComparacao = 'cadastro';
-                        item.distanciaMetros = d;
+                        compCoord = cadInfo ? { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' } : null;
+                    } else if (item.origem === 'CADASTRO_NOVA_PLAQUETA') {
+                        item.distanciaMetros = null;
+                        tipoComparacao = 'inicial';
+                        compCoord = hasItemCoord ? { lat: itemLat, lng: itemLng, label: 'Posição Inicial Cadastrada' } : null;
+                    } else {
+                        // Se for uma movimentação onde não há histórico anterior gravado no banco,
+                        // mas temos as coordenadas registradas, tentamos calcular com o cadastro se diferente
+                        if (cadInfo && hasItemCoord) {
+                            const dCad = calcularDistanciaHaversine({ lat: cadInfo.lat, lng: cadInfo.lng }, { lat: itemLat, lng: itemLng });
+                            if (dCad > 0.5) {
+                                item.distanciaMetros = dCad;
+                                tipoComparacao = 'anterior';
+                                compCoord = { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' };
+                            } else {
+                                item.distanciaMetros = null;
+                                tipoComparacao = 'desconhecido';
+                                compCoord = null;
+                            }
+                        } else {
+                            item.distanciaMetros = null;
+                            tipoComparacao = 'desconhecido';
+                            compCoord = null;
+                        }
                     }
 
                     item.compCoord = compCoord;
@@ -5618,11 +5694,10 @@
         };
 
         // Modal Comparativo Mapbox acionado pelo clique na Distância do Histórico
-        window.abrirModalComparativoDoHistorico = function(itemId) {
+        window.abrirModalComparativoDoHistorico = async function(itemId) {
             const histItem = histCache.find(i => String(i.id) === String(itemId));
-            const pontoReferencia = histItem?.compCoord || histItem?.cadInfo;
-            if (!histItem || !pontoReferencia) {
-                alert("Coordenadas de comparação não disponíveis para este registro.");
+            if (!histItem) {
+                alert("Registro de histórico não localizado.");
                 return;
             }
 
@@ -5633,8 +5708,64 @@
                 return;
             }
 
-            const distMetros = histItem.distanciaMetros !== null ? histItem.distanciaMetros : 0;
-            const refLabel = pontoReferencia.label || (histItem.tipoComparacao === 'anterior' ? 'Posição Anterior' : 'Cadastro Atual');
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+
+            let pontoReferencia = histItem.compCoord;
+            let distMetros = histItem.distanciaMetros;
+
+            // Se ainda não temos o ponto anterior real ou ele aponta para a mesma coordenada deste log,
+            // consultamos o Supabase diretamente pela movimentação imediatamente anterior com coordenadas distintas
+            const precisaBuscarAnterior = !pontoReferencia || 
+                (typeof calcularDistanciaHaversine === 'function' && calcularDistanciaHaversine(pontoReferencia, { lat: itemLat, lng: itemLng }) < 0.5);
+
+            if (precisaBuscarAnterior && client && histItem.identificacao) {
+                try {
+                    const { data: priorLogs, error: errPrior } = await client
+                        .from('historico_localizacao_plaquetas')
+                        .select('latitude, longitude, origem, observacao, created_at')
+                        .eq('identificacao', histItem.identificacao)
+                        .lt('created_at', histItem.created_at)
+                        .order('created_at', { ascending: false })
+                        .limit(10);
+
+                    if (!errPrior && Array.isArray(priorLogs)) {
+                        for (const cand of priorLogs) {
+                            const cLat = parseFloat(cand.latitude);
+                            const cLng = parseFloat(cand.longitude);
+                            if (!isNaN(cLat) && !isNaN(cLng) && cLat !== 0 && cLng !== 0) {
+                                const d = (typeof calcularDistanciaHaversine === 'function')
+                                    ? calcularDistanciaHaversine({ lat: cLat, lng: cLng }, { lat: itemLat, lng: itemLng })
+                                    : null;
+                                if (d !== null && d > 0.5) {
+                                    pontoReferencia = {
+                                        lat: cLat,
+                                        lng: cLng,
+                                        label: `Posição Anterior Real (${cand.origem || 'Histórico'})`
+                                    };
+                                    distMetros = d;
+                                    histItem.compCoord = pontoReferencia;
+                                    histItem.distanciaMetros = d;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                } catch (eQuery) {
+                    console.warn("Aviso ao buscar posição anterior real no histórico:", eQuery);
+                }
+            }
+
+            // Fallback caso seja o primeiro registro do histórico (cadastro inicial)
+            if (!pontoReferencia) {
+                if (histItem.cadInfo) {
+                    pontoReferencia = { lat: histItem.cadInfo.lat, lng: histItem.cadInfo.lng, label: 'Posição Cadastrada Atual' };
+                } else {
+                    pontoReferencia = { lat: itemLat, lng: itemLng, label: 'Posição Registrada Inicial' };
+                }
+                if (distMetros === null) distMetros = 0;
+            }
+
+            const refLabel = pontoReferencia.label || 'Posição Anterior';
 
             // Montar objeto compatível com abrirModalComparativoCoords
             const itemComp = {

@@ -1574,7 +1574,7 @@
           html += '          <button type="button" onclick="removerFotoEstagio(' + idx + ', \'' + estagio + '\')" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-md">✕</button>';
           html += '        </div>';
           html += '        <input type="file" id="' + idFile + '" accept="image/*" capture="environment" class="hidden" onchange="processarFotoEstagio(' + idx + ', \'' + estagio + '\', event)" />';
-          html += '        <button type="button" onclick="document.getElementById(\'' + idFile + '\').click()" class="w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center justify-center gap-1">';
+          html += '        <button type="button" onclick="var f = document.getElementById(\'' + idFile + '\'); if(f) f.value = \'\'; f.click();" class="w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center justify-center gap-1 cursor-pointer">';
           html += '          <span class="material-symbols-outlined text-[16px]">photo_camera</span> Anexar Foto';
           html += '        </button>';
           html += '      </div>';
@@ -1942,18 +1942,56 @@
         atualizarMapaPonto(targetIdx);
       }
 
-      // Processador de imagem leve e direto via HTML5 Canvas (evita OOM ao voltar da câmera)
+      // Processador de imagem leve e robusto via HTML5 Canvas (evita OOM ao voltar da câmera)
       function otimizarEComprimirFoto(file, maxDim, quality) {
         maxDim = maxDim || 1200;
         quality = quality || 0.75;
         return new Promise(function(resolve) {
           if (!file) return resolve(null);
-          var blobUrl = URL.createObjectURL(file);
+          var blobUrl = null;
+          try {
+            blobUrl = URL.createObjectURL(file);
+          } catch(e) {
+            blobUrl = null;
+          }
+
+          var finalizou = false;
+          function concluir(resultado) {
+            if (finalizou) return;
+            finalizou = true;
+            if (blobUrl) {
+              try { URL.revokeObjectURL(blobUrl); } catch(errRevoke) {}
+            }
+            resolve(resultado);
+          }
+
+          // Timeout de segurança: se o canvas demorar mais de 2.5s para carregar/decodificar, usa FileReader
+          var timerSeguranca = setTimeout(function() {
+            if (finalizou) return;
+            console.warn('⚠️ [Compressão] Timeout de processamento via Canvas excedido, acionando fallback.');
+            var readerFallback = new FileReader();
+            readerFallback.onload = function(fe) { concluir(fe.target.result); };
+            readerFallback.onerror = function() { concluir(null); };
+            readerFallback.readAsDataURL(file);
+          }, 2500);
+
+          if (!blobUrl) {
+            clearTimeout(timerSeguranca);
+            var reader = new FileReader();
+            reader.onload = function(re) { concluir(re.target.result); };
+            reader.onerror = function() { concluir(null); };
+            reader.readAsDataURL(file);
+            return;
+          }
+
           var img = new Image();
           img.onload = function() {
+            clearTimeout(timerSeguranca);
             try {
               var w = img.naturalWidth || img.width;
               var h = img.naturalHeight || img.height;
+              if (!w || !h) throw new Error('Dimensões inválidas da imagem');
+
               if (w > maxDim || h > maxDim) {
                 if (w > h) {
                   h = Math.round((h * maxDim) / w);
@@ -1971,28 +2009,34 @@
               ctx.imageSmoothingQuality = 'medium';
               ctx.drawImage(img, 0, 0, w, h);
               var compressedB64 = canvas.toDataURL('image/jpeg', quality);
-              URL.revokeObjectURL(blobUrl);
-              resolve(compressedB64);
+              concluir(compressedB64);
             } catch(e) {
-              console.warn('⚠️ Falha ao comprimir imagem via canvas:', e);
-              URL.revokeObjectURL(blobUrl);
+              console.warn('⚠️ Falha ao comprimir imagem via canvas, usando fallback:', e);
               var reader = new FileReader();
-              reader.onload = function(re) { resolve(re.target.result); };
-              reader.onerror = function() { resolve(null); };
+              reader.onload = function(re) { concluir(re.target.result); };
+              reader.onerror = function() { concluir(null); };
               reader.readAsDataURL(file);
             }
           };
           img.onerror = function() {
-            URL.revokeObjectURL(blobUrl);
-            resolve(null);
+            clearTimeout(timerSeguranca);
+            console.warn('⚠️ Erro no carregamento da imagem via blob, tentando FileReader direto.');
+            var reader = new FileReader();
+            reader.onload = function(re) { concluir(re.target.result); };
+            reader.onerror = function() { concluir(null); };
+            reader.readAsDataURL(file);
           };
           img.src = blobUrl;
         });
       }
 
       async function processarFotoEstagio(pontoIdx, estagio, event) {
-        var file = event.target.files[0];
+        var inputEl = event.target;
+        var file = inputEl && inputEl.files ? inputEl.files[0] : null;
         if (!file) return;
+
+        // Limpa o valor do input imediatamente para permitir disparar onchange caso o usuário tire novamente a foto
+        inputEl.value = '';
 
         var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
         var idImg = 'img_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
@@ -2003,8 +2047,9 @@
         var boxEl = document.getElementById(idBox);
 
         // Preview imediato e econômico usando ObjectURL
-        var tempUrl = URL.createObjectURL(file);
-        if (containerEl && imgEl) {
+        var tempUrl = null;
+        try { tempUrl = URL.createObjectURL(file); } catch(e) {}
+        if (tempUrl && containerEl && imgEl) {
           imgEl.src = tempUrl;
           containerEl.classList.remove('hidden');
         }
@@ -2015,13 +2060,18 @@
 
         // Comprime diretamente da memória e persiste de imediato no rascunho
         var b64Comprimido = await otimizarEComprimirFoto(file, 1200, 0.75);
-        URL.revokeObjectURL(tempUrl);
+        if (tempUrl) {
+          try { URL.revokeObjectURL(tempUrl); } catch(e) {}
+        }
 
         if (b64Comprimido) {
           if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
           pontosData[pontoIdx].fotosEstagios[estagio] = b64Comprimido;
           if (imgEl) imgEl.src = b64Comprimido;
-          salvarRascunhoFinalizar();
+          if (containerEl) containerEl.classList.remove('hidden');
+          await salvarRascunhoFinalizar();
+        } else {
+          console.error('⚠️ [Fotos] Falha total ao capturar foto do estágio:', estagio);
         }
       }
 
