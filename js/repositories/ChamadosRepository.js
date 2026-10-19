@@ -106,7 +106,7 @@ class ChamadosRepository {
             // Tenta consultar as colunas mais apropriadas de ordenação temporal (data_abertura e data_fechamento)
             let hbRes = await client
                 .from(this.viewName)
-                .select('data_abertura, data_fechamento')
+                .select('id, protocolo, data_abertura, data_fechamento')
                 .order('data_abertura', { ascending: false })
                 .limit(1);
 
@@ -120,7 +120,7 @@ class ChamadosRepository {
             if (hbRes.error || !hbRes.data || hbRes.data.length === 0) {
                 hbRes = await client
                     .from(this.primaryTable)
-                    .select('data_abertura, data_fechamento')
+                    .select('id, protocolo, data_abertura, data_fechamento')
                     .order('data_abertura', { ascending: false })
                     .limit(1);
             }
@@ -137,7 +137,8 @@ class ChamadosRepository {
             if (!hbRes.error && hbRes.data && hbRes.data.length > 0) {
                 const latestDbAbertura = hbRes.data[0].data_abertura || hbRes.data[0].updated_at || '';
                 const latestDbFechamento = (hbFechRes && !hbFechRes.error && hbFechRes.data && hbFechRes.data[0]) ? (hbFechRes.data[0].data_fechamento || '') : '';
-                const latestDbSignature = `${latestDbAbertura}_${latestDbFechamento}`;
+                const latestDbProt = hbRes.data[0].protocolo || hbRes.data[0].id || '';
+                const latestDbSignature = `${latestDbProt}_${latestDbAbertura}_${latestDbFechamento}`;
 
                 if (latestDbSignature && latestDbSignature === cachedMeta.lastTimestamp) {
                     console.log(`⚡ [ChamadosRepository Heartbeat Hit] Nenhuma OS nova/alterada detectada. Reutilizando cache local.`);
@@ -247,11 +248,13 @@ class ChamadosRepository {
             const filtroOrTemporal = `data_abertura.gte.${dataCorteIso},status.neq.Concluída,status.neq.Concluida`;
 
             // 1. Tenta consultar a view unificada com projeção restrita e corte temporal
+            // IMPORTANTE: Ordena decrescente (mais novas primeiro) para garantir que chamados recentes
+            // NUNCA sejam cortados pelo limite de 1000 registros do PostgREST.
             let query = client
                 .from(this.viewName)
                 .select(colunasView)
                 .or(filtroOrTemporal)
-                .order('data_abertura', { ascending: true });
+                .order('data_abertura', { ascending: false });
 
             let { data, error } = await query;
 
@@ -261,7 +264,7 @@ class ChamadosRepository {
                     .from(this.primaryTable)
                     .select(colunasTabela)
                     .or(filtroOrTemporal)
-                    .order('data_abertura', { ascending: true });
+                    .order('data_abertura', { ascending: false });
 
                 if (!resPrimary.error && resPrimary.data && resPrimary.data.length > 0) {
                     data = resPrimary.data;
@@ -271,7 +274,7 @@ class ChamadosRepository {
                         .from(this.legacyTable)
                         .select(colunasTabela)
                         .or(filtroOrTemporal)
-                        .order('data_abertura', { ascending: true });
+                        .order('data_abertura', { ascending: false });
                     data = resLegacy.data || [];
                 }
             }
@@ -365,17 +368,19 @@ class ChamadosRepository {
                 try {
                     let maxAbertura = null;
                     let maxFechamento = null;
+                    let maxProt = '';
                     for (const r of data) {
                         const tsAbertura = r.data_abertura || r.updated_at;
                         if (tsAbertura && (!maxAbertura || tsAbertura > maxAbertura)) {
                             maxAbertura = tsAbertura;
+                            maxProt = r.protocolo || r.id || '';
                         }
                         const tsFech = r.data_fechamento;
                         if (tsFech && (!maxFechamento || tsFech > maxFechamento)) {
                             maxFechamento = tsFech;
                         }
                     }
-                    const signature = `${maxAbertura || ''}_${maxFechamento || ''}`;
+                    const signature = `${maxProt}_${maxAbertura || ''}_${maxFechamento || ''}`;
 
                     sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
                     sessionStorage.setItem(CACHE_META_KEY, JSON.stringify({

@@ -370,7 +370,7 @@
             if (window.supabaseClient) {
                 const { data: { session } } = await window.supabaseClient.auth.getSession();
                 if (session) {
-                    let targetUrl = 'Painel.html';
+                    let targetUrl = 'Abrir.html';
                     if (window.AuthGuard) {
                         const authData = await window.AuthGuard.requireAuth();
                         targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: session.user });
@@ -490,6 +490,8 @@
                     // O perfil na tabela 'profiles' é a Fonte da Verdade para liberação do acesso
                     let isPending = false;
                     if (profile) {
+                        // Persiste no cache do AuthGuard para navegação instantânea
+                        sessionStorage.setItem('authguard_profile_' + data.session.user.id, JSON.stringify(profile));
                         isPending = (profile.role === 'pendente') || 
                                     (profile.status === 'pendente') || 
                                     (profile.ativo === false);
@@ -507,15 +509,14 @@
 
                     let targetUrl = 'Abrir.html';
                     if (window.AuthGuard) {
-                        const authData = await window.AuthGuard.requireAuth();
-                        targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: data.session.user, profile: profile });
+                        targetUrl = window.AuthGuard.getRedirectUrlForUser({ user: data.session.user, profile: profile });
                     } else {
                         targetUrl = (profile?.role === 'ouvidoria' || profile?.cargo_solicitado === 'ouvidoria') ? 'Abrir.html' : 'Painel.html';
                     }
                     exibirAlerta('Login efetuado com sucesso! Redirecionando...', 'sucesso');
                     setTimeout(() => {
                         window.location.href = targetUrl;
-                    }, 800);
+                    }, 600);
                 }
             } catch (err) {
                 exibirAlerta('Falha na conexão com o servidor de autenticação.');

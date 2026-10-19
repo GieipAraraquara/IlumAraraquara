@@ -258,7 +258,7 @@
             if (window.supabaseClient) {
                 const { data: { session } } = await window.supabaseClient.auth.getSession();
                 if (session) {
-                    let targetUrl = 'Painel.html';
+                    let targetUrl = 'Abrir.html';
                     if (window.AuthGuard) {
                         const authData = await window.AuthGuard.requireAuth();
                         targetUrl = window.AuthGuard.getRedirectUrlForUser(authData || { user: session.user });

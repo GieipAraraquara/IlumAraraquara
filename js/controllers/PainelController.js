@@ -917,7 +917,9 @@ class PainelController {
         if (window.supabaseClient && window.ChamadosRepository) {
             try {
                 const repo = new window.ChamadosRepository();
-                const needsEnrich = !item || !item._isEnriched || !item.rawPontosFinal || (Array.isArray(item.rawPontosFinal) && item.rawPontosFinal.length === 0);
+                const hasFechamentosCarregados = Array.isArray(item?.fechamentosRaw) && item.fechamentosRaw.length > 0;
+                const isConcluidaOuComReparo = item && (item.isConcluida || item.status === 'Concluída' || item.status === 'Concluida' || item.dataFechamento || item.materialUtilizado);
+                const needsEnrich = !item || !item._isEnriched || !item.rawPontosFinal || (Array.isArray(item.rawPontosFinal) && item.rawPontosFinal.length === 0) || (isConcluidaOuComReparo && !hasFechamentosCarregados);
                 if (needsEnrich) {
                     const fullRow = await repo.fetchById(cleanId);
                     if (fullRow) {

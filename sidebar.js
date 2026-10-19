@@ -357,7 +357,63 @@ window.closeFinalizarOSModal = function() {
     } catch(e) {}
 };
 
-// Escuta mensagens globais dos iframes (Abrir.html e Finalizar.html)
+// Helper central de atualização instantânea ao receber eventos de OS
+function sincronizarDadosOSLocais(action, protocolo) {
+    console.log('⚡ [Sincronização OS Automática] Evento recebido:', action, protocolo);
+    try {
+        sessionStorage.removeItem('chamados_repo_cache_v1');
+        sessionStorage.removeItem('chamados_repo_meta_v1');
+        sessionStorage.removeItem('chamados_repo_cache_v2');
+        sessionStorage.removeItem('chamados_repo_meta_v2');
+        sessionStorage.removeItem('auditoria_repo_cache_v1');
+        sessionStorage.removeItem('auditoria_repo_meta_v1');
+        localStorage.removeItem('os_cached_chamados');
+    } catch(e) {}
+
+    if (window.painelController && typeof window.painelController.loadData === 'function') {
+        window.painelController.loadData(true);
+    } else if (typeof window.carregarChamados === 'function') {
+        window.carregarChamados();
+    } else if (typeof window.applyCombinedFilters === 'function') {
+        window.applyCombinedFilters();
+    }
+
+    if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+        window.auditoriaController.loadData(true);
+    } else if (typeof window.carregarDadosAuditoria === 'function') {
+        window.carregarDadosAuditoria();
+    }
+
+    if (typeof window.carregarMapaOSsAbertas === 'function') {
+        window.carregarMapaOSsAbertas(true);
+    }
+}
+
+// 1. Escuta BroadcastChannel entre abas (comunicação instantânea sem egress)
+try {
+    if (typeof BroadcastChannel !== 'undefined') {
+        const osBroadcastChannel = new BroadcastChannel('sistema_os_sync');
+        osBroadcastChannel.onmessage = (event) => {
+            if (event.data && (event.data.action === 'OS_CRIADA_SILENCIOSO' || event.data.action === 'OS_CONCLUIDA_SILENCIOSO' || event.data.action === 'OS_CRIADA_SUCESSO' || event.data.action === 'OS_CONCLUIDA_SUCESSO')) {
+                sincronizarDadosOSLocais(event.data.action, event.data.protocolo);
+            }
+        };
+    }
+} catch(eBC) {}
+
+// 2. Escuta evento Storage do localStorage (fallback entre abas/navegadores)
+window.addEventListener('storage', (event) => {
+    if (event.key === 'sistema_os_ultimo_evento' && event.newValue) {
+        try {
+            const evData = JSON.parse(event.newValue);
+            if (evData && evData.action) {
+                sincronizarDadosOSLocais(evData.action, evData.protocolo);
+            }
+        } catch(e) {}
+    }
+});
+
+// 3. Escuta mensagens globais dos iframes (Abrir.html e Finalizar.html)
 window.addEventListener('message', (event) => {
     if (event.data) {
         if (event.data.action === 'FECHAR_MODAL_ABERTURA') {
@@ -365,72 +421,16 @@ window.addEventListener('message', (event) => {
         } else if (event.data.action === 'FECHAR_MODAL_FINALIZAR') {
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
         } else if (event.data.action === 'OS_CRIADA_SILENCIOSO' || event.data.action === 'OS_CONCLUIDA_SILENCIOSO') {
-            // A OS foi cadastrada/concluída no banco e o formulário exibiu o popup de confirmação.
-            // Limpa chaves de cache e atualiza os dados das telas em segundo plano SEM fechar o modal.
-            try {
-                sessionStorage.removeItem('chamados_repo_cache_v1');
-                sessionStorage.removeItem('chamados_repo_meta_v1');
-                sessionStorage.removeItem('chamados_repo_cache_v2');
-                sessionStorage.removeItem('chamados_repo_meta_v2');
-                sessionStorage.removeItem('auditoria_repo_cache_v1');
-                sessionStorage.removeItem('auditoria_repo_meta_v1');
-                localStorage.removeItem('os_cached_chamados');
-            } catch(e) {}
-
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                window.painelController.loadData(true);
-            } else if (typeof window.carregarChamados === 'function') {
-                window.carregarChamados();
-            } else if (typeof window.applyCombinedFilters === 'function') {
-                window.applyCombinedFilters();
-            }
-
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                window.auditoriaController.loadData(true);
-            } else if (typeof window.carregarDadosAuditoria === 'function') {
-                window.carregarDadosAuditoria();
-            }
-
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                window.carregarMapaOSsAbertas(true);
-            }
+            sincronizarDadosOSLocais(event.data.action, event.data.protocolo);
         } else if (
             event.data.action === 'OS_CRIADA_SUCESSO' ||
             event.data.action === 'OS_CONCLUIDA_SUCESSO' ||
             event.data.action === 'OS_EDITADA_SUCESSO' ||
             event.data.action === 'OS_CANCELADA_SUCESSO'
         ) {
-            // Fechamento definitivo do modal após confirmação do usuário no popup
-            try {
-                sessionStorage.removeItem('chamados_repo_cache_v1');
-                sessionStorage.removeItem('chamados_repo_meta_v1');
-                sessionStorage.removeItem('chamados_repo_cache_v2');
-                sessionStorage.removeItem('chamados_repo_meta_v2');
-                sessionStorage.removeItem('auditoria_repo_cache_v1');
-                sessionStorage.removeItem('auditoria_repo_meta_v1');
-                localStorage.removeItem('os_cached_chamados');
-            } catch(e) {}
-
             if (typeof window.closeNovaOSModal === 'function') window.closeNovaOSModal();
             if (typeof window.closeFinalizarOSModal === 'function') window.closeFinalizarOSModal();
-
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                window.painelController.loadData(true);
-            } else if (typeof window.carregarChamados === 'function') {
-                window.carregarChamados();
-            } else if (typeof window.applyCombinedFilters === 'function') {
-                window.applyCombinedFilters();
-            }
-
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                window.auditoriaController.loadData(true);
-            } else if (typeof window.carregarDadosAuditoria === 'function') {
-                window.carregarDadosAuditoria();
-            }
-
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                window.carregarMapaOSsAbertas(true);
-            }
+            sincronizarDadosOSLocais(event.data.action, event.data.protocolo);
         }
     }
 });

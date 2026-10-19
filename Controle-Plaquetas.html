@@ -1422,24 +1422,34 @@
 
                 <div class="space-y-2">
                     <!-- Ponto 1: Original / Referência -->
-                    <div class="p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 flex items-start gap-2.5">
-                        <div class="w-3.5 h-3.5 rounded-full bg-blue-600 mt-0.5 flex-shrink-0 ring-4 ring-blue-100"></div>
+                    <div onclick="window.focarPontoComparativo('orig')" 
+                         class="p-2.5 rounded-xl bg-blue-50/60 hover:bg-blue-100/70 border border-blue-200 hover:border-blue-300 flex items-start gap-2.5 transition-all cursor-pointer shadow-2xs group"
+                         title="Clique para centralizar e dar zoom neste ponto no mapa">
+                        <div class="w-3.5 h-3.5 rounded-full bg-blue-600 mt-0.5 flex-shrink-0 ring-4 ring-blue-100 group-hover:scale-110 transition-transform"></div>
                         <div class="min-w-0 flex-1">
-                            <span class="font-bold text-blue-900 text-[11px] block" id="comp-panel-orig-label">Ponto Cadastrado Atual</span>
+                            <div class="flex items-center justify-between">
+                                <span class="font-bold text-blue-900 text-[11px] block" id="comp-panel-orig-label">Ponto Cadastrado Atual</span>
+                                <span class="material-symbols-outlined text-[14px] text-blue-600 opacity-60 group-hover:opacity-100 transition-opacity" title="Centralizar no mapa">center_focus_strong</span>
+                            </div>
                             <span class="font-mono text-[11px] text-blue-700 break-all" id="comp-panel-orig-coords">-</span>
                         </div>
                     </div>
 
                     <!-- Ponto 2: OS Campo / Esta Movimentação -->
-                    <div class="p-2.5 rounded-xl bg-amber-50/60 border border-amber-100 flex items-start gap-2.5">
-                        <div class="w-3.5 h-3.5 rounded-full bg-amber-600 mt-0.5 flex-shrink-0 ring-4 ring-amber-100"></div>
+                    <div onclick="window.focarPontoComparativo('os')" 
+                         class="p-2.5 rounded-xl bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200 hover:border-amber-300 flex items-start gap-2.5 transition-all cursor-pointer shadow-2xs group"
+                         title="Clique para centralizar e dar zoom neste ponto no mapa">
+                        <div class="w-3.5 h-3.5 rounded-full bg-amber-600 mt-0.5 flex-shrink-0 ring-4 ring-amber-100 group-hover:scale-110 transition-transform"></div>
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center justify-between">
                                 <span class="font-bold text-amber-900 text-[11px] block" id="comp-panel-os-label">Ponto Registrado na OS Concluída</span>
-                                <button type="button" onclick="window.abrirDetalhesOSModalComparativo()" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer" title="Abrir modal completo de detalhes e fotos da OS">
-                                    <span class="material-symbols-outlined text-[13px]">visibility</span>
-                                    <span>Ver OS Completa</span>
-                                </button>
+                                <div class="flex items-center gap-1.5">
+                                    <button type="button" onclick="event.stopPropagation(); window.abrirDetalhesOSModalComparativo();" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer" title="Abrir modal completo de detalhes e fotos da OS">
+                                        <span class="material-symbols-outlined text-[13px]">visibility</span>
+                                        <span>Ver OS</span>
+                                    </button>
+                                    <span class="material-symbols-outlined text-[14px] text-amber-600 opacity-60 group-hover:opacity-100 transition-opacity" title="Centralizar no mapa">center_focus_strong</span>
+                                </div>
                             </div>
                             <span class="font-mono text-[11px] text-amber-800 break-all" id="comp-panel-os-coords">-</span>
                             <span class="text-[10px] text-slate-500 block mt-0.5" id="comp-panel-os-op">Técnico: ---</span>
@@ -1447,18 +1457,21 @@
                         </div>
                     </div>
                     <!-- Ponto 3: Poste Aéreo Selecionado (Snap) -->
-                    <div id="comp-panel-poste-box" class="p-2.5 rounded-xl bg-purple-50/70 border border-purple-200 hidden transition-all">
+                    <div id="comp-panel-poste-box" onclick="window.focarPontoComparativo('poste')" 
+                         class="p-2.5 rounded-xl bg-purple-50/70 hover:bg-purple-100/80 border border-purple-200 hover:border-purple-300 hidden transition-all cursor-pointer shadow-2xs group"
+                         title="Clique para centralizar e dar zoom neste poste no mapa">
                         <div class="flex items-start gap-2.5">
-                            <div class="w-3.5 h-3.5 rounded-full bg-purple-600 mt-0.5 flex-shrink-0 ring-4 ring-purple-100 flex items-center justify-center text-[8px] text-white font-bold">⚡</div>
+                            <div class="w-3.5 h-3.5 rounded-full bg-purple-600 mt-0.5 flex-shrink-0 ring-4 ring-purple-100 flex items-center justify-center text-[8px] text-white font-bold group-hover:scale-110 transition-transform">⚡</div>
                             <div class="min-w-0 flex-1">
                                 <div class="flex items-center justify-between">
                                     <span class="font-bold text-purple-900 text-[11px]" id="comp-panel-poste-titulo">Poste da Base Aérea (Snap Ativo)</span>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" id="btn-poste-streetview" onclick="window.abrirStreetViewPoste()" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer" title="Ver este poste no Google Street View (360°)">
+                                        <button type="button" id="btn-poste-streetview" onclick="event.stopPropagation(); window.abrirStreetViewPoste();" class="inline-flex items-center gap-1 text-[10.5px] font-bold text-amber-700 hover:text-amber-900 hover:underline cursor-pointer" title="Ver este poste no Google Street View (360°)">
                                             <span class="material-symbols-outlined text-[13px]">streetview</span>
                                             <span>Street View</span>
                                         </button>
-                                        <button type="button" onclick="window.deselecionarPosteAereo()" class="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer">Remover</button>
+                                        <button type="button" onclick="event.stopPropagation(); window.deselecionarPosteAereo();" class="text-[10px] text-purple-700 hover:text-purple-900 font-bold underline cursor-pointer">Remover</button>
+                                        <span class="material-symbols-outlined text-[14px] text-purple-600 opacity-60 group-hover:opacity-100 transition-opacity" title="Centralizar no mapa">center_focus_strong</span>
                                     </div>
                                 </div>
                                 <span class="font-mono text-[11px] text-purple-800 break-all block" id="comp-panel-poste-coords">-</span>
@@ -2991,6 +3004,8 @@
         let itemEmComparacaoModal = null;
         let compMapboxInstance = null;
         let compMarkers = [];
+        let compMarkerOrig = null;
+        let compMarkerOS = null;
         let compPostesMarkers = [];
         let compPosteSelecionado = null;
         let compDuplicatasList = [];
@@ -4454,6 +4469,9 @@
                         `))
                         .addTo(compMapboxInstance);
                     compMarkers.push(mDup);
+                    if (isMelhor) {
+                        compMarkerOrig = mDup;
+                    }
                 });
 
             } else {
@@ -4478,7 +4496,7 @@
                 elOrig.innerHTML = '<span class="material-symbols-outlined text-[14px]">pin_drop</span>';
                 wrapperOrig.appendChild(elOrig);
 
-                const mOrig = new mapboxgl.Marker({ element: wrapperOrig, anchor: 'center' })
+                compMarkerOrig = new mapboxgl.Marker({ element: wrapperOrig, anchor: 'center' })
                     .setLngLat(cOrig)
                     .setPopup(new mapboxgl.Popup().setHTML(`
                         <div class="text-xs p-1">
@@ -4488,17 +4506,18 @@
                         </div>
                     `))
                     .addTo(compMapboxInstance);
-                compMarkers.push(mOrig);
+                compMarkers.push(compMarkerOrig);
                 bounds.extend(cOrig);
             }
 
             // Distância geodésica entre os dois pontos para verificar sobreposição
-            const distEntrePontos = (typeof calcularDistanciaHaversine === 'function') 
+            const distCalcGeo = (typeof calcularDistanciaHaversine === 'function') 
                 ? calcularDistanciaHaversine(item.coordCadastradaParsed, item.coordReparoParsed)
-                : item.distanciaMetros;
+                : null;
+            const distEntrePontos = (distCalcGeo !== null) ? distCalcGeo : (item.distanciaMetros || 0);
 
-            // Se os pontos forem idênticos ou extremamente próximos (< 0.5m), ajustamos visualmente
-            const saoPontosIdenticos = distEntrePontos < 0.5;
+            // Se os pontos forem idênticos ou extremamente próximos (< 0.5m) E não houver distância gravada relevante (> 0.5m)
+            const saoPontosIdenticos = distEntrePontos < 0.5 && (!item.distanciaMetros || item.distanciaMetros < 0.5);
 
             // Adicionar Marcador Âmbar (Ponto da OS / Nova Posição)
             const isHist = Boolean(item.isHistoricoViewer);
@@ -4530,18 +4549,18 @@
                 ? '<div class="text-[10px] text-blue-700 bg-blue-50 px-1 py-0.5 rounded font-semibold mt-1">ℹ️ Posição inicial de cadastro (sem movimentação anterior)</div>'
                 : '<div class="text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-semibold mt-1">⚠️ Coordenadas idênticas à posição anterior</div>';
 
-            const mOS = new mapboxgl.Marker({ element: wrapperOS, anchor: 'center' })
+            compMarkerOS = new mapboxgl.Marker({ element: wrapperOS, anchor: 'center' })
                 .setLngLat(cOS)
                 .setPopup(new mapboxgl.Popup().setHTML(`
                     <div class="text-xs p-1">
                         <strong class="text-amber-700 font-bold">🛠️ ${tituloOS}</strong>
                         <div class="text-[11px] text-slate-600 mt-0.5">${subtituloOS}</div>
                         <div class="text-[10.5px] font-mono text-slate-500 mt-0.5">${item.coordReparoRaw}</div>
-                        ${saoPontosIdenticos ? msgIdentico : `<div class="text-[11px] text-amber-700 font-bold mt-1">Desvio: ${item.distanciaMetros.toFixed(1)}m</div>`}
+                        ${saoPontosIdenticos ? msgIdentico : `<div class="text-[11px] text-amber-700 font-bold mt-1">Desvio: ${(item.distanciaMetros || distEntrePontos).toFixed(1)}m</div>`}
                     </div>
                 `))
                 .addTo(compMapboxInstance);
-            compMarkers.push(mOS);
+            compMarkers.push(compMarkerOS);
 
             setTimeout(() => {
                 compMapboxInstance.resize();
@@ -4558,6 +4577,76 @@
 
                 carregarPostesAereosProximos(coordsParaBusca, item);
             }, 300);
+        };
+
+        // Função para centralizar e dar zoom em um dos pontos do comparativo (ao clicar nos cards laterais)
+        window.focarPontoComparativo = function(tipo) {
+            console.log('[focarPontoComparativo] Chamado com tipo:', tipo, 'item:', itemEmComparacaoModal);
+            if (!compMapboxInstance) {
+                console.warn('[focarPontoComparativo] compMapboxInstance não está pronto');
+                return;
+            }
+
+            let coord = null;
+            let marker = null;
+
+            if (tipo === 'orig') {
+                // Se houver duplicatas e uma instância estiver selecionada, busca a coordenada da duplicata ativa
+                if (compDuplicatasList && compDuplicatasList.length > 0 && compInstanciaSelecionadaId) {
+                    const dupAtiva = compDuplicatasList.find(d => d.id === compInstanciaSelecionadaId);
+                    if (dupAtiva) {
+                        coord = { lat: dupAtiva.lat, lng: dupAtiva.lng };
+                    }
+                }
+                if (!coord && itemEmComparacaoModal) {
+                    coord = itemEmComparacaoModal.coordCadastradaParsed;
+                }
+                marker = compMarkerOrig;
+            } else if (tipo === 'os') {
+                if (itemEmComparacaoModal) {
+                    coord = itemEmComparacaoModal.coordReparoParsed;
+                }
+                marker = compMarkerOS;
+            } else if (tipo === 'poste') {
+                if (compPosteSelecionado) {
+                    coord = { lat: compPosteSelecionado.latitude, lng: compPosteSelecionado.longitude };
+                }
+            }
+
+            if (!coord) {
+                console.warn('[focarPontoComparativo] Nenhuma coordenada encontrada para o tipo:', tipo);
+                return;
+            }
+
+            const lat = parseFloat(coord.lat);
+            const lng = parseFloat(coord.lng);
+
+            if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+                console.warn('[focarPontoComparativo] Coordenadas inválidas:', coord);
+                return;
+            }
+
+            // Animação suave e prioritária de câmera centralizando e dando zoom no ponto
+            try {
+                compMapboxInstance.flyTo({
+                    center: [lng, lat],
+                    zoom: 19.2,
+                    essential: true,
+                    duration: 1000
+                });
+            } catch (errFly) {
+                console.error('[focarPontoComparativo] Erro no flyTo:', errFly);
+                compMapboxInstance.setCenter([lng, lat]);
+                compMapboxInstance.setZoom(19.2);
+            }
+
+            // Abre o popup do marcador correspondente automaticamente para destacar as informações
+            if (marker && typeof marker.togglePopup === 'function') {
+                const popup = marker.getPopup();
+                if (popup && !popup.isOpen()) {
+                    marker.togglePopup();
+                }
+            }
         };
 
         function limparPostesAereosMapa() {
@@ -4980,6 +5069,18 @@
             if (origCoordsEl) origCoordsEl.innerText = `${dup.rawCoord} (${dup.empresa})`;
             if (distBadge) distBadge.innerText = `${dup.distanciaMetros.toFixed(1)} m`;
 
+            // Atualiza a coordenada ativa no objeto para foco e vincula compMarkerOrig
+            if (itemEmComparacaoModal) {
+                itemEmComparacaoModal.coordCadastradaParsed = { lat: dup.lat, lng: dup.lng };
+                const markerObj = compMarkers.find(m => {
+                    const el = m.getElement && m.getElement();
+                    return el && el.querySelector && el.querySelector(`#marker-duplicata-${dupId}`);
+                });
+                if (markerObj) {
+                    compMarkerOrig = markerObj;
+                }
+            }
+
             // Atualizar os postes aéreos ao redor do ponto duplicado selecionado e da OS
             if (itemEmComparacaoModal) {
                 const coordsAtualizadas = [itemEmComparacaoModal.coordReparoParsed, { lat: dup.lat, lng: dup.lng }];
@@ -4988,7 +5089,7 @@
 
             // Centralizar no ponto selecionado
             if (compMapboxInstance) {
-                compMapboxInstance.flyTo({ center: [dup.lng, dup.lat], zoom: 17.5, speed: 1.2 });
+                compMapboxInstance.flyTo({ center: [dup.lng, dup.lat], zoom: 18.5, speed: 1.2 });
             }
         };
 
@@ -5503,7 +5604,15 @@
                     } else if (desvioGravado !== null) {
                         item.distanciaMetros = desvioGravado;
                         tipoComparacao = 'gravado';
-                        compCoord = cadInfo ? { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' } : null;
+                        // IMPORTANTE: cadInfo é a posição atual no banco (que já recebeu essa movimentação).
+                        // Se cadInfo for idêntico à coordenada deste item, NÃO use cadInfo como compCoord,
+                        // para que o modal consulte a posição anterior real no banco via abrirModalComparativoDoHistorico!
+                        const cadDistItem = (cadInfo && hasItemCoord) ? calcularDistanciaHaversine({ lat: cadInfo.lat, lng: cadInfo.lng }, { lat: itemLat, lng: itemLng }) : 0;
+                        if (cadInfo && cadDistItem > 0.5) {
+                            compCoord = { lat: cadInfo.lat, lng: cadInfo.lng, label: 'Posição Cadastrada' };
+                        } else {
+                            compCoord = null;
+                        }
                     } else if (item.origem === 'CADASTRO_NOVA_PLAQUETA') {
                         item.distanciaMetros = null;
                         tipoComparacao = 'inicial';
@@ -5720,15 +5829,34 @@
 
             if (precisaBuscarAnterior && client && histItem.identificacao) {
                 try {
-                    const { data: priorLogs, error: errPrior } = await client
+                    const rawId = String(histItem.identificacao).trim();
+                    const idLimpo = rawId.replace(/^#/, '').trim();
+                    const idsParaBuscar = [...new Set([rawId, idLimpo, `#${idLimpo}`])];
+
+                    console.log(`🔍 [Comparativo Histórico] Buscando ponto anterior real para plaqueta:`, idsParaBuscar);
+
+                    // 1. Busca no histórico de movimentações registros anteriores com data menor
+                    let { data: priorLogs, error: errPrior } = await client
                         .from('historico_localizacao_plaquetas')
-                        .select('latitude, longitude, origem, observacao, created_at')
-                        .eq('identificacao', histItem.identificacao)
+                        .select('id, latitude, longitude, origem, observacao, created_at')
+                        .in('identificacao', idsParaBuscar)
                         .lt('created_at', histItem.created_at)
                         .order('created_at', { ascending: false })
-                        .limit(10);
+                        .limit(20);
 
-                    if (!errPrior && Array.isArray(priorLogs)) {
+                    // Se não encontrou por data estrita (ex: relógio sincronizado na mesma fração de segundo), busca todos os logs com ID diferente
+                    if ((!priorLogs || priorLogs.length === 0) && !errPrior) {
+                        const { data: allLogs } = await client
+                            .from('historico_localizacao_plaquetas')
+                            .select('id, latitude, longitude, origem, observacao, created_at')
+                            .in('identificacao', idsParaBuscar)
+                            .neq('id', histItem.id)
+                            .order('created_at', { ascending: false })
+                            .limit(20);
+                        priorLogs = allLogs;
+                    }
+
+                    if (Array.isArray(priorLogs)) {
                         for (const cand of priorLogs) {
                             const cLat = parseFloat(cand.latitude);
                             const cLng = parseFloat(cand.longitude);
@@ -5745,7 +5873,41 @@
                                     distMetros = d;
                                     histItem.compCoord = pontoReferencia;
                                     histItem.distanciaMetros = d;
+                                    console.log(`📍 [Comparativo Histórico] Ponto anterior encontrado no histórico:`, pontoReferencia, `Distância: ${d.toFixed(1)}m`);
                                     break;
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Se ainda não achou ponto anterior no histórico e temos a tabela localizacao_plaquetas
+                    if (!pontoReferencia || (typeof calcularDistanciaHaversine === 'function' && calcularDistanciaHaversine(pontoReferencia, { lat: itemLat, lng: itemLng }) < 0.5)) {
+                        const { data: cadRows } = await client
+                            .from('localizacao_plaquetas')
+                            .select('identificacao, "Latitude", "Longitude", "Empresa"')
+                            .in('identificacao', idsParaBuscar)
+                            .limit(10);
+
+                        if (Array.isArray(cadRows)) {
+                            for (const cRow of cadRows) {
+                                const latCad = parseCoordinate(cRow.Latitude);
+                                const lngCad = parseCoordinate(cRow.Longitude);
+                                if (latCad !== null && lngCad !== null) {
+                                    const dCad = (typeof calcularDistanciaHaversine === 'function')
+                                        ? calcularDistanciaHaversine({ lat: latCad, lng: lngCad }, { lat: itemLat, lng: itemLng })
+                                        : null;
+                                    if (dCad !== null && dCad > 0.5) {
+                                        pontoReferencia = {
+                                            lat: latCad,
+                                            lng: lngCad,
+                                            label: `Posição Cadastrada (${cRow.Empresa || 'Cadastro'})`
+                                        };
+                                        distMetros = dCad;
+                                        histItem.compCoord = pontoReferencia;
+                                        histItem.distanciaMetros = dCad;
+                                        console.log(`📍 [Comparativo Histórico] Ponto anterior obtido da tabela localizacao_plaquetas:`, pontoReferencia);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -5755,9 +5917,121 @@
                 }
             }
 
-            // Fallback caso seja o primeiro registro do histórico (cadastro inicial)
-            if (!pontoReferencia) {
-                if (histItem.cadInfo) {
+            // Se ainda não encontrou ponto anterior diferente no histórico e o item possui OS associada
+            if ((!pontoReferencia || (typeof calcularDistanciaHaversine === 'function' && calcularDistanciaHaversine(pontoReferencia, { lat: itemLat, lng: itemLng }) < 0.5)) && client && histItem.numero_os) {
+                try {
+                    const numOsLimpo = String(histItem.numero_os).replace(/[^0-9]/g, '');
+                    const rawProt = String(histItem.numero_os).trim();
+                    if (numOsLimpo || rawProt) {
+                        let queryOs = client
+                            .from('ordens_servico')
+                            .select('latitude, longitude, lat, lng, coordenadas, pontos_inicial, pontos_final, protocolo');
+                        
+                        if (numOsLimpo) {
+                            queryOs = queryOs.or(`protocolo.eq.${numOsLimpo},protocolo.eq.${rawProt}`);
+                        } else {
+                            queryOs = queryOs.eq('protocolo', rawProt);
+                        }
+
+                        const { data: osRows } = await queryOs.maybeSingle();
+
+                        if (osRows) {
+                            const plqAlvo = String(histItem.identificacao || '').replace(/^#/, '').trim().toUpperCase();
+
+                            // 1. Tentar extrair coordenada inicial da plaqueta em pontos_inicial da OS
+                            const parseArrayJson = (val) => {
+                                if (Array.isArray(val)) return val;
+                                if (typeof val === 'string') {
+                                    try { return JSON.parse(val); } catch(e) {}
+                                }
+                                return null;
+                            };
+
+                            const ptsIni = parseArrayJson(osRows.pontos_inicial);
+                            if (ptsIni && Array.isArray(ptsIni)) {
+                                const ptIni = ptsIni.find(p => {
+                                    const code = String(p.plaqueta || p.plaqueta_inicial || p.identificacao || '').replace(/^#/, '').trim().toUpperCase();
+                                    return code === plqAlvo;
+                                });
+                                if (ptIni) {
+                                    const cStr = ptIni.coordenada || ptIni.coordenada_inicial || (ptIni.lat && ptIni.lng ? `${ptIni.lat}, ${ptIni.lng}` : '');
+                                    const parsedIni = (typeof extrairLatLng === 'function') ? extrairLatLng(cStr) : null;
+                                    if (parsedIni && (typeof calcularDistanciaHaversine === 'function')) {
+                                        const d = calcularDistanciaHaversine(parsedIni, { lat: itemLat, lng: itemLng });
+                                        if (d > 0.5) {
+                                            pontoReferencia = {
+                                                lat: parsedIni.lat,
+                                                lng: parsedIni.lng,
+                                                label: `Posição Inicial Cadastrada (OS #${osRows.protocolo})`
+                                            };
+                                            distMetros = d;
+                                            histItem.compCoord = pontoReferencia;
+                                            histItem.distanciaMetros = d;
+                                            console.log(`📍 [Comparativo Histórico] Ponto obtido de pontos_inicial da OS:`, pontoReferencia);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. Se não achou em pontos_inicial, tentar a coordenada mestre da OS
+                            if (!pontoReferencia || (typeof calcularDistanciaHaversine === 'function' && calcularDistanciaHaversine(pontoReferencia, { lat: itemLat, lng: itemLng }) < 0.5)) {
+                                let osLat = parseFloat(osRows.latitude || osRows.lat);
+                                let osLng = parseFloat(osRows.longitude || osRows.lng);
+                                if (isNaN(osLat) && osRows.coordenadas) {
+                                    const partes = String(osRows.coordenadas).split(',');
+                                    if (partes.length === 2) {
+                                        osLat = parseFloat(partes[0].trim());
+                                        osLng = parseFloat(partes[1].trim());
+                                    }
+                                }
+                                if (!isNaN(osLat) && !isNaN(osLng) && osLat !== 0 && osLng !== 0) {
+                                    const d = (typeof calcularDistanciaHaversine === 'function')
+                                        ? calcularDistanciaHaversine({ lat: osLat, lng: osLng }, { lat: itemLat, lng: itemLng })
+                                        : null;
+                                    if (d !== null && d > 0.5) {
+                                        pontoReferencia = {
+                                            lat: osLat,
+                                            lng: osLng,
+                                            label: `Posição Original da OS #${osRows.protocolo || numOsLimpo}`
+                                        };
+                                        distMetros = d;
+                                        histItem.compCoord = pontoReferencia;
+                                        histItem.distanciaMetros = d;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (eOs) {
+                    console.warn("Aviso ao buscar coordenadas da OS de origem:", eOs);
+                }
+            }
+
+            // Fallback inteligente: se o trigger sobrescreveu e temos um desvio gravado na observação (ex: 15m),
+            // mas nenhuma coordenada anterior diferente sobreviveu no banco, projetamos a coordenada anterior
+            // com o raio do desvio para permitir a comparação visual no mapa em vez de mostrar sobreposição idêntica.
+            if ((!pontoReferencia || (typeof calcularDistanciaHaversine === 'function' && calcularDistanciaHaversine(pontoReferencia, { lat: itemLat, lng: itemLng }) < 0.5))) {
+                let desvioObs = null;
+                if (histItem.observacao) {
+                    const matchObs = histItem.observacao.match(/desvio(?:\s*(?:original)?\s*<=\s*15m)?:\s*([0-9]+(?:\.[0-9]+)?)\s*m/i);
+                    if (matchObs && matchObs[1]) {
+                        desvioObs = parseFloat(matchObs[1]);
+                    }
+                }
+
+                if (desvioObs && desvioObs > 0.5) {
+                    // Desloca geometricamente em metros (~0.00001 grau por metro) para representar a posição anterior original
+                    const deltaLat = (desvioObs / 111111);
+                    pontoReferencia = {
+                        lat: itemLat + deltaLat,
+                        lng: itemLng,
+                        label: `Posição Anterior Estimada (Desvio gravado: ${desvioObs.toFixed(1)}m)`
+                    };
+                    distMetros = desvioObs;
+                    histItem.compCoord = pontoReferencia;
+                    histItem.distanciaMetros = desvioObs;
+                    console.log(`📍 [Comparativo Histórico] Usando estimativa visual de desvio gravado: ${desvioObs}m`);
+                } else if (histItem.cadInfo) {
                     pontoReferencia = { lat: histItem.cadInfo.lat, lng: histItem.cadInfo.lng, label: 'Posição Cadastrada Atual' };
                 } else {
                     pontoReferencia = { lat: itemLat, lng: itemLng, label: 'Posição Registrada Inicial' };

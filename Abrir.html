@@ -1666,6 +1666,32 @@
         return prefixo + timeCode + dateStr;
       }
 
+      function notificarCriacaoOS(protocolo) {
+        if (!protocolo) return;
+        // 1. Notifica janela pai caso esteja incorporado em iframe
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protocolo }, '*');
+          } catch(e) {}
+        }
+        // 2. Notifica todas as outras abas/janelas abertas via BroadcastChannel
+        try {
+          if (typeof BroadcastChannel !== 'undefined') {
+            var bc = new BroadcastChannel('sistema_os_sync');
+            bc.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protocolo, timestamp: Date.now() });
+            bc.close();
+          }
+        } catch(eBC) {}
+        // 3. Fallback entre abas via localStorage (dispara evento storage nas demais janelas)
+        try {
+          localStorage.setItem('sistema_os_ultimo_evento', JSON.stringify({
+            action: 'OS_CRIADA_SILENCIOSO',
+            protocolo: protocolo,
+            timestamp: Date.now()
+          }));
+        } catch(eLS) {}
+      }
+
       // =========================================================================
       // MODO DE EDIÇÃO DA OS (ADMIN DASHBOARD DE-FATO COM FORMULARIO.HTML)
       // =========================================================================
@@ -2076,14 +2102,23 @@
               let profile = null;
 
               try {
-                const { data, error: pErr } = await client
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', user.id)
-                  .maybeSingle();
+                const cacheProfileKey = 'authguard_profile_' + user.id;
+                const cachedProfileStr = sessionStorage.getItem(cacheProfileKey);
+                if (cachedProfileStr) {
+                  try { profile = JSON.parse(cachedProfileStr); } catch(e) {}
+                }
 
-                if (!pErr && data) {
-                  profile = data;
+                if (!profile) {
+                  const { data, error: pErr } = await client
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', user.id)
+                    .maybeSingle();
+
+                  if (!pErr && data) {
+                    profile = data;
+                    sessionStorage.setItem(cacheProfileKey, JSON.stringify(profile));
+                  }
                 }
               } catch(e) {
                 console.warn("⚠️ [Auth OS] Erro ao consultar perfil:", e);
@@ -3405,9 +3440,7 @@
             exibirModalSucesso(msgSucesso, protExtraido);
             descongelarGpsRapido();
 
-            if (window.parent && window.parent !== window) {
-              window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
-            }
+            notificarCriacaoOS(protExtraido);
 
             var token = localStorage.getItem('os_token');
             if (token && typeof callServer === 'function') {
@@ -6285,9 +6318,7 @@
               : "OS de Praça Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
             exibirModalSucesso(msgTexto, protExtraido);
             
-            if (window.parent && window.parent !== window) {
-              window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
-            }
+            notificarCriacaoOS(protExtraido);
 
             var token = localStorage.getItem('os_token');
             if (token && typeof callServer === 'function') {
@@ -6807,9 +6838,7 @@
               : "Ordem de Serviço Cadastrada com Sucesso!<br><strong class='text-blue-600 font-bold'>Protocolo: " + protExtraido + "</strong>";
             exibirModalSucesso(msgTexto, protExtraido);
           
-          if (window.parent && window.parent !== window) {
-            window.parent.postMessage({ action: 'OS_CRIADA_SILENCIOSO', protocolo: protExtraido }, '*');
-          }
+          notificarCriacaoOS(protExtraido);
 
           var token = localStorage.getItem('os_token');
           if (token && typeof callServer === 'function') {

@@ -3056,11 +3056,26 @@
               materiais: carrinhoMateriais,
               fotos: arrPontosPayload
             };
-            if (urlsComplementaresViaria.length > 0) {
-              fechPayload.fotos_complementares = urlsComplementaresViaria;
+
+            let fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
+
+            while (fechInsertRes.error && fechInsertRes.error.message && fechInsertRes.error.message.includes("Could not find the")) {
+              const matchFech = fechInsertRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+              if (matchFech && matchFech[1]) {
+                const colAusenteFech = matchFech[1];
+                console.warn(`⚠️ [Finalizar] Coluna '${colAusenteFech}' não existe na tabela 'fechamentos_os'. Removendo e tentando novamente...`);
+                delete fechPayload[colAusenteFech];
+                fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
+              } else {
+                break;
+              }
             }
-            await client.from('fechamentos_os').insert([fechPayload]);
-            console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
+
+            if (fechInsertRes.error) {
+              console.warn('⚠️ Erro ao inserir na tabela fechamentos_os:', fechInsertRes.error);
+            } else {
+              console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
+            }
           } catch(errFechInsert) {
             console.warn('⚠️ Não foi possível salvar em fechamentos_os:', errFechInsert);
           }
