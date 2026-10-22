@@ -189,7 +189,24 @@ class ChamadosService {
             rawSessoes = Object.values(rawSessoes || {});
         }
 
-        const usuarioAtual = localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+        const getUsuarioAtual = () => {
+            if (window.AuthGuard && typeof window.AuthGuard.getUsuarioAtual === 'function') {
+                return window.AuthGuard.getUsuarioAtual();
+            }
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const p = window.AuthGuard._cachedAuthData.profile;
+                const u = window.AuthGuard._cachedAuthData.user;
+                if (p && p.nome) return p.nome;
+                if (u?.user_metadata?.full_name) return u.user_metadata.full_name;
+                if (u?.user_metadata?.name) return u.user_metadata.name;
+                if (p && p.email) return p.email;
+                if (u?.email) return u.email;
+            }
+            if (window.currentUserName) return window.currentUserName;
+            return localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || localStorage.getItem('user_email') || 'Administrador';
+        };
+
+        const usuarioAtual = getUsuarioAtual();
         const numTarget = parseInt(numeroSessao, 10);
 
         let encontrada = false;
@@ -232,7 +249,16 @@ class ChamadosService {
      * @param {string} [origemTela='Painel']
      */
     async alternarDesconsiderarFechamento(fechamentoId, protocolo, numeroFechamento, desconsiderar, motivo = '', origemTela = 'Painel') {
-        const usuarioAtual = localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+        let usuarioAtual = 'Administrador';
+        if (window.AuthGuard && typeof window.AuthGuard.getUsuarioAtual === 'function') {
+            usuarioAtual = window.AuthGuard.getUsuarioAtual();
+        } else if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+            const p = window.AuthGuard._cachedAuthData.profile;
+            const u = window.AuthGuard._cachedAuthData.user;
+            usuarioAtual = p?.nome || u?.user_metadata?.full_name || u?.user_metadata?.name || p?.email || u?.email || 'Administrador';
+        } else {
+            usuarioAtual = window.currentUserName || localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || localStorage.getItem('user_email') || 'Administrador';
+        }
 
         return await this.repository.alternarDesconsiderarFechamento(
             fechamentoId,

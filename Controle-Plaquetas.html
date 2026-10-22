@@ -355,10 +355,10 @@
             </div>
 
             <!-- Card 2: Registradas nos Últimos 30 Dias -->
-            <div class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+            <div onclick="window.ativarFiltroUltimasCadastradas()" class="col-span-12 md:col-span-4 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md hover:border-emerald-500/50 transition-all duration-300 opacity-0 animate-fade-in-up [animation-delay:300ms] cursor-pointer group" title="Clique para ver as últimas plaquetas cadastradas">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Registradas (30 Dias)</span>
-                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <span class="font-label-md text-label-md text-on-surface-variant group-hover:text-emerald-700 uppercase tracking-wider font-semibold transition-colors">Registradas (30 Dias)</span>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
                         <span class="material-symbols-outlined text-[20px]">add_location_alt</span>
                     </div>
                 </div>
@@ -367,7 +367,7 @@
                 </div>
                 <div class="flex items-center gap-1 mt-1 text-on-surface-variant text-xs">
                     <span class="material-symbols-outlined text-[15px] text-emerald-600">calendar_month</span>
-                    <span>Novas plaquetas nos últimos 30 dias</span>
+                    <span>Novas plaquetas nos últimos 30 dias (clique para listar)</span>
                 </div>
             </div>
 
@@ -398,7 +398,18 @@
                         <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Plaquetas de Iluminação Cadastradas</h3>
                     </div>
                 
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-2.5 flex-wrap">
+                    <!-- Seletor de Ordenação -->
+                    <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-on-surface-variant">swap_vert</span>
+                        <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Ordem:</label>
+                        <select id="select-ordem-plaquetas" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 py-0 pl-1 pr-6">
+                            <option value="recentes" selected>Últimas Cadastradas (Recentes)</option>
+                            <option value="identificacao_asc">Identificação (A - Z)</option>
+                            <option value="identificacao_desc">Identificação (Z - A)</option>
+                        </select>
+                    </div>
+
                     <!-- Quantidade por Página -->
                     <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
                         <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Exibir:</label>
@@ -882,6 +893,43 @@
 
     <!-- SEÇÃO 3: Histórico de Alterações de Plaquetas (Audit Log Geodésico) -->
     <div id="secao-historico-plaquetas" class="space-y-4 max-w-max-width-content mx-auto hidden" style="display: none;">
+        <!-- Barra de Ações & Alternância de Visualização da Aba de Histórico -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-surface-container-lowest p-3.5 sm:px-5 rounded-2xl border border-outline-variant shadow-xs">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[24px]">timeline</span>
+                </div>
+                <div>
+                    <h3 class="text-sm sm:text-base font-bold text-on-surface">Auditoria Geodésica & Linha do Tempo</h3>
+                    <p class="text-xs text-on-surface-variant">Rastreie o deslocamento físico, alterações manuais e aprovações de campo.</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+                <button type="button" id="btn-toggle-mapa-historico" onclick="window.alternarVisualizacaoMapaHistorico()" 
+                        class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 active:scale-95 shadow-2xs">
+                    <span class="material-symbols-outlined text-[17px]">map</span>
+                    <span id="btn-toggle-mapa-hist-texto">Abrir Mapa de Movimentações</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Painel Interativo de Mapa na Aba de Histórico -->
+        <div id="hist-mapa-container" class="hidden bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xs overflow-hidden">
+            <div class="p-3.5 border-b border-outline-variant bg-[#F8FAFC]/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2">
+                    <span class="material-symbols-outlined text-purple-600 text-[18px]">route</span>
+                    <span class="font-bold text-slate-800" id="hist-mapa-status-titulo">Trajetória e Movimentações das Plaquetas</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-purple-100 text-purple-800" id="hist-mapa-contagem-badge">0 pontos mapeados</span>
+                </div>
+                <div class="flex items-center gap-2 text-[11px] text-slate-500 flex-wrap">
+                    <span class="inline-flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Posição Anterior</span>
+                    <span class="inline-flex items-center gap-1 ml-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Nova Posição</span>
+                    <span class="inline-flex items-center gap-1 ml-1"><span class="w-3 h-0.5 bg-purple-500"></span> Linha de Deslocamento</span>
+                </div>
+            </div>
+            <div id="hist-mapa-canvas" class="w-full h-[420px] bg-slate-100 relative"></div>
+        </div>
+
         <!-- Tabela de Histórico -->
         <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xs overflow-hidden">
             <!-- Loading Indicator -->
@@ -1012,6 +1060,10 @@
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
                                                 <input type="radio" name="hist-origem-radio" value="FINALIZAR_OS" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
                                                 <span>Finalização de OS</span>
+                                            </label>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="hist-origem-radio" value="EDICAO_DIRETA_BANCO" class="text-purple-600 focus:ring-purple-600 cursor-pointer">
+                                                <span>Intervenção Direta no Banco</span>
                                             </label>
                                             <div class="border-t border-outline-variant my-1 pt-1">
                                                 <button type="button" class="w-full text-left px-2 py-1 text-error text-label-sm hover:underline font-semibold cursor-pointer" onclick="window.limparFiltroOrigemHistorico()">Limpar Filtro</button>
@@ -1255,7 +1307,7 @@
                 </div>
                 <div>
                     <label for="form-input-empresa" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Empresa</label>
-                    <input type="text" id="form-input-empresa" placeholder="Ex: FORTNORT" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-semibold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
+                    <input type="text" id="form-input-empresa" placeholder="Ex: ILUMITERRA - SEGUNDO CONTRATO" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-semibold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary" />
                 </div>
             </div>
 
@@ -1324,52 +1376,90 @@
     </div>
 </div>
 
-<!-- MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA -->
+<!-- MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA COM MAPA DE EVOLUÇÃO -->
 <div id="modal-historico-plaqueta" onclick="if (event.target === this) window.fecharModalHistoricoPlaqueta()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
-    <div id="modal-historico-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[85vh] max-h-[700px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+    <div id="modal-historico-plaqueta-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-6xl w-full h-[90vh] max-h-[760px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
         <!-- Header -->
-        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200 bg-slate-50 flex-shrink-0">
+        <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50 flex-shrink-0">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center flex-shrink-0">
-                    <span class="material-symbols-outlined text-[24px]">history</span>
+                    <span class="material-symbols-outlined text-[24px]">route</span>
                 </div>
                 <div>
-                    <h3 class="text-base sm:text-lg font-bold text-slate-900" id="historico-modal-titulo">Histórico de Posições</h3>
-                    <p class="text-xs text-slate-500 font-medium">Registro de alterações e movimentações desta plaqueta no tempo.</p>
+                    <div class="flex items-center gap-2">
+                        <h3 class="text-base sm:text-lg font-bold text-slate-900" id="historico-modal-titulo">Evolução & Trajetória: Plaqueta #---</h3>
+                        <span id="historico-modal-badge-total" class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-200">0 posições registradas</span>
+                    </div>
+                    <p class="text-xs text-slate-500 font-medium">Linha do tempo visual: acompanhe a evolução geográfica, de onde ela partiu e para onde foi.</p>
                 </div>
             </div>
-            <button type="button" onclick="window.fecharModalHistoricoPlaqueta()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center">
-                <span class="material-symbols-outlined text-[22px]">close</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <button type="button" onclick="window.fecharModalHistoricoPlaqueta()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
         </div>
 
-        <!-- Body -->
-        <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-5 space-y-4">
-            <div id="historico-loading" class="text-center py-8 text-slate-500 font-medium hidden">
-                <span class="material-symbols-outlined text-[32px] animate-spin text-purple-600 mb-2">sync</span>
-                <p>Carregando histórico do Supabase...</p>
+        <!-- Body Dividido em 2 Colunas: Lista Cronológica à Esquerda e Mapa Interativo de Trajetória à Direita -->
+        <div class="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
+            <!-- Coluna 1: Linha do Tempo e Tabela de Registros -->
+            <div class="w-full md:w-1/2 flex flex-col border-b md:border-b-0 md:border-r border-slate-200 bg-slate-50/50">
+                <div class="p-3 bg-white border-b border-slate-200 flex items-center justify-between text-xs">
+                    <span class="font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-purple-600">history</span>
+                        <span>Passo a Passo da Trajetória</span>
+                    </span>
+                    <span class="text-[11px] text-slate-500 font-medium">Clique em um ponto para focar no mapa</span>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3">
+                    <div id="historico-loading" class="text-center py-10 text-slate-500 font-medium hidden">
+                        <span class="material-symbols-outlined text-[32px] animate-spin text-purple-600 mb-2">sync</span>
+                        <p>Carregando histórico do Supabase...</p>
+                    </div>
+
+                    <div id="historico-empty" class="text-center py-12 text-slate-500 hidden">
+                        <span class="material-symbols-outlined text-[40px] text-slate-300 mb-2">location_off</span>
+                        <p class="font-bold text-slate-700">Nenhum histórico registrado</p>
+                        <p class="text-xs text-slate-400 mt-1">As alterações de posição desta plaqueta serão gravadas automaticamente aqui.</p>
+                    </div>
+
+                    <!-- Container da Linha do Tempo de Movimentações -->
+                    <div id="historico-timeline-list" class="space-y-2.5">
+                        <!-- Itens gerados dinamicamente via JS -->
+                    </div>
+                </div>
             </div>
 
-            <div id="historico-empty" class="text-center py-10 text-slate-500 hidden">
-                <span class="material-symbols-outlined text-[40px] text-slate-300 mb-2">location_off</span>
-                <p class="font-bold text-slate-700">Nenhum histórico registrado</p>
-                <p class="text-xs text-slate-400 mt-1">As alterações de posição desta plaqueta serão gravadas automaticamente aqui.</p>
-            </div>
+            <!-- Coluna 2: Mapa Mapbox da Trajetória com Linhas Conectadas -->
+            <div class="w-full md:w-1/2 flex flex-col bg-slate-100 relative">
+                <!-- Overlay Informativo do Mapa -->
+                <div class="absolute top-3 left-3 right-3 z-10 flex items-center justify-between gap-2 pointer-events-none">
+                    <div class="bg-white/90 backdrop-blur-md border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs text-xs pointer-events-auto flex items-center gap-2">
+                        <span class="inline-flex items-center gap-1 font-bold text-slate-800">
+                            <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span> Origem Inicial
+                        </span>
+                        <span class="text-slate-300">&bull;</span>
+                        <span class="inline-flex items-center gap-1 font-bold text-slate-800">
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-600"></span> Posição Atual
+                        </span>
+                    </div>
+                    <button type="button" onclick="window.reajustarZoomTrajetoriaPlaqueta()" 
+                            class="bg-white/90 hover:bg-white backdrop-blur-md border border-slate-200 text-slate-700 p-2 rounded-xl shadow-xs text-xs font-bold pointer-events-auto flex items-center gap-1 hover:text-purple-700 transition-all cursor-pointer" 
+                            title="Enquadrar toda a trajetória">
+                        <span class="material-symbols-outlined text-[17px]">zoom_out_map</span>
+                        <span class="hidden sm:inline">Enquadrar Todos</span>
+                    </button>
+                </div>
 
-            <div id="historico-content" class="hidden w-full">
-                <table class="w-full text-left text-xs border-collapse table-fixed">
-                    <thead>
-                        <tr class="border-b border-slate-200 bg-slate-100 text-slate-700 font-bold uppercase tracking-wider">
-                            <th class="py-2.5 px-3 w-36">Data / Hora</th>
-                            <th class="py-2.5 px-3 w-40">Posição</th>
-                            <th class="py-2.5 px-3 w-28">Nº da OS</th>
-                            <th class="py-2.5 px-3 w-36">Usuário</th>
-                            <th class="py-2.5 px-3">Observação</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tbody-historico-plaqueta" class="divide-y divide-slate-200 text-slate-800">
-                    </tbody>
-                </table>
+                <!-- Canvas Mapbox -->
+                <div id="mapa-trajetoria-plaqueta-canvas" class="w-full h-full min-h-[300px]"></div>
+
+                <!-- Rodapé informativo do mapa -->
+                <div class="p-2.5 bg-white border-t border-slate-200 text-[11px] text-slate-500 flex items-center justify-between">
+                    <span id="hist-mapa-dist-total">Deslocamento total acumulado: calculando...</span>
+                    <span class="font-medium text-purple-700">Setas indicam o sentido do deslocamento</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1618,6 +1708,30 @@
     </div>
 </div>
 
+<!-- Modal de Confirmação Padrão (Com Fundo Desfocado) -->
+<div id="confirm-modal" onclick="if (event.target === this) window.closeConfirmModal()" class="fixed inset-0 z-[80000] hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full p-6 text-on-surface transform transition-all duration-300 scale-95 opacity-0" id="confirm-modal-box">
+        <div class="flex items-start gap-4">
+            <div id="modal-icon-bg" class="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-rose-100 text-rose-700">
+                <span id="modal-icon" class="material-symbols-outlined text-[24px]">delete</span>
+            </div>
+            <div class="flex-1">
+                <h3 id="modal-title" class="text-title-md font-title-md font-bold text-on-surface mb-1">Confirmar Ação</h3>
+                <p id="modal-message" class="text-body-md text-on-surface-variant leading-relaxed text-sm">Deseja prosseguir?</p>
+            </div>
+        </div>
+
+        <div class="mt-6 flex items-center justify-end gap-3">
+            <button type="button" onclick="window.closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="button" id="modal-confirm-btn" class="px-6 py-2 rounded-xl text-label-md font-semibold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 transition-all shadow-sm cursor-pointer">
+                Confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- CONTROLLER E LÓGICA DE GERENCIAMENTO DE PLAQUETAS -->
 <script>
     (function() {
@@ -1629,6 +1743,7 @@
         let tamanhoPagina = 25;
         
         let buscaTexto = '';
+        let ordemPlaquetas = 'recentes'; // 'recentes' | 'identificacao_asc' | 'identificacao_desc'
         let filtroEmpresa = 'all';
         let filtroEmpresaSel = ['all'];
         let filtroObsPreset = ''; // '', 'DUPLICADO', 'HAS_OBS'
@@ -1639,6 +1754,51 @@
         let mapboxInstance = null;
         let mapboxMarkerInstance = null;
         let timeoutDebounceBusca = null;
+
+        // Modal Padrão de Confirmação HTML
+        window.closeConfirmModal = function() {
+            const modal = document.getElementById('confirm-modal');
+            const modalBox = document.getElementById('confirm-modal-box');
+            if (!modal || !modalBox) return;
+            modalBox.classList.remove('scale-100', 'opacity-100');
+            modalBox.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 200);
+        };
+
+        window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+            const modal = document.getElementById('confirm-modal');
+            const modalBox = document.getElementById('confirm-modal-box');
+            const modalIconBg = document.getElementById('modal-icon-bg');
+            const modalIcon = document.getElementById('modal-icon');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+
+            if (!modal || !modalBox) return;
+
+            if (modalTitle) modalTitle.textContent = title || 'Confirmar Ação';
+            if (modalMessage) modalMessage.innerHTML = message || 'Deseja prosseguir?';
+            if (modalIcon) modalIcon.textContent = icon || 'help';
+            if (modalIconBg) modalIconBg.className = `w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${iconBgClass || 'bg-rose-100 text-rose-700'}`;
+            if (modalConfirmBtn) {
+                modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-rose-600 text-white hover:bg-rose-700'} active:scale-95 transition-all shadow-sm cursor-pointer`;
+                modalConfirmBtn.textContent = confirmText || 'Confirmar';
+                modalConfirmBtn.onclick = async () => {
+                    window.closeConfirmModal();
+                    if (typeof onConfirm === 'function') {
+                        await onConfirm();
+                    }
+                };
+            }
+
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalBox.classList.remove('scale-95', 'opacity-0');
+                modalBox.classList.add('scale-100', 'opacity-100');
+            }, 10);
+        };
 
         // Função de inicialização exportada para SPA e carregamento direto
         window.initControlePlaquetas = function() {
@@ -1709,6 +1869,15 @@
                 });
             }
 
+            const selectOrdem = document.getElementById('select-ordem-plaquetas');
+            if (selectOrdem) {
+                selectOrdem.value = ordemPlaquetas;
+                selectOrdem.addEventListener('change', (e) => {
+                    ordemPlaquetas = e.target.value;
+                    carregarPlaquetas(1);
+                });
+            }
+
             if (selectPaginacao) {
                 selectPaginacao.addEventListener('change', (e) => {
                     tamanhoPagina = parseInt(e.target.value, 10) || 25;
@@ -1723,6 +1892,13 @@
                     window.abrirMapaMultiPlaquetasModal();
                 });
             }
+
+            window.ativarFiltroUltimasCadastradas = function() {
+                ordemPlaquetas = 'recentes';
+                const sel = document.getElementById('select-ordem-plaquetas');
+                if (sel) sel.value = 'recentes';
+                carregarPlaquetas(1);
+            };
 
             setupHeaderFilters();
 
@@ -1983,8 +2159,8 @@
             }
 
             try {
-                // Projeção cirúrgica de colunas existentes na tabela localizacao_plaquetas
-                const COLUNAS_PLAQUETAS = 'identificacao, "Latitude", "Longitude", "QTD. Lum.", "Observação", "Empresa", "Quando foi colocado?"';
+                // Projeção cirúrgica de colunas existentes na tabela localizacao_plaquetas (incluindo id para ordenação cronológica)
+                const COLUNAS_PLAQUETAS = 'id, identificacao, "Latitude", "Longitude", "QTD. Lum.", "Observação", "Empresa", "Quando foi colocado?"';
                 let query = client.from('localizacao_plaquetas').select(COLUNAS_PLAQUETAS, { count: 'exact' });
 
                 // Filtro de busca textual (suporta busca por múltiplas plaquetas ex: C0012 C0013)
@@ -2037,10 +2213,20 @@
                     query = query.ilike('Observação', `%${qObs}%`);
                 }
 
-                // Paginacao
+                // Aplicação da Ordenação
+                if (ordemPlaquetas === 'identificacao_desc') {
+                    query = query.order('identificacao', { ascending: false });
+                } else if (ordemPlaquetas === 'identificacao_asc') {
+                    query = query.order('identificacao', { ascending: true });
+                } else {
+                    // Padrão: Mais recentes primeiro (últimas cadastradas)
+                    query = query.order('id', { ascending: false });
+                }
+
+                // Paginação
                 const inicio = (paginaAtual - 1) * tamanhoPagina;
                 const fim = inicio + tamanhoPagina - 1;
-                query = query.order('identificacao', { ascending: true }).range(inicio, fim);
+                query = query.range(inicio, fim);
 
                 let { data, count, error } = await query;
 
@@ -2048,9 +2234,17 @@
                     console.warn('⚠️ Erro na consulta combinada. Tentando fallback por identificacao:', error);
                     let fallbackQuery = client.from('localizacao_plaquetas')
                         .select('*', { count: 'exact' })
-                        .ilike('identificacao', `%${buscaTexto.trim()}%`)
-                        .order('identificacao', { ascending: true })
-                        .range(inicio, fim);
+                        .ilike('identificacao', `%${buscaTexto.trim()}%`);
+                    
+                    if (ordemPlaquetas === 'identificacao_desc') {
+                        fallbackQuery = fallbackQuery.order('identificacao', { ascending: false });
+                    } else if (ordemPlaquetas === 'identificacao_asc') {
+                        fallbackQuery = fallbackQuery.order('identificacao', { ascending: true });
+                    } else {
+                        fallbackQuery = fallbackQuery.order('id', { ascending: false });
+                    }
+
+                    fallbackQuery = fallbackQuery.range(inicio, fim);
                     const resFB = await fallbackQuery;
                     if (!resFB.error) {
                         data = resFB.data;
@@ -2152,12 +2346,16 @@
                 tr.className = 'border-b border-outline-variant/60 hover:bg-surface-container-low/60 transition-colors align-middle';
 
                 // 1. Identificação
+                const isRecente = (ordemPlaquetas === 'recentes' && plq.raw && plq.raw.id);
                 const tdIdent = `
                     <td class="py-3 px-5 font-bold">
-                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
-                            <span class="material-symbols-outlined text-[15px]">tag</span>
-                            <span>${plq.identificacao}</span>
-                        </span>
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
+                                <span class="material-symbols-outlined text-[15px]">tag</span>
+                                <span>${plq.identificacao}</span>
+                            </span>
+                            ${isRecente ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Registro #${plq.raw.id}"><span class="material-symbols-outlined text-[12px]">fiber_new</span>#${plq.raw.id}</span>` : ''}
+                        </div>
                     </td>`;
 
                 // 2. Localização (Lat / Lng)
@@ -2459,20 +2657,31 @@
             }
 
             try {
-                const updatePayload = {
-                    Latitude: newLat,
-                    Longitude: newLng
-                };
+                const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
+                
+                // 1. Tentar executar via RPC Transacional Auditada (Padrão Profissional)
+                const { data: rpcRes, error: rpcErr } = await client.rpc('atualizar_posicao_plaqueta_auditada', {
+                    p_identificacao: plaquetaEmVisualizacaoMap.identificacao,
+                    p_nova_lat: newLat,
+                    p_nova_lng: newLng,
+                    p_origem: 'EDICAO_MAPA',
+                    p_numero_os: null,
+                    p_usuario: userNome,
+                    p_observacao: 'Localização ajustada via mapa Mapbox'
+                });
 
-                const { error } = await client.from('localizacao_plaquetas')
-                    .update(updatePayload)
-                    .eq('identificacao', plaquetaEmVisualizacaoMap.identificacao);
+                if (rpcErr || (rpcRes && !rpcRes.success)) {
+                    console.warn("Aviso ao salvar via RPC, aplicando fallback direto:", rpcErr || rpcRes?.error);
+                    // Fallback caso a RPC não esteja disponível
+                    const { error } = await client.from('localizacao_plaquetas')
+                        .update({ Latitude: newLat, Longitude: newLng })
+                        .eq('identificacao', plaquetaEmVisualizacaoMap.identificacao);
 
-                if (error) {
-                    alert("Erro ao atualizar coordenadas no Supabase: " + error.message);
-                } else {
+                    if (error) {
+                        alert("Erro ao atualizar coordenadas no Supabase: " + error.message);
+                        return;
+                    }
                     try {
-                        const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Administrador';
                         await client.from('historico_localizacao_plaquetas').insert([{
                             identificacao: plaquetaEmVisualizacaoMap.identificacao,
                             latitude: newLat,
@@ -2482,11 +2691,11 @@
                             observacao: 'Localização ajustada via mapa Mapbox'
                         }]);
                     } catch (hErr) { console.warn('Aviso histórico:', hErr); }
-
-                    alert(`✅ Localização da plaqueta #${plaquetaEmVisualizacaoMap.identificacao} atualizada com sucesso!`);
-                    window.fecharMapaPlaquetaModal();
-                    carregarPlaquetas(paginaAtual);
                 }
+
+                alert(`✅ Localização da plaqueta #${plaquetaEmVisualizacaoMap.identificacao} atualizada com sucesso!`);
+                window.fecharMapaPlaquetaModal();
+                carregarPlaquetas(paginaAtual);
             } catch (err) {
                 alert("Erro inesperado: " + err.message);
             } finally {
@@ -2542,7 +2751,7 @@
                 document.getElementById('form-input-latitude').value = '';
                 document.getElementById('form-input-longitude').value = '';
                 document.getElementById('form-input-qtd-lum').value = 1;
-                document.getElementById('form-input-empresa').value = 'FORTNORT';
+                document.getElementById('form-input-empresa').value = 'ILUMITERRA - SEGUNDO CONTRATO';
                 document.getElementById('form-input-observacao').value = '';
             }
 
@@ -2877,31 +3086,43 @@
         };
 
         // =========================================================================
-        // LÓGICA DO MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA
+        // LÓGICA DO MODAL 4: HISTÓRICO DE POSIÇÕES DA PLAQUETA COM MAPA DE TRAJETÓRIA
         // =========================================================================
+        let trajetoriaMapboxInstance = null;
+        let trajetoriaMarkers = [];
+        let trajetoriaCoordsList = [];
+
         window.abrirModalHistoricoPlaqueta = async function(identificacao) {
             const modal = document.getElementById('modal-historico-plaqueta');
             const modalBox = document.getElementById('modal-historico-plaqueta-box');
             const titulo = document.getElementById('historico-modal-titulo');
+            const badgeTotal = document.getElementById('historico-modal-badge-total');
             const loading = document.getElementById('historico-loading');
             const empty = document.getElementById('historico-empty');
-            const content = document.getElementById('historico-content');
-            const tbody = document.getElementById('tbody-historico-plaqueta');
+            const listContainer = document.getElementById('historico-timeline-list');
+            const distTotalEl = document.getElementById('hist-mapa-dist-total');
 
             if (!modal || !modalBox) return;
 
-            if (titulo) titulo.innerText = `Histórico de Posições #${identificacao}`;
+            const plqFormatada = String(identificacao || '').replace(/^#/, '').trim().toUpperCase();
+            if (titulo) titulo.innerText = `Evolução & Trajetória: Plaqueta #${plqFormatada}`;
+            if (badgeTotal) badgeTotal.innerText = `Buscando...`;
+            if (distTotalEl) distTotalEl.innerText = `Calculando deslocamento...`;
 
             modal.classList.remove('hidden');
             setTimeout(() => {
                 modalBox.classList.remove('scale-95', 'opacity-0');
                 modalBox.classList.add('scale-100', 'opacity-100');
-            }, 50);
+            }, 30);
 
             if (loading) loading.classList.remove('hidden');
             if (empty) empty.classList.add('hidden');
-            if (content) content.classList.add('hidden');
-            if (tbody) tbody.innerHTML = '';
+            if (listContainer) listContainer.innerHTML = '';
+
+            // Limpar marcadores anteriores do mapa de trajetória
+            trajetoriaMarkers.forEach(m => m.remove());
+            trajetoriaMarkers = [];
+            trajetoriaCoordsList = [];
 
             const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
             if (!client) {
@@ -2914,16 +3135,18 @@
             }
 
             try {
+                // Buscar todo o histórico ordenado cronologicamente (do mais antigo para o mais novo para traçar o caminho)
+                const idsParaBuscar = [plqFormatada, `#${plqFormatada}`];
                 const { data, error } = await client
                     .from('historico_localizacao_plaquetas')
                     .select('*')
-                    .ilike('identificacao', identificacao)
-                    .order('created_at', { ascending: false });
+                    .in('identificacao', idsParaBuscar)
+                    .order('created_at', { ascending: true });
 
                 if (loading) loading.classList.add('hidden');
 
                 if (error) {
-                    console.error('❌ Erro ao buscar histórico:', error);
+                    console.error('❌ Erro ao buscar histórico da plaqueta:', error);
                     if (empty) {
                         empty.classList.remove('hidden');
                         empty.querySelector('.font-bold').innerText = "Falha ao consultar histórico";
@@ -2934,54 +3157,310 @@
 
                 if (!data || data.length === 0) {
                     if (empty) empty.classList.remove('hidden');
+                    if (badgeTotal) badgeTotal.innerText = '0 posições registradas';
+                    if (distTotalEl) distTotalEl.innerText = 'Nenhuma movimentação registrada.';
                     return;
                 }
 
-                if (content) content.classList.remove('hidden');
+                if (badgeTotal) badgeTotal.innerText = `${data.length} ${data.length === 1 ? 'posição registrada' : 'posições registradas'}`;
 
-                data.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'hover:bg-slate-50 transition-colors';
+                // Filtrar apenas registros com coordenadas válidas para a rota
+                const pontosValidos = [];
+                let distanciaAcumuladaMetros = 0;
 
-                    const dt = item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '---';
+                data.forEach((item, idx) => {
                     const lat = parseFloat(item.latitude);
                     const lng = parseFloat(item.longitude);
                     const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
-
-                    const locHtml = hasCoords 
-                        ? `<a href="https://www.google.com/maps/search/?api=1&query=${lat},${lng}" target="_blank" class="inline-flex items-center gap-1 text-blue-600 hover:underline font-mono font-semibold">
-                            <span class="material-symbols-outlined text-[14px]">location_on</span>
-                            ${lat.toFixed(5)}, ${lng.toFixed(5)}
-                           </a>`
-                        : `<span class="text-amber-600 font-medium">Sem coords</span>`;
-
-                    const osHtml = item.numero_os 
-                        ? `<span class="px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-bold border border-blue-200">#${item.numero_os}</span>`
-                        : `<span class="text-slate-400">---</span>`;
-
-                    const userHtml = `<div>
-                        <span class="font-bold text-slate-900">${item.usuario || 'Sistema'}</span>
-                        <div class="text-[10px] text-slate-500 font-mono">${item.origem || 'FINALIZAR_OS'}</div>
-                    </div>`;
-
-                    const obsHtml = `<span class="text-slate-600 block break-words whitespace-normal text-xs" title="${(item.observacao || '').replace(/"/g, '&quot;')}">${item.observacao || '---'}</span>`;
-
-                    tr.innerHTML = `
-                        <td class="py-2.5 px-3 whitespace-nowrap font-medium text-slate-600">${dt}</td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">${locHtml}</td>
-                        <td class="py-2.5 px-3 whitespace-nowrap">${osHtml}</td>
-                        <td class="py-2.5 px-3 truncate max-w-[140px]">${userHtml}</td>
-                        <td class="py-2.5 px-3 whitespace-normal break-words">${obsHtml}</td>
-                    `;
-
-                    tbody.appendChild(tr);
+                    if (hasCoords) {
+                        pontosValidos.push({
+                            index: pontosValidos.length + 1,
+                            totalPontos: 0, // atualizado abaixo
+                            id: item.id,
+                            lat: lat,
+                            lng: lng,
+                            data: item.created_at,
+                            usuario: item.usuario || 'Sistema',
+                            origem: item.origem || 'HISTORICO',
+                            numero_os: item.numero_os,
+                            observacao: item.observacao || ''
+                        });
+                    }
                 });
 
+                pontosValidos.forEach(p => p.totalPontos = pontosValidos.length);
+
+                // Calcular distâncias passo a passo
+                for (let k = 1; k < pontosValidos.length; k++) {
+                    const pAnt = pontosValidos[k - 1];
+                    const pAtual = pontosValidos[k];
+                    if (typeof calcularDistanciaHaversine === 'function') {
+                        const d = calcularDistanciaHaversine({ lat: pAnt.lat, lng: pAnt.lng }, { lat: pAtual.lat, lng: pAtual.lng });
+                        pAtual.distanciaDoAnterior = d;
+                        distanciaAcumuladaMetros += d;
+                    }
+                }
+
+                if (distTotalEl) {
+                    if (distanciaAcumuladaMetros < 1000) {
+                        distTotalEl.innerHTML = `Deslocamento acumulado: <strong class="text-purple-700">${distanciaAcumuladaMetros.toFixed(1)}m</strong> (${pontosValidos.length} pontos geográficos)`;
+                    } else {
+                        distTotalEl.innerHTML = `Deslocamento acumulado: <strong class="text-purple-700">${(distanciaAcumuladaMetros / 1000).toFixed(2)}km</strong> (${pontosValidos.length} pontos geográficos)`;
+                    }
+                }
+
+                // Renderizar Itens da Linha do Tempo (ordem cronológica invertida para exibir o mais recente no topo)
+                const registrosDecrescente = [...data].reverse();
+                if (listContainer) {
+                    listContainer.innerHTML = '';
+                    registrosDecrescente.forEach((item, revIdx) => {
+                        const cronoIndex = data.length - revIdx; // 1 = primeira/inicial, data.length = atual
+                        const lat = parseFloat(item.latitude);
+                        const lng = parseFloat(item.longitude);
+                        const hasCoords = !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+
+                        const dtStr = item.created_at ? new Date(item.created_at).toLocaleString('pt-BR') : '---';
+                        const isPrimeiro = (cronoIndex === 1);
+                        const isUltimo = (cronoIndex === data.length);
+
+                        // Encontrar distância deste ponto se houver
+                        const pontoCorrespondente = pontosValidos.find(p => p.id === item.id);
+                        let distBadge = '';
+                        if (pontoCorrespondente && pontoCorrespondente.distanciaDoAnterior !== undefined) {
+                            const dVal = pontoCorrespondente.distanciaDoAnterior;
+                            const dStr = dVal < 1000 ? `${dVal.toFixed(1)}m` : `${(dVal / 1000).toFixed(2)}km`;
+                            distBadge = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold ${dVal > 15 ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-emerald-100 text-emerald-900 border border-emerald-300'}">
+                                <span class="material-symbols-outlined text-[11px]">straighten</span> Desvio: ${dStr}
+                            </span>`;
+                        }
+
+                        let dotCor = 'bg-purple-600 ring-purple-100';
+                        let labelPosicao = `Movimentação #${cronoIndex}`;
+                        if (isPrimeiro) {
+                            dotCor = 'bg-blue-600 ring-blue-100';
+                            labelPosicao = `Origem Inicial (Cadastro)`;
+                        } else if (isUltimo) {
+                            dotCor = 'bg-emerald-600 ring-emerald-100';
+                            labelPosicao = `Posição Atual (Mais recente)`;
+                        }
+
+                        const cardEl = document.createElement('div');
+                        cardEl.id = `hist-card-ponto-${cronoIndex}`;
+                        cardEl.className = `p-3 rounded-xl border transition-all cursor-pointer shadow-2xs group ${isUltimo ? 'bg-emerald-50/70 border-emerald-300 hover:bg-emerald-100/70' : isPrimeiro ? 'bg-blue-50/60 border-blue-200 hover:bg-blue-100/60' : 'bg-white border-slate-200 hover:border-purple-300 hover:bg-purple-50/40'}`;
+                        cardEl.onclick = () => {
+                            if (hasCoords) {
+                                window.focarPontoTrajetoriaNoMapa(lng, lat, cronoIndex);
+                            }
+                        };
+
+                        cardEl.innerHTML = `
+                            <div class="flex items-start gap-2.5">
+                                <div class="w-6 h-6 rounded-full ${dotCor} ring-4 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5 shadow-xs">
+                                    ${cronoIndex}
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="flex items-center justify-between gap-1 flex-wrap">
+                                        <span class="font-bold text-slate-900 text-xs">${labelPosicao}</span>
+                                        <span class="text-[11px] text-slate-500 font-medium">${dtStr}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                        ${item.numero_os ? `
+                                            <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 font-mono text-[10.5px] font-bold border border-blue-200">
+                                                <span class="material-symbols-outlined text-[12px]">receipt_long</span> #${item.numero_os}
+                                            </span>
+                                        ` : ''}
+                                        <span class="inline-flex items-center gap-1 text-[11px] text-slate-600 font-medium">
+                                            <span class="material-symbols-outlined text-[13px] text-slate-400">person</span> ${item.usuario || 'Sistema'}
+                                        </span>
+                                        ${distBadge}
+                                    </div>
+                                    <div class="mt-1 text-[11px] font-mono text-slate-500 flex items-center justify-between">
+                                        <span>${hasCoords ? `${lat.toFixed(5)}, ${lng.toFixed(5)}` : 'Sem coordenadas'}</span>
+                                        ${hasCoords ? `<span class="material-symbols-outlined text-[15px] text-purple-600 opacity-60 group-hover:opacity-100 transition-opacity">center_focus_strong</span>` : ''}
+                                    </div>
+                                    ${item.observacao ? `
+                                        <p class="text-[11px] text-slate-600 mt-1 italic break-words bg-white/70 p-1.5 rounded-lg border border-slate-100">${item.observacao}</p>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                        listContainer.appendChild(cardEl);
+                    });
+                }
+
+                // Inicializar e Renderizar o Mapa Mapbox de Trajetória
+                setTimeout(() => {
+                    window.renderizarMapaTrajetoriaPlaqueta(pontosValidos);
+                }, 100);
+
             } catch (err) {
-                console.error('❌ Exceção histórico:', err);
+                console.error('❌ Exceção histórico com mapa:', err);
                 if (loading) loading.classList.add('hidden');
                 if (empty) empty.classList.remove('hidden');
             }
+        };
+
+        window.renderizarMapaTrajetoriaPlaqueta = function(pontosValidos) {
+            const canvasEl = document.getElementById('mapa-trajetoria-plaqueta-canvas');
+            if (!canvasEl) return;
+
+            trajetoriaCoordsList = pontosValidos || [];
+
+            if (trajetoriaCoordsList.length === 0) {
+                return;
+            }
+
+            // Ponto central padrão
+            const pCentro = [trajetoriaCoordsList[trajetoriaCoordsList.length - 1].lng, trajetoriaCoordsList[trajetoriaCoordsList.length - 1].lat];
+
+            if (!trajetoriaMapboxInstance) {
+                mapboxgl.accessToken = MAPBOX_TOKEN;
+                trajetoriaMapboxInstance = new mapboxgl.Map({
+                    container: 'mapa-trajetoria-plaqueta-canvas',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: pCentro,
+                    zoom: 16
+                });
+                trajetoriaMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+            } else {
+                trajetoriaMapboxInstance.jumpTo({ center: pCentro, zoom: 16 });
+                trajetoriaMapboxInstance.resize();
+            }
+
+            trajetoriaMapboxInstance.on('load', () => {
+                desenharLinhasTrajetoria();
+            });
+
+            if (trajetoriaMapboxInstance.isStyleLoaded()) {
+                desenharLinhasTrajetoria();
+            }
+
+            function desenharLinhasTrajetoria() {
+                // Limpar marcadores anteriores
+                trajetoriaMarkers.forEach(m => m.remove());
+                trajetoriaMarkers = [];
+
+                const bounds = new mapboxgl.LngLatBounds();
+                const lineCoordinates = [];
+
+                trajetoriaCoordsList.forEach((pt, idx) => {
+                    const isPrimeiro = (idx === 0);
+                    const isUltimo = (idx === trajetoriaCoordsList.length - 1);
+                    const coords = [pt.lng, pt.lat];
+                    lineCoordinates.push(coords);
+                    bounds.extend(coords);
+
+                    // Criar elemento HTML personalizado para o marcador com o número da etapa
+                    const elMarker = document.createElement('div');
+                    elMarker.className = 'cursor-pointer group transition-transform duration-200 hover:scale-125';
+
+                    let corPin = '#9333ea'; // Roxo padrão
+                    let borderPin = '#ffffff';
+                    if (isPrimeiro) {
+                        corPin = '#2563eb'; // Azul (origem)
+                    } else if (isUltimo) {
+                        corPin = '#059669'; // Verde (atual)
+                    }
+
+                    elMarker.innerHTML = `
+                        <div style="background-color: ${corPin}; border: 2.5px solid ${borderPin}; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);" 
+                             class="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold ring-2 ring-black/10">
+                            ${pt.index}
+                        </div>
+                    `;
+
+                    // Popup com detalhes
+                    const popupHtml = `
+                        <div class="p-2 text-xs font-sans text-slate-800 space-y-1">
+                            <div class="font-bold text-slate-900 border-b pb-1 flex items-center justify-between gap-2">
+                                <span>Ponto #${pt.index} ${isPrimeiro ? '(Origem)' : isUltimo ? '(Atual)' : ''}</span>
+                                <span class="text-[10px] text-slate-500">${pt.data ? new Date(pt.data).toLocaleDateString('pt-BR') : ''}</span>
+                            </div>
+                            ${pt.numero_os ? `<div class="font-mono text-blue-700 font-bold">OS #${pt.numero_os}</div>` : ''}
+                            <div class="text-[11px] text-slate-600">Por: <strong>${pt.usuario}</strong></div>
+                            ${pt.distanciaDoAnterior !== undefined ? `<div class="text-purple-700 font-bold text-[10.5px]">Deslocamento: ${pt.distanciaDoAnterior.toFixed(1)}m</div>` : ''}
+                            ${pt.observacao ? `<div class="text-[10px] text-slate-500 italic mt-0.5">${pt.observacao}</div>` : ''}
+                        </div>
+                    `;
+
+                    const popup = new mapboxgl.Popup({ offset: 15 }).setHTML(popupHtml);
+
+                    const marker = new mapboxgl.Marker({ element: elMarker })
+                        .setLngLat(coords)
+                        .setPopup(popup)
+                        .addTo(trajetoriaMapboxInstance);
+
+                    trajetoriaMarkers.push(marker);
+                });
+
+                // Desenhar a linha conectando os pontos no mapa com GeoJSON
+                const geojsonLine = {
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: lineCoordinates
+                    }
+                };
+
+                const sourceId = 'trajetoria-line-source';
+                const layerId = 'trajetoria-line-layer';
+                const arrowLayerId = 'trajetoria-arrow-layer';
+
+                if (trajetoriaMapboxInstance.getSource(sourceId)) {
+                    trajetoriaMapboxInstance.getSource(sourceId).setData(geojsonLine);
+                } else {
+                    trajetoriaMapboxInstance.addSource(sourceId, {
+                        type: 'geojson',
+                        data: geojsonLine
+                    });
+
+                    // Linha contínua com gradiente
+                    trajetoriaMapboxInstance.addLayer({
+                        id: layerId,
+                        type: 'line',
+                        source: sourceId,
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': '#7c3aed',
+                            'line-width': 3.5,
+                            'line-dasharray': [2, 1]
+                        }
+                    });
+                }
+
+                // Ajustar zoom aos limites dos pontos
+                if (trajetoriaCoordsList.length > 1) {
+                    trajetoriaMapboxInstance.fitBounds(bounds, { padding: 60, maxZoom: 17 });
+                }
+            }
+        };
+
+        window.focarPontoTrajetoriaNoMapa = function(lng, lat, pontoIndex) {
+            if (!trajetoriaMapboxInstance) return;
+            trajetoriaMapboxInstance.flyTo({ center: [lng, lat], zoom: 17.5, essential: true });
+
+            // Abrir popup correspondente
+            if (trajetoriaMarkers && trajetoriaMarkers[pontoIndex - 1]) {
+                trajetoriaMarkers[pontoIndex - 1].togglePopup();
+            }
+
+            // Destacar o card selecionado na lista
+            document.querySelectorAll('#historico-timeline-list > div').forEach(card => card.classList.remove('ring-2', 'ring-purple-600'));
+            const cardAlvo = document.getElementById(`hist-card-ponto-${pontoIndex}`);
+            if (cardAlvo) {
+                cardAlvo.classList.add('ring-2', 'ring-purple-600');
+            }
+        };
+
+        window.reajustarZoomTrajetoriaPlaqueta = function() {
+            if (!trajetoriaMapboxInstance || !trajetoriaCoordsList || trajetoriaCoordsList.length === 0) return;
+            const bounds = new mapboxgl.LngLatBounds();
+            trajetoriaCoordsList.forEach(pt => bounds.extend([pt.lng, pt.lat]));
+            trajetoriaMapboxInstance.fitBounds(bounds, { padding: 60, maxZoom: 17 });
         };
 
         window.fecharModalHistoricoPlaqueta = function() {
@@ -3010,6 +3489,8 @@
         let compPosteSelecionado = null;
         let compDuplicatasList = [];
         let compInstanciaSelecionadaId = null;
+        let compPostesRequestId = 0;
+        let compFitBoundsTimeout = null;
 
         window.alternarAbaPlaquetas = function(aba) {
             abaAtiva = aba;
@@ -3355,12 +3836,12 @@
                 console.log(`📍 [Aprovação Coordenadas] ${plaquetasMap.size} códigos únicos de plaquetas encontrados no cadastro.`);
 
                 // Buscar postes da base aérea que já contenham vínculo com as plaquetas necessárias
-                const postesVinculadosMap = new Map(); // plaquetaUpper -> Array<{ id: number, id_plaqueta_vinculada: string, plaquetasArr: string[] }>
+                const postesVinculadosMap = new Map(); // plaquetaUpper -> Array<{ id: number, id_plaqueta_vinculada: string, latitude: number, longitude: number, plaquetasArr: string[] }>
                 for (let i = 0; i < plaquetasArray.length; i += CHUNK_SIZE) {
                     const chunk = plaquetasArray.slice(i, i + CHUNK_SIZE);
                     const { data: postesChunk, error: pstErr } = await client
                         .from('postes_base_aerea')
-                        .select('id, id_plaqueta_vinculada')
+                        .select('id, id_plaqueta_vinculada, latitude, longitude')
                         .in('id_plaqueta_vinculada', chunk);
 
                     if (!pstErr && postesChunk) {
@@ -3497,6 +3978,10 @@
                         temConflitoPosteOcupado: temConflitoPosteOcupado,
                         temConflitoPosteMigrado: temConflitoPosteMigrado,
                         outroPosteAnteriorId: outroPosteVinculado ? outroPosteVinculado.id : null,
+                        outroPosteAnterior: outroPosteVinculado || null,
+                        outroPosteAnteriorCoords: (outroPosteVinculado && outroPosteVinculado.latitude && outroPosteVinculado.longitude) 
+                            ? { lat: parseFloat(outroPosteVinculado.latitude), lng: parseFloat(outroPosteVinculado.longitude) } 
+                            : null,
                         temDuplicatasBanco: temDuplicatasBanco,
                         temDesvioAlto: temDesvioAlto,
                         motivosAprovacao: motivosAprovacao,
@@ -3785,11 +4270,21 @@
             const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
             if (!item) return;
 
-            const confirmar = confirm(`Deseja aprovar a coordenada da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId}?\n\n` +
-                                      `Coordenada Atual: ${item.coordCadastradaRaw}\n` +
-                                      `Nova Coordenada: ${item.coordReparoRaw}\n` +
-                                      `Desvio: ${item.distanciaMetros} metros`);
-            if (!confirmar) return;
+            // Se for exclusivamente Calibração Fina (sem conflitos de duplicatas, postes ocupados ou desvios altos),
+            // aprova diretamente sem exigir confirmação modal
+            const isCalibracaoFina = (item.motivosAprovacao && item.motivosAprovacao.some(m => m.tipo === 'CALIBRACAO_FINA')) 
+                && !item.temDuplicatasBanco 
+                && !item.temConflitoPosteOcupado 
+                && !item.temConflitoPosteMigrado 
+                && !item.temDesvioAlto;
+
+            if (!isCalibracaoFina) {
+                const confirmar = confirm(`Deseja aprovar a coordenada da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId}?\n\n` +
+                                          `Coordenada Atual: ${item.coordCadastradaRaw}\n` +
+                                          `Nova Coordenada: ${item.coordReparoRaw}\n` +
+                                          `Desvio: ${item.distanciaMetros} metros`);
+                if (!confirmar) return;
+            }
 
             await executarAprovacao(item);
         };
@@ -3833,27 +4328,58 @@
                         .map(inst => inst.id);
                 }
 
-                let queryUpdate = client.from('localizacao_plaquetas')
-                    .update({
-                        Latitude: newLat,
-                        Longitude: newLng,
-                        "Observação": limparObsoletas ? '' : undefined
-                    });
+                // 1. Atualizar localizacao_plaquetas e gravar histórico via RPC Transacional Auditada
+                const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
+                const modoTexto = options.modoVinculoPoste === 'SOMAR' ? ' [Luminária Adicional / Braço Somado]' : '';
+                let obsTexto = isSnapPoste
+                    ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})`
+                    : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`;
 
-                if (idParaPreservarEAtualizar) {
-                    queryUpdate = queryUpdate.eq('id', idParaPreservarEAtualizar);
-                } else {
-                    queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
+                if (idsEfetivosParaRemover.length > 0) {
+                    obsTexto += ` [${idsEfetivosParaRemover.length} duplicata(s) removida(s)]`;
                 }
 
-                const { error: errUpdate } = await queryUpdate;
+                const { data: rpcRes, error: rpcErr } = await client.rpc('atualizar_posicao_plaqueta_auditada', {
+                    p_identificacao: item.plaquetaId,
+                    p_nova_lat: newLat,
+                    p_nova_lng: newLng,
+                    p_origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
+                    p_numero_os: String(item.protocolo || ''),
+                    p_usuario: userNome,
+                    p_observacao: obsTexto,
+                    p_desvio_metros: !isNaN(parseFloat(item.distanciaMetros)) ? parseFloat(item.distanciaMetros) : null,
+                    p_extra_payload: { 
+                        limpar_obs: limparObsoletas,
+                        id_registro_alvo: idParaPreservarEAtualizar,
+                        ids_remover: idsEfetivosParaRemover
+                    }
+                });
 
-                if (errUpdate) {
-                    alert(`Erro ao atualizar plaqueta #${item.plaquetaId}: ` + errUpdate.message);
-                    return false;
+                let rpcSucesso = !rpcErr && rpcRes && rpcRes.success;
+
+                if (!rpcSucesso) {
+                    console.warn("Aviso ao aprovar via RPC, usando fallback direto:", rpcErr || rpcRes?.error);
+                    let queryUpdate = client.from('localizacao_plaquetas')
+                        .update({
+                            Latitude: newLat,
+                            Longitude: newLng,
+                            "Observação": limparObsoletas ? '' : undefined
+                        });
+
+                    if (idParaPreservarEAtualizar) {
+                        queryUpdate = queryUpdate.eq('id', idParaPreservarEAtualizar);
+                    } else {
+                        queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
+                    }
+
+                    const { error: errUpdate } = await queryUpdate;
+                    if (errUpdate) {
+                        alert(`Erro ao atualizar plaqueta #${item.plaquetaId}: ` + errUpdate.message);
+                        return false;
+                    }
                 }
 
-                // 1.1 Excluir as duplicatas selecionadas
+                // 1.1 Excluir as duplicatas selecionadas (garantir via query direta caso a RPC não tenha excluído)
                 if (idsEfetivosParaRemover.length > 0) {
                     try {
                         const { error: delErr } = await client.from('localizacao_plaquetas')
@@ -3908,28 +4434,20 @@
                     } catch (pErr) { console.warn("Aviso ao vincular poste:", pErr); }
                 }
 
-                // 3. Gravar no histórico de localização
-                try {
-                    const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
-                    const modoTexto = options.modoVinculoPoste === 'SOMAR' ? ' [Luminária Adicional / Braço Somado]' : '';
-                    let obsTexto = isSnapPoste
-                        ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})`
-                        : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`;
-
-                    if (idsParaRemover.length > 0) {
-                        obsTexto += ` [${idsParaRemover.length} duplicata(s) removida(s)]`;
-                    }
-
-                    await client.from('historico_localizacao_plaquetas').insert([{
-                        identificacao: item.plaquetaId,
-                        latitude: newLat,
-                        longitude: newLng,
-                        numero_os: item.protocolo,
-                        origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
-                        usuario: userNome,
-                        observacao: obsTexto
-                    }]);
-                } catch (hErr) { console.warn("Aviso ao gravar histórico:", hErr); }
+                // 3. Gravar no histórico de localização (Apenas no fallback se a RPC não executou)
+                if (!rpcSucesso) {
+                    try {
+                        await client.from('historico_localizacao_plaquetas').insert([{
+                            identificacao: item.plaquetaId,
+                            latitude: newLat,
+                            longitude: newLng,
+                            numero_os: item.protocolo,
+                            origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
+                            usuario: userNome,
+                            observacao: obsTexto
+                        }]);
+                    } catch (hErr) { console.warn("Aviso ao gravar histórico:", hErr); }
+                }
 
                 // 4. Atualizar estado local em memória (Remover da fila este ponto específico)
                 filaAprovacaoCache = filaAprovacaoCache.filter(i => {
@@ -3957,13 +4475,29 @@
             }
         }
 
-        window.descartarCoordenadaOS = async function(itemKey) {
+        window.descartarCoordenadaOS = async function(itemKey, pularConfirmacao = false) {
             const item = filaAprovacaoCache.find(i => i.itemKey === itemKey || i.protocolo === itemKey);
             if (!item) return;
 
-            const confirmar = confirm(`Deseja descartar a sugestão da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId} e manter a localização cadastrada atual?`);
-            if (!confirmar) return;
+            if (pularConfirmacao) {
+                await executarDescarteOS(item);
+                return;
+            }
 
+            window.showConfirmModal({
+                title: 'Descartar Sugestão da OS',
+                message: `Deseja descartar a sugestão da OS <strong>#${item.protocolo}</strong> para a Plaqueta <strong>#${item.plaquetaId}</strong> e manter a localização cadastrada atual?`,
+                icon: 'delete',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 text-white hover:bg-rose-700',
+                confirmText: 'Descartar Sugestão',
+                onConfirm: async () => {
+                    await executarDescarteOS(item);
+                }
+            });
+        };
+
+        async function executarDescarteOS(item) {
             // Grava o descarte no histórico para que este par (OS, Plaqueta) não retorne na fila em recarregamentos futuros
             const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
             if (client && item) {
@@ -3989,7 +4523,7 @@
             });
             atualizarKPIsAprovacao();
             renderizarFilaAprovacao();
-        };
+        }
 
         window.aprovarCoordenadasSelecionadasLote = async function() {
             const selecionados = filaAprovacaoCache.filter(i => i.selecionado);
@@ -4340,26 +4874,55 @@
                                 </span>
                             ` : ''}
                             ${item.temConflitoPosteMigrado ? `
-                                <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300" title="Atenção: Esta plaqueta estava no Poste #${item.outroPosteAnteriorId}">
+                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
                                     <span class="material-symbols-outlined text-[12px] text-purple-700">swap_horiz</span>
-                                    <span>Antes no Poste #${item.outroPosteAnteriorId}</span>
-                                </span>
+                                    <span>Antes no Poste #${item.outroPosteAnteriorId} (Ver)</span>
+                                </button>
                             ` : ''}
                         </div>
                     `;
                 } else if (item.posteNaoEncontrado) {
                     badgeOpPosteEl.classList.remove('hidden');
                     badgeOpPosteEl.innerHTML = `
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-300">
-                            <span class="material-symbols-outlined text-[13px] text-slate-500">location_off</span>
-                            <span>Poste não encontrado no mapa</span>
-                        </span>
+                        <div class="flex items-center gap-1 flex-wrap">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-medium bg-slate-100 text-slate-700 border border-slate-300">
+                                <span class="material-symbols-outlined text-[13px] text-slate-500">location_off</span>
+                                <span>Poste não encontrado no mapa</span>
+                            </span>
+                            ${item.temConflitoPosteMigrado ? `
+                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
+                                    <span class="material-symbols-outlined text-[12px] text-purple-700">swap_horiz</span>
+                                    <span>Antes no Poste #${item.outroPosteAnteriorId} (Ver)</span>
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                } else if (item.temConflitoPosteMigrado) {
+                    badgeOpPosteEl.classList.remove('hidden');
+                    badgeOpPosteEl.innerHTML = `
+                        <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer shadow-2xs" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
+                            <span class="material-symbols-outlined text-[13px] text-purple-700">swap_horiz</span>
+                            <span>Vinculada antes ao Poste #${item.outroPosteAnteriorId} (Ver no Mapa)</span>
+                        </button>
                     `;
                 } else {
                     badgeOpPosteEl.classList.add('hidden');
                     badgeOpPosteEl.innerHTML = '';
                 }
             }
+
+            // Limpar imediatamente marcadores e timers anteriores antes de qualquer renderização
+            if (compFitBoundsTimeout) {
+                clearTimeout(compFitBoundsTimeout);
+                compFitBoundsTimeout = null;
+            }
+            compPostesRequestId++; // Invalida qualquer busca de postes pendente de modais anteriores
+            compMarkers.forEach(m => m.remove());
+            compMarkers = [];
+            compMarkerOrig = null;
+            compMarkerOS = null;
+            limparPostesAereosMapa();
+            window.deselecionarPosteAereo();
 
             modal.classList.remove('hidden');
             setTimeout(() => {
@@ -4380,13 +4943,10 @@
                     zoom: 17
                 });
                 compMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+            } else {
+                // Se a instância já existe, reposiciona a câmera imediatamente para não piscar a coordenada do item anterior
+                compMapboxInstance.jumpTo({ center: cOrig, zoom: 17 });
             }
-
-            // Limpar marcadores anteriores
-            compMarkers.forEach(m => m.remove());
-            compMarkers = [];
-            limparPostesAereosMapa();
-            window.deselecionarPosteAereo();
 
             const duplicatas = item.instanciasDuplicadas || [];
             compDuplicatasList = duplicatas;
@@ -4562,11 +5122,12 @@
                 .addTo(compMapboxInstance);
             compMarkers.push(compMarkerOS);
 
-            setTimeout(() => {
+            compFitBoundsTimeout = setTimeout(() => {
+                if (!compMapboxInstance) return;
                 compMapboxInstance.resize();
                 compMapboxInstance.fitBounds(bounds, { padding: 90, maxZoom: 18 });
 
-                // Carregar postes aéreos num raio que engloba a coordenada da OS e o cadastro atual
+                // Carregar postes aéreos num raio que engloba a coordenada da OS, o cadastro atual e o poste anterior (se houver)
                 const coordsParaBusca = [item.coordReparoParsed];
                 if (item.coordCadastradaParsed && item.coordCadastradaParsed.lat && item.coordCadastradaParsed.lng) {
                     coordsParaBusca.push(item.coordCadastradaParsed);
@@ -4574,8 +5135,11 @@
                 if (item.instanciasDuplicadas && item.instanciasDuplicadas.length > 0) {
                     item.instanciasDuplicadas.forEach(d => coordsParaBusca.push({ lat: d.lat, lng: d.lng }));
                 }
+                if (item.outroPosteAnteriorCoords && item.outroPosteAnteriorCoords.lat && item.outroPosteAnteriorCoords.lng) {
+                    coordsParaBusca.push(item.outroPosteAnteriorCoords);
+                }
 
-                carregarPostesAereosProximos(coordsParaBusca, item);
+                carregarPostesAereosProximos(coordsParaBusca, item, compPostesRequestId);
             }, 300);
         };
 
@@ -4610,6 +5174,17 @@
             } else if (tipo === 'poste') {
                 if (compPosteSelecionado) {
                     coord = { lat: compPosteSelecionado.latitude, lng: compPosteSelecionado.longitude };
+                }
+            } else if (tipo === 'poste_anterior') {
+                if (itemEmComparacaoModal && itemEmComparacaoModal.outroPosteAnteriorCoords) {
+                    coord = itemEmComparacaoModal.outroPosteAnteriorCoords;
+                    // Se o marcador estiver no mapa, abre seu popup
+                    const pstId = itemEmComparacaoModal.outroPosteAnteriorId;
+                    const markerPst = compPostesMarkers.find(m => {
+                        const el = m.getElement && m.getElement();
+                        return el && el.querySelector && el.querySelector(`#marker-poste-${pstId}`);
+                    });
+                    if (markerPst) marker = markerPst;
                 }
             }
 
@@ -4654,7 +5229,8 @@
             compPostesMarkers = [];
         }
 
-        async function carregarPostesAereosProximos(coordsArray, itemAtual) {
+        async function carregarPostesAereosProximos(coordsArray, itemAtual, reqId = null) {
+            const currentReq = reqId !== null ? reqId : compPostesRequestId;
             const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
             if (!client || !compMapboxInstance) return;
 
@@ -4674,10 +5250,35 @@
                         .lte('latitude', pt.lat + delta)
                         .gte('longitude', pt.lng - delta)
                         .lte('longitude', pt.lng + delta)
-                        .limit(50);
+                        .limit(150);
                 });
 
+                // Se houver um poste específico que o operador selecionou no fechamento da OS,
+                // busca-o explicitamente para garantir que ele NUNCA fique de fora por causa de limit/offset
+                if (itemAtual && itemAtual.posteIdSelecionado) {
+                    promessas.push(
+                        client
+                            .from('postes_base_aerea')
+                            .select('id, latitude, longitude, id_plaqueta_vinculada')
+                            .eq('id', itemAtual.posteIdSelecionado)
+                    );
+                }
+
+                // Se houver um poste anterior vinculado à plaqueta, busca-o explicitamente também
+                if (itemAtual && itemAtual.outroPosteAnteriorId) {
+                    promessas.push(
+                        client
+                            .from('postes_base_aerea')
+                            .select('id, latitude, longitude, id_plaqueta_vinculada')
+                            .eq('id', itemAtual.outroPosteAnteriorId)
+                    );
+                }
+
                 const resultados = await Promise.all(promessas);
+
+                // Se o usuário já trocou de modal ou abriu outra plaqueta enquanto a requisição rodava, ignora!
+                if (currentReq !== compPostesRequestId || !itemEmComparacaoModal) return;
+
                 const postesMap = new Map();
 
                 resultados.forEach(res => {
@@ -4696,6 +5297,7 @@
                     const totalBracos = arrPlaquetasVinculadas.length;
 
                     const isPosteEscolhidoPeloOperador = Boolean(itemAtual && itemAtual.posteIdSelecionado && String(itemAtual.posteIdSelecionado) === String(poste.id));
+                    const isPosteAnteriorDaPlaqueta = Boolean(itemAtual && itemAtual.outroPosteAnteriorId && String(itemAtual.outroPosteAnteriorId) === String(poste.id));
 
                     let isPosteDaPropriaPlaqueta = false;
                     let isPosteDeOutraPlaqueta = false;
@@ -4724,6 +5326,11 @@
                         elPoste.className = 'w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-2xl flex items-center justify-center text-white text-[12px] font-bold ring-4 ring-emerald-300 animate-pulse cursor-pointer z-40';
                         elPoste.title = `🎯 Poste #${poste.id} [ESCOLHIDO PELO OPERADOR NO MAPA DA OS]`;
                         elPoste.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span>';
+                    } else if (isPosteAnteriorDaPlaqueta) {
+                        // Estado Especial: Poste anterior onde a plaqueta estava associada no banco
+                        elPoste.className = 'w-7 h-7 rounded-full bg-purple-900 hover:bg-purple-950 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-purple-400 cursor-pointer z-30';
+                        elPoste.title = `🔄 Poste Anterior #${poste.id} (Onde a Plaqueta #${itemAtual.plaquetaId} estava associada)`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[15px]">swap_horiz</span>';
                     } else if (isPosteDaPropriaPlaqueta) {
                         // Estado 1: Poste que já pertence à própria plaqueta em revisão
                         elPoste.className = 'w-7 h-7 rounded-full bg-indigo-700 hover:bg-indigo-800 border-2 border-white shadow-xl flex items-center justify-center text-white text-[11px] font-bold ring-4 ring-indigo-300 cursor-pointer z-30';
@@ -4759,6 +5366,16 @@
                             <div class="bg-emerald-50 border border-emerald-300 text-emerald-900 px-2 py-1 rounded text-[10.5px] font-bold flex items-center gap-1.5 shadow-2xs">
                                 <span class="material-symbols-outlined text-[14px] text-emerald-600">verified</span>
                                 <span>🎯 Selecionado pelo Operador em Campo</span>
+                            </div>
+                        `;
+                    } else if (isPosteAnteriorDaPlaqueta) {
+                        corTitulo = 'text-purple-900';
+                        corBtn = 'bg-purple-800 hover:bg-purple-900';
+                        labelBtn = 'Manter Neste Poste';
+                        badgeStatusHtml = `
+                            <div class="bg-purple-50 border border-purple-300 text-purple-950 px-2 py-1 rounded text-[10.5px] font-bold flex items-center gap-1.5 shadow-2xs">
+                                <span class="material-symbols-outlined text-[14px] text-purple-700">swap_horiz</span>
+                                <span>🔄 Poste Anterior da Plaqueta #${itemAtual.plaquetaId}</span>
                             </div>
                         `;
                     } else if (isPosteDaPropriaPlaqueta) {
@@ -4993,11 +5610,24 @@
 
             modalBox.classList.remove('scale-100', 'opacity-100');
             modalBox.classList.add('scale-95', 'opacity-0');
+            // Cancela requisições e timers pendentes
+            if (compFitBoundsTimeout) {
+                clearTimeout(compFitBoundsTimeout);
+                compFitBoundsTimeout = null;
+            }
+            compPostesRequestId++;
+
             setTimeout(() => {
                 modal.classList.add('hidden');
                 itemEmComparacaoModal = null;
                 window.deselecionarPosteAereo();
                 limparPostesAereosMapa();
+                compMarkers.forEach(m => m.remove());
+                compMarkers = [];
+                compMarkerOrig = null;
+                compMarkerOS = null;
+                compDuplicatasList = [];
+                compInstanciaSelecionadaId = null;
             }, 200);
         };
 
@@ -5143,26 +5773,33 @@
             }
         };
 
-        window.confirmarDescarteModalComparativo = async function() {
+        window.confirmarDescarteModalComparativo = function() {
             if (!itemEmComparacaoModal) return;
             const item = itemEmComparacaoModal;
 
-            const confirmar = confirm(`Deseja descartar a sugestão da OS #${item.protocolo} para a Plaqueta #${item.plaquetaId} e manter a localização cadastrada atual?`);
-            if (!confirmar) return;
+            window.showConfirmModal({
+                title: 'Descartar Sugestão da OS',
+                message: `Deseja descartar a sugestão da OS <strong>#${item.protocolo}</strong> para a Plaqueta <strong>#${item.plaquetaId}</strong> e manter a localização cadastrada atual?`,
+                icon: 'delete',
+                iconBgClass: 'bg-rose-100 text-rose-700',
+                confirmBtnClass: 'bg-rose-600 text-white hover:bg-rose-700',
+                confirmText: 'Descartar Sugestão',
+                onConfirm: async () => {
+                    const btn = document.getElementById('btn-descartar-modal-comp');
+                    if (btn) btn.disabled = true;
 
-            const btn = document.getElementById('btn-descartar-modal-comp');
-            if (btn) btn.disabled = true;
-
-            try {
-                const targetKey = item.itemKey || item.protocolo;
-                await window.descartarCoordenadaOS(targetKey);
-                window.fecharModalComparativoCoords();
-            } catch (err) {
-                console.error("❌ Erro ao descartar do modal:", err);
-                alert("Erro ao descartar: " + (err.message || err));
-            } finally {
-                if (btn) btn.disabled = false;
-            }
+                    try {
+                        const targetKey = item.itemKey || item.protocolo;
+                        await window.descartarCoordenadaOS(targetKey, true);
+                        window.fecharModalComparativoCoords();
+                    } catch (err) {
+                        console.error("❌ Erro ao descartar do modal:", err);
+                        alert("Erro ao descartar: " + (err.message || err));
+                    } finally {
+                        if (btn) btn.disabled = false;
+                    }
+                }
+            });
         };
 
         // =========================================================================
@@ -5701,7 +6338,8 @@
                 'EDICAO_FORMULARIO': { label: 'Edição Formulário', bg: 'bg-sky-50 text-sky-700 border-sky-200', icon: 'edit_note' },
                 'CADASTRO_NOVA_PLAQUETA': { label: 'Nova Plaqueta', bg: 'bg-teal-50 text-teal-700 border-teal-200', icon: 'add_circle' },
                 'DESCARTE_OS': { label: 'Descarte de OS', bg: 'bg-rose-50 text-rose-700 border-rose-200', icon: 'cancel' },
-                'FINALIZAR_OS': { label: 'Finalização de OS', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'task_alt' }
+                'FINALIZAR_OS': { label: 'Finalização de OS', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'task_alt' },
+                'EDICAO_DIRETA_BANCO': { label: 'Intervenção Direta', bg: 'bg-orange-50 text-orange-700 border-orange-200', icon: 'terminal' }
             };
 
             const frag = document.createDocumentFragment();
@@ -5800,6 +6438,216 @@
             });
 
             tbody.appendChild(frag);
+
+            // Sincronizar o mapa geral da aba de histórico se estiver aberto
+            if (histMapaAberto) {
+                window.desenharMapaGeralHistorico();
+            }
+        };
+
+        // =========================================================================
+        // CONTROLADOR DO MAPA GERAL DA ABA DE HISTÓRICO
+        // =========================================================================
+        let histMapaAberto = false;
+        let histMapboxInstance = null;
+        let histMapboxMarkers = [];
+
+        window.alternarVisualizacaoMapaHistorico = function() {
+            histMapaAberto = !histMapaAberto;
+            const container = document.getElementById('hist-mapa-container');
+            const btnTexto = document.getElementById('btn-toggle-mapa-hist-texto');
+            const btn = document.getElementById('btn-toggle-mapa-historico');
+
+            if (histMapaAberto) {
+                if (container) container.classList.remove('hidden');
+                if (btnTexto) btnTexto.innerText = "Ocultar Mapa de Movimentações";
+                if (btn) btn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer bg-purple-600 text-white shadow-xs active:scale-95";
+                setTimeout(() => {
+                    window.desenharMapaGeralHistorico();
+                }, 150);
+            } else {
+                if (container) container.classList.add('hidden');
+                if (btnTexto) btnTexto.innerText = "Abrir Mapa de Movimentações";
+                if (btn) btn.className = "flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 active:scale-95 shadow-2xs";
+            }
+        };
+
+        window.desenharMapaGeralHistorico = function() {
+            const canvasEl = document.getElementById('hist-mapa-canvas');
+            const badgeContagem = document.getElementById('hist-mapa-contagem-badge');
+            const tituloStatus = document.getElementById('hist-mapa-status-titulo');
+            if (!canvasEl) return;
+
+            // Filtrar itens da página atual que possuem coordenadas
+            const itensComCoordenadas = (histCache || []).filter(item => {
+                const lat = parseFloat(item.latitude);
+                const lng = parseFloat(item.longitude);
+                return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0;
+            });
+
+            if (badgeContagem) {
+                badgeContagem.innerText = `${itensComCoordenadas.length} movimentações no mapa`;
+            }
+            if (tituloStatus && histFiltroPlaqueta) {
+                tituloStatus.innerText = `Trajetória e Movimentações da Plaqueta #${histFiltroPlaqueta.toUpperCase()}`;
+            } else if (tituloStatus) {
+                tituloStatus.innerText = `Trajetória e Movimentações das Plaquetas (Página Atual)`;
+            }
+
+            const pCentro = itensComCoordenadas.length > 0
+                ? [parseFloat(itensComCoordenadas[0].longitude), parseFloat(itensComCoordenadas[0].latitude)]
+                : [-48.17188, -21.75478];
+
+            if (!histMapboxInstance) {
+                mapboxgl.accessToken = MAPBOX_TOKEN;
+                histMapboxInstance = new mapboxgl.Map({
+                    container: 'hist-mapa-canvas',
+                    style: 'mapbox://styles/mapbox/streets-v12',
+                    center: pCentro,
+                    zoom: 15
+                });
+                histMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
+            } else {
+                histMapboxInstance.resize();
+            }
+
+            // Limpar marcadores anteriores
+            histMapboxMarkers.forEach(m => m.remove());
+            histMapboxMarkers = [];
+
+            if (itensComCoordenadas.length === 0) return;
+
+            const bounds = new mapboxgl.LngLatBounds();
+            const linhasGeoJSON = {
+                type: 'FeatureCollection',
+                features: []
+            };
+
+            // Agrupar por plaqueta para desenhar as linhas de trajetória de onde estava para onde foi
+            const gruposPlaqueta = {};
+            itensComCoordenadas.forEach(item => {
+                const plq = String(item.identificacao || '').replace(/^#/, '').trim().toUpperCase();
+                if (!gruposPlaqueta[plq]) gruposPlaqueta[plq] = [];
+                gruposPlaqueta[plq].push(item);
+            });
+
+            // Para cada plaqueta, traçar as conexões de deslocamento
+            Object.keys(gruposPlaqueta).forEach(plq => {
+                const lista = gruposPlaqueta[plq];
+                // Ordenar por created_at crescente para seguir a ordem cronológica
+                lista.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+                for (let i = 0; i < lista.length; i++) {
+                    const item = lista[i];
+                    const lat = parseFloat(item.latitude);
+                    const lng = parseFloat(item.longitude);
+                    const coords = [lng, lat];
+                    bounds.extend(coords);
+
+                    // Se temos um ponto de referência anterior gravado ou na lista
+                    let coordsAnterior = null;
+                    if (item.compCoord && item.compCoord.lat && item.compCoord.lng) {
+                        coordsAnterior = [item.compCoord.lng, item.compCoord.lat];
+                    } else if (i > 0) {
+                        coordsAnterior = [parseFloat(lista[i - 1].longitude), parseFloat(lista[i - 1].latitude)];
+                    }
+
+                    if (coordsAnterior && (Math.abs(coordsAnterior[0] - coords[0]) > 0.00001 || Math.abs(coordsAnterior[1] - coords[1]) > 0.00001)) {
+                        bounds.extend(coordsAnterior);
+                        linhasGeoJSON.features.push({
+                            type: 'Feature',
+                            properties: { plaqueta: plq },
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: [coordsAnterior, coords]
+                            }
+                        });
+
+                        // Marcador do ponto anterior
+                        const elAnt = document.createElement('div');
+                        elAnt.className = 'w-3 h-3 rounded-full bg-blue-500 ring-2 ring-white shadow-xs cursor-pointer';
+                        const popupAnt = new mapboxgl.Popup({ offset: 10 }).setHTML(`
+                            <div class="p-1.5 text-xs">
+                                <strong class="text-blue-900 block">Posição Anterior #${plq}</strong>
+                                <span class="text-slate-500">${item.compCoord?.label || 'Ponto de partida'}</span>
+                            </div>
+                        `);
+                        const markerAnt = new mapboxgl.Marker({ element: elAnt })
+                            .setLngLat(coordsAnterior)
+                            .setPopup(popupAnt)
+                            .addTo(histMapboxInstance);
+                        histMapboxMarkers.push(markerAnt);
+                    }
+
+                    // Marcador da nova posição
+                    const elAtual = document.createElement('div');
+                    elAtual.className = 'flex items-center justify-center cursor-pointer group transition-transform duration-200 hover:scale-125';
+                    elAtual.innerHTML = `
+                        <div class="px-2 py-0.5 rounded-full bg-purple-700 text-white font-bold text-[10px] ring-2 ring-white shadow-md flex items-center gap-0.5">
+                            <span>#${plq}</span>
+                        </div>
+                    `;
+
+                    const distFmt = item.distanciaMetros ? `${item.distanciaMetros.toFixed(1)}m` : '---';
+                    const popupAtual = new mapboxgl.Popup({ offset: 15 }).setHTML(`
+                        <div class="p-2 text-xs text-slate-800 space-y-1">
+                            <div class="font-bold text-slate-900 border-b pb-1 flex items-center justify-between gap-2">
+                                <span>Plaqueta #${plq}</span>
+                                <span class="text-[10px] text-purple-700 font-semibold">${item.origem || 'Movimentação'}</span>
+                            </div>
+                            ${item.numero_os ? `<div class="font-mono text-blue-700 font-bold">OS #${item.numero_os}</div>` : ''}
+                            <div class="text-[11px] text-slate-600">Responsável: <strong>${item.usuario || 'Sistema'}</strong></div>
+                            <div class="text-[11px] text-slate-600">Deslocamento: <strong class="text-purple-700">${distFmt}</strong></div>
+                            ${item.observacao ? `<div class="text-[10px] text-slate-500 italic mt-0.5">${item.observacao}</div>` : ''}
+                            <button type="button" onclick="window.abrirModalHistoricoPlaqueta('${plq}')" class="mt-1 w-full text-center py-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[10.5px] border border-purple-200 cursor-pointer">
+                                Ver Trajetória Completa
+                            </button>
+                        </div>
+                    `);
+
+                    const markerAtual = new mapboxgl.Marker({ element: elAtual })
+                        .setLngLat(coords)
+                        .setPopup(popupAtual)
+                        .addTo(histMapboxInstance);
+                    histMapboxMarkers.push(markerAtual);
+                }
+            });
+
+            // Adicionar ou atualizar camada de linhas
+            const sourceId = 'hist-geral-linhas-source';
+            const layerId = 'hist-geral-linhas-layer';
+
+            const desenharLinhas = () => {
+                if (histMapboxInstance.getSource(sourceId)) {
+                    histMapboxInstance.getSource(sourceId).setData(linhasGeoJSON);
+                } else {
+                    histMapboxInstance.addSource(sourceId, {
+                        type: 'geojson',
+                        data: linhasGeoJSON
+                    });
+                    histMapboxInstance.addLayer({
+                        id: layerId,
+                        type: 'line',
+                        source: sourceId,
+                        layout: { 'line-join': 'round', 'line-cap': 'round' },
+                        paint: {
+                            'line-color': '#9333ea',
+                            'line-width': 3,
+                            'line-dasharray': [2, 1]
+                        }
+                    });
+                }
+            };
+
+            if (histMapboxInstance.isStyleLoaded()) {
+                desenharLinhas();
+            } else {
+                histMapboxInstance.once('load', desenharLinhas);
+            }
+
+            if (itensComCoordenadas.length > 1) {
+                histMapboxInstance.fitBounds(bounds, { padding: 50, maxZoom: 17 });
+            }
         };
 
         // Modal Comparativo Mapbox acionado pelo clique na Distância do Histórico

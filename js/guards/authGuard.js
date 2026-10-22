@@ -108,6 +108,34 @@ window.AuthGuard = {
     },
 
     /**
+     * Retorna a identificação textual do usuário autenticado no momento (Nome ou Email).
+     * @returns {string} Nome ou e-mail do usuário autenticado, ou fallback 'Administrador'
+     */
+    getUsuarioAtual() {
+        if (this._cachedAuthData) {
+            const profile = this._cachedAuthData.profile;
+            const user = this._cachedAuthData.user;
+            if (profile && profile.nome && profile.nome.trim()) return profile.nome.trim();
+            if (user?.user_metadata?.full_name && user.user_metadata.full_name.trim()) return user.user_metadata.full_name.trim();
+            if (user?.user_metadata?.name && user.user_metadata.name.trim()) return user.user_metadata.name.trim();
+            if (profile && profile.email && profile.email.trim()) return profile.email.trim();
+            if (user?.email && user.email.trim()) return user.email.trim();
+        }
+
+        if (window.currentUserName && String(window.currentUserName).trim()) {
+            return String(window.currentUserName).trim();
+        }
+
+        const localNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome');
+        if (localNome && localNome.trim()) return localNome.trim();
+
+        const localEmail = localStorage.getItem('user_email') || localStorage.getItem('supabase_user_email');
+        if (localEmail && localEmail.trim()) return localEmail.trim();
+
+        return 'Administrador';
+    },
+
+    /**
      * Retorna a URL de redirecionamento apropriada com base na categoria / role do usuário
      * @param {Object} authData Objeto com dados do usuário e perfil ({ user, profile })
      * @returns {string} Nome do arquivo de destino ('Painel.html', 'Finalizar.html', 'Painel-Manutentor.html', 'Abrir.html')
@@ -255,6 +283,16 @@ window.AuthGuard = {
         }
 
         this._cachedAuthData = authData;
+        if (authData) {
+            const resolvedNome = authData.profile?.nome || authData.user?.user_metadata?.full_name || authData.user?.user_metadata?.name || '';
+            const resolvedEmail = authData.profile?.email || authData.user?.email || '';
+            if (resolvedNome) {
+                try { localStorage.setItem('usuario_nome', resolvedNome); } catch(e) {}
+            }
+            if (resolvedEmail) {
+                try { localStorage.setItem('user_email', resolvedEmail); } catch(e) {}
+            }
+        }
         try { window.dispatchEvent(new CustomEvent('auth-ready', { detail: authData })); } catch(e) {}
 
         const currentPageName = this.getCurrentPageName(targetUrl);

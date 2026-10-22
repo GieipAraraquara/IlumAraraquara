@@ -716,6 +716,7 @@
 
                     <div id="mapaCanvasPraca" class="w-full h-44 rounded-xl border border-slate-200 relative overflow-hidden bg-slate-100 z-0"></div>
                     <div id="coordsTextPraca" class="text-xs text-center font-medium text-slate-500">Obtendo coordenadas GPS...</div>
+                    <div id="gpsAvisoPraca" class="hidden text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1"></div>
                 </div>
 
                 <!-- MATERIAIS PRAÇA -->
@@ -1023,6 +1024,7 @@
       var mapPraca = null;
       var markerPraca = null;
       var coordsGpsPracaAtual = null;
+      var precisaoGpsPracaAtual = null;
 
       var NOMES_DIRETOS_ADMITIDOS = ["IGOR", "FERNANDO", "CARLOS", "ANA", "ERNESTO", "VALTER"];
 
@@ -1072,6 +1074,7 @@
           fotosAndamentoPracaBase64Arr: fotosAndamentoPracaBase64Arr,
           qtdEletricistaPraca: document.getElementById('qtdEletricistaPraca')?.value || 1,
           coordsGpsPracaAtual: coordsGpsPracaAtual,
+          precisaoGpsPracaAtual: precisaoGpsPracaAtual,
           carrinhoMateriaisPraca: carrinhoMateriaisPraca
         };
 
@@ -1140,6 +1143,9 @@
                 }
                 if (pData.lat || pData.lng) {
                   atualizarMapaPonto(idx);
+                  if (pData.precisaoGps) {
+                    renderizarStatusPrecisaoGpsPonto(idx, pData.precisaoGps, false);
+                  }
                 }
 
                 if (pData.posteSelecionado) {
@@ -1230,6 +1236,9 @@
             }
             if (draft.coordsGpsPracaAtual) {
               coordsGpsPracaAtual = draft.coordsGpsPracaAtual;
+              if (draft.precisaoGpsPracaAtual) {
+                precisaoGpsPracaAtual = draft.precisaoGpsPracaAtual;
+              }
               iniciarGpsPracaComMapa();
             }
             if (draft.carrinhoMateriaisPraca && Array.isArray(draft.carrinhoMateriaisPraca)) {
@@ -1453,6 +1462,9 @@
         }
         if (pData.lat || pData.lng) {
           atualizarMapaPonto(idx);
+          if (pData.precisaoGps) {
+            renderizarStatusPrecisaoGpsPonto(idx, pData.precisaoGps, false);
+          }
         }
 
         // Restaura status visual da seleção de poste
@@ -1521,17 +1533,20 @@
         html += '    </div>';
         html += '  </div>';
 
-        // COORDENADAS GPS E BOTÃO DE CAPTURA DO PONTO COM MAPBOX E POSTES AÉREOS
         html += '  <div class="space-y-1.5 border-t border-slate-100 pt-3">';
-        html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) <span class="text-red-500 font-bold">*</span></label>';
+        html += '    <div class="flex items-center justify-between">';
+        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) <span class="text-red-500 font-bold">*</span></label>';
+        html += '      <span id="gpsBadgePonto_' + idx + '" class="hidden text-[11px] font-bold px-2 py-0.5 rounded-full"></span>';
+        html += '    </div>';
         html += '    <div class="flex flex-col sm:flex-row gap-2 items-center">';
         html += '      <input type="text" id="lat_' + idx + '" placeholder="Lat: -21.7..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
         html += '      <input type="text" id="lng_' + idx + '" placeholder="Lng: -48.1..." oninput="mascaraCoord(this); atualizarMapaPonto(' + idx + ')" class="w-full sm:flex-1 bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-600 outline-none" />';
-        html += '      <button type="button" onclick="capturarLocalizacaoGPS(' + idx + ')" class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">';
+        html += '      <button type="button" id="btnGpsPonto_' + idx + '" onclick="capturarLocalizacaoGPS(' + idx + ')" class="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1.5 shadow-sm active:scale-95 cursor-pointer">';
         html += '        <span class="material-symbols-outlined text-[16px]">my_location</span>';
         html += '        <span>Puxar GPS</span>';
         html += '      </button>';
         html += '    </div>';
+        html += '    <div id="gpsAvisoPonto_' + idx + '" class="hidden text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1"></div>';
         
         // CONTAINER DO MAPA MAPBOX + SELEÇÃO DO POSTE
         html += '    <div id="mapaWrapperPonto_' + idx + '" class="hidden mt-3 space-y-2">';
@@ -1889,40 +1904,117 @@
         }
       }
 
+      function renderizarStatusPrecisaoGpsPonto(idx, accuracy, erro) {
+        var badge = document.getElementById('gpsBadgePonto_' + idx);
+        var aviso = document.getElementById('gpsAvisoPonto_' + idx);
+        if (!badge || !aviso) return;
+
+        if (erro) {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-800 border border-red-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">❌ Sem sinal GPS</span>';
+          badge.classList.remove('hidden');
+
+          aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-red-50 text-red-700 border border-red-200';
+          aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-red-600">error</span><span>Não foi possível obter o sinal GPS. Verifique a permissão e o GPS do celular.</span>';
+          aviso.classList.remove('hidden');
+          return;
+        }
+
+        if (typeof accuracy !== 'number') {
+          badge.classList.add('hidden');
+          aviso.classList.add('hidden');
+          return;
+        }
+
+        badge.classList.remove('hidden');
+        var acc = Math.round(accuracy);
+
+        if (acc <= 20) {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">🎯 Alta precisão (±' + acc + 'm)</span>';
+          aviso.classList.add('hidden');
+        } else if (acc <= 50) {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 border border-blue-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">📡 Sinal bom (±' + acc + 'm)</span>';
+          aviso.classList.add('hidden');
+        } else if (acc <= 100) {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">⚠️ Precisão moderada (±' + acc + 'm)</span>';
+          aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-amber-50 text-amber-800 border border-amber-200';
+          aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-amber-600">warning</span><span>A precisão do GPS está em ±' + acc + 'm. Se estiver sob árvores ou prédios, tente aproximar-se do poste.</span>';
+          aviso.classList.remove('hidden');
+        } else {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">⚠️ Sinal fraco (±' + acc + 'm)</span>';
+          aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-rose-50 text-rose-800 border border-rose-200';
+          aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-rose-600">location_searching</span><span>Sinal GPS com baixa precisão (±' + acc + 'm). Recomenda-se clicar em "Puxar GPS" novamente em local aberto.</span>';
+          aviso.classList.remove('hidden');
+        }
+      }
+
       function capturarLocalizacaoGPS(idx) {
         var latInput = document.getElementById('lat_' + idx);
         var lngInput = document.getElementById('lng_' + idx);
+        var btnGps = document.getElementById('btnGpsPonto_' + idx);
         var msg = document.getElementById('mensagem');
         if (msg) msg.innerHTML = "";
 
         if (!navigator.geolocation) {
           if (msg) msg.innerHTML = '<span class="text-red-600 font-bold">GPS indisponível neste dispositivo.</span>';
+          renderizarStatusPrecisaoGpsPonto(idx, null, true);
           return;
         }
 
         if (latInput) latInput.value = "Buscando...";
         if (lngInput) lngInput.value = "Buscando...";
+        if (btnGps) {
+          btnGps.disabled = true;
+          btnGps.classList.add('opacity-70', 'cursor-not-allowed');
+          btnGps.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">refresh</span><span>Buscando...</span>';
+        }
+
+        var badge = document.getElementById('gpsBadgePonto_' + idx);
+        if (badge) {
+          badge.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200';
+          badge.innerHTML = '<span class="inline-flex items-center gap-1">📡 Localizando satélites...</span>';
+          badge.classList.remove('hidden');
+        }
 
         navigator.geolocation.getCurrentPosition(
           function(pos) {
+            if (btnGps) {
+              btnGps.disabled = false;
+              btnGps.classList.remove('opacity-70', 'cursor-not-allowed');
+              btnGps.innerHTML = '<span class="material-symbols-outlined text-[16px]">my_location</span><span>Puxar GPS</span>';
+            }
+
             var latNum = parseFloat(pos.coords.latitude.toFixed(6));
             var lngNum = parseFloat(pos.coords.longitude.toFixed(6));
+            var acc = Math.round(pos.coords.accuracy || 0);
 
             if (!pontosData[idx]) inicializarStatePonto(idx);
             pontosData[idx].latGps = latNum;
             pontosData[idx].lngGps = lngNum;
+            pontosData[idx].precisaoGps = acc;
 
             if (latInput) latInput.value = latNum.toFixed(6);
             if (lngInput) lngInput.value = lngNum.toFixed(6);
 
+            renderizarStatusPrecisaoGpsPonto(idx, acc, false);
             atualizarMapaPonto(idx, true);
           }, 
           function(err) {
+            if (btnGps) {
+              btnGps.disabled = false;
+              btnGps.classList.remove('opacity-70', 'cursor-not-allowed');
+              btnGps.innerHTML = '<span class="material-symbols-outlined text-[16px]">my_location</span><span>Puxar GPS</span>';
+            }
             if (latInput) latInput.value = "";
             if (lngInput) lngInput.value = "";
+            renderizarStatusPrecisaoGpsPonto(idx, null, true);
             if (msg) msg.innerHTML = '<span class="text-red-600 font-bold">Falha ao buscar GPS do Ponto ' + (idx + 1) + '. Certifique-se de que a localização está habilitada no celular.</span>';
           }, 
-          { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 14000, maximumAge: 0 }
         );
       }
 
@@ -1942,92 +2034,131 @@
         atualizarMapaPonto(targetIdx);
       }
 
-      // Processador de imagem leve e robusto via HTML5 Canvas (evita OOM ao voltar da câmera)
-      function otimizarEComprimirFoto(file, maxDim, quality) {
-        maxDim = maxDim || 1200;
-        quality = quality || 0.75;
+      // Converte File/Blob para Base64 bruto de forma infalível (fallback garantido)
+      function converterFileParaBase64(file) {
         return new Promise(function(resolve) {
           if (!file) return resolve(null);
-          var blobUrl = null;
+          var reader = new FileReader();
+          reader.onload = function(e) { resolve(e.target.result); };
+          reader.onerror = function() { resolve(null); };
+          reader.readAsDataURL(file);
+        });
+      }
+
+      // Processador de imagem de alta performance e à prova de travamentos / OOM
+      // Usa createImageBitmap com redimensionamento nativo assíncrono (suportado em Chrome/Android/iOS modernos)
+      // e fallback inteligente com HTML5 Canvas + FileReader infalível.
+      async function otimizarEComprimirFoto(file, maxDim, quality) {
+        if (!file) return null;
+        maxDim = maxDim || 1200;
+        quality = quality || 0.75;
+
+        // Estratégia 1: createImageBitmap nativo (mais rápido, sem decodificar mega-imagem na memória principal)
+        if (typeof window.createImageBitmap === 'function') {
           try {
-            blobUrl = URL.createObjectURL(file);
-          } catch(e) {
-            blobUrl = null;
-          }
+            var bmp = await createImageBitmap(file);
+            var w = bmp.width;
+            var h = bmp.height;
 
-          var finalizou = false;
-          function concluir(resultado) {
-            if (finalizou) return;
-            finalizou = true;
-            if (blobUrl) {
-              try { URL.revokeObjectURL(blobUrl); } catch(errRevoke) {}
-            }
-            resolve(resultado);
-          }
-
-          // Timeout de segurança: se o canvas demorar mais de 2.5s para carregar/decodificar, usa FileReader
-          var timerSeguranca = setTimeout(function() {
-            if (finalizou) return;
-            console.warn('⚠️ [Compressão] Timeout de processamento via Canvas excedido, acionando fallback.');
-            var readerFallback = new FileReader();
-            readerFallback.onload = function(fe) { concluir(fe.target.result); };
-            readerFallback.onerror = function() { concluir(null); };
-            readerFallback.readAsDataURL(file);
-          }, 2500);
-
-          if (!blobUrl) {
-            clearTimeout(timerSeguranca);
-            var reader = new FileReader();
-            reader.onload = function(re) { concluir(re.target.result); };
-            reader.onerror = function() { concluir(null); };
-            reader.readAsDataURL(file);
-            return;
-          }
-
-          var img = new Image();
-          img.onload = function() {
-            clearTimeout(timerSeguranca);
-            try {
-              var w = img.naturalWidth || img.width;
-              var h = img.naturalHeight || img.height;
-              if (!w || !h) throw new Error('Dimensões inválidas da imagem');
-
-              if (w > maxDim || h > maxDim) {
-                if (w > h) {
-                  h = Math.round((h * maxDim) / w);
-                  w = maxDim;
-                } else {
-                  w = Math.round((w * maxDim) / h);
-                  h = maxDim;
-                }
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
               }
-              var canvas = document.createElement('canvas');
-              canvas.width = w;
-              canvas.height = h;
-              var ctx = canvas.getContext('2d');
+            }
+
+            var canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            var ctx = canvas.getContext('2d', { alpha: false });
+            if (ctx) {
               ctx.imageSmoothingEnabled = true;
               ctx.imageSmoothingQuality = 'medium';
-              ctx.drawImage(img, 0, 0, w, h);
-              var compressedB64 = canvas.toDataURL('image/jpeg', quality);
-              concluir(compressedB64);
-            } catch(e) {
-              console.warn('⚠️ Falha ao comprimir imagem via canvas, usando fallback:', e);
-              var reader = new FileReader();
-              reader.onload = function(re) { concluir(re.target.result); };
-              reader.onerror = function() { concluir(null); };
-              reader.readAsDataURL(file);
+              ctx.drawImage(bmp, 0, 0, w, h);
+              if (typeof bmp.close === 'function') {
+                try { bmp.close(); } catch(eClose) {}
+              }
+              var b64 = canvas.toDataURL('image/jpeg', quality);
+              if (b64 && b64.length > 100) {
+                return b64;
+              }
             }
-          };
-          img.onerror = function() {
-            clearTimeout(timerSeguranca);
-            console.warn('⚠️ Erro no carregamento da imagem via blob, tentando FileReader direto.');
-            var reader = new FileReader();
-            reader.onload = function(re) { concluir(re.target.result); };
-            reader.onerror = function() { concluir(null); };
-            reader.readAsDataURL(file);
-          };
-          img.src = blobUrl;
-        });
+            if (typeof bmp.close === 'function') {
+              try { bmp.close(); } catch(eClose) {}
+            }
+          } catch (errBmp) {
+            console.warn('⚠️ [Fotos] Falha no createImageBitmap, tentando método Canvas tradicional:', errBmp);
+          }
+        }
+
+        // Estratégia 2: Carregamento via Image() + HTML5 Canvas
+        try {
+          var resCanvas = await new Promise(function(resolve) {
+            var blobUrl = null;
+            try { blobUrl = URL.createObjectURL(file); } catch(e) {}
+            if (!blobUrl) return resolve(null);
+
+            var timerTimeout = setTimeout(function() {
+              try { URL.revokeObjectURL(blobUrl); } catch(e) {}
+              resolve(null);
+            }, 6000); // 6s de margem para celulares mais lentos
+
+            var img = new Image();
+            img.onload = function() {
+              clearTimeout(timerTimeout);
+              try {
+                var w = img.naturalWidth || img.width;
+                var h = img.naturalHeight || img.height;
+                if (!w || !h) {
+                  try { URL.revokeObjectURL(blobUrl); } catch(e) {}
+                  return resolve(null);
+                }
+
+                if (w > maxDim || h > maxDim) {
+                  if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                  } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                  }
+                }
+
+                var canvas = document.createElement('canvas');
+                canvas.width = w;
+                canvas.height = h;
+                var ctx = canvas.getContext('2d', { alpha: false });
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'medium';
+                ctx.drawImage(img, 0, 0, w, h);
+                var compressedB64 = canvas.toDataURL('image/jpeg', quality);
+                try { URL.revokeObjectURL(blobUrl); } catch(e) {}
+                resolve(compressedB64 && compressedB64.length > 100 ? compressedB64 : null);
+              } catch(e) {
+                try { URL.revokeObjectURL(blobUrl); } catch(errRev) {}
+                resolve(null);
+              }
+            };
+            img.onerror = function() {
+              clearTimeout(timerTimeout);
+              try { URL.revokeObjectURL(blobUrl); } catch(e) {}
+              resolve(null);
+            };
+            img.src = blobUrl;
+          });
+
+          if (resCanvas) return resCanvas;
+        } catch(errImg) {
+          console.warn('⚠️ [Fotos] Falha no redimensionamento via Image:', errImg);
+        }
+
+        // Estratégia 3 (Infalível): Converte o arquivo original diretamente para Base64
+        // Garante que a foto NUNCA seja perdida ou descartada mesmo em cenários extremos
+        console.warn('⚠️ [Fotos] Acionando conversão direta para Base64 sem perda de dados.');
+        return await converterFileParaBase64(file);
       }
 
       async function processarFotoEstagio(pontoIdx, estagio, event) {
@@ -2046,7 +2177,7 @@
         var imgEl = document.getElementById(idImg);
         var boxEl = document.getElementById(idBox);
 
-        // Preview imediato e econômico usando ObjectURL
+        // Preview imediato e responsivo usando ObjectURL
         var tempUrl = null;
         try { tempUrl = URL.createObjectURL(file); } catch(e) {}
         if (tempUrl && containerEl && imgEl) {
@@ -2058,20 +2189,44 @@
           boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
         }
 
-        // Comprime diretamente da memória e persiste de imediato no rascunho
-        var b64Comprimido = await otimizarEComprimirFoto(file, 1200, 0.75);
-        if (tempUrl) {
-          try { URL.revokeObjectURL(tempUrl); } catch(e) {}
-        }
+        try {
+          // Comprime com motor inteligente à prova de falhas
+          var b64Comprimido = await otimizarEComprimirFoto(file, 1200, 0.75);
 
-        if (b64Comprimido) {
           if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
-          pontosData[pontoIdx].fotosEstagios[estagio] = b64Comprimido;
-          if (imgEl) imgEl.src = b64Comprimido;
-          if (containerEl) containerEl.classList.remove('hidden');
-          await salvarRascunhoFinalizar();
-        } else {
-          console.error('⚠️ [Fotos] Falha total ao capturar foto do estágio:', estagio);
+
+          if (b64Comprimido) {
+            pontosData[pontoIdx].fotosEstagios[estagio] = b64Comprimido;
+            if (imgEl) imgEl.src = b64Comprimido;
+            if (containerEl) containerEl.classList.remove('hidden');
+            await salvarRascunhoFinalizar();
+          } else if (tempUrl) {
+            // Em caso de qualquer anomalia, garante persistência do arquivo lido
+            var fallbackB64 = await converterFileParaBase64(file);
+            if (fallbackB64) {
+              pontosData[pontoIdx].fotosEstagios[estagio] = fallbackB64;
+              if (imgEl) imgEl.src = fallbackB64;
+              if (containerEl) containerEl.classList.remove('hidden');
+              await salvarRascunhoFinalizar();
+            }
+          }
+        } catch(errProc) {
+          console.error('⚠️ [Fotos] Erro no processamento da foto:', errProc);
+          var emergB64 = await converterFileParaBase64(file);
+          if (emergB64) {
+            if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
+            pontosData[pontoIdx].fotosEstagios[estagio] = emergB64;
+            if (imgEl) imgEl.src = emergB64;
+            if (containerEl) containerEl.classList.remove('hidden');
+            await salvarRascunhoFinalizar();
+          }
+        } finally {
+          // Apenas revoga a ObjectURL temporária DEPOIS de ter garantido o src em base64 persistido
+          if (tempUrl) {
+            setTimeout(function() {
+              try { URL.revokeObjectURL(tempUrl); } catch(eRev) {}
+            }, 1000);
+          }
         }
       }
 
@@ -2887,6 +3042,7 @@
               poste_nao_encontrado: Boolean(stObj.posteNaoEncontrado),
               conflito_plaqueta_poste: conflitoPlaquetaPoste,
               distancia_gps_poste_metros: distGpsPoste,
+              precisao_gps_metros: (typeof stObj.precisaoGps === 'number') ? stObj.precisaoGps : null,
               data_reparo: dataReparo,
               evidencias: evidenciasUrls,
               texto_auditoria_ocr: ocrTexto
@@ -3222,7 +3378,7 @@
                       Latitude: pLatCalib,
                       Longitude: pLngCalib,
                       "QTD. Lum.": 1,
-                      Empresa: 'FORTNORT',
+                      Empresa: 'ILUMITERRA - SEGUNDO CONTRATO',
                       Observação: (ehSnapPoste ? 'Cadastrada no Poste #' + pt.poste_id_selecionado : 'Cadastrada') + ' via Finalização OS #' + protFinal
                     }]);
 
@@ -3507,17 +3663,33 @@
         if (!file) return;
         fotoEntradaPracaNome = file.name || "foto_entrada.jpg";
 
-        var tempUrl = URL.createObjectURL(file);
-        document.getElementById('imgPreviewEntradaPraca').src = tempUrl;
-        document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
+        var tempUrl = null;
+        try { tempUrl = URL.createObjectURL(file); } catch(e) {}
+        if (tempUrl) {
+          document.getElementById('imgPreviewEntradaPraca').src = tempUrl;
+          document.getElementById('previewEntradaPracaContainer').classList.remove('hidden');
+        }
 
-        var b64 = await otimizarEComprimirFoto(file, 1200, 0.75);
-        URL.revokeObjectURL(tempUrl);
-
-        if (b64) {
-          fotoEntradaPracaBase64 = b64;
-          document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
-          salvarRascunhoFinalizar();
+        try {
+          var b64 = await otimizarEComprimirFoto(file, 1200, 0.75);
+          if (b64) {
+            fotoEntradaPracaBase64 = b64;
+            document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+            salvarRascunhoFinalizar();
+          } else {
+            var fbB64 = await converterFileParaBase64(file);
+            if (fbB64) {
+              fotoEntradaPracaBase64 = fbB64;
+              document.getElementById('imgPreviewEntradaPraca').src = fotoEntradaPracaBase64;
+              salvarRascunhoFinalizar();
+            }
+          }
+        } finally {
+          if (tempUrl) {
+            setTimeout(function() {
+              try { URL.revokeObjectURL(tempUrl); } catch(eRev) {}
+            }, 1000);
+          }
         }
       }
 
@@ -3632,20 +3804,59 @@
       function iniciarGpsPracaComMapa() {
         var badge = document.getElementById('gpsBadgePraca');
         var coordsText = document.getElementById('coordsTextPraca');
+        var aviso = document.getElementById('gpsAvisoPraca');
 
         if (!navigator.geolocation) {
-          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800'; badge.innerText = '❌ Indisponível'; }
+          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200'; badge.innerText = '❌ Indisponível'; }
           if (coordsText) coordsText.innerText = 'GPS não suportado neste dispositivo.';
+          if (aviso) {
+            aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-red-50 text-red-700 border border-red-200';
+            aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-red-600">error</span><span>GPS não suportado neste aparelho ou navegador.</span>';
+            aviso.classList.remove('hidden');
+          }
           return;
+        }
+
+        if (badge) {
+          badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200';
+          badge.innerText = '📡 Localizando...';
         }
 
         navigator.geolocation.getCurrentPosition(function(pos) {
           var lat = pos.coords.latitude.toFixed(6);
           var lng = pos.coords.longitude.toFixed(6);
-          var acc = Math.round(pos.coords.accuracy);
+          var acc = Math.round(pos.coords.accuracy || 0);
 
           coordsGpsPracaAtual = lat + ", " + lng;
-          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800'; badge.innerText = '🎯 ±' + acc + 'm'; }
+          precisaoGpsPracaAtual = acc;
+
+          if (badge) {
+            if (acc <= 20) {
+              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+              badge.innerText = '🎯 ±' + acc + 'm';
+              if (aviso) aviso.classList.add('hidden');
+            } else if (acc <= 50) {
+              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200';
+              badge.innerText = '📡 ±' + acc + 'm';
+              if (aviso) aviso.classList.add('hidden');
+            } else if (acc <= 100) {
+              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
+              badge.innerText = '⚠️ ±' + acc + 'm';
+              if (aviso) {
+                aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-amber-50 text-amber-800 border border-amber-200';
+                aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-amber-600">warning</span><span>Sinal GPS com precisão moderada (±' + acc + 'm).</span>';
+                aviso.classList.remove('hidden');
+              }
+            } else {
+              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200';
+              badge.innerText = '⚠️ ±' + acc + 'm';
+              if (aviso) {
+                aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-rose-50 text-rose-800 border border-rose-200';
+                aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-rose-600">location_searching</span><span>Sinal GPS fraco (±' + acc + 'm). Aproxime-se de área aberta para melhorar a precisão.</span>';
+                aviso.classList.remove('hidden');
+              }
+            }
+          }
           if (coordsText) coordsText.innerText = 'Lat: ' + lat + ' | Lng: ' + lng;
 
           if (typeof L !== 'undefined') {
@@ -3676,9 +3887,14 @@
             setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
           }
         }, function(err) {
-          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800'; badge.innerText = '⚠️ Sem sinal'; }
+          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200'; badge.innerText = '⚠️ Sem sinal'; }
           if (coordsText) coordsText.innerText = 'Ative a localização e permissão de GPS no seu aparelho.';
-        }, { enableHighAccuracy: true, timeout: 10000 });
+          if (aviso) {
+            aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-red-50 text-red-700 border border-red-200';
+            aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-red-600">error</span><span>Não foi possível obter a localização. Certifique-se de que o GPS está ativado.</span>';
+            aviso.classList.remove('hidden');
+          }
+        }, { enableHighAccuracy: true, timeout: 12000 });
       }
 
       function exibirModalAlertaValidacao(titulo, mensagem) {
@@ -3993,7 +4209,9 @@
               fotos_andamento: urlsAndamento,
               foto_saida: null,
               coordenada_inicio: coordsGpsPracaAtual || null,
+              precisao_gps_inicio: (typeof precisaoGpsPracaAtual === 'number') ? precisaoGpsPracaAtual : null,
               coordenada_fim: null,
+              precisao_gps_fim: null,
               materiais: (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : [],
               descricao_servico: descServicoTexto || null
             });
@@ -4003,6 +4221,7 @@
               sessaoAberta.fim = agoraIso;
               sessaoAberta.status = (statusFinal === 'Concluída') ? 'CONCLUÍDA' : 'ENCERRADA';
               sessaoAberta.coordenada_fim = coordsGpsPracaAtual || null;
+              sessaoAberta.precisao_gps_fim = (typeof precisaoGpsPracaAtual === 'number') ? precisaoGpsPracaAtual : null;
               if (descServicoTexto) {
                 sessaoAberta.descricao_servico = descServicoTexto;
               }

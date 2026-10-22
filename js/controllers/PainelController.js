@@ -4479,6 +4479,7 @@ window.alternarDesconsiderarFechamento = async function(fechamentoId, osId, nume
                                 if (String(f.id) === String(fechamentoId)) {
                                     f.desconsiderado = Boolean(desconsiderar);
                                     f.desconsiderado_em = desconsiderar ? new Date().toISOString() : null;
+                                    f.desconsiderado_por = desconsiderar ? (window.AuthGuard?.getUsuarioAtual?.() || localStorage.getItem('usuario_nome') || 'Administrador') : null;
                                     f.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
                                 }
                             });

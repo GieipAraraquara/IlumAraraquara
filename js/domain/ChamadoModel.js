@@ -1339,6 +1339,7 @@ class ChamadoModel {
 
         // Categorias que possuem limite estrito de 1 unidade por ponto de iluminação
         const categoriasContadas = {
+            SERVICO: 0,
             RELE: 0,
             LUMINARIA: 0,
             LAMPADA: 0,
@@ -1365,22 +1366,23 @@ class ChamadoModel {
 
             const nomeLower = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-            // Ignorar serviços e mão de obra gerais
-            if (nomeLower.includes('servico') || nomeLower.includes('mao de obra') || nomeLower.includes('caminhao') || nomeLower.includes('guindauto')) {
-                continue;
-            }
-
             // Regra específica: Se for OS Viária e tiver "REFLETOR", é divergente (refletores são exclusivos de praças/espaços públicos)
             if (nomeLower.includes('refletor')) {
                 return true;
             }
 
-            // Ignorar placas de identificação, plaquetas e adesivos
+            // Identificar serviços de manutenção / troca / mão de obra viária (limite de 1 por ponto)
+            if (nomeLower.includes('servico') || nomeLower.includes('mao de obra') || nomeLower.includes('caminhao') || nomeLower.includes('guindauto')) {
+                categoriasContadas.SERVICO += qtd;
+                continue;
+            }
+
+            // Ignorar placas de identificação, plaquetas e adesivos físicos (quando não forem o serviço contratual de instalação)
             if (nomeLower.includes('placa') || nomeLower.includes('plaqueta') || nomeLower.includes('identificacao')) {
                 continue;
             }
 
-            // Identificar categoria exclusiva (1 por ponto)
+            // Identificar categoria exclusiva de materiais (1 por ponto)
             if (nomeLower.includes('rele') || nomeLower.includes('fotoeletrico')) {
                 categoriasContadas.RELE += qtd;
             } else if (nomeLower.includes('luminaria') || nomeLower.includes('refletor')) {
@@ -1398,13 +1400,10 @@ class ChamadoModel {
 
         // Determina a quantidade de pontos da OS Viária
         let numPontos = 1;
-        if (this.pontosDetalhados && Array.isArray(this.pontosDetalhados) && this.pontosDetalhados.length > 0) {
-            numPontos = this.pontosDetalhados.length;
-        } else if (this.qtdFinal && this.qtdFinal > 0) {
-            numPontos = this.qtdFinal;
-        } else if (this.qtdInicial && this.qtdInicial > 0) {
-            numPontos = this.qtdInicial;
-        }
+        const ptsCount = (this.pontosDetalhados && Array.isArray(this.pontosDetalhados)) ? this.pontosDetalhados.length : 0;
+        const qFinal = Number(this.qtdFinal) || 0;
+        const qInicial = Number(this.qtdInicial) || 0;
+        numPontos = Math.max(1, ptsCount, qFinal, qInicial);
 
         // Divergente se alguma categoria unitária exceder a quantidade de pontos na OS Viária
         return Object.values(categoriasContadas).some(total => total > numPontos);

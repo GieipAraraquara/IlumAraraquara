@@ -632,9 +632,8 @@ class AuditoriaController {
                         : (item.formattedMaterialUtilizado ? [item.formattedMaterialUtilizado] : ['Mais de um material informado']);
                     const matItemsHtml = matList.map(m => `<li class="font-medium text-amber-200 leading-snug">${esc(m)}</li>`).join('');
                     
-                    const numPtsReparados = (item.pontosDetalhados && item.pontosDetalhados.length > 0) 
-                        ? item.pontosDetalhados.length 
-                        : (item.qtdFinal || item.qtdInicial || 1);
+                    const ptsCount = (item.pontosDetalhados && Array.isArray(item.pontosDetalhados)) ? item.pontosDetalhados.length : 0;
+                    const numPtsReparados = Math.max(1, ptsCount, Number(item.qtdFinal) || 0, Number(item.qtdInicial) || 0);
                     
                     const isPraca = Boolean(item.isPraca);
                     const hasRefletorViaria = !isPraca && matList.some(m => {
@@ -674,7 +673,7 @@ class AuditoriaController {
                     } else {
                         rodapeHtml = `
                             <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
-                                Regra: quantidade de componentes principais (relés, luminárias ou lâmpadas) não pode ultrapassar <strong>${numPtsReparados} un</strong> (1 por ponto).
+                                Regra: quantidade de serviços de manutenção ou componentes principais (relés, luminárias ou lâmpadas) não pode ultrapassar <strong>${numPtsReparados} un</strong> (1 por ponto).
                             </div>
                         `;
                     }
@@ -4363,6 +4362,7 @@ if (typeof window.alternarDesconsiderarFechamento !== 'function') {
                                     if (String(f.id) === String(fechamentoId)) {
                                         f.desconsiderado = Boolean(desconsiderar);
                                         f.desconsiderado_em = desconsiderar ? new Date().toISOString() : null;
+                                        f.desconsiderado_por = desconsiderar ? (window.AuthGuard?.getUsuarioAtual?.() || localStorage.getItem('usuario_nome') || 'Administrador') : null;
                                         f.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
                                     }
                                 });

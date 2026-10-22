@@ -17,10 +17,10 @@
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
     <script src="js/domain/ChamadoModel.js?v=56"></script>
-    <script src="js/repositories/ChamadosRepository.js?v=42"></script>
+    <script src="js/repositories/ChamadosRepository.js?v=43"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=33"></script>
-    <script src="js/services/MapService.js?v=74"></script>
+    <script src="js/services/MapService.js?v=75"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
     <script src="js/controllers/PainelController.js?v=47"></script>
@@ -2842,6 +2842,12 @@
                 zoom: 13
             });
 
+            pendentesMapboxInstance.on('error', (e) => {
+                if (e && e.error && String(e.error.message || '').includes('glyphs > 65535')) {
+                    return;
+                }
+            });
+
             pendentesMapboxInstance.addControl(new mapboxgl.NavigationControl({ showCompass: true }), 'top-right');
             pendentesMapboxInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
 
@@ -3052,7 +3058,7 @@
                         origem: String(c.origem.protocolo).replace(/^#/, ''),
                         destino: String(c.destino.protocolo).replace(/^#/, ''),
                         distancia: distStr,
-                        rotulo: distStr ? `${distStr}` : `#${c.origem.protocolo} ➔ #${c.destino.protocolo}`
+                        rotulo: distStr ? `${distStr}` : `#${c.origem.protocolo} -> #${c.destino.protocolo}`
                     },
                     geometry: {
                         type: 'LineString',

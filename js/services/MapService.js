@@ -402,6 +402,11 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
                     center: [lng, lat],
                     zoom: 16
                 });
+                window.sharedMapInstance.on('error', (e) => {
+                    if (e && e.error && String(e.error.message || '').includes('glyphs > 65535')) {
+                        return; // Aviso cosmético de glyphs Unicode fora do BMP em POIs do mapa base
+                    }
+                });
                 window.sharedMapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
                 window.sharedMapInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');
             } else {
@@ -721,6 +726,11 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
                 style: 'mapbox://styles/mapbox/streets-v12',
                 center: [firstM.lng, firstM.lat],
                 zoom: 16
+            });
+            window.sharedMapInstance.on('error', (e) => {
+                if (e && e.error && String(e.error.message || '').includes('glyphs > 65535')) {
+                    return;
+                }
             });
             window.sharedMapInstance.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
             window.sharedMapInstance.addControl(new mapboxgl.FullscreenControl(), 'top-right');

@@ -247,35 +247,51 @@ class ChamadosRepository {
             const colunasTabela = ChamadosRepository.COLUNAS_TABELA_OS;
             const filtroOrTemporal = `data_abertura.gte.${dataCorteIso},status.neq.Concluída,status.neq.Concluida`;
 
-            // 1. Tenta consultar a view unificada com projeção restrita e corte temporal
-            // IMPORTANTE: Ordena decrescente (mais novas primeiro) para garantir que chamados recentes
-            // NUNCA sejam cortados pelo limite de 1000 registros do PostgREST.
-            let query = client
-                .from(this.viewName)
-                .select(colunasView)
-                .or(filtroOrTemporal)
-                .order('data_abertura', { ascending: false });
+            // Helper para carregar todos os registros de uma tabela/view em lotes paginados de 1000
+            // contornando o limite estrito do PostgREST sem quebrar o limite de Egress
+            const carregarTodosPaginado = async (sourceName, colunas) => {
+                const PAGE_SIZE = 1000;
+                let offset = 0;
+                let allRows = [];
+                let hasMore = true;
 
-            let { data, error } = await query;
-
-            if (error || !data || data.length === 0) {
-                // 2. Fallback: consulta direta em ordens_servico (utilizando colunas existentes na tabela)
-                const resPrimary = await client
-                    .from(this.primaryTable)
-                    .select(colunasTabela)
-                    .or(filtroOrTemporal)
-                    .order('data_abertura', { ascending: false });
-
-                if (!resPrimary.error && resPrimary.data && resPrimary.data.length > 0) {
-                    data = resPrimary.data;
-                } else {
-                    // 3. Fallback legado: consulta em chamados
-                    const resLegacy = await client
-                        .from(this.legacyTable)
-                        .select(colunasTabela)
+                while (hasMore) {
+                    const to = offset + PAGE_SIZE - 1;
+                    const res = await client
+                        .from(sourceName)
+                        .select(colunas)
                         .or(filtroOrTemporal)
-                        .order('data_abertura', { ascending: false });
-                    data = resLegacy.data || [];
+                        .order('data_abertura', { ascending: false })
+                        .range(offset, to);
+
+                    if (res.error) {
+                        console.warn(`⚠️ [ChamadosRepository] Erro ao consultar ${sourceName} no range [${offset}-${to}]:`, res.error);
+                        return null;
+                    }
+
+                    const batch = res.data || [];
+                    allRows = allRows.concat(batch);
+
+                    if (batch.length < PAGE_SIZE) {
+                        hasMore = false;
+                    } else {
+                        offset += PAGE_SIZE;
+                    }
+                }
+                return allRows;
+            };
+
+            // 1. Tenta consultar a view unificada com projeção restrita, corte temporal e paginação completa
+            let data = await carregarTodosPaginado(this.viewName, colunasView);
+
+            if (!data || data.length === 0) {
+                // 2. Fallback: consulta direta em ordens_servico paginada
+                data = await carregarTodosPaginado(this.primaryTable, colunasTabela);
+
+                if (!data || data.length === 0) {
+                    // 3. Fallback legado: consulta em chamados paginada
+                    data = await carregarTodosPaginado(this.legacyTable, colunasTabela);
+                    data = data || [];
                 }
             }
 
@@ -1418,7 +1434,19 @@ class ChamadosRepository {
     async alternarDesconsiderarFechamento(fechamentoId, protocolo, desconsiderar, motivo = '', metaLog = {}) {
         try {
             const client = this.getClient();
-            const usuarioAtual = metaLog.usuario || localStorage.getItem('usuario_nome') || localStorage.getItem('user_email') || 'Administrador';
+            let usuarioAtual = metaLog.usuario;
+            if (!usuarioAtual) {
+                if (window.AuthGuard && typeof window.AuthGuard.getUsuarioAtual === 'function') {
+                    usuarioAtual = window.AuthGuard.getUsuarioAtual();
+                } else if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                    const p = window.AuthGuard._cachedAuthData.profile;
+                    const u = window.AuthGuard._cachedAuthData.user;
+                    usuarioAtual = p?.nome || u?.user_metadata?.full_name || u?.user_metadata?.name || p?.email || u?.email;
+                }
+            }
+            if (!usuarioAtual) {
+                usuarioAtual = window.currentUserName || localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || localStorage.getItem('user_email') || 'Administrador';
+            }
             const nowIso = new Date().toISOString();
 
             const updatePayload = {
