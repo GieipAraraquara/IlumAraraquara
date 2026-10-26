@@ -2275,6 +2275,8 @@
         minZoom: 1,
         maxZoom: 15,
         zoomCapabilities: null,
+        exposureCapabilities: null,
+        brilhoAtual: 0, // Compensação de brilho / exposição
         fotoCapturadaBase64: null,
         onFotoConfirmadaCallback: null,
         fallbackFileInputId: null,
@@ -2287,24 +2289,33 @@
           this.fotoCapturadaBase64 = null;
           this.torchAtivo = false;
           this.zoomAtual = 1;
+          this.brilhoAtual = 0;
 
           var tituloEl = document.getElementById('cameraModalTitulo');
           if (tituloEl) tituloEl.innerText = titulo || 'Câmera';
 
-          // Reseta visualização
+          // Reseta visualização e transformações do vídeo
           var videoEl = document.getElementById('cameraVideoFeed');
           var imgPreview = document.getElementById('cameraSnapshotPreview');
           var liveControls = document.getElementById('cameraLiveControls');
           var reviewControls = document.getElementById('cameraReviewControls');
           var modal = document.getElementById('modalCameraInterna');
 
-          if (videoEl) videoEl.classList.remove('hidden');
+          if (videoEl) {
+            videoEl.classList.remove('hidden');
+            videoEl.style.transform = 'scale(1)';
+            videoEl.style.filter = 'brightness(1)';
+          }
           if (imgPreview) {
             imgPreview.classList.add('hidden');
             imgPreview.src = '';
           }
           if (liveControls) liveControls.classList.remove('hidden');
           if (reviewControls) reviewControls.classList.add('hidden');
+
+          var expSlider = document.getElementById('cameraExposureSlider');
+          if (expSlider) expSlider.value = 0;
+          this.destacarBotaoZoom(1);
 
           if (modal) modal.classList.remove('hidden');
 
@@ -2420,51 +2431,51 @@
             }
           }
 
-          // 2. Suporte a Zoom Nativo
+          // 2. Controles de Zoom (SEMPRE VISÍVEIS)
+          // Se o hardware do Android não reportar capabilities.zoom, usamos zoom digital (CSS + Canvas Crop)
           var zoomBox = document.getElementById('cameraZoomControls');
           if (zoomBox) {
+            zoomBox.classList.remove('hidden');
+            zoomBox.classList.add('flex');
+
             if (capabilities.zoom) {
               this.zoomCapabilities = capabilities.zoom;
               this.minZoom = capabilities.zoom.min || 1;
-              this.maxZoom = capabilities.zoom.max || 15;
-              zoomBox.classList.remove('hidden');
-              zoomBox.classList.add('flex');
-              var maxZ = this.maxZoom;
-              var zoomLevels = [1, 2, 3, 5, 7, 10, 12, 15];
-              zoomLevels.forEach(z => {
-                var btn = document.getElementById('btnZoom' + z + 'x');
-                if (btn) {
-                  // Oculta botões cujo zoom exceda o máximo de hardware do celular
-                  if (z > 1 && z > maxZ) {
-                    btn.classList.add('hidden');
-                  } else {
-                    btn.classList.remove('hidden');
-                  }
-                }
-              });
-              this.destacarBotaoZoom(1);
+              this.maxZoom = Math.max(capabilities.zoom.max || 15, 15);
             } else {
               this.zoomCapabilities = null;
-              zoomBox.classList.add('hidden');
-              zoomBox.classList.remove('flex');
+              this.minZoom = 1;
+              this.maxZoom = 15;
             }
+
+            var zoomLevels = [1, 2, 3, 5, 7, 10, 12, 15];
+            zoomLevels.forEach(z => {
+              var btn = document.getElementById('btnZoom' + z + 'x');
+              if (btn) btn.classList.remove('hidden');
+            });
+            this.destacarBotaoZoom(this.zoomAtual || 1);
           }
 
-          // 3. Suporte a Controle de Exposição / Brilho (crucial para plaqueta)
+          // 3. Controle de Exposição / Brilho (SEMPRE VISÍVEL - crucial para plaqueta)
+          // Se o hardware não suportar exposureCompensation nativo, aplicamos filtro de brilho digital (CSS + Canvas)
           var expBox = document.getElementById('cameraExposureControl');
           var expSlider = document.getElementById('cameraExposureSlider');
           if (expBox && expSlider) {
+            expBox.classList.remove('hidden');
+            expBox.classList.add('flex');
+
             if (capabilities.exposureCompensation) {
-              expBox.classList.remove('hidden');
-              expBox.classList.add('flex');
+              this.exposureCapabilities = capabilities.exposureCompensation;
               expSlider.min = capabilities.exposureCompensation.min;
               expSlider.max = capabilities.exposureCompensation.max;
               expSlider.step = capabilities.exposureCompensation.step || 0.2;
-              expSlider.value = 0;
             } else {
-              expBox.classList.add('hidden');
-              expBox.classList.remove('flex');
+              this.exposureCapabilities = null;
+              expSlider.min = -2;
+              expSlider.max = 2;
+              expSlider.step = 0.1;
             }
+            expSlider.value = this.brilhoAtual || 0;
           }
 
           // 4. Autofoco Contínuo de Alta Precisão
@@ -2482,10 +2493,9 @@
 
           var self = this;
 
-          // Gestos de Pinça (Pinch-to-zoom) e Toque para Focar (Tap-to-focus)
+          // Gestos de Pinça (Pinch-to-zoom)
           box.addEventListener('touchstart', function(e) {
             if (e.touches.length === 2) {
-              // Início da pinça
               var dx = e.touches[0].clientX - e.touches[1].clientX;
               var dy = e.touches[0].clientY - e.touches[1].clientY;
               self.touchStartDist = Math.hypot(dx, dy);
@@ -2494,12 +2504,12 @@
           }, { passive: true });
 
           box.addEventListener('touchmove', function(e) {
-            if (e.touches.length === 2 && self.touchStartDist > 0 && self.zoomCapabilities) {
+            if (e.touches.length === 2 && self.touchStartDist > 0) {
               var dx = e.touches[0].clientX - e.touches[1].clientX;
               var dy = e.touches[0].clientY - e.touches[1].clientY;
               var dist = Math.hypot(dx, dy);
               var factor = dist / self.touchStartDist;
-              var novoZoom = Math.min(Math.max(self.touchStartZoom * factor, self.minZoom), self.maxZoom);
+              var novoZoom = Math.min(Math.max(self.touchStartZoom * factor, self.minZoom || 1), self.maxZoom || 15);
               self.ajustarZoom(Math.round(novoZoom * 10) / 10);
             }
           }, { passive: true });
@@ -2512,7 +2522,7 @@
 
           // Toque para Focar (Tap to Focus)
           box.addEventListener('click', function(e) {
-            if (e.target && e.target.id === 'cameraSnapshotPreview') return;
+            if (e.target && (e.target.id === 'cameraSnapshotPreview' || e.target.closest('#cameraExposureControl'))) return;
             var rect = box.getBoundingClientRect();
             var x = e.clientX - rect.left;
             var y = e.clientY - rect.top;
@@ -2591,16 +2601,32 @@
         },
 
         async ajustarZoom(valor) {
-          if (!this.track) return;
-          try {
-            this.zoomAtual = valor;
-            await this.track.applyConstraints({
-              advanced: [{ zoom: valor }]
-            });
-            this.destacarBotaoZoom(valor);
-          } catch(eZoom) {
-            console.warn('⚠️ [Câmera] Falha ao ajustar zoom:', eZoom);
+          this.zoomAtual = valor;
+          var videoEl = document.getElementById('cameraVideoFeed');
+
+          // 1. Tenta zoom via hardware nativo (se suportado pelo driver da câmera)
+          var hardwareZoomAplicado = false;
+          if (this.track && this.zoomCapabilities) {
+            try {
+              await this.track.applyConstraints({
+                advanced: [{ zoom: valor }]
+              });
+              hardwareZoomAplicado = true;
+            } catch(eZoom) {
+              console.warn('⚠️ [Câmera] Hardware zoom não aceito, aplicando zoom digital:', eZoom);
+            }
           }
+
+          // 2. Se hardware não aplicou zoom, aplica zoom digital suave no elemento de vídeo
+          if (videoEl) {
+            if (hardwareZoomAplicado) {
+              videoEl.style.transform = 'scale(1)';
+            } else {
+              videoEl.style.transform = 'scale(' + valor + ')';
+            }
+          }
+
+          this.destacarBotaoZoom(valor);
         },
 
         destacarBotaoZoom(valor) {
@@ -2620,14 +2646,32 @@
         },
 
         async ajustarExposicao(val) {
-          if (!this.track) return;
-          var numVal = parseFloat(val);
-          try {
-            await this.track.applyConstraints({
-              advanced: [{ exposureCompensation: numVal }]
-            });
-          } catch (eExp) {
-            console.warn('⚠️ [Câmera] Falha ao ajustar exposição:', eExp);
+          var numVal = parseFloat(val) || 0;
+          this.brilhoAtual = numVal;
+          var videoEl = document.getElementById('cameraVideoFeed');
+
+          // 1. Tenta compensação nativa de exposição da lente
+          var hardwareExpAplicada = false;
+          if (this.track && this.exposureCapabilities) {
+            try {
+              await this.track.applyConstraints({
+                advanced: [{ exposureCompensation: numVal }]
+              });
+              hardwareExpAplicada = true;
+            } catch (eExp) {
+              console.warn('⚠️ [Câmera] Hardware exposure não aceito, aplicando brilho digital:', eExp);
+            }
+          }
+
+          // 2. Aplica filtro CSS de brilho garantido no vídeo
+          if (videoEl) {
+            if (hardwareExpAplicada) {
+              videoEl.style.filter = 'brightness(1)';
+            } else {
+              // Converte -2..+2 para fator de brilho 0.4 .. 1.8
+              var fator = Math.max(0.3, Math.min(2.0, 1 + (numVal * 0.35)));
+              videoEl.style.filter = 'brightness(' + fator + ')';
+            }
           }
         },
 
@@ -2648,25 +2692,48 @@
 
           // Redimensiona proporcionalmente para 1200px máx para manter o PWA ultraleve
           var maxDim = 1200;
-          if (w > maxDim || h > maxDim) {
-            if (w > h) {
-              h = Math.round((h * maxDim) / w);
-              w = maxDim;
+          var outW = w;
+          var outH = h;
+          if (outW > maxDim || outH > maxDim) {
+            if (outW > outH) {
+              outH = Math.round((outH * maxDim) / outW);
+              outW = maxDim;
             } else {
-              w = Math.round((w * maxDim) / h);
-              h = maxDim;
+              outW = Math.round((outW * maxDim) / outH);
+              outH = maxDim;
             }
           }
 
-          canvasEl.width = w;
-          canvasEl.height = h;
+          canvasEl.width = outW;
+          canvasEl.height = outH;
           var ctx = canvasEl.getContext('2d', { alpha: false });
           ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'medium';
-          ctx.drawImage(videoEl, 0, 0, w, h);
+          ctx.imageSmoothingQuality = 'high';
+
+          // Aplica brilho digital se não foi aplicado por hardware
+          if (!this.exposureCapabilities && this.brilhoAtual !== 0) {
+            var fatorBrilho = Math.max(0.3, Math.min(2.0, 1 + (this.brilhoAtual * 0.35)));
+            ctx.filter = 'brightness(' + fatorBrilho + ')';
+          } else {
+            ctx.filter = 'none';
+          }
+
+          // Aplica recorte (crop) de zoom digital caso o zoom não tenha sido por hardware
+          var z = this.zoomAtual || 1;
+          if (!this.zoomCapabilities && z > 1) {
+            var cropW = w / z;
+            var cropH = h / z;
+            var cropX = (w - cropW) / 2;
+            var cropY = (h - cropH) / 2;
+            ctx.drawImage(videoEl, cropX, cropY, cropW, cropH, 0, 0, outW, outH);
+          } else {
+            ctx.drawImage(videoEl, 0, 0, outW, outH);
+          }
+
+          ctx.filter = 'none'; // Reseta filtro do canvas
 
           // Gera Base64 em JPEG de alta qualidade
-          this.fotoCapturadaBase64 = canvasEl.toDataURL('image/jpeg', 0.80);
+          this.fotoCapturadaBase64 = canvasEl.toDataURL('image/jpeg', 0.82);
 
           // Congela na tela para o técnico avaliar
           if (imgPreview && this.fotoCapturadaBase64) {
