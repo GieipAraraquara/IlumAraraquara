@@ -2272,9 +2272,14 @@
         facingMode: 'environment', // Traseira por padrão
         torchAtivo: false,
         zoomAtual: 1,
+        minZoom: 1,
+        maxZoom: 15,
+        zoomCapabilities: null,
         fotoCapturadaBase64: null,
         onFotoConfirmadaCallback: null,
         fallbackFileInputId: null,
+        touchStartDist: 0,
+        touchStartZoom: 1,
 
         async abrir(titulo, onConfirmar, fallbackFileInputId = null) {
           this.onFotoConfirmadaCallback = onConfirmar;
@@ -2314,6 +2319,8 @@
                 fEl.click();
               }
             }
+          } else {
+            this.configurarEventosGestos();
           }
         },
 
@@ -2326,17 +2333,49 @@
             return false;
           }
 
-          var constraints = {
-            audio: false,
-            video: {
-              facingMode: { ideal: this.facingMode },
-              width: { ideal: 1920 },
-              height: { ideal: 1080 }
+          // Busca de dispositivo traseiro prioritário (em celulares multi-câmera, prioriza a lente principal 'back 0' ou 'camera 0')
+          var targetDeviceId = null;
+          try {
+            if (this.facingMode === 'environment' && typeof navigator.mediaDevices.enumerateDevices === 'function') {
+              var devices = await navigator.mediaDevices.enumerateDevices();
+              var videoDevices = devices.filter(d => d.kind === 'videoinput');
+              var backDevices = videoDevices.filter(d => {
+                var label = (d.label || '').toLowerCase();
+                return label.includes('back') || label.includes('traseira') || label.includes('rear') || label.includes('environment');
+              });
+
+              // Filtra fora lentes ultrawide/macro que têm foco fixo ou distância focal diferente
+              var mainCam = backDevices.find(d => {
+                var lbl = (d.label || '').toLowerCase();
+                return (lbl.includes('0') || lbl.includes('main') || lbl.includes('primary') || lbl.includes('wide')) && !lbl.includes('ultra') && !lbl.includes('macro');
+              });
+
+              if (mainCam && mainCam.deviceId) {
+                targetDeviceId = mainCam.deviceId;
+              } else if (backDevices.length > 0 && backDevices[0].deviceId) {
+                targetDeviceId = backDevices[0].deviceId;
+              }
             }
+          } catch(eDev) {
+            console.warn('⚠️ [Câmera] Não foi possível enumerar dispositivos específicos:', eDev);
+          }
+
+          var videoConstraints = {
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           };
 
+          if (targetDeviceId) {
+            videoConstraints.deviceId = { exact: targetDeviceId };
+          } else {
+            videoConstraints.facingMode = { ideal: this.facingMode };
+          }
+
           try {
-            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            this.stream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: videoConstraints
+            });
             videoEl.srcObject = this.stream;
             await videoEl.play();
 
@@ -2344,8 +2383,25 @@
             this.configurarRecursosHardware();
             return true;
           } catch (err) {
-            console.error('⚠️ [Câmera] Erro ao acessar hardware da câmera:', err);
-            return false;
+            console.warn('⚠️ [Câmera] Tentativa com deviceId falhou, tentando fallback genérico:', err);
+            try {
+              this.stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                  facingMode: { ideal: this.facingMode },
+                  width: { ideal: 1920 },
+                  height: { ideal: 1080 }
+                }
+              });
+              videoEl.srcObject = this.stream;
+              await videoEl.play();
+              this.track = this.stream.getVideoTracks()[0];
+              this.configurarRecursosHardware();
+              return true;
+            } catch (err2) {
+              console.error('⚠️ [Câmera] Erro total ao acessar hardware da câmera:', err2);
+              return false;
+            }
           }
         },
 
@@ -2368,9 +2424,12 @@
           var zoomBox = document.getElementById('cameraZoomControls');
           if (zoomBox) {
             if (capabilities.zoom) {
+              this.zoomCapabilities = capabilities.zoom;
+              this.minZoom = capabilities.zoom.min || 1;
+              this.maxZoom = capabilities.zoom.max || 15;
               zoomBox.classList.remove('hidden');
               zoomBox.classList.add('flex');
-              var maxZ = capabilities.zoom.max || 1;
+              var maxZ = this.maxZoom;
               var zoomLevels = [1, 2, 3, 5, 7, 10, 12, 15];
               zoomLevels.forEach(z => {
                 var btn = document.getElementById('btnZoom' + z + 'x');
@@ -2385,6 +2444,7 @@
               });
               this.destacarBotaoZoom(1);
             } else {
+              this.zoomCapabilities = null;
               zoomBox.classList.add('hidden');
               zoomBox.classList.remove('flex');
             }
@@ -2407,12 +2467,94 @@
             }
           }
 
-          // 4. Autofoco Contínuo
+          // 4. Autofoco Contínuo de Alta Precisão
           if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
             try {
               this.track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
             } catch(eFocus) {}
           }
+        },
+
+        configurarEventosGestos() {
+          var box = document.getElementById('cameraViewportBox');
+          if (!box || box._gesturesBound) return;
+          box._gesturesBound = true;
+
+          var self = this;
+
+          // Gestos de Pinça (Pinch-to-zoom) e Toque para Focar (Tap-to-focus)
+          box.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+              // Início da pinça
+              var dx = e.touches[0].clientX - e.touches[1].clientX;
+              var dy = e.touches[0].clientY - e.touches[1].clientY;
+              self.touchStartDist = Math.hypot(dx, dy);
+              self.touchStartZoom = self.zoomAtual || 1;
+            }
+          }, { passive: true });
+
+          box.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && self.touchStartDist > 0 && self.zoomCapabilities) {
+              var dx = e.touches[0].clientX - e.touches[1].clientX;
+              var dy = e.touches[0].clientY - e.touches[1].clientY;
+              var dist = Math.hypot(dx, dy);
+              var factor = dist / self.touchStartDist;
+              var novoZoom = Math.min(Math.max(self.touchStartZoom * factor, self.minZoom), self.maxZoom);
+              self.ajustarZoom(Math.round(novoZoom * 10) / 10);
+            }
+          }, { passive: true });
+
+          box.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2) {
+              self.touchStartDist = 0;
+            }
+          }, { passive: true });
+
+          // Toque para Focar (Tap to Focus)
+          box.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'cameraSnapshotPreview') return;
+            var rect = box.getBoundingClientRect();
+            var x = e.clientX - rect.left;
+            var y = e.clientY - rect.top;
+            self.exibirMiraFoco(x, y);
+            self.forcarFoco();
+          });
+        },
+
+        exibirMiraFoco(x, y) {
+          var box = document.getElementById('cameraViewportBox');
+          if (!box) return;
+
+          var miraExistente = document.getElementById('cameraFocusRing');
+          if (miraExistente) miraExistente.remove();
+
+          var mira = document.createElement('div');
+          mira.id = 'cameraFocusRing';
+          mira.className = 'absolute w-16 h-16 border-2 border-amber-300 rounded-full pointer-events-none transform -translate-x-1/2 -translate-y-1/2 scale-125 opacity-100 transition-all duration-300 z-30 shadow-lg';
+          mira.style.left = x + 'px';
+          mira.style.top = y + 'px';
+          box.appendChild(mira);
+
+          setTimeout(() => {
+            mira.style.transform = 'translate(-50%, -50%) scale(0.9)';
+          }, 20);
+
+          setTimeout(() => {
+            mira.style.opacity = '0';
+            setTimeout(() => { mira.remove(); }, 300);
+          }, 1200);
+        },
+
+        async forcarFoco() {
+          if (!this.track) return;
+          try {
+            var caps = (typeof this.track.getCapabilities === 'function') ? this.track.getCapabilities() : {};
+            if (caps.focusMode && caps.focusMode.includes('continuous')) {
+              await this.track.applyConstraints({
+                advanced: [{ focusMode: 'continuous' }]
+              });
+            }
+          } catch(e) {}
         },
 
         async alternarLanterna() {
@@ -2468,7 +2610,9 @@
             b.classList.remove('bg-white', 'text-black');
             b.classList.add('text-white');
           });
-          var btnAtivo = document.getElementById('btnZoom' + valor + 'x');
+          // Se o valor for exato, destaca; se for entre números da pinça, destaca o mais próximo
+          var intZoom = Math.round(valor);
+          var btnAtivo = document.getElementById('btnZoom' + intZoom + 'x') || document.getElementById('btnZoom' + valor + 'x');
           if (btnAtivo) {
             btnAtivo.classList.remove('text-white');
             btnAtivo.classList.add('bg-white', 'text-black');
