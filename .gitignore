@@ -1,0 +1,21 @@
+# Variáveis de Ambiente e Segredos
+.env
+.env.local
+*.env
+
+# Módulos Node
+node_modules/
+npm-debug.log
+
+# Build e arquivos Vercel
+.vercel/
+.DS_Store
+
+# Testes locais de Push Notifications
+push_subscriptions.json
+
+# Backups e Dumps com dados sensíveis
+Google Apps Script - Backup*/
+migration_dump/
+Importar-BancoDeDados/
+*.bat

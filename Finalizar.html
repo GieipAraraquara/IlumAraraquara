@@ -45,6 +45,7 @@
 
     <!-- Domain Model & Map Service -->
     <script src="js/domain/ChamadoModel.js?v=31"></script>
+    <script src="js/services/ConfiguracoesService.js?v=1"></script>
     <script src="js/services/MapService.js?v=73"></script>
 
     <script>
@@ -469,10 +470,10 @@
                 </div>
 
                 <div id="boxFotoComplementarViaria">
-                    <input type="file" id="fotoComplementarViaria" accept="image/*" capture="environment" multiple class="hidden" onchange="adicionarFotoComplementarViaria(event)">
+                    <input type="file" id="fotoComplementarViaria" accept="image/*" multiple class="hidden" onchange="adicionarFotoComplementarViaria(event)">
                     <button type="button" 
                             id="btnAnexarFotoComplementarViaria"
-                            onclick="document.getElementById('fotoComplementarViaria').click()"
+                            onclick="abrirCameraComplementarViaria()"
                             class="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-300 border-dashed rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
                         <span class="material-symbols-outlined text-[20px] text-blue-600">add_a_photo</span>
                         <span>Anexar Fotos Complementares</span>
@@ -642,12 +643,12 @@
                             1. Foto de Entrada da Sessão <span class="text-red-500 font-bold">* (Obrigatório para iniciar)</span>
                         </label>
                         <div id="boxFotoEntradaPraca">
-                            <input type="file" id="fotoEntradaPraca" accept="image/*" capture="environment" class="hidden" onchange="previewFotoEntradaPraca(event)">
+                            <input type="file" id="fotoEntradaPraca" accept="image/*" class="hidden" onchange="previewFotoEntradaPraca(event)">
                             <button type="button" 
                                     id="btnAnexarFotoPraca"
-                                    onclick="document.getElementById('fotoEntradaPraca').click()"
-                                    class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2">
-                                <span class="material-symbols-outlined text-[18px]">photo_camera</span>
+                                    onclick="abrirCameraEntradaPraca()"
+                                    class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
+                                <span class="material-symbols-outlined text-[18px] text-blue-600">photo_camera</span>
                                 <span>Anexar Foto de Entrada</span>
                             </button>
                         </div>
@@ -687,10 +688,10 @@
                     </div>
 
                     <div id="boxFotoAndamentoPraca">
-                        <input type="file" id="fotoAndamentoPraca" accept="image/*" capture="environment" multiple class="hidden" onchange="adicionarFotoAndamentoPraca(event)">
+                        <input type="file" id="fotoAndamentoPraca" accept="image/*" multiple class="hidden" onchange="adicionarFotoAndamentoPraca(event)">
                         <button type="button" 
                                 id="btnAnexarFotoAndamentoPraca"
-                                onclick="document.getElementById('fotoAndamentoPraca').click()"
+                                onclick="abrirCameraAndamentoPraca()"
                                 class="w-full py-3 px-4 bg-slate-50 hover:bg-slate-100 active:scale-[0.99] border border-slate-300 border-dashed rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center justify-center gap-2 cursor-pointer">
                             <span class="material-symbols-outlined text-[20px] text-blue-600">add_a_photo</span>
                             <span>Anexar Fotos do Andamento</span>
@@ -1297,6 +1298,15 @@
           }
         }
 
+        // Carregar configurações contratuais e regras operacionais do sistema
+        try {
+          if (window.ConfiguracoesService) {
+            window.appRegrasOperacionais = await window.ConfiguracoesService.obterConfiguracoes();
+          }
+        } catch(e) {
+          console.warn('⚠️ Não foi possível carregar configurações do sistema, usando valores padrões.', e);
+        }
+
         ajustarPontos();
         configurarEventosCombobox();
         carregarMateriaisDinamicos();
@@ -1513,9 +1523,15 @@
         }
         html += '  </div>';
 
+        var cfg = window.appRegrasOperacionais || (window.ConfiguracoesService ? window.ConfiguracoesService.defaultValues : {});
+        var exigirPlaqueta = (cfg.permitir_conclusao_sem_plaqueta !== true);
+        var exigirGps = (cfg.exigir_geolocalizacao_conclusao !== false);
+        var exigirFotoAntes = (cfg.exigir_foto_antes !== false);
+        var exigirFotoDepois = (cfg.exigir_foto_depois !== false);
+
         html += '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
         html += '    <div>';
-        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Nº Plaqueta do Poste <span class="text-red-500 font-bold">*</span></label>';
+        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Nº Plaqueta do Poste ' + (exigirPlaqueta ? '<span class="text-red-500 font-bold">*</span>' : '<span class="text-slate-400 font-normal lowercase">(opcional)</span>') + '</label>';
         html += '      <input type="text" id="plaqueta_' + idx + '" placeholder="Ex: U8162" maxlength="5" oninput="mascaraPlaqueta(this)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:ring-2 focus:ring-blue-600 outline-none" />';
         html += '    </div>';
 
@@ -1535,7 +1551,7 @@
 
         html += '  <div class="space-y-1.5 border-t border-slate-100 pt-3">';
         html += '    <div class="flex items-center justify-between">';
-        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) <span class="text-red-500 font-bold">*</span></label>';
+        html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600">Coordenadas de Reparo (GPS) ' + (exigirGps ? '<span class="text-red-500 font-bold">*</span>' : '<span class="text-slate-400 font-normal lowercase">(opcional)</span>') + '</label>';
         html += '      <span id="gpsBadgePonto_' + idx + '" class="hidden text-[11px] font-bold px-2 py-0.5 rounded-full"></span>';
         html += '    </div>';
         html += '    <div class="flex flex-col sm:flex-row gap-2 items-center">';
@@ -1572,25 +1588,32 @@
 
         // UPLOAD DE FOTOS E EVIDÊNCIAS
         html += '  <div class="border-t border-slate-100 pt-3">';
-        html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Fotos de Evidência e Auditoria <span class="text-red-500 font-bold">* (Obrigatório anexar as 3 fotos)</span></label>';
+        html += '    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-2">Fotos de Evidência e Auditoria</label>';
         html += '    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">';
 
-        var estagios = ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'];
-        estagios.forEach(function(estagio) {
+        var estagios = [
+          { nome: 'Problema Encontrado', obrigatorio: exigirFotoAntes },
+          { nome: 'Reparo Efetuado', obrigatorio: exigirFotoDepois },
+          { nome: 'Plaqueta', obrigatorio: exigirPlaqueta }
+        ];
+
+        estagios.forEach(function(itemEstagio) {
+          var estagio = itemEstagio.nome;
+          var isObrigatorio = itemEstagio.obrigatorio;
           var idFile = 'foto_' + idx + '_' + estagio.replace(/ /g, '_');
           var idPreview = 'previewContainer_' + idx + '_' + estagio.replace(/ /g, '_');
           var idImg = 'img_' + idx + '_' + estagio.replace(/ /g, '_');
           var idBox = 'boxFoto_' + idx + '_' + estagio.replace(/ /g, '_');
 
           html += '      <div id="' + idBox + '" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center space-y-2 transition-all">';
-          html += '        <span class="text-xs font-bold text-slate-700 block">' + estagio + ' <span class="text-red-500">*</span></span>';
+          html += '        <span class="text-xs font-bold text-slate-700 block">' + estagio + ' ' + (isObrigatorio ? '<span class="text-red-500 font-bold">*</span>' : '<span class="text-slate-400 font-normal lowercase">(opcional)</span>') + '</span>';
           html += '        <div id="' + idPreview + '" class="hidden relative inline-block">';
           html += '          <img id="' + idImg + '" class="h-24 w-auto rounded-lg border border-slate-300 mx-auto object-cover" />';
           html += '          <button type="button" onclick="removerFotoEstagio(' + idx + ', \'' + estagio + '\')" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center font-bold shadow-md">✕</button>';
           html += '        </div>';
-          html += '        <input type="file" id="' + idFile + '" accept="image/*" capture="environment" class="hidden" onchange="processarFotoEstagio(' + idx + ', \'' + estagio + '\', event)" />';
-          html += '        <button type="button" onclick="var f = document.getElementById(\'' + idFile + '\'); if(f) f.value = \'\'; f.click();" class="w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center justify-center gap-1 cursor-pointer">';
-          html += '          <span class="material-symbols-outlined text-[16px]">photo_camera</span> Anexar Foto';
+          html += '        <input type="file" id="' + idFile + '" accept="image/*" class="hidden" onchange="processarFotoEstagio(' + idx + ', \'' + estagio + '\', event)" />';
+          html += '        <button type="button" onclick="abrirCameraEstagioPonto(' + idx + ', \'' + estagio + '\')" class="w-full py-1.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-lg text-xs font-semibold text-slate-700 shadow-sm flex items-center justify-center gap-1 cursor-pointer">';
+          html += '          <span class="material-symbols-outlined text-[16px] text-blue-600">photo_camera</span> Anexar Foto';
           html += '        </button>';
           html += '      </div>';
         });
@@ -2230,6 +2253,351 @@
         }
       }
 
+      // =========================================================================
+      // GERENCIADOR DA CÂMERA INTEGRADA (WEBRTC PWA IN-APP CAMERA)
+      // =========================================================================
+      window.cameraInterna = {
+        stream: null,
+        track: null,
+        facingMode: 'environment', // Traseira por padrão
+        torchAtivo: false,
+        zoomAtual: 1,
+        fotoCapturadaBase64: null,
+        onFotoConfirmadaCallback: null,
+        fallbackFileInputId: null,
+
+        async abrir(titulo, onConfirmar, fallbackFileInputId = null) {
+          this.onFotoConfirmadaCallback = onConfirmar;
+          this.fallbackFileInputId = fallbackFileInputId;
+          this.fotoCapturadaBase64 = null;
+          this.torchAtivo = false;
+          this.zoomAtual = 1;
+
+          var tituloEl = document.getElementById('cameraModalTitulo');
+          if (tituloEl) tituloEl.innerText = titulo || 'Câmera';
+
+          // Reseta visualização
+          var videoEl = document.getElementById('cameraVideoFeed');
+          var imgPreview = document.getElementById('cameraSnapshotPreview');
+          var liveControls = document.getElementById('cameraLiveControls');
+          var reviewControls = document.getElementById('cameraReviewControls');
+          var modal = document.getElementById('modalCameraInterna');
+
+          if (videoEl) videoEl.classList.remove('hidden');
+          if (imgPreview) {
+            imgPreview.classList.add('hidden');
+            imgPreview.src = '';
+          }
+          if (liveControls) liveControls.classList.remove('hidden');
+          if (reviewControls) reviewControls.classList.add('hidden');
+
+          if (modal) modal.classList.remove('hidden');
+
+          var iniciou = await this.iniciarStream();
+          if (!iniciou) {
+            this.fechar();
+            // Fallback transparente se o navegador não permitir getUserMedia
+            if (this.fallbackFileInputId) {
+              var fEl = document.getElementById(this.fallbackFileInputId);
+              if (fEl) {
+                fEl.value = '';
+                fEl.click();
+              }
+            }
+          }
+        },
+
+        async iniciarStream() {
+          this.pararStream();
+
+          var videoEl = document.getElementById('cameraVideoFeed');
+          if (!videoEl || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.warn('⚠️ [Câmera] navigator.mediaDevices.getUserMedia não suportado neste navegador.');
+            return false;
+          }
+
+          var constraints = {
+            audio: false,
+            video: {
+              facingMode: { ideal: this.facingMode },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 }
+            }
+          };
+
+          try {
+            this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+            videoEl.srcObject = this.stream;
+            await videoEl.play();
+
+            this.track = this.stream.getVideoTracks()[0];
+            this.configurarRecursosHardware();
+            return true;
+          } catch (err) {
+            console.error('⚠️ [Câmera] Erro ao acessar hardware da câmera:', err);
+            return false;
+          }
+        },
+
+        configurarRecursosHardware() {
+          if (!this.track) return;
+          var capabilities = (typeof this.track.getCapabilities === 'function') ? this.track.getCapabilities() : {};
+
+          // 1. Suporte a Lanterna (Torch)
+          var btnTorch = document.getElementById('btnCameraLanterna');
+          if (btnTorch) {
+            if (capabilities.torch) {
+              btnTorch.classList.remove('hidden');
+              this.atualizarIconeLanterna();
+            } else {
+              btnTorch.classList.add('hidden');
+            }
+          }
+
+          // 2. Suporte a Zoom Nativo
+          var zoomBox = document.getElementById('cameraZoomControls');
+          if (zoomBox) {
+            if (capabilities.zoom) {
+              zoomBox.classList.remove('hidden');
+              zoomBox.classList.add('flex');
+              var maxZ = capabilities.zoom.max || 1;
+              var btn3x = document.getElementById('btnZoom3x');
+              if (btn3x) {
+                if (maxZ < 3) btn3x.classList.add('hidden');
+                else btn3x.classList.remove('hidden');
+              }
+              this.destacarBotaoZoom(1);
+            } else {
+              zoomBox.classList.add('hidden');
+              zoomBox.classList.remove('flex');
+            }
+          }
+
+          // 3. Suporte a Controle de Exposição / Brilho (crucial para plaqueta)
+          var expBox = document.getElementById('cameraExposureControl');
+          var expSlider = document.getElementById('cameraExposureSlider');
+          if (expBox && expSlider) {
+            if (capabilities.exposureCompensation) {
+              expBox.classList.remove('hidden');
+              expBox.classList.add('flex');
+              expSlider.min = capabilities.exposureCompensation.min;
+              expSlider.max = capabilities.exposureCompensation.max;
+              expSlider.step = capabilities.exposureCompensation.step || 0.5;
+              expSlider.value = 0;
+              document.getElementById('cameraExposureLabel').innerText = '0';
+            } else {
+              expBox.classList.add('hidden');
+              expBox.classList.remove('flex');
+            }
+          }
+
+          // 4. Autofoco Contínuo
+          if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+            try {
+              this.track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] });
+            } catch(eFocus) {}
+          }
+        },
+
+        async alternarLanterna() {
+          if (!this.track) return;
+          try {
+            this.torchAtivo = !this.torchAtivo;
+            await this.track.applyConstraints({
+              advanced: [{ torch: this.torchAtivo }]
+            });
+            this.atualizarIconeLanterna();
+          } catch (eTorch) {
+            console.warn('⚠️ [Câmera] Falha ao alternar lanterna:', eTorch);
+          }
+        },
+
+        atualizarIconeLanterna() {
+          var iconEl = document.getElementById('iconCameraLanterna');
+          var btnEl = document.getElementById('btnCameraLanterna');
+          if (!iconEl || !btnEl) return;
+          if (this.torchAtivo) {
+            iconEl.innerText = 'flash_on';
+            btnEl.classList.remove('bg-white/15', 'text-white');
+            btnEl.classList.add('bg-amber-400', 'text-black');
+          } else {
+            iconEl.innerText = 'flash_off';
+            btnEl.classList.remove('bg-amber-400', 'text-black');
+            btnEl.classList.add('bg-white/15', 'text-white');
+          }
+        },
+
+        async inverterCamera() {
+          this.facingMode = (this.facingMode === 'environment') ? 'user' : 'environment';
+          await this.iniciarStream();
+        },
+
+        async ajustarZoom(valor) {
+          if (!this.track) return;
+          try {
+            this.zoomAtual = valor;
+            await this.track.applyConstraints({
+              advanced: [{ zoom: valor }]
+            });
+            this.destacarBotaoZoom(valor);
+          } catch(eZoom) {
+            console.warn('⚠️ [Câmera] Falha ao ajustar zoom:', eZoom);
+          }
+        },
+
+        destacarBotaoZoom(valor) {
+          ['btnZoom1x', 'btnZoom2x', 'btnZoom3x'].forEach(id => {
+            var b = document.getElementById(id);
+            if (!b) return;
+            b.classList.remove('bg-white', 'text-black');
+            b.classList.add('text-white');
+          });
+          var btnAtivo = document.getElementById('btnZoom' + valor + 'x');
+          if (btnAtivo) {
+            btnAtivo.classList.remove('text-white');
+            btnAtivo.classList.add('bg-white', 'text-black');
+          }
+        },
+
+        async ajustarExposicao(val) {
+          if (!this.track) return;
+          var numVal = parseFloat(val);
+          var lbl = document.getElementById('cameraExposureLabel');
+          if (lbl) lbl.innerText = numVal > 0 ? ('+' + numVal) : String(numVal);
+
+          try {
+            await this.track.applyConstraints({
+              advanced: [{ exposureCompensation: numVal }]
+            });
+          } catch (eExp) {
+            console.warn('⚠️ [Câmera] Falha ao ajustar exposição:', eExp);
+          }
+        },
+
+        dispararFoto() {
+          var videoEl = document.getElementById('cameraVideoFeed');
+          var canvasEl = document.getElementById('cameraCanvasOutput');
+          var imgPreview = document.getElementById('cameraSnapshotPreview');
+          if (!videoEl || !canvasEl) return;
+
+          var w = videoEl.videoWidth || 1920;
+          var h = videoEl.videoHeight || 1080;
+
+          // Redimensiona proporcionalmente para 1200px máx para manter o PWA ultraleve
+          var maxDim = 1200;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+
+          canvasEl.width = w;
+          canvasEl.height = h;
+          var ctx = canvasEl.getContext('2d', { alpha: false });
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'medium';
+          ctx.drawImage(videoEl, 0, 0, w, h);
+
+          // Gera Base64 em JPEG de alta qualidade
+          this.fotoCapturadaBase64 = canvasEl.toDataURL('image/jpeg', 0.80);
+
+          // Congela na tela para o técnico avaliar
+          if (imgPreview && this.fotoCapturadaBase64) {
+            imgPreview.src = this.fotoCapturadaBase64;
+            imgPreview.classList.remove('hidden');
+            videoEl.classList.add('hidden');
+
+            document.getElementById('cameraLiveControls')?.classList.add('hidden');
+            document.getElementById('cameraReviewControls')?.classList.remove('hidden');
+            document.getElementById('cameraReviewControls')?.classList.add('flex');
+          }
+        },
+
+        repetirFoto() {
+          this.fotoCapturadaBase64 = null;
+          var videoEl = document.getElementById('cameraVideoFeed');
+          var imgPreview = document.getElementById('cameraSnapshotPreview');
+          if (videoEl) videoEl.classList.remove('hidden');
+          if (imgPreview) {
+            imgPreview.classList.add('hidden');
+            imgPreview.src = '';
+          }
+          document.getElementById('cameraReviewControls')?.classList.add('hidden');
+          document.getElementById('cameraReviewControls')?.classList.remove('flex');
+          document.getElementById('cameraLiveControls')?.classList.remove('hidden');
+        },
+
+        async confirmarFoto() {
+          var b64 = this.fotoCapturadaBase64;
+          var cb = this.onFotoConfirmadaCallback;
+          this.fechar();
+
+          if (b64 && typeof cb === 'function') {
+            await cb(b64);
+          }
+        },
+
+        pararStream() {
+          if (this.stream) {
+            try {
+              this.stream.getTracks().forEach(track => {
+                try { track.stop(); } catch(eStop) {}
+              });
+            } catch(e) {}
+            this.stream = null;
+            this.track = null;
+          }
+          var videoEl = document.getElementById('cameraVideoFeed');
+          if (videoEl) videoEl.srcObject = null;
+        },
+
+        fechar() {
+          this.pararStream();
+          var modal = document.getElementById('modalCameraInterna');
+          if (modal) modal.classList.add('hidden');
+          this.fotoCapturadaBase64 = null;
+          this.onFotoConfirmadaCallback = null;
+        }
+      };
+
+      // Função chamada ao clicar em 'Anexar Foto' em qualquer estágio de ponto
+      function abrirCameraEstagioPonto(pontoIdx, estagio) {
+        var idFile = 'foto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var titulo = estagio + ' (Ponto ' + (pontoIdx + 1) + ')';
+
+        window.cameraInterna.abrir(titulo, async function(b64) {
+          await aplicarFotoEstagioDireta(pontoIdx, estagio, b64);
+        }, idFile);
+      }
+
+      // Aplica a foto capturada pela câmera integrada diretamente no estado e no preview do DOM
+      async function aplicarFotoEstagioDireta(pontoIdx, estagio, b64) {
+        if (!b64) return;
+        var idPreview = 'previewContainer_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idImg = 'img_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+        var idBox = 'boxFoto_' + pontoIdx + '_' + estagio.replace(/ /g, '_');
+
+        var containerEl = document.getElementById(idPreview);
+        var imgEl = document.getElementById(idImg);
+        var boxEl = document.getElementById(idBox);
+
+        if (!pontosData[pontoIdx]) inicializarStatePonto(pontoIdx);
+        pontosData[pontoIdx].fotosEstagios[estagio] = b64;
+
+        if (imgEl) imgEl.src = b64;
+        if (containerEl) containerEl.classList.remove('hidden');
+        if (boxEl) {
+          boxEl.classList.remove('border-slate-200', 'bg-slate-50');
+          boxEl.classList.add('border-emerald-400', 'bg-emerald-50/50');
+        }
+
+        await salvarRascunhoFinalizar();
+      }
+
       function removerFotoEstagio(pontoIdx, estagio) {
         if (pontosData[pontoIdx]) {
           pontosData[pontoIdx].fotosEstagios[estagio] = null;
@@ -2249,6 +2617,39 @@
           boxEl.classList.add('border-slate-200', 'bg-slate-50');
         }
         salvarRascunhoFinalizar();
+      }
+
+      // Função chamada ao clicar em 'Anexar Foto de Entrada' na OS Praça
+      function abrirCameraEntradaPraca() {
+        window.cameraInterna.abrir('Foto de Entrada da Sessão (Praça)', function(b64) {
+          fotoEntradaPracaBase64 = b64;
+          fotoEntradaPracaNome = "foto_entrada_" + Date.now() + ".jpg";
+          var imgEl = document.getElementById('imgPreviewEntradaPraca');
+          var contEl = document.getElementById('previewEntradaPracaContainer');
+          if (imgEl) imgEl.src = b64;
+          if (contEl) contEl.classList.remove('hidden');
+          salvarRascunhoFinalizar();
+        }, 'fotoEntradaPraca');
+      }
+
+      // Função chamada ao clicar em 'Anexar Fotos Complementares'
+      function abrirCameraComplementarViaria() {
+        window.cameraInterna.abrir('Foto Complementar (OS Viária)', function(b64) {
+          if (!b64) return;
+          fotosComplementaresViariaBase64Arr.push(b64);
+          renderizarPreviewsComplementaresViaria();
+          salvarRascunhoFinalizar();
+        }, 'fotoComplementarViaria');
+      }
+
+      // Função chamada ao clicar em 'Anexar Fotos do Andamento' na OS Praça
+      function abrirCameraAndamentoPraca() {
+        window.cameraInterna.abrir('Foto de Andamento (Praça)', function(b64) {
+          if (!b64) return;
+          fotosAndamentoPracaBase64Arr.push(b64);
+          renderizarPreviewsAndamentoPraca();
+          salvarRascunhoFinalizar();
+        }, 'fotoAndamentoPraca');
       }
 
       // =========================================================================
@@ -2768,8 +3169,13 @@
           return;
         }
 
-        // Validação obrigatória por ponto: Plaqueta (texto), Coordenadas GPS e 3 fotos de evidência
-        var estagiosObrigatorios = ['Problema Encontrado', 'Reparo Efetuado', 'Plaqueta'];
+        // Obter configurações contratuais ativas
+        var cfg = window.appRegrasOperacionais || (window.ConfiguracoesService ? window.ConfiguracoesService.defaultValues : {});
+        var exigirPlaqueta = (cfg.permitir_conclusao_sem_plaqueta !== true);
+        var exigirGps = (cfg.exigir_geolocalizacao_conclusao !== false);
+        var exigirFotoAntes = (cfg.exigir_foto_antes !== false);
+        var exigirFotoDepois = (cfg.exigir_foto_depois !== false);
+
         var pontosComPendencia = [];
 
         for (var i = 0; i < qtdAtual; i++) {
@@ -2777,24 +3183,28 @@
           var fotos = stObj.fotosEstagios || {};
           var faltantesPonto = [];
 
-          // 1. Validação da Plaqueta (texto)
-          var plaqInput = document.getElementById('plaqueta_' + i);
-          var plaqVal = plaqInput ? plaqInput.value.trim() : '';
-          if (!plaqVal) {
-            faltantesPonto.push('Nº da Plaqueta');
+          // 1. Validação da Plaqueta (se exigido pelas regras operacionais)
+          if (exigirPlaqueta) {
+            var plaqInput = document.getElementById('plaqueta_' + i);
+            var plaqVal = plaqInput ? plaqInput.value.trim() : '';
+            if (!plaqVal) {
+              faltantesPonto.push('Nº da Plaqueta');
+            }
           }
 
-          // 2. Validação das Coordenadas GPS (Lat / Lng)
-          var latInput = document.getElementById('lat_' + i);
-          var lngInput = document.getElementById('lng_' + i);
-          var latVal = latInput ? latInput.value.trim() : '';
-          var lngVal = lngInput ? lngInput.value.trim() : '';
+          // 2. Validação das Coordenadas GPS (se exigido pelas regras operacionais)
+          if (exigirGps) {
+            var latInput = document.getElementById('lat_' + i);
+            var lngInput = document.getElementById('lng_' + i);
+            var latVal = latInput ? latInput.value.trim() : '';
+            var lngVal = lngInput ? lngInput.value.trim() : '';
 
-          var latNum = parseFloat(latVal.replace(',', '.'));
-          var lngNum = parseFloat(lngVal.replace(',', '.'));
+            var latNum = parseFloat(latVal.replace(',', '.'));
+            var lngNum = parseFloat(lngVal.replace(',', '.'));
 
-          if (!latVal || !lngVal || latVal === 'Buscando...' || lngVal === 'Buscando...' || isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
-            faltantesPonto.push('Coordenadas GPS');
+            if (!latVal || !lngVal || latVal === 'Buscando...' || lngVal === 'Buscando...' || isNaN(latNum) || isNaN(lngNum) || latNum === 0 || lngNum === 0) {
+              faltantesPonto.push('Coordenadas GPS');
+            }
           }
 
           // 3. Validação da Seleção do Poste no Mapa
@@ -2804,16 +3214,23 @@
             faltantesPonto.push('Seleção do Poste no Mapa (ou clicar em "Poste não encontrado no mapa")');
           }
 
-          // 4. Validação das 3 Fotos
+          // 4. Validação das Fotos conforme regras operacionais ativas
           var probValPonto = document.getElementById('tipoProblema_' + i) ? document.getElementById('tipoProblema_' + i).value : '';
-          estagiosObrigatorios.forEach(function(estagio) {
-            if (probValPonto === 'Nenhum' && estagio === 'Reparo Efetuado') {
-              return; // Exceção: Foto de Reparo Efetuado não é necessária se o problema for "Nenhum"
+
+          if (exigirFotoAntes && !fotos['Problema Encontrado']) {
+            faltantesPonto.push('Foto (Problema Encontrado)');
+          }
+
+          if (exigirFotoDepois) {
+            if (probValPonto !== 'Nenhum' && !fotos['Reparo Efetuado']) {
+              faltantesPonto.push('Foto (Reparo Efetuado)');
             }
-            if (!fotos[estagio]) {
-              faltantesPonto.push('Foto (' + estagio + ')');
-            }
-          });
+          }
+
+          // Foto da plaqueta segue a obrigatoriedade da plaqueta
+          if (exigirPlaqueta && !fotos['Plaqueta']) {
+            faltantesPonto.push('Foto (Plaqueta)');
+          }
 
           if (faltantesPonto.length > 0) {
             pontosComPendencia.push({
@@ -2828,10 +3245,10 @@
             return '• Ponto #' + item.ponto + ':\n   ' + item.faltantes.join('\n   ');
           }).join('\n\n');
 
-          var mensagemErro = 'Para finalizar a Ordem de Serviço, é obrigatório preencher a Plaqueta, as Coordenadas GPS, selecionar o Poste no mapa (ou marcar "Poste não encontrado") e anexar as fotos de evidência para cada ponto:\n\n' + detalheErros;
+          var mensagemErro = 'Para finalizar a Ordem de Serviço, cumpra os requisitos obrigatórios pendentes por ponto:\n\n' + detalheErros;
 
-          exibirModalAlertaValidacao("Campos Obrigatórios Pendentes", mensagemErro);
-          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ É obrigatório preencher Plaqueta, GPS, selecionar o Poste no mapa e anexar as fotos para cada ponto.</span>';
+          exibirModalAlertaValidacao("Requisitos Operacionais Pendentes", mensagemErro);
+          msg.innerHTML = '<span class="text-red-600 font-bold">⚠️ Existem pendências obrigatórias para os pontos cadastrados.</span>';
           return;
         }
 
@@ -3372,45 +3789,9 @@
                       observacao: obsHist
                     }]);
                   } else {
-                    // Plaqueta não existia no cadastro: insere o novo registro cravado na posição do poste/alvo
-                    await client.from('localizacao_plaquetas').insert([{
-                      identificacao: plaqUpper,
-                      Latitude: pLatCalib,
-                      Longitude: pLngCalib,
-                      "QTD. Lum.": 1,
-                      Empresa: 'ILUMITERRA - SEGUNDO CONTRATO',
-                      Observação: (ehSnapPoste ? 'Cadastrada no Poste #' + pt.poste_id_selecionado : 'Cadastrada') + ' via Finalização OS #' + protFinal
-                    }]);
-
-                    if (ehSnapPoste && pt.poste_id_selecionado) {
-                      try {
-                        var resPstVincNova = await client.from('postes_base_aerea')
-                          .select('id, id_plaqueta_vinculada')
-                          .eq('id', pt.poste_id_selecionado)
-                          .maybeSingle();
-                        if (resPstVincNova && resPstVincNova.data) {
-                          var vincArrNova = String(resPstVincNova.data.id_plaqueta_vinculada || '').toUpperCase().split(',').map(s => s.trim()).filter(Boolean);
-                          if (!vincArrNova.includes(plaqUpper)) {
-                            vincArrNova.push(plaqUpper);
-                            await client.from('postes_base_aerea')
-                              .update({ id_plaqueta_vinculada: vincArrNova.join(', ') })
-                              .eq('id', pt.poste_id_selecionado);
-                          }
-                        }
-                      } catch (eUpPosteNova) {
-                        console.warn('Aviso ao vincular nova plaqueta ao poste:', eUpPosteNova);
-                      }
-                    }
-
-                    await client.from('historico_localizacao_plaquetas').insert([{
-                      identificacao: plaqUpper,
-                      latitude: pLatCalib,
-                      longitude: pLngCalib,
-                      numero_os: protFinal,
-                      origem: ehSnapPoste ? 'SNAP_POSTE_AEREO' : 'CADASTRO_NOVA_PLAQUETA',
-                      usuario: nomeOperadorFinalizacao,
-                      observacao: (ehSnapPoste ? 'Nova plaqueta cadastrada no Poste #' + pt.poste_id_selecionado : 'Nova plaqueta cadastrada') + ' ao finalizar OS #' + protFinal
-                    }]);
+                    // Plaqueta não existia no cadastro: NÃO insere diretamente no banco.
+                    // A nova plaqueta fica registrada na OS e será enviada para a Fila de Aprovação de Coordenadas do Controle de Plaquetas.
+                    console.log(`ℹ️ [Plaqueta #${plaqUpper}] Plaqueta nova identificada na OS #${protFinal}. Não cadastrada previamente; aguardará aprovação no Controle de Plaquetas.`);
                   }
                 }
               }
@@ -4653,5 +5034,93 @@
             }
         });
     </script>
+
+    <!-- ========================================================================= -->
+    <!-- MODAL DE CÂMERA INTEGRADA (PWA IN-APP CAMERA COM ZOOM, LANTERNA E BRILHO) -->
+    <!-- ========================================================================= -->
+    <div id="modalCameraInterna" class="hidden fixed inset-0 z-[100000] bg-black flex flex-col select-none touch-none animate-fade-in font-sans">
+        <!-- Barra Superior: Título, Lanterna, Troca de Câmera e Fechar -->
+        <div class="flex items-center justify-between p-3.5 sm:p-4 text-white z-20 bg-gradient-to-b from-black/80 to-transparent">
+            <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span id="cameraModalTitulo" class="text-xs sm:text-sm font-bold tracking-wide">Câmera</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <!-- Botão Lanterna/Torch -->
+                <button type="button" id="btnCameraLanterna" onclick="window.cameraInterna.alternarLanterna()" class="hidden w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer" title="Ligar/Desligar Lanterna">
+                    <span class="material-symbols-outlined text-[20px]" id="iconCameraLanterna">flash_off</span>
+                </button>
+                <!-- Botão Inverter Câmera (Traseira/Frontal) -->
+                <button type="button" id="btnCameraInverter" onclick="window.cameraInterna.inverterCamera()" class="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer" title="Inverter Câmera">
+                    <span class="material-symbols-outlined text-[20px]">cameraswitch</span>
+                </button>
+                <!-- Botão Fechar -->
+                <button type="button" onclick="window.cameraInterna.fechar()" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/30 active:scale-95 text-white flex items-center justify-center transition-all cursor-pointer ml-1" title="Fechar Câmera">
+                    <span class="material-symbols-outlined text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Área Central: Visor de Vídeo e Preview Congelado -->
+        <div class="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden bg-black" id="cameraViewportBox">
+            <video id="cameraVideoFeed" autoplay playsinline muted class="w-full h-full object-cover"></video>
+            <canvas id="cameraCanvasOutput" class="hidden"></canvas>
+            <img id="cameraSnapshotPreview" class="hidden w-full h-full object-contain" alt="Preview da Foto" />
+
+            <!-- Grade de Enquadramento Guia (útil para centralizar plaqueta) -->
+            <div id="cameraGridGuia" class="absolute inset-4 pointer-events-none border border-white/20 rounded-2xl grid grid-cols-3 grid-rows-3 transition-opacity duration-300">
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15"></div>
+                <div class="border-r border-b border-white/15 flex items-center justify-center">
+                    <div class="w-8 h-8 border border-white/30 rounded-full"></div>
+                </div>
+                <div class="border-b border-white/15"></div>
+                <div class="border-r border-white/15"></div>
+                <div class="border-r border-white/15"></div>
+                <div></div>
+            </div>
+
+            <!-- Controle Lateral Flutuante: Compensação de Exposição/Brilho (Crucial para Plaqueta) -->
+            <div id="cameraExposureControl" class="hidden absolute right-3 top-1/2 -translate-y-1/2 z-20 flex-col items-center gap-2 bg-black/50 backdrop-blur-md p-2 rounded-2xl border border-white/15 text-white">
+                <span class="material-symbols-outlined text-[16px] text-amber-300">wb_sunny</span>
+                <input type="range" id="cameraExposureSlider" min="-2" max="2" step="0.5" value="0" orient="vertical" oninput="window.cameraInterna.ajustarExposicao(this.value)" class="h-28 w-1.5 accent-amber-400 bg-white/20 rounded-lg cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+                <span class="text-[9px] font-mono text-white/70" id="cameraExposureLabel">0</span>
+            </div>
+        </div>
+
+        <!-- Barra Inferior: Controles de Zoom, Botão de Disparo / Confirmar -->
+        <div class="p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-20 flex flex-col items-center gap-3">
+            <!-- Controles Rápidos de Zoom (1x, 2x, 3x) -->
+            <div id="cameraZoomControls" class="hidden items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/15">
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(1)" id="btnZoom1x" class="px-2.5 py-1 text-xs font-bold rounded-full bg-white text-black transition-all">1x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(2)" id="btnZoom2x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all">2x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(3)" id="btnZoom3x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all">3x</button>
+            </div>
+
+            <!-- Botões de Ação: Disparo (ao vivo) ou Confirmar/Repetir (quando congelada) -->
+            <div class="w-full flex items-center justify-around max-w-sm">
+                <!-- Modo Captura: Botão de Disparo Principal -->
+                <div id="cameraLiveControls" class="flex items-center justify-center w-full">
+                    <button type="button" onclick="window.cameraInterna.dispararFoto()" class="w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-white flex items-center justify-center bg-white/20 active:scale-90 transition-transform cursor-pointer shadow-2xl">
+                        <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-white"></div>
+                    </button>
+                </div>
+
+                <!-- Modo Foto Congelada: Repetir ou Confirmar -->
+                <div id="cameraReviewControls" class="hidden items-center justify-between w-full px-4 gap-4">
+                    <button type="button" onclick="window.cameraInterna.repetirFoto()" class="flex-1 py-3 px-4 bg-white/15 hover:bg-white/25 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 border border-white/20 transition-all cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">replay</span>
+                        <span>Tirar Outra</span>
+                    </button>
+                    <button type="button" onclick="window.cameraInterna.confirmarFoto()" class="flex-1 py-3 px-4 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/30 transition-all cursor-pointer">
+                        <span class="material-symbols-outlined text-[18px]">check</span>
+                        <span>Usar Foto</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

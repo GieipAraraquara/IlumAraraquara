@@ -22,8 +22,8 @@
     <script src="js/services/ChamadosService.js?v=33"></script>
     <script src="js/services/MapService.js?v=75"></script>
     <script src="js/services/PushNotificationService.js"></script>
-    <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/PainelController.js?v=47"></script>
+    <script src="js/services/ConfiguracoesService.js?v=1"></script>
+    <script src="js/controllers/PainelController.js?v=48"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js?v=33"></script>
@@ -210,6 +210,22 @@
         .resizer:hover::after,
         .resizer.resizing::after {
             background-color: #0051d5; /* Azul Secundário */
+        }
+
+        /* Mapbox GL Marker Precision Fix: previne que transitions ou transforms CSS atrasem/desloquem a posição do marcador no zoom */
+        .mapboxgl-marker {
+            transition: none !important;
+            will-change: transform;
+        }
+        .mapboxgl-marker,
+        .mapboxgl-marker * {
+            transition: none !important;
+            animation: none !important;
+        }
+        .marker-anchor-center {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
     </style>
 </head>

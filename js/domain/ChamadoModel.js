@@ -957,6 +957,17 @@ class ChamadoModel {
             const modoIni = (pIni && (pIni.modo || pIni.tipoLocal || pIni.tipo_local)) || '';
             const isAddressMode = modoIni === 'endereco' || (!modoIni && ChamadoModel.isRealAddress(endIni));
 
+            // Extração de dados do Poste Aéreo selecionado no ponto
+            const posteId = pFin ? (pFin.poste_id_selecionado || pFin.poste_id || pFin.posteAereoId || pFin.poste_aereo_id || null) : null;
+            const posteLat = pFin ? (pFin.poste_lat !== undefined ? pFin.poste_lat : (pFin.posteLat !== undefined ? pFin.posteLat : null)) : null;
+            const posteLng = pFin ? (pFin.poste_lng !== undefined ? pFin.poste_lng : (pFin.posteLng !== undefined ? pFin.posteLng : null)) : null;
+            const posteDist = pFin ? (pFin.distancia_gps_poste_metros !== undefined ? pFin.distancia_gps_poste_metros : (pFin.distanciaGpsPosteMetros !== undefined ? pFin.distanciaGpsPosteMetros : null)) : null;
+            const postePlaq = pFin ? (pFin.poste_plaqueta_vinculada || pFin.postePlaquetaVinculada || null) : null;
+            const posteNaoEnc = pFin ? Boolean(pFin.poste_nao_encontrado || pFin.posteNaoEncontrado) : false;
+            const conflitoPoste = pFin ? Boolean(pFin.conflito_plaqueta_poste || pFin.conflitoPlaquetaPoste) : false;
+            // Extração de precisão do GPS capturado pelo operador
+            const precisaoGps = pFin ? (pFin.precisao_gps_metros !== undefined && pFin.precisao_gps_metros !== null ? Number(pFin.precisao_gps_metros) : (pFin.precisaoGps !== undefined && pFin.precisaoGps !== null ? Number(pFin.precisaoGps) : null)) : null;
+
             result.push({
                 numero: i + 1,
                 fechamento: numFech,
@@ -973,7 +984,17 @@ class ChamadoModel {
                 plaquetaFinal: ChamadoModel.formatLocationText(plqFin),
                 coordenadaFinal: ChamadoModel.formatLocationText(coordFin),
                 problemaEncontrado: ChamadoModel.formatLocationText(probFin),
-                hasFinalData: hasFinalData
+                hasFinalData: hasFinalData,
+                precisaoGpsMetros: precisaoGps,
+                // Dados do Poste da Base Aérea
+                posteId: posteId,
+                posteLat: posteLat,
+                posteLng: posteLng,
+                posteDistanciaMetros: posteDist,
+                postePlaquetaVinculada: postePlaq,
+                posteNaoEncontrado: posteNaoEnc,
+                conflitoPlaquetaPoste: conflitoPoste,
+                hasPoste: Boolean(posteId)
             });
         });
 
@@ -1519,6 +1540,122 @@ class ChamadoModel {
         const day = String(this.dataConclusao.getDate()).padStart(2, '0');
         const month = String(this.dataConclusao.getMonth() + 1).padStart(2, '0');
         return `${day}/${month}`;
+    }
+
+    /**
+     * Calcula o SLA contratual desta OS baseado nas configurações gerais do sistema.
+     * Retorna { dataLimite, horasRestantes, diasRestantes, statusSla: 'ok'|'amarelo'|'critico'|'atrasado'|'concluido', label, badgeClass }
+     */
+    calcularSLA(customConfig) {
+        const cfg = customConfig || window.AppSettings || (window.ConfiguracoesService ? window.ConfiguracoesService.defaultValues : {
+            prazo_baixa_prioridade_dias: 15,
+            prazo_normal_dias: 7,
+            prazo_alta_prioridade_dias: 3,
+            prazo_urgente_horas: 24,
+            prazo_emergencia_horas: 6,
+            tipo_contagem_prazo: 'corridos',
+            alerta_vencimento_dias: 2,
+            alerta_critico_horas: 12
+        });
+
+        if (!this.dataAbertura || isNaN(this.dataAbertura.getTime())) {
+            return { statusSla: 'ok', label: 'SLA --', badgeClass: 'hidden' };
+        }
+
+        const prioNorm = String(this.prioridade || 'Normal').trim().toLowerCase();
+        let prazoHoras = (cfg.prazo_normal_dias || 7) * 24;
+
+        if (prioNorm.includes('emerg') || prioNorm.includes('risco')) {
+            prazoHoras = parseInt(cfg.prazo_emergencia_horas, 10) || 6;
+        } else if (prioNorm.includes('urg') || prioNorm.includes('crit')) {
+            prazoHoras = parseInt(cfg.prazo_urgente_horas, 10) || 24;
+        } else if (prioNorm.includes('alta')) {
+            prazoHoras = (parseInt(cfg.prazo_alta_prioridade_dias, 10) || 3) * 24;
+        } else if (prioNorm.includes('baixa')) {
+            prazoHoras = (parseInt(cfg.prazo_baixa_prioridade_dias, 10) || 15) * 24;
+        } else {
+            prazoHoras = (parseInt(cfg.prazo_normal_dias, 10) || 7) * 24;
+        }
+
+        // Se for dias úteis e o prazo for em dias (>= 24h)
+        const tipoContagem = cfg.tipo_contagem_prazo || 'corridos';
+        const dataLimite = new Date(this.dataAbertura.getTime());
+
+        if (tipoContagem === 'uteis' && prazoHoras >= 24) {
+            let diasUteisRestantes = Math.round(prazoHoras / 24);
+            while (diasUteisRestantes > 0) {
+                dataLimite.setDate(dataLimite.getDate() + 1);
+                const diaSemana = dataLimite.getDay();
+                if (diaSemana !== 0 && diaSemana !== 6) { // 0=Domingo, 6=Sábado
+                    diasUteisRestantes--;
+                }
+            }
+        } else {
+            dataLimite.setTime(dataLimite.getTime() + (prazoHoras * 3600 * 1000));
+        }
+
+        const agora = new Date();
+        const dataFimCalculo = (this.isConcluida && this.dataConclusao && !isNaN(this.dataConclusao.getTime())) ? this.dataConclusao : agora;
+        const diffMs = dataLimite.getTime() - dataFimCalculo.getTime();
+        const diffHoras = diffMs / (3600 * 1000);
+
+        const alertaDias = parseInt(cfg.alerta_vencimento_dias, 10) || 2;
+        const alertaCriticoHoras = parseInt(cfg.alerta_critico_horas, 10) || 12;
+
+        if (this.isConcluida) {
+            const noPrazo = diffMs >= 0;
+            return {
+                dataLimite,
+                horasRestantes: diffHoras,
+                statusSla: 'concluido',
+                label: noPrazo ? 'Concluída no SLA' : 'Concluída c/ Atraso',
+                badgeClass: noPrazo ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
+            };
+        }
+
+        if (diffMs < 0) {
+            const horasAtraso = Math.abs(Math.round(diffHoras));
+            const diasAtraso = Math.floor(horasAtraso / 24);
+            const strAtraso = diasAtraso > 0 ? `${diasAtraso}d atrasada` : `${horasAtraso}h atrasada`;
+            return {
+                dataLimite,
+                horasRestantes: diffHoras,
+                statusSla: 'atrasado',
+                label: strAtraso,
+                badgeClass: 'bg-red-100 text-red-800 border border-red-300 font-bold'
+            };
+        }
+
+        if (diffHoras <= alertaCriticoHoras) {
+            const hRest = Math.max(1, Math.round(diffHoras));
+            return {
+                dataLimite,
+                horasRestantes: diffHoras,
+                statusSla: 'critico',
+                label: `Vence em ${hRest}h`,
+                badgeClass: 'bg-red-50 text-red-700 border border-red-200 font-bold animate-pulse'
+            };
+        }
+
+        if (diffHoras <= (alertaDias * 24)) {
+            const diasRest = Math.max(1, Math.ceil(diffHoras / 24));
+            return {
+                dataLimite,
+                horasRestantes: diffHoras,
+                statusSla: 'amarelo',
+                label: `Vence em ${diasRest}d`,
+                badgeClass: 'bg-amber-50 text-amber-800 border border-amber-200 font-medium'
+            };
+        }
+
+        const diasRest = Math.ceil(diffHoras / 24);
+        return {
+            dataLimite,
+            horasRestantes: diffHoras,
+            statusSla: 'ok',
+            label: `${diasRest}d restantes`,
+            badgeClass: 'bg-slate-100 text-slate-600 border border-slate-200 font-normal'
+        };
     }
 
     /**

@@ -324,6 +324,21 @@
             cursor: pointer; z-index: 45;
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
+        /* Badge Sequencial da Rota de Auditoria */
+        .marker-auditoria-step-badge {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: #ffffff; border: 2.5px solid #ffffff;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 800;
+            box-shadow: 0 4px 14px rgba(5, 150, 105, 0.5);
+            cursor: pointer; z-index: 50;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .marker-auditoria-step-badge:hover {
+            transform: scale(1.28);
+            box-shadow: 0 6px 18px rgba(5, 150, 105, 0.75);
+        }
         .marker-operador-step-badge:hover {
             transform: scale(1.25);
             box-shadow: 0 6px 18px rgba(16, 185, 129, 0.7);
@@ -563,14 +578,33 @@
                 <!-- Modo de Escopo -->
                 <div>
                     <label class="text-[11px] font-bold text-on-surface-variant block mb-1.5 uppercase tracking-wider">Modo de Seleção:</label>
-                    <div class="grid grid-cols-2 gap-1.5">
-                        <button type="button" id="btnEscopoAuto" onclick="setModoEscopoRota('auto')" class="px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm">
-                            <span>⚡ Automático</span>
+                    <div class="grid grid-cols-3 gap-1">
+                        <button type="button" id="btnEscopoAuto" onclick="setModoEscopoRota('auto')" class="px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm">
+                            <span>⚡ Auto</span>
                         </button>
-                        <button type="button" id="btnEscopoRegiao" onclick="setModoEscopoRota('regiao')" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary">
-                            <span>✏️ Por Região</span>
+                        <button type="button" id="btnEscopoRegiao" onclick="setModoEscopoRota('regiao')" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary">
+                            <span>✏️ Região</span>
+                        </button>
+                        <button type="button" id="btnEscopoAuditoria" onclick="setModoEscopoRota('auditoria')" class="px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-emerald-600">
+                            <span>🔎 Auditoria</span>
                         </button>
                     </div>
+                </div>
+
+                <!-- Info Modo Auditoria (Apenas se modo auditoria ativo) -->
+                <div id="containerInfoAuditoriaRota" class="hidden p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 space-y-1.5">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-[11px] flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
+                            <span>Pontos de Auditoria</span>
+                        </span>
+                        <span id="badgeQtdAuditoriaCarregada" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-600 text-white">0 OSs</span>
+                    </div>
+                    <p id="descAuditoriaRotaTexto" class="text-[10.5px] leading-snug">Selecione OSs na tela de Auditoria ou use os pontos já importados.</p>
+                    <a href="Auditoria.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline pt-0.5">
+                        <span>Ir para tabela de Auditoria</span>
+                        <span class="material-symbols-outlined text-[13px]">open_in_new</span>
+                    </a>
                 </div>
 
                 <!-- Ponto de Partida -->
@@ -591,9 +625,9 @@
                 <div id="containerMaxOSsRota">
                     <div class="flex justify-between items-center mb-1">
                         <label class="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">Limite de Atendimentos:</label>
-                        <span id="labelMaxOSsRotaVal" class="text-xs font-bold text-secondary">10 OSs</span>
+                        <span id="labelMaxOSsRotaVal" class="text-xs font-bold text-secondary">15 OSs</span>
                     </div>
-                    <input type="range" id="inputMaxOSsRota" min="3" max="25" value="10" step="1" oninput="document.getElementById('labelMaxOSsRotaVal').innerText = this.value + ' OSs'" class="w-full accent-secondary cursor-pointer" />
+                    <input type="range" id="inputMaxOSsRota" min="3" max="50" value="15" step="1" oninput="document.getElementById('labelMaxOSsRotaVal').innerText = this.value + ' OSs'" class="w-full accent-secondary cursor-pointer" />
                 </div>
 
                 <!-- Botão Desenhar Área (apenas se modo regiao) -->
@@ -640,6 +674,20 @@
                     <span class="material-symbols-outlined text-[14px]">content_copy</span>
                     <span id="btnCopiarLinkRotaText">Copiar Link do Google Maps</span>
                 </button>
+
+                <!-- Trechos do Google Maps (Exibido quando > 10 pontos) -->
+                <div id="containerTrechosGoogleMaps" class="hidden space-y-1.5 p-2 bg-slate-500/10 border border-slate-400/30 rounded-xl text-xs">
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-[11px] text-on-surface flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[14px] text-secondary">alt_route</span>
+                            <span>Trechos da Rota (+10 pontos):</span>
+                        </span>
+                        <span class="text-[10px] text-on-surface-variant italic">Google Maps max. 10/link</span>
+                    </div>
+                    <div id="listaBotoesTrechosGoogleMaps" class="grid grid-cols-1 gap-1 pt-1">
+                        <!-- Links dos trechos gerados via JS -->
+                    </div>
+                </div>
 
                 <!-- Lista de Sequência da Rota -->
                 <div class="border-t border-outline-variant/60 pt-2">
@@ -968,7 +1016,34 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         carregarMapaOSsAbertas();
+        verificarParametrosRotaAuditoriaInicial();
     });
+
+    function verificarParametrosRotaAuditoriaInicial() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const modoParam = urlParams.get('modo');
+        const hasSessionRota = !!sessionStorage.getItem('rota_auditoria_selecionada');
+
+        if (modoParam === 'auditoria' || hasSessionRota) {
+            setTimeout(() => {
+                const painel = document.getElementById('painelRoteirizacaoOS');
+                if (painel && painel.classList.contains('hidden')) {
+                    togglePainelRoteirizacao();
+                }
+                setModoEscopoRota('auditoria');
+
+                // Aguarda o mapa terminar o carregamento para traçar a rota automaticamente
+                const checkMapInterval = setInterval(() => {
+                    if (mapOSsInstance && dadosOSsAbertasCache && dadosOSsAbertasCache.length > 0) {
+                        clearInterval(checkMapInterval);
+                        calcularERenderizarRotaViaria();
+                    }
+                }, 300);
+
+                setTimeout(() => clearInterval(checkMapInterval), 8000);
+            }, 600);
+        }
+    }
 
     function filtrarOSsMapaDirect(val) {
         filtrarOSsMapa(val);
@@ -2149,20 +2224,29 @@
             mapOSsInstance.on('click', layerFillId, (e) => {
                 if (e.features && e.features[0]) {
                     const props = e.features[0].properties;
-                    new mapboxgl.Popup({ offset: 10, closeButton: true })
+                    const nomeCondominio = props.nome || 'Condomínio Bloqueado';
+                    const justificativa = props.justificativa || 'Área particular não atendida pelo município.';
+
+                    new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: '320px' })
                         .setLngLat(e.lngLat)
                         .setHTML(`
-                            <div class="p-2 space-y-1.5 font-sans" style="min-width: 200px;">
-                                <div class="flex items-center gap-1.5 text-xs font-bold text-rose-800 border-b border-rose-100 pb-1">
-                                    <span>🚫</span>
-                                    <span>${props.nome}</span>
+                            <div class="bg-slate-900/95 backdrop-blur-md text-slate-100 rounded-2xl p-3.5 shadow-2xl border border-rose-500/40 font-sans text-xs min-w-[240px] max-w-[320px]">
+                                <div class="flex items-center gap-2 pb-2.5 mb-2.5 border-b border-rose-500/30 pr-6">
+                                    <span class="w-6 h-6 rounded-full bg-rose-500/20 text-rose-400 flex items-center justify-center text-sm font-bold flex-shrink-0">🚫</span>
+                                    <div class="min-w-0 flex-1">
+                                        <h4 class="font-bold text-xs text-rose-300 leading-tight truncate" title="${nomeCondominio}">${nomeCondominio}</h4>
+                                        <span class="text-[10px] text-rose-400/80 font-medium tracking-wide uppercase">Área / Condomínio Bloqueado</span>
+                                    </div>
                                 </div>
-                                <div class="text-[11px] text-slate-700 leading-snug">
-                                    <strong class="text-rose-700">Bloqueio de OS:</strong><br>
-                                    ${props.justificativa || 'Área particular não atendida pelo município.'}
-                                </div>
-                                <div class="text-[10px] text-slate-400 font-semibold pt-0.5">
-                                    Condomínio / Perímetro Proibido
+                                <div class="space-y-2 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 text-[11px]">
+                                    <div class="flex items-start gap-1.5 text-slate-300 leading-relaxed">
+                                        <span class="text-rose-400 font-bold flex-shrink-0">Motivo:</span>
+                                        <span class="text-slate-200">${justificativa}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-800/80 text-[10px] text-amber-400/90 font-medium">
+                                        <span class="material-symbols-outlined text-[13px] text-amber-400">info</span>
+                                        <span>Abertura de OS restrita neste perímetro</span>
+                                    </div>
                                 </div>
                             </div>
                         `)
@@ -3835,20 +3919,62 @@
         modoEscopoRota = modo;
         const btnAuto = document.getElementById('btnEscopoAuto');
         const btnRegiao = document.getElementById('btnEscopoRegiao');
+        const btnAuditoria = document.getElementById('btnEscopoAuditoria');
         const containerMax = document.getElementById('containerMaxOSsRota');
         const containerBtnRegiao = document.getElementById('containerBtnDesenharRegiao');
+        const containerInfoAudit = document.getElementById('containerInfoAuditoriaRota');
+
+        // Reset classes
+        const clsInactive = "px-2 py-1.5 rounded-lg text-[11px] font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+        const clsActive = "px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
+        const clsActiveAudit = "px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all flex items-center justify-center gap-1 border-emerald-600 bg-emerald-500/15 text-emerald-700 shadow-sm";
+
+        if (btnAuto) btnAuto.className = clsInactive;
+        if (btnRegiao) btnRegiao.className = clsInactive;
+        if (btnAuditoria) btnAuditoria.className = clsInactive;
+
+        if (containerInfoAudit) containerInfoAudit.classList.add('hidden');
+        if (containerBtnRegiao) containerBtnRegiao.classList.add('hidden');
 
         if (modo === 'auto') {
-            if (btnAuto) btnAuto.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
-            if (btnRegiao) btnRegiao.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+            if (btnAuto) btnAuto.className = clsActive;
             if (containerMax) containerMax.classList.remove('hidden');
-            if (containerBtnRegiao) containerBtnRegiao.classList.add('hidden');
             if (desenhoRegiaoState.ativo) desativarModoDesenhoRegiao();
-        } else {
-            if (btnRegiao) btnRegiao.className = "px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 border-secondary bg-secondary/10 text-secondary shadow-sm";
-            if (btnAuto) btnAuto.className = "px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all flex items-center justify-center gap-1 border-outline-variant bg-surface-container-lowest text-on-surface-variant hover:border-secondary";
+        } else if (modo === 'regiao') {
+            if (btnRegiao) btnRegiao.className = clsActive;
             if (containerMax) containerMax.classList.add('hidden');
             if (containerBtnRegiao) containerBtnRegiao.classList.remove('hidden');
+        } else if (modo === 'auditoria') {
+            if (btnAuditoria) btnAuditoria.className = clsActiveAudit;
+            if (containerMax) containerMax.classList.add('hidden');
+            if (containerInfoAudit) containerInfoAudit.classList.remove('hidden');
+            if (desenhoRegiaoState.ativo) desativarModoDesenhoRegiao();
+
+            atualizarBadgeAuditoriaPainel();
+        }
+    }
+
+    function atualizarBadgeAuditoriaPainel() {
+        const badge = document.getElementById('badgeQtdAuditoriaCarregada');
+        const desc = document.getElementById('descAuditoriaRotaTexto');
+        let count = 0;
+        try {
+            const raw = sessionStorage.getItem('rota_auditoria_selecionada');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && Array.isArray(parsed.pontos)) {
+                    count = parsed.pontos.length;
+                }
+            }
+        } catch(e) {}
+
+        if (badge) badge.innerText = `${count} ${count === 1 ? 'OS' : 'OSs'}`;
+        if (desc) {
+            if (count > 0) {
+                desc.innerHTML = `<b>${count} pontos selecionados</b> na auditoria prontos para gerar o trajeto otimizado.`;
+            } else {
+                desc.innerText = "Nenhum ponto importado ainda. Selecione na tabela de Auditoria ou gere uma rota com OSs concluídas.";
+            }
         }
     }
 
@@ -4074,35 +4200,111 @@
             return;
         }
 
-        const osAbertas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, 'abertas');
         let candidatosViarios = [];
 
-        osAbertas.forEach(os => {
-            if (!isViarioProtocol(os)) return;
+        if (modoEscopoRota === 'auditoria') {
+            let pontosAudit = [];
+            try {
+                const raw = sessionStorage.getItem('rota_auditoria_selecionada');
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && Array.isArray(parsed.pontos)) {
+                        pontosAudit = parsed.pontos;
+                    }
+                }
+            } catch(e) {}
 
-            if (os.pontos && Array.isArray(os.pontos)) {
-                os.pontos.forEach(pt => {
-                    const lat = parseFloat(pt.lat);
-                    const lng = parseFloat(pt.lng);
-                    if (!isNaN(lat) && !isNaN(lng)) {
-                        const dias = calcularDiasEmAberto(os.data);
+            if (pontosAudit.length > 0) {
+                pontosAudit.forEach((item, idx) => {
+                    const lat = parseFloat(item.lat);
+                    const lng = parseFloat(item.lng);
+                    if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) {
                         candidatosViarios.push({
-                            os: os,
-                            pt: pt,
+                            os: {
+                                protocolo: item.protocolo,
+                                id: item.id,
+                                status: 'Concluída (Auditoria)',
+                                prioridade: 'Auditoria',
+                                tecnico: item.tecnico,
+                                data: item.dataConclusao || ''
+                            },
+                            pt: {
+                                endereco: item.endereco || 'Ponto de Auditoria',
+                                plaqueta: item.plaqueta || '',
+                                problema: item.problema || ''
+                            },
                             lat: lat,
                             lng: lng,
-                            diasEmAberto: dias,
-                            prioridade: os.prioridade || 'Normal',
-                            scoreCriticidade: (dias * 2) + (os.prioridade === 'Urgente' ? 15 : 0)
+                            diasEmAberto: 0,
+                            prioridade: 'Auditoria',
+                            scoreCriticidade: 100 - idx,
+                            isAuditoria: true
+                        });
+                    }
+                });
+            } else {
+                // Se nenhum ponto foi selecionado no sessionStorage, busca OSs concluídas do cache do mapa
+                const osConcluidas = (dadosOSsAbertasCache || []).filter(c => {
+                    const st = String(c.status || '').toLowerCase();
+                    return st.includes('conclu') || st.includes('resolv') || st.includes('fechad');
+                });
+
+                osConcluidas.forEach(os => {
+                    if (os.pontos && Array.isArray(os.pontos)) {
+                        os.pontos.forEach(pt => {
+                            const lat = parseFloat(pt.lat);
+                            const lng = parseFloat(pt.lng);
+                            if (!isNaN(lat) && !isNaN(lng)) {
+                                candidatosViarios.push({
+                                    os: os,
+                                    pt: pt,
+                                    lat: lat,
+                                    lng: lng,
+                                    diasEmAberto: 0,
+                                    prioridade: 'Auditoria',
+                                    scoreCriticidade: 50,
+                                    isAuditoria: true
+                                });
+                            }
                         });
                     }
                 });
             }
-        });
 
-        if (candidatosViarios.length === 0) {
-            alert("Nenhum protocolo viário em aberto foi localizado no filtro atual.");
-            return;
+            if (candidatosViarios.length === 0) {
+                alert("Nenhuma Ordem de Serviço concluída com coordenadas válidas foi encontrada para auditar.");
+                return;
+            }
+        } else {
+            const osAbertas = obterListaFiltradaPorStatus(dadosOSsAbertasCache, 'abertas');
+
+            osAbertas.forEach(os => {
+                if (!isViarioProtocol(os)) return;
+
+                if (os.pontos && Array.isArray(os.pontos)) {
+                    os.pontos.forEach(pt => {
+                        const lat = parseFloat(pt.lat);
+                        const lng = parseFloat(pt.lng);
+                        if (!isNaN(lat) && !isNaN(lng)) {
+                            const dias = calcularDiasEmAberto(os.data);
+                            candidatosViarios.push({
+                                os: os,
+                                pt: pt,
+                                lat: lat,
+                                lng: lng,
+                                diasEmAberto: dias,
+                                prioridade: os.prioridade || 'Normal',
+                                scoreCriticidade: (dias * 2) + (os.prioridade === 'Urgente' ? 15 : 0)
+                            });
+                        }
+                    });
+                }
+            });
+
+            if (candidatosViarios.length === 0) {
+                alert("Nenhum protocolo viário em aberto foi localizado no filtro atual.");
+                return;
+            }
         }
 
         if (modoEscopoRota === 'regiao') {
@@ -4121,7 +4323,7 @@
         }
 
         const inputMax = document.getElementById('inputMaxOSsRota');
-        const maxOSs = modoEscopoRota === 'auto' ? (parseInt(inputMax?.value, 10) || 10) : candidatosViarios.length;
+        const maxOSs = (modoEscopoRota === 'auto') ? (parseInt(inputMax?.value, 10) || 15) : candidatosViarios.length;
 
         const sequenciaRota = [];
         let pool = [...candidatosViarios];
@@ -4283,15 +4485,19 @@
             }
         });
 
-        const p1 = seqUnica[0];
+        // O Google Maps aceita no máximo 10 pontos por URL (1 origem + até 8 waypoints + 1 destino)
+        // Se houver mais de 10, pega os primeiros 10 para o link direto do botão principal
+        const pontosParaUrl = seqUnica.slice(0, 10);
+
+        const p1 = pontosParaUrl[0];
         const origin = `${p1.lat},${p1.lng}`;
 
-        const pN = seqUnica[seqUnica.length - 1];
+        const pN = pontosParaUrl[pontosParaUrl.length - 1];
         const destination = `${pN.lat},${pN.lng}`;
 
         let waypointsStr = '';
-        if (seqUnica.length > 2) {
-            const intermediarios = seqUnica.slice(1, seqUnica.length - 1);
+        if (pontosParaUrl.length > 2) {
+            const intermediarios = pontosParaUrl.slice(1, pontosParaUrl.length - 1);
             waypointsStr = intermediarios.map(p => `${p.lat},${p.lng}`).join('|');
         }
 
@@ -4301,6 +4507,60 @@
         }
         url += `&travelmode=driving`;
         return url;
+    }
+
+    function construirLinksGoogleMapsEmTrechos(sequencia) {
+        if (!sequencia || sequencia.length <= 1) return [];
+
+        const seqUnica = [];
+        sequencia.forEach(p => {
+            const ult = seqUnica[seqUnica.length - 1];
+            if (!ult || Math.abs(ult.lat - p.lat) > 0.00001 || Math.abs(ult.lng - p.lng) > 0.00001) {
+                seqUnica.push(p);
+            }
+        });
+
+        const TRECHO_MAX = 9; // 1 origem + 8 waypoints/destinos (total 9-10 paradas por trecho)
+        const trechos = [];
+        let inicioIdx = 0;
+        let parte = 1;
+
+        while (inicioIdx < seqUnica.length - 1) {
+            const chunk = seqUnica.slice(inicioIdx, inicioIdx + TRECHO_MAX + 1);
+            if (chunk.length < 2) break;
+
+            const p1 = chunk[0];
+            const pN = chunk[chunk.length - 1];
+            const origin = `${p1.lat},${p1.lng}`;
+            const destination = `${pN.lat},${pN.lng}`;
+
+            let waypointsStr = '';
+            if (chunk.length > 2) {
+                const intermediarios = chunk.slice(1, chunk.length - 1);
+                waypointsStr = intermediarios.map(p => `${p.lat},${p.lng}`).join('|');
+            }
+
+            let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}`;
+            if (waypointsStr) {
+                url += `&waypoints=${encodeURIComponent(waypointsStr)}`;
+            }
+            url += `&travelmode=driving`;
+
+            const primeiroPontoNum = inicioIdx + 1;
+            const ultimoPontoNum = inicioIdx + chunk.length;
+
+            trechos.push({
+                parte: parte,
+                label: `Trecho ${parte} (Pontos ${primeiroPontoNum} ao ${ultimoPontoNum})`,
+                url: url,
+                totalPontos: chunk.length
+            });
+
+            inicioIdx += (chunk.length - 1);
+            parte++;
+        }
+
+        return trechos;
     }
 
     function renderizarRotaNoMapa(rota) {
@@ -4341,13 +4601,15 @@
             }
         });
 
+        const isRotaAuditoria = (modoEscopoRota === 'auditoria') || (rota.sequencia && rota.sequencia.some(p => p.isAuditoria));
+
         // Linha Principal de Navegação (Traçado Real de Ruas)
         mapOSsInstance.addLayer({
             id: 'rota-viaria-line',
             type: 'line',
             source: 'rota-viaria-source',
             paint: {
-                'line-color': '#0051d5',
+                'line-color': isRotaAuditoria ? '#059669' : '#0051d5',
                 'line-width': 5,
                 'line-opacity': 0.95
             }
@@ -4359,8 +4621,8 @@
             const isFirst = idx === 0;
 
             const el = document.createElement('div');
-            el.className = `marker-rota-step-badge ${isFirst ? 'marker-rota-inicio-badge' : ''}`;
-            el.innerHTML = isFirst ? '🚀' : stepNum;
+            el.className = isRotaAuditoria ? 'marker-auditoria-step-badge' : `marker-rota-step-badge ${isFirst ? 'marker-rota-inicio-badge' : ''}`;
+            el.innerHTML = (isFirst && !isRotaAuditoria) ? '🚀' : stepNum;
             el.title = `Passo ${stepNum}: OS #${pt.os.protocolo} - ${pt.pt.endereco}`;
             
             el.onclick = (e) => {
@@ -4398,7 +4660,9 @@
 
         if (!container) return;
 
-        if (elQtde) elQtde.innerText = `${rota.sequencia.length} Ordens Viárias`;
+        const isRotaAuditoria = (modoEscopoRota === 'auditoria') || (rota.sequencia && rota.sequencia.some(p => p.isAuditoria));
+
+        if (elQtde) elQtde.innerText = isRotaAuditoria ? `${rota.sequencia.length} Pontos de Auditoria` : `${rota.sequencia.length} Ordens Viárias`;
         if (elDist) elDist.innerText = `~ ${rota.distanciaTotalKm.toFixed(1)} km`;
         if (elLinkGmaps) elLinkGmaps.href = rota.googleMapsUrl;
 
@@ -4407,7 +4671,13 @@
             if (p.diasEmAberto > maiorDias) maiorDias = p.diasEmAberto;
         });
         if (badgeAging) {
-            badgeAging.innerText = maiorDias > 0 ? `OS mais antiga: ${maiorDias}d` : 'OSs recentes';
+            if (isRotaAuditoria) {
+                badgeAging.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-bold";
+                badgeAging.innerText = "Auditoria de Campo";
+            } else {
+                badgeAging.className = "text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold";
+                badgeAging.innerText = maiorDias > 0 ? `OS mais antiga: ${maiorDias}d` : 'OSs recentes';
+            }
         }
 
         if (listContainer) {
@@ -4417,23 +4687,28 @@
                 const isFirst = idx === 0;
                 
                 const itemDiv = document.createElement('div');
-                itemDiv.className = "bg-surface-container-lowest border border-outline-variant/60 hover:border-secondary p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all hover:bg-secondary/5";
+                itemDiv.className = "bg-surface-container-lowest border border-outline-variant/60 hover:border-emerald-600 p-2 rounded-lg flex items-center justify-between cursor-pointer transition-all hover:bg-emerald-500/5";
                 itemDiv.onclick = () => {
                     if (mapOSsInstance) {
                         mapOSsInstance.flyTo({ center: [p.lng, p.lat], zoom: 16, padding: obterPaddingMapaParaPainel() });
                     }
                 };
 
+                const corBadgeStep = isRotaAuditoria ? 'bg-emerald-600' : (isFirst ? 'bg-emerald-600' : 'bg-secondary');
+                const tagInfo = isRotaAuditoria ? 
+                    `<span class="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700 font-bold">${p.os.tecnico ? p.os.tecnico.split(' ')[0] : 'Concluído'}</span>` : 
+                    `<span class="text-[10px] px-1.5 py-0.2 rounded ${p.diasEmAberto > 7 ? 'bg-error/15 text-error font-bold' : (p.diasEmAberto > 3 ? 'bg-amber-500/15 text-amber-700 font-bold' : 'bg-emerald-500/15 text-emerald-700 font-bold')}">${p.diasEmAberto}d</span>`;
+
                 itemDiv.innerHTML = `
                     <div class="flex items-center gap-2 overflow-hidden">
-                        <span class="w-5 h-5 rounded-full ${isFirst ? 'bg-emerald-600' : 'bg-secondary'} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                            ${isFirst ? '1' : stepNum}
+                        <span class="w-5 h-5 rounded-full ${corBadgeStep} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                            ${stepNum}
                         </span>
                         <div class="truncate">
                             <div class="flex items-center gap-1">
                                 <span class="font-bold text-on-surface text-xs">#${p.os.protocolo}</span>
                                 ${p.prioridade === 'Urgente' ? '<span class="text-error font-bold text-[10px]">⚡</span>' : ''}
-                                <span class="text-[10px] px-1.5 py-0.2 rounded ${p.diasEmAberto > 7 ? 'bg-error/15 text-error font-bold' : (p.diasEmAberto > 3 ? 'bg-amber-500/15 text-amber-700 font-bold' : 'bg-emerald-500/15 text-emerald-700 font-bold')}">${p.diasEmAberto}d</span>
+                                ${tagInfo}
                             </div>
                             <p class="text-[10px] text-on-surface-variant truncate">${p.pt.endereco || 'Araraquara, SP'}</p>
                         </div>
@@ -4442,6 +4717,36 @@
                 `;
                 listContainer.appendChild(itemDiv);
             });
+        }
+
+        // Renderização dos trechos segmentados do Google Maps quando houver mais de 10 pontos
+        const containerTrechos = document.getElementById('containerTrechosGoogleMaps');
+        const listaTrechos = document.getElementById('listaBotoesTrechosGoogleMaps');
+
+        if (containerTrechos && listaTrechos) {
+            const trechos = construirLinksGoogleMapsEmTrechos(rota.sequencia);
+            if (trechos.length > 1) {
+                containerTrechos.classList.remove('hidden');
+                listaTrechos.innerHTML = '';
+
+                trechos.forEach(tr => {
+                    const btnTrecho = document.createElement('a');
+                    btnTrecho.href = tr.url;
+                    btnTrecho.target = "_blank";
+                    btnTrecho.className = "py-1.5 px-2.5 rounded-lg bg-surface-container-lowest border border-outline-variant/60 hover:border-secondary hover:bg-secondary/10 text-on-surface font-semibold text-xs flex items-center justify-between transition-all active:scale-95 text-decoration-none shadow-sm";
+                    btnTrecho.innerHTML = `
+                        <span class="flex items-center gap-1.5">
+                            <span class="w-4 h-4 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold flex items-center justify-center">${tr.parte}</span>
+                            <span>${tr.label}</span>
+                        </span>
+                        <span class="material-symbols-outlined text-[15px] text-secondary">open_in_new</span>
+                    `;
+                    listaTrechos.appendChild(btnTrecho);
+                });
+            } else {
+                containerTrechos.classList.add('hidden');
+                listaTrechos.innerHTML = '';
+            }
         }
 
         container.classList.remove('hidden');

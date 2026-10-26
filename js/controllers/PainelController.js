@@ -109,6 +109,11 @@ class PainelController {
     async loadData(forceRefresh = false) {
         try {
             this.showSkeletons();
+            if (window.ConfiguracoesService) {
+                try {
+                    await window.ConfiguracoesService.obterConfiguracoes();
+                } catch(e) {}
+            }
             let list = await this.service.getChamadosList(forceRefresh);
             if (typeof window !== 'undefined' && Boolean(window.isManutentorView)) {
                 list = list.filter(item => {
@@ -272,10 +277,24 @@ class PainelController {
             tdProtocolo.textContent = item.protocolo;
         }
 
-        // Data Abertura
+        // Data Abertura & Indicador de SLA Contratual
         const tdData = document.createElement('td');
         tdData.className = 'py-3 px-5 text-on-surface-variant whitespace-nowrap truncate align-middle';
-        tdData.textContent = item.formattedDateShort;
+
+        const sla = item.calcularSLA ? item.calcularSLA() : null;
+        if (sla && !isCancelada && !isRejeitada) {
+            tdData.innerHTML = `
+                <div class="flex flex-col gap-1 items-start">
+                    <span class="font-medium text-slate-700">${item.formattedDateShort}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 ${sla.badgeClass}" title="Vencimento estimado: ${sla.dataLimite ? sla.dataLimite.toLocaleDateString('pt-BR') : '--'}">
+                        <span class="material-symbols-outlined text-[11px]">${sla.statusSla === 'atrasado' || sla.statusSla === 'critico' ? 'warning' : 'timer'}</span>
+                        <span>${sla.label}</span>
+                    </span>
+                </div>
+            `;
+        } else {
+            tdData.textContent = item.formattedDateShort;
+        }
 
         // Endereço / Pontos
         const tdEndereco = document.createElement('td');
@@ -1003,7 +1022,9 @@ class PainelController {
         if (elSub) {
             const dataAb = item.dataAbertura ? item.dataAbertura.toLocaleDateString('pt-BR') : '--/--/----';
             const dataConc = item.dataConclusao ? item.dataConclusao.toLocaleDateString('pt-BR') : 'Em aberto';
-            elSub.innerText = `Abertura: ${dataAb} | Conclusão: ${dataConc}`;
+            const sla = item.calcularSLA ? item.calcularSLA() : null;
+            const slaText = sla ? ` | SLA: ${sla.label}` : '';
+            elSub.innerText = `Abertura: ${dataAb} | Conclusão: ${dataConc}${slaText}`;
         }
 
         const elStatusBadge = document.getElementById('detalheModalStatusBadge');
@@ -1907,9 +1928,45 @@ class PainelController {
                                     <div class="space-y-1">
                                         <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Fechamento #${p.fechamento || p.numeroFechamento || 1}</div>
                                         <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (pIdx === 0 ? (item.plaquetaFinal || 'Não informada') : 'Não informada')}</span></div>
-                                        <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
+                                            ${p.precisaoGpsMetros !== null && p.precisaoGpsMetros !== undefined ? `
+                                                <span class="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${p.precisaoGpsMetros <= 20 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : (p.precisaoGpsMetros <= 50 ? 'bg-blue-100 text-blue-800 border border-blue-200' : (p.precisaoGpsMetros <= 100 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-rose-100 text-rose-800 border border-rose-200'))}" title="Precisão do sinal GPS capturado pelo operador">
+                                                    <span>🎯 ±${Math.round(p.precisaoGpsMetros)}m</span>
+                                                </span>
+                                            ` : ''}
+                                        </div>
                                         <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
                                         ${isRealAddr(endFinVal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFinVal}</span></div>` : ''}
+                                        ${p.posteId ? `
+                                        <div class="mt-1.5 p-1.5 rounded-lg bg-purple-50/80 border border-purple-200/80 text-[11px] space-y-1">
+                                            <div class="flex items-center justify-between gap-1 flex-wrap">
+                                                <span class="inline-flex items-center gap-1 font-bold text-purple-900">
+                                                    <span class="material-symbols-outlined text-[14px] text-purple-700">electric_bolt</span>
+                                                    <span>Poste #${p.posteId}</span>
+                                                </span>
+                                                ${p.posteDistanciaMetros !== null && p.posteDistanciaMetros !== undefined ? `
+                                                    <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200" title="Distância entre o GPS do operador e o Poste Selecionado">
+                                                        ${p.posteDistanciaMetros}m do reparo
+                                                    </span>
+                                                ` : ''}
+                                            </div>
+                                            ${(p.posteLat && p.posteLng) ? `
+                                                <div class="text-[10px] font-mono text-purple-800/80 flex items-center justify-between">
+                                                    <span>${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
+                                                    <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 text-amber-700 hover:text-amber-800 font-semibold cursor-pointer" title="Ver Poste no Street View 360°">
+                                                        <span class="material-symbols-outlined text-[12px]">streetview</span>
+                                                        <span>Street View</span>
+                                                    </a>
+                                                </div>
+                                            ` : ''}
+                                        </div>
+                                        ` : (p.posteNaoEncontrado ? `
+                                        <div class="mt-1 p-1 rounded bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-[13px] text-amber-600">info</span>
+                                            <span>Operador marcou poste não encontrado no mapa</span>
+                                        </div>
+                                        ` : '')}
                                     </div>
                                     ${navFin.hasNav ? `
                                     <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
@@ -2033,8 +2090,22 @@ class PainelController {
                             ` : ''}
                             ${(s.coordenada_inicio || s.coordenada_fim) ? `
                             <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
-                                ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
-                                ${s.coordenada_fim ? `<div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>` : ''}
+                                ${s.coordenada_inicio ? `
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>
+                                        ${(s.precisao_gps_inicio !== null && s.precisao_gps_inicio !== undefined) ? `
+                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_inicio <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_inicio <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_inicio)}m</span>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                                ${s.coordenada_fim ? `
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>
+                                        ${(s.precisao_gps_fim !== null && s.precisao_gps_fim !== undefined) ? `
+                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_fim <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_fim <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_fim)}m</span>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
                             </div>
                             ` : ''}
                             ${(s.materiais && s.materiais.length > 0) ? `

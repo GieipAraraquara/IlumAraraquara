@@ -646,6 +646,32 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
                 distanciaPar: distPar
             });
         }
+
+        // 4.1 Identificar Poste Selecionado da Base Aérea (se houver)
+        const rawPtFinal = (item.rawPontosFinal && Array.isArray(item.rawPontosFinal)) ? (item.rawPontosFinal[idx] || item.rawPontosFinal[0]) : null;
+        const posteId = p.posteId || (rawPtFinal && (rawPtFinal.poste_id_selecionado || rawPtFinal.poste_id || rawPtFinal.poste_aereo_id));
+        let pLatPoste = p.posteLat !== undefined ? p.posteLat : (rawPtFinal && rawPtFinal.poste_lat);
+        let pLngPoste = p.posteLng !== undefined ? p.posteLng : (rawPtFinal && rawPtFinal.poste_lng);
+        const pDistPoste = p.posteDistanciaMetros !== undefined ? p.posteDistanciaMetros : (rawPtFinal && rawPtFinal.distancia_gps_poste_metros);
+        const pPlaqPoste = p.postePlaquetaVinculada || (rawPtFinal && rawPtFinal.poste_plaqueta_vinculada);
+
+        if (posteId && pLatPoste !== null && pLatPoste !== undefined && pLngPoste !== null && pLngPoste !== undefined) {
+            const parsedPosteLat = parseFloat(pLatPoste);
+            const parsedPosteLng = parseFloat(pLngPoste);
+            if (!isNaN(parsedPosteLat) && !isNaN(parsedPosteLng) && parsedPosteLat !== 0) {
+                markersData.push({
+                    tipo: 'poste',
+                    pontoNumero: numPonto,
+                    posteId: posteId,
+                    lat: parsedPosteLat,
+                    lng: parsedPosteLng,
+                    distanciaReparo: pDistPoste,
+                    plaquetaVinculada: pPlaqPoste,
+                    reparoLat: ptFin ? ptFin.lat : null,
+                    reparoLng: ptFin ? ptFin.lng : null
+                });
+            }
+        }
     });
 
     // Se nenhum ponto tinha coordenada GPS direta, tenta fallback no endereço da OS
@@ -672,6 +698,11 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
                     <span class="inline-flex items-center gap-1 font-bold text-emerald-700">
                         <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block"></span> Finalização: ${markersData.filter(m => m.tipo === 'finalizacao').length}
                     </span>
+                    ${markersData.some(m => m.tipo === 'poste') ? `
+                    <span class="inline-flex items-center gap-1 font-bold text-purple-700">
+                        <span class="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block"></span> Postes: ${markersData.filter(m => m.tipo === 'poste').length}
+                    </span>
+                    ` : ''}
                 </div>
                 ${paresComDistancia > 0 ? `
                     <div class="text-[11px] font-semibold text-slate-700 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
@@ -757,69 +788,233 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
             window.sharedMapInstance.fitBounds(bounds, { padding: 80, maxZoom: 18, duration: 800 });
         }
 
-        // Renderizar cada marcador customizado com identificador de tipo (Abertura vs Finalização) e Ponto #
+        // 8.1 Renderizar cada marcador customizado com ancoragem padronizada (center) e sem CSS shifts
         markersData.forEach(m => {
+            const isPoste = m.tipo === 'poste';
             const isAbertura = m.tipo === 'abertura';
-            const bgColor = isAbertura ? 'bg-blue-600' : 'bg-emerald-600';
-            const borderGlow = isAbertura ? 'border-blue-200' : 'border-emerald-200';
-            const labelTipo = isAbertura ? 'Abertura' : 'Fechamento';
-            const icon = isAbertura ? 'flag' : 'check_circle';
+            const labelTipo = isPoste ? 'Poste Selecionado' : (isAbertura ? 'Abertura' : 'Fechamento');
+            const icon = isPoste ? 'electric_bolt' : (isAbertura ? 'flag' : 'check_circle');
+
+            // Criar wrapper neutro para ancoragem exata do Mapbox (idêntico ao Controle-Plaquetas.html)
+            const wrapper = document.createElement('div');
+            wrapper.className = 'marker-anchor-center';
+            wrapper.style.width = '24px';
+            wrapper.style.height = '24px';
+            wrapper.style.display = 'flex';
+            wrapper.style.alignItems = 'center';
+            wrapper.style.justifyContent = 'center';
 
             const el = document.createElement('div');
-            el.className = 'custom-map-pin-multi flex flex-col items-center cursor-pointer transition-transform hover:scale-115 hover:z-30';
-            el.innerHTML = `
-                <div class="relative flex flex-col items-center">
-                    <span class="px-1.5 py-0.5 rounded-full text-[10px] font-black text-white shadow-md border border-white mb-0.5 whitespace-nowrap ${bgColor}">
-                        #${m.pontoNumero} ${isAbertura ? 'ABR' : 'FIM'}
-                    </span>
-                    <div class="w-8 h-8 rounded-full ${bgColor} text-white flex items-center justify-center shadow-lg border-2 border-white">
-                        <span class="material-symbols-outlined text-[18px]">${icon}</span>
-                    </div>
-                </div>
-            `;
+            if (isPoste) {
+                el.className = 'w-8 h-8 rounded-full bg-emerald-600 hover:bg-emerald-700 border-2 border-white shadow-2xl flex items-center justify-center text-white text-[12px] font-bold ring-4 ring-emerald-300 animate-pulse cursor-pointer z-40';
+                el.title = `🎯 Poste #${m.posteId} [ESCOLHIDO PELO OPERADOR NO MAPA DA OS]`;
+                el.innerHTML = '<span class="material-symbols-outlined text-[18px]">verified</span>';
+            } else if (isAbertura) {
+                el.className = 'w-6 h-6 rounded-full bg-blue-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-blue-300 cursor-pointer z-20';
+                el.title = `📍 Ponto #${m.pontoNumero} (Abertura)`;
+                el.innerHTML = '<span class="material-symbols-outlined text-[14px]">flag</span>';
+            } else {
+                el.className = 'w-6 h-6 rounded-full bg-emerald-600 border-2 border-white shadow-lg flex items-center justify-center text-white text-[11px] font-bold ring-2 ring-emerald-300 cursor-pointer z-30';
+                el.title = `🛠️ Ponto #${m.pontoNumero} (Fechamento #${m.fechamento || 1})`;
+                el.innerHTML = '<span class="material-symbols-outlined text-[14px]">check_circle</span>';
+            }
+            wrapper.appendChild(el);
 
             // Popup descritivo com informações e botão de navegação rápida
-            const popupHtml = `
-                <div class="p-2 space-y-1.5 text-xs text-slate-800" style="min-width: 200px;">
-                    <div class="flex items-center justify-between border-b border-slate-200 pb-1">
-                        <span class="font-bold flex items-center gap-1 ${isAbertura ? 'text-blue-700' : 'text-emerald-700'}">
-                            <span class="material-symbols-outlined text-[15px]">${icon}</span>
-                            <span>Ponto #${m.pontoNumero} (${labelTipo})</span>
-                        </span>
-                        <span class="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                            ${isAbertura ? 'Abertura' : (m.fechamento ? `Fech. #${m.fechamento}` : 'Final')}
-                        </span>
-                    </div>
-                    ${m.plaqueta ? `<div><b class="text-slate-600">Plaqueta:</b> <span class="font-bold text-slate-800">${m.plaqueta}</span></div>` : ''}
-                    ${m.problema ? `<div><b class="text-slate-600">Problema:</b> <span class="font-medium text-slate-700">${m.problema}</span></div>` : ''}
-                    ${m.endereco ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-700">${m.endereco}</span></div>` : ''}
-                    <div><b class="text-slate-600">GPS:</b> <span class="font-mono text-[10.5px] text-blue-600">${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</span></div>
-                    ${m.distanciaPar !== null ? `
-                        <div class="pt-1 mt-1 border-t border-slate-100 text-[11px] font-bold ${m.distanciaPar > 50 ? 'text-amber-700' : 'text-emerald-700'}">
-                            📏 Distância Abertura ➔ Finalização: <b>${m.distanciaPar.toFixed(1)}m</b>
+            let popupHtml = '';
+            if (isPoste) {
+                const streetViewUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${m.lat},${m.lng}`;
+                const gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}`;
+                popupHtml = `
+                    <div class="p-2 space-y-1.5 text-xs text-slate-800" style="min-width: 220px;">
+                        <div class="flex items-center justify-between border-b border-emerald-200 pb-1">
+                            <span class="font-bold flex items-center gap-1 text-emerald-700">
+                                <span class="material-symbols-outlined text-[16px]">verified</span>
+                                <span>🎯 Poste Escolhido #${m.posteId}</span>
+                            </span>
+                            <span class="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                Ponto #${m.pontoNumero}
+                            </span>
                         </div>
-                    ` : ''}
-                    <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
-                        <a href="https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}" target="_blank" class="flex-1 text-center py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[10px] border border-blue-200">
-                            Google Maps
-                        </a>
-                        <a href="https://waze.com/ul?ll=${m.lat},${m.lng}&navigate=yes" target="_blank" class="flex-1 text-center py-1 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-semibold text-[10px] border border-cyan-200">
-                            Waze
-                        </a>
+                        ${m.plaquetaVinculada ? `<div><b class="text-slate-600">Plaqueta Vinculada:</b> <span class="font-bold text-emerald-700">${m.plaquetaVinculada}</span></div>` : ''}
+                        ${m.distanciaReparo !== null && m.distanciaReparo !== undefined ? `
+                            <div class="text-[11px] font-semibold text-emerald-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
+                                📏 Distância ao Fechamento: <b>${m.distanciaReparo}m</b>
+                            </div>
+                        ` : ''}
+                        <div><b class="text-slate-600">Coordenadas:</b> <span class="font-mono text-[10.5px] text-emerald-700">${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</span></div>
+                        <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                            <a href="${streetViewUrl}" target="_blank" class="flex-1 text-center py-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold text-[10px] border border-amber-200 flex items-center justify-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">streetview</span> Street View
+                            </a>
+                            <a href="${gmapsUrl}" target="_blank" class="flex-1 text-center py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold text-[10px] border border-emerald-200 flex items-center justify-center gap-1">
+                                <span class="material-symbols-outlined text-[12px]">open_in_new</span> Maps
+                            </a>
+                        </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                popupHtml = `
+                    <div class="p-2 space-y-1.5 text-xs text-slate-800" style="min-width: 200px;">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-1">
+                            <span class="font-bold flex items-center gap-1 ${isAbertura ? 'text-blue-700' : 'text-emerald-700'}">
+                                <span class="material-symbols-outlined text-[15px]">${icon}</span>
+                                <span>Ponto #${m.pontoNumero} (${labelTipo})</span>
+                            </span>
+                            <span class="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                ${isAbertura ? 'Abertura' : (m.fechamento ? `Fech. #${m.fechamento}` : 'Final')}
+                            </span>
+                        </div>
+                        ${m.plaqueta ? `<div><b class="text-slate-600">Plaqueta:</b> <span class="font-bold text-slate-800">${m.plaqueta}</span></div>` : ''}
+                        ${m.problema ? `<div><b class="text-slate-600">Problema:</b> <span class="font-medium text-slate-700">${m.problema}</span></div>` : ''}
+                        ${m.endereco ? `<div><b class="text-slate-600">Endereço:</b> <span class="font-medium text-slate-700">${m.endereco}</span></div>` : ''}
+                        <div><b class="text-slate-600">GPS:</b> <span class="font-mono text-[10.5px] text-blue-600">${m.lat.toFixed(6)}, ${m.lng.toFixed(6)}</span></div>
+                        ${m.distanciaPar !== null ? `
+                            <div class="pt-1 mt-1 border-t border-slate-100 text-[11px] font-bold ${m.distanciaPar > 50 ? 'text-amber-700' : 'text-emerald-700'}">
+                                📏 Distância Abertura ➔ Finalização: <b>${m.distanciaPar.toFixed(1)}m</b>
+                            </div>
+                        ` : ''}
+                        <div class="flex items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                            <a href="https://www.google.com/maps/search/?api=1&query=${m.lat},${m.lng}" target="_blank" class="flex-1 text-center py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold text-[10px] border border-blue-200">
+                                Google Maps
+                            </a>
+                            <a href="https://waze.com/ul?ll=${m.lat},${m.lng}&navigate=yes" target="_blank" class="flex-1 text-center py-1 rounded bg-cyan-50 hover:bg-cyan-100 text-cyan-800 font-semibold text-[10px] border border-cyan-200">
+                                Waze
+                            </a>
+                        </div>
+                    </div>
+                `;
+            }
 
-            const popup = new mapboxgl.Popup({ offset: 25, maxWidth: '280px', closeButton: true })
+            const popup = new mapboxgl.Popup({ offset: 12, maxWidth: '280px', closeButton: true })
                 .setHTML(popupHtml);
 
-            const marker = new mapboxgl.Marker({ element: el })
+            const marker = new mapboxgl.Marker({ element: wrapper, anchor: 'center' })
                 .setLngLat([m.lng, m.lat])
                 .setPopup(popup)
                 .addTo(window.sharedMapInstance);
 
             window.sharedMapMarkersList.push(marker);
         });
+
+        // 8.2 Carregar Postes da Base Aérea do Entorno (para contextualizar a estrutura da rua)
+        (async function carregarPostesEntorno() {
+            const client = (typeof obterSupabaseClient === 'function') 
+                ? obterSupabaseClient() 
+                : (window.supabaseClient || (window.supabase && typeof window.supabase.createClient === 'function' && window.supabaseClient));
+            if (!client || !window.sharedMapInstance) return;
+
+            try {
+                const delta = 0.00135; // ~150 metros ao redor dos pontos
+                const promessas = markersData.map(pt => {
+                    return client
+                        .from('postes_base_aerea')
+                        .select('id, latitude, longitude, id_plaqueta_vinculada')
+                        .gte('latitude', pt.lat - delta)
+                        .lte('latitude', pt.lat + delta)
+                        .gte('longitude', pt.lng - delta)
+                        .lte('longitude', pt.lng + delta)
+                        .limit(100);
+                });
+
+                const resultados = await Promise.all(promessas);
+                if (!window.sharedMapInstance) return;
+
+                const postesMap = new Map();
+                resultados.forEach(res => {
+                    if (res && res.data) {
+                        res.data.forEach(p => postesMap.set(p.id, p));
+                    }
+                });
+
+                const postes = Array.from(postesMap.values());
+                const idsPostesPrincipais = new Set(markersData.filter(m => m.tipo === 'poste').map(m => String(m.posteId)));
+
+                postes.forEach(poste => {
+                    const pstIdStr = String(poste.id);
+                    if (idsPostesPrincipais.has(pstIdStr)) {
+                        return; // O poste selecionado principal já foi plotado com destaque
+                    }
+
+                    const pLat = parseFloat(poste.latitude);
+                    const pLng = parseFloat(poste.longitude);
+                    if (isNaN(pLat) || isNaN(pLng) || pLat === 0) return;
+
+                    let arrPlaquetas = [];
+                    if (poste.id_plaqueta_vinculada) {
+                        arrPlaquetas = String(poste.id_plaqueta_vinculada).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+                    }
+                    const totalBracos = arrPlaquetas.length;
+
+                    const elPoste = document.createElement('div');
+                    elPoste.id = `shared-marker-poste-${poste.id}`;
+
+                    if (totalBracos > 0) {
+                        elPoste.className = 'w-6 h-6 rounded-full bg-sky-700 hover:bg-sky-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-sky-300 cursor-pointer z-15';
+                        elPoste.title = `⚡ Poste #${poste.id} [${totalBracos} luminária(s): ${arrPlaquetas.join(', ')}]`;
+                        elPoste.innerHTML = totalBracos > 1 ? `<span class="text-[10px] font-bold">${totalBracos}</span>` : '<span class="material-symbols-outlined text-[13px]">sell</span>';
+                    } else {
+                        elPoste.className = 'w-6 h-6 rounded-full bg-purple-700 hover:bg-purple-800 border-2 border-white shadow-md flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-300 cursor-pointer z-10';
+                        elPoste.title = `⚡ Poste #${poste.id} (Disponível)`;
+                        elPoste.innerHTML = '<span class="material-symbols-outlined text-[13px]">electric_bolt</span>';
+                    }
+
+                    const wrapperPoste = document.createElement('div');
+                    wrapperPoste.className = 'marker-anchor-center';
+                    wrapperPoste.style.width = '24px';
+                    wrapperPoste.style.height = '24px';
+                    wrapperPoste.style.display = 'flex';
+                    wrapperPoste.style.alignItems = 'center';
+                    wrapperPoste.style.justifyContent = 'center';
+                    wrapperPoste.appendChild(elPoste);
+
+                    const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${pLat},${pLng}`;
+                    const gmUrl = `https://www.google.com/maps/search/?api=1&query=${pLat},${pLng}`;
+
+                    const popupHtml = `
+                        <div class="text-xs p-1 text-slate-800 space-y-1.5 min-w-[200px]">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-1">
+                                <strong class="text-purple-700 flex items-center gap-1 font-bold">
+                                    <span class="material-symbols-outlined text-[15px]">electric_bolt</span>
+                                    <span>Poste #${poste.id}</span>
+                                </strong>
+                                <span class="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200">Base Aérea</span>
+                            </div>
+                            ${totalBracos > 0 ? `
+                                <div class="bg-sky-50 border border-sky-200 text-sky-900 px-2 py-1 rounded text-[10.5px]">
+                                    <b>${totalBracos > 1 ? `${totalBracos} luminárias vinculadas:` : 'Luminária vinculada:'}</b>
+                                    <div class="font-mono text-[10px] text-sky-800 font-bold truncate mt-0.5">#${arrPlaquetas.join(', #')}</div>
+                                </div>
+                            ` : `
+                                <div class="text-[10px] text-slate-500 flex items-center gap-1">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    <span>Poste livre (sem plaqueta)</span>
+                                </div>
+                            `}
+                            <div class="text-[10.5px] text-slate-500 font-mono">${pLat.toFixed(6)}, ${pLng.toFixed(6)}</div>
+                            <div class="flex items-center gap-1.5 pt-1 border-t border-slate-100">
+                                <a href="${svUrl}" target="_blank" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-1 px-2 rounded text-[10px] flex items-center justify-center gap-1 shadow-2xs">
+                                    <span class="material-symbols-outlined text-[12px]">streetview</span> Street View
+                                </a>
+                                <a href="${gmUrl}" target="_blank" class="flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold py-1 px-2 rounded text-[10px] border border-purple-200 flex items-center justify-center gap-1">
+                                    <span class="material-symbols-outlined text-[12px]">open_in_new</span> Maps
+                                </a>
+                            </div>
+                        </div>
+                    `;
+
+                    const popup = new mapboxgl.Popup({ offset: 12, maxWidth: '280px', closeButton: true }).setHTML(popupHtml);
+                    const markerPoste = new mapboxgl.Marker({ element: wrapperPoste, anchor: 'center' })
+                        .setLngLat([pLng, pLat])
+                        .setPopup(popup)
+                        .addTo(window.sharedMapInstance);
+
+                    window.sharedMapMarkersList.push(markerPoste);
+                });
+            } catch(e) {
+                console.warn('⚠️ Erro ao plotar postes do entorno no mapa compartilhado:', e);
+            }
+        })();
 
         // Adicionar linhas conectando pares Abertura -> Finalização ou sequência de pontos
         const pairsCoords = [];
@@ -840,6 +1035,15 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
             }
         });
 
+        // Adicionar linhas conectando Fechamento ao Poste Selecionado
+        const posteCoords = [];
+        markersData.filter(m => m.tipo === 'poste' && m.reparoLat !== null && m.reparoLng !== null).forEach(m => {
+            posteCoords.push([
+                [m.reparoLng, m.reparoLat],
+                [m.lng, m.lat]
+            ]);
+        });
+
         const drawLines = () => {
             if (!window.sharedMapInstance) return;
             try {
@@ -848,6 +1052,12 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
                 }
                 if (window.sharedMapInstance.getSource('route-line-pontos')) {
                     window.sharedMapInstance.removeSource('route-line-pontos');
+                }
+                if (window.sharedMapInstance.getLayer('route-line-postes')) {
+                    window.sharedMapInstance.removeLayer('route-line-postes');
+                }
+                if (window.sharedMapInstance.getSource('route-line-postes')) {
+                    window.sharedMapInstance.removeSource('route-line-postes');
                 }
 
                 if (pairsCoords.length > 0) {
@@ -880,6 +1090,40 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
                             'line-width': 3,
                             'line-dasharray': [2, 2],
                             'line-opacity': 0.85
+                        }
+                    });
+                }
+
+                if (posteCoords.length > 0) {
+                    const linesPosteGeoJson = {
+                        type: 'FeatureCollection',
+                        features: posteCoords.map(coords => ({
+                            type: 'Feature',
+                            geometry: {
+                                type: 'LineString',
+                                coordinates: coords
+                            }
+                        }))
+                    };
+
+                    window.sharedMapInstance.addSource('route-line-postes', {
+                        type: 'geojson',
+                        data: linesPosteGeoJson
+                    });
+
+                    window.sharedMapInstance.addLayer({
+                        id: 'route-line-postes',
+                        type: 'line',
+                        source: 'route-line-postes',
+                        layout: {
+                            'line-join': 'round',
+                            'line-cap': 'round'
+                        },
+                        paint: {
+                            'line-color': '#7e22ce',
+                            'line-width': 2.5,
+                            'line-dasharray': [1.5, 2],
+                            'line-opacity': 0.9
                         }
                     });
                 }

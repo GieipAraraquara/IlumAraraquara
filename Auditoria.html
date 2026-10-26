@@ -214,6 +214,22 @@
             background-color: #0051d5; /* Azul Secundário */
         }
 
+        /* Mapbox GL Marker Precision Fix: previne que transitions ou transforms CSS atrasem/desloquem a posição do marcador no zoom */
+        .mapboxgl-marker {
+            transition: none !important;
+            will-change: transform;
+        }
+        .mapboxgl-marker,
+        .mapboxgl-marker * {
+            transition: none !important;
+            animation: none !important;
+        }
+        .marker-anchor-center {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
         /* Vertical Table Header Styling (2-Line Support) */
         .th-vertical {
             height: 115px;
@@ -454,6 +470,11 @@
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Tabela de Auditoria de OS</h3>
                 <div class="flex gap-2 items-center">
                     <div class="relative inline-block text-left">
+                        <button type="button" id="btn-toggle-modo-rota-auditoria" onclick="window.toggleModoRotaAuditoria()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm" title="Ativar seleção de OSs para criar uma rota de auditoria no mapa">
+                            <span class="material-symbols-outlined text-[17px] text-emerald-600">route</span>
+                            <span id="label-btn-modo-rota-auditoria">Criar Rota no Mapa</span>
+                        </button>
+
                         <button type="button" id="audit-cols-dropdown-trigger" onclick="window.toggleAuditColsDropdown(event)" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 active:scale-95" title="Selecionar quais colunas de auditoria exibir e filtrar">
                             <span class="material-symbols-outlined text-[16px] text-secondary">view_column</span>
                             <span id="audit-cols-btn-label">Colunas (10/10)</span>
@@ -494,6 +515,10 @@
                 <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="os-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-30 relative">
+                            <!-- Checkbox de Rota (Oculto por padrão, ativado via modo rota) -->
+                            <th class="th-checkbox-rota hidden py-3 px-2 w-[44px] min-w-[44px] text-center align-middle" data-col="chk">
+                                <input type="checkbox" id="chk-rota-auditoria-all-os" onchange="window.toggleSelecionarTodasRota(this, 'os')" class="w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" title="Marcar/Desmarcar todas visíveis" />
+                            </th>
                             <!-- Column 1 (Protocolo com Filtro de Busca) -->
                             <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible align-bottom pb-3" style="width: 120px; min-width: 105px;" data-col="0">
                                 <div class="relative inline-block text-left group/protocol-filter">
@@ -1032,15 +1057,25 @@
                     <span class="material-symbols-outlined text-[20px] text-blue-600">alt_route</span>
                     <span>Serviços Finalizados (Viário)</span>
                 </h3>
-                <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
-                    0 Registros
-                </span>
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="window.toggleModoRotaAuditoria()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm" title="Ativar seleção de OSs para criar uma rota de auditoria no mapa">
+                        <span class="material-symbols-outlined text-[17px] text-emerald-600">route</span>
+                        <span>Criar Rota no Mapa</span>
+                    </button>
+                    <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
+                        0 Registros
+                    </span>
+                </div>
             </div>
             
             <div class="w-full min-h-[250px] overflow-visible">
                 <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="completed-services-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                            <!-- Checkbox de Rota (Oculto por padrão, ativado via modo rota) -->
+                            <th class="th-checkbox-rota hidden py-3 px-2 w-[44px] min-w-[44px] text-center align-middle" data-col="chk">
+                                <input type="checkbox" id="chk-rota-auditoria-all-comp" onchange="window.toggleSelecionarTodasRota(this, 'comp')" class="w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" title="Marcar/Desmarcar todas visíveis" />
+                            </th>
                             <!-- Column 1: Protocolo com Filtro -->
                             <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 140px; min-width: 140px;" data-col="0">
                                 <div class="relative inline-block text-left group/comp-protocol-filter">
@@ -1599,6 +1634,36 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+
+    <!-- Barra Flutuante de Seleção de Rota de Auditoria -->
+    <div id="barra-flutuante-rota-auditoria" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[5000] hidden items-center gap-3 bg-surface-container-lowest/95 backdrop-blur-md border border-emerald-500/40 px-5 py-3 rounded-2xl shadow-2xl transition-all duration-300">
+        <div class="flex items-center gap-2">
+            <span class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-700 flex items-center justify-center font-bold">
+                <span class="material-symbols-outlined text-[20px]">route</span>
+            </span>
+            <div>
+                <div class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+                    <span id="label-qtd-selecionadas-rota" class="text-emerald-700 font-extrabold text-sm">0 OSs</span> selecionadas
+                </div>
+                <div class="text-[10px] text-on-surface-variant">Selecione os pontos que deseja auditar no mapa</div>
+            </div>
+        </div>
+
+        <div class="h-6 w-px bg-outline-variant/60 mx-1"></div>
+
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="window.limparSelecaoRotaAuditoria()" class="px-2.5 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer">
+                Limpar
+            </button>
+            <button type="button" onclick="window.cancelarModoRotaAuditoria()" class="px-3 py-1.5 text-xs font-semibold border border-outline-variant/60 text-on-surface hover:bg-surface-container-high rounded-lg transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="button" id="btn-confirmar-gerar-rota" onclick="window.confirmarEnvioRotaAoMapa()" class="px-4 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Gerar Rota no Mapa</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
         </div>
     </div>
 </main>
@@ -4472,6 +4537,171 @@
             if (e.key === 'Escape') window.fecharDetalhesOSModal();
         }
     });
+
+    // ==========================================
+    // SELEÇÃO DE OSs PARA ROTA DE AUDITORIA NO MAPA
+    // ==========================================
+    window.modoSelecaoRotaAuditoria = false;
+    window.selectedOSsParaRota = new Map(); // id/protocolo -> { id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, data }
+
+    window.toggleModoRotaAuditoria = function(forceState = null) {
+        window.modoSelecaoRotaAuditoria = (forceState !== null) ? forceState : !window.modoSelecaoRotaAuditoria;
+        const ativo = window.modoSelecaoRotaAuditoria;
+
+        // Alterna classes visuais dos botões
+        const btnToggle = document.getElementById('btn-toggle-modo-rota-auditoria');
+        const labelBtn = document.getElementById('label-btn-modo-rota-auditoria');
+        if (btnToggle) {
+            if (ativo) {
+                btnToggle.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-emerald-600 text-white border-emerald-600 shadow-md active:scale-95";
+                if (labelBtn) labelBtn.innerText = "Modo Rota Ativo ✓";
+            } else {
+                btnToggle.className = "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm";
+                if (labelBtn) labelBtn.innerText = "Criar Rota no Mapa";
+            }
+        }
+
+        // Exibe ou oculta cabeçalhos e células de checkbox
+        document.querySelectorAll('.th-checkbox-rota').forEach(th => {
+            th.classList.toggle('hidden', !ativo);
+        });
+        document.querySelectorAll('.td-checkbox-rota').forEach(td => {
+            td.classList.toggle('hidden', !ativo);
+        });
+
+        // Barra flutuante de ações
+        const barra = document.getElementById('barra-flutuante-rota-auditoria');
+        if (barra) {
+            if (ativo) {
+                barra.classList.remove('hidden');
+                barra.classList.add('flex');
+            } else {
+                barra.classList.add('hidden');
+                barra.classList.remove('flex');
+            }
+        }
+
+        window.atualizarContadorSelecaoRota();
+    };
+
+    window.cancelarModoRotaAuditoria = function() {
+        window.selectedOSsParaRota.clear();
+        document.querySelectorAll('.chk-item-rota-auditoria').forEach(cb => { cb.checked = false; });
+        const allOs = document.getElementById('chk-rota-auditoria-all-os');
+        const allComp = document.getElementById('chk-rota-auditoria-all-comp');
+        if (allOs) allOs.checked = false;
+        if (allComp) allComp.checked = false;
+        window.toggleModoRotaAuditoria(false);
+    };
+
+    window.limparSelecaoRotaAuditoria = function() {
+        window.selectedOSsParaRota.clear();
+        document.querySelectorAll('.chk-item-rota-auditoria').forEach(cb => { cb.checked = false; });
+        const allOs = document.getElementById('chk-rota-auditoria-all-os');
+        const allComp = document.getElementById('chk-rota-auditoria-all-comp');
+        if (allOs) allOs.checked = false;
+        if (allComp) allComp.checked = false;
+        window.atualizarContadorSelecaoRota();
+    };
+
+    window.toggleItemRotaAuditoria = function(checkbox, event) {
+        if (event) event.stopPropagation();
+        const id = checkbox.dataset.id;
+        const protocolo = checkbox.dataset.protocolo;
+        const lat = parseFloat(checkbox.dataset.lat);
+        const lng = parseFloat(checkbox.dataset.lng);
+        const endereco = checkbox.dataset.endereco || '';
+        const tecnico = checkbox.dataset.tecnico || '';
+        const problema = checkbox.dataset.problema || '';
+        const plaqueta = checkbox.dataset.plaqueta || '';
+        const dataConclusao = checkbox.dataset.data || '';
+
+        if (checkbox.checked) {
+            window.selectedOSsParaRota.set(protocolo || id, {
+                id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, dataConclusao
+            });
+        } else {
+            window.selectedOSsParaRota.delete(protocolo || id);
+        }
+        window.atualizarContadorSelecaoRota();
+    };
+
+    window.toggleSelecionarTodasRota = function(masterCheckbox, tipo) {
+        const tableId = tipo === 'os' ? '#os-table' : '#completed-services-table';
+        const isChecked = masterCheckbox.checked;
+        const rows = document.querySelectorAll(`${tableId} tbody tr:not([id^="no-"])`);
+
+        rows.forEach(row => {
+            const cb = row.querySelector('.chk-item-rota-auditoria');
+            if (cb) {
+                cb.checked = isChecked;
+                const id = cb.dataset.id;
+                const protocolo = cb.dataset.protocolo;
+                const lat = parseFloat(cb.dataset.lat);
+                const lng = parseFloat(cb.dataset.lng);
+                const endereco = cb.dataset.endereco || '';
+                const tecnico = cb.dataset.tecnico || '';
+                const problema = cb.dataset.problema || '';
+                const plaqueta = cb.dataset.plaqueta || '';
+                const dataConclusao = cb.dataset.data || '';
+
+                if (isChecked) {
+                    window.selectedOSsParaRota.set(protocolo || id, {
+                        id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, dataConclusao
+                    });
+                } else {
+                    window.selectedOSsParaRota.delete(protocolo || id);
+                }
+            }
+        });
+
+        window.atualizarContadorSelecaoRota();
+    };
+
+    window.atualizarContadorSelecaoRota = function() {
+        const count = window.selectedOSsParaRota.size;
+        const label = document.getElementById('label-qtd-selecionadas-rota');
+        const btnConfirm = document.getElementById('btn-confirmar-gerar-rota');
+
+        if (label) {
+            label.innerText = `${count} ${count === 1 ? 'OS' : 'OSs'}`;
+        }
+        if (btnConfirm) {
+            btnConfirm.disabled = (count === 0);
+        }
+    };
+
+    window.confirmarEnvioRotaAoMapa = function() {
+        if (!window.selectedOSsParaRota || window.selectedOSsParaRota.size === 0) {
+            alert("Selecione ao menos 1 Ordem de Serviço para traçar a rota no mapa.");
+            return;
+        }
+
+        const items = Array.from(window.selectedOSsParaRota.values());
+
+        // Valida se há coordenadas disponíveis
+        const comCoords = items.filter(it => !isNaN(it.lat) && !isNaN(it.lng) && it.lat !== 0 && it.lng !== 0);
+        if (comCoords.length === 0) {
+            alert("As OSs selecionadas não possuem coordenadas de latitude/longitude cadastradas para traçar a rota.");
+            return;
+        }
+
+        const payload = {
+            timestamp: Date.now(),
+            origem: 'auditoria',
+            totalSelecionadas: items.length,
+            pontos: items
+        };
+
+        try {
+            sessionStorage.setItem('rota_auditoria_selecionada', JSON.stringify(payload));
+        } catch(e) {
+            console.error("Erro ao gravar rota no sessionStorage:", e);
+        }
+
+        // Redireciona com parâmetro de rota de auditoria
+        window.location.href = 'Mapa.html?modo=auditoria&origem=auditoria_tabela';
+    };
 </script>
 </body>
 </html>

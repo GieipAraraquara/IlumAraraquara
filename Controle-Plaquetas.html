@@ -625,31 +625,43 @@
                 <div class="text-on-surface-variant text-xs mt-1">Total aguardando revisão</div>
             </div>
 
-            <!-- Card 2: Conflitos de Poste / Plaqueta -->
-            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+            <!-- Card 2: Novas Plaquetas -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Conflitos de Poste</span>
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Novas Plaquetas</span>
+                    <div class="w-8 h-8 rounded-lg bg-teal-50 text-teal-600 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-[20px]">add_circle</span>
+                    </div>
+                </div>
+                <div class="font-headline-lg text-headline-lg text-teal-600 font-bold" id="kpi-aprov-novas-plaquetas">0</div>
+                <div class="text-on-surface-variant text-xs mt-1">Sem cadastro prévio</div>
+            </div>
+
+            <!-- Card 3: Conflitos de Poste / Plaqueta -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Conflitos Poste</span>
                     <div class="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
                         <span class="material-symbols-outlined text-[20px]">electric_bolt</span>
                     </div>
                 </div>
                 <div class="font-headline-lg text-headline-lg text-purple-600 font-bold" id="kpi-aprov-conflito-postes">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Poste ocupado ou plaqueta migrada</div>
+                <div class="text-on-surface-variant text-xs mt-1">Ocupado ou migrado</div>
             </div>
 
-            <!-- Card 3: Plaqueta Duplicada no Banco -->
-            <div class="col-span-12 sm:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
+            <!-- Card 4: Plaqueta Duplicada no Banco -->
+            <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
-                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Plaquetas Duplicadas</span>
+                    <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Duplicadas</span>
                     <div class="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
                         <span class="material-symbols-outlined text-[20px]">content_copy</span>
                     </div>
                 </div>
                 <div class="font-headline-lg text-headline-lg text-amber-600 font-bold" id="kpi-aprov-duplicadas-banco">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">2+ pontos no cadastro oficial</div>
+                <div class="text-on-surface-variant text-xs mt-1">2+ no cadastro oficial</div>
             </div>
 
-            <!-- Card 4: Desvio Geodésico Alto (> 15m) -->
+            <!-- Card 5: Desvio Geodésico Alto (> 15m) -->
             <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
                     <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Desvio > 15m</span>
@@ -658,10 +670,10 @@
                     </div>
                 </div>
                 <div class="font-headline-lg text-headline-lg text-rose-600 font-bold" id="kpi-aprov-alta-dist">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Acima do limite automático</div>
+                <div class="text-on-surface-variant text-xs mt-1">Acima de 15m</div>
             </div>
 
-            <!-- Card 5: Desvio Baixo (<= 15m) -->
+            <!-- Card 6: Desvio Baixo (<= 15m) -->
             <div class="col-span-12 sm:col-span-6 lg:col-span-2 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-4 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)]">
                 <div class="flex items-center justify-between mb-1">
                     <span class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider font-semibold">Desvio &le; 15m</span>
@@ -670,7 +682,7 @@
                     </div>
                 </div>
                 <div class="font-headline-lg text-headline-lg text-emerald-600 font-bold" id="kpi-aprov-baixa-dist">0</div>
-                <div class="text-on-surface-variant text-xs mt-1">Calibração fina com alerta</div>
+                <div class="text-on-surface-variant text-xs mt-1">Calibração fina</div>
             </div>
         </div>
 
@@ -773,6 +785,10 @@
                                                 <span>Todos os motivos</span>
                                             </label>
                                             <div class="border-t border-outline-variant/40 my-0.5"></div>
+                                            <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
+                                                <input type="radio" name="aprov-motivo-radio" value="nova_plaqueta" class="text-teal-600 focus:ring-teal-600 cursor-pointer">
+                                                <span>✨ Nova Plaqueta (Inédita)</span>
+                                            </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded-lg cursor-pointer transition-colors text-xs">
                                                 <input type="radio" name="aprov-motivo-radio" value="conflito_poste" class="text-amber-600 focus:ring-amber-600 cursor-pointer">
                                                 <span>⚡ Conflitos de Poste / Vínculo</span>
@@ -2803,8 +2819,24 @@
                         .update(payload)
                         .eq('identificacao', idOriginal);
                 } else {
+                    // Verificar se já existe uma plaqueta com essa identificação antes de inserir
+                    const { data: existente, error: errBusca } = await client.from('localizacao_plaquetas')
+                        .select('identificacao')
+                        .ilike('identificacao', identificacao)
+                        .maybeSingle();
+
+                    if (errBusca) {
+                        alert("Erro ao verificar plaqueta existente: " + errBusca.message);
+                        return;
+                    }
+
+                    if (existente) {
+                        alert(`A plaqueta #${identificacao} já existe no cadastro. Use a opção de editar para alterá-la.`);
+                        return;
+                    }
+
                     res = await client.from('localizacao_plaquetas')
-                        .upsert([payload], { onConflict: 'identificacao' });
+                        .insert([payload]);
                 }
 
                 if (res.error) {
@@ -3701,7 +3733,7 @@
                     const { data: resHistAudit } = await client
                         .from('historico_localizacao_plaquetas')
                         .select('numero_os, identificacao')
-                        .in('origem', ['SNAP_POSTE_AEREO', 'APROVACAO_OS', 'DESCARTE_OS'])
+                        .in('origem', ['SNAP_POSTE_AEREO', 'APROVACAO_OS', 'DESCARTE_OS', 'CADASTRO_NOVA_PLAQUETA'])
                         .not('numero_os', 'is', null);
 
                     if (resHistAudit && resHistAudit.length > 0) {
@@ -3866,7 +3898,62 @@
                 const filaMontada = [];
                 osComCoord.forEach(item => {
                     const instsCadastradas = plaquetasMap.get(item.plaquetaId.toUpperCase());
-                    if (!instsCadastradas || instsCadastradas.length === 0) return; // Plaqueta não cadastrada ou já excluída
+                    const isNovaPlaqueta = !instsCadastradas || instsCadastradas.length === 0;
+
+                    // Se for uma plaqueta nova (sem cadastro prévio na base)
+                    if (isNovaPlaqueta) {
+                        const plaquetasDoPosteAtual = parsePlaquetasPoste(item.postePlaquetaVinculada);
+                        const temOutrasPlaquetasNoPoste = plaquetasDoPosteAtual.length > 0 && !plaquetasDoPosteAtual.includes(item.plaquetaId.toUpperCase());
+                        const temConflitoPosteOcupado = Boolean(item.conflitoPlaquetaPoste || temOutrasPlaquetasNoPoste);
+
+                        const postAnteriores = postesVinculadosMap.get(item.plaquetaId.toUpperCase()) || [];
+                        const outroPosteVinculado = postAnteriores.find(p => !item.posteIdSelecionado || String(p.id) !== String(item.posteIdSelecionado));
+                        const temConflitoPosteMigrado = Boolean(outroPosteVinculado);
+
+                        const motivosAprovacao = [
+                            {
+                                tipo: 'NOVA_PLAQUETA',
+                                titulo: 'Nova Plaqueta',
+                                descricao: 'Plaqueta informada no fechamento da OS sem cadastro prévio no banco',
+                                badgeClass: 'bg-teal-50 text-teal-800 border-teal-300',
+                                icon: 'add_circle'
+                            }
+                        ];
+
+                        if (temConflitoPosteOcupado) {
+                            motivosAprovacao.push({
+                                tipo: 'POSTE_OCUPADO',
+                                titulo: plaquetasDoPosteAtual.length > 1 ? 'Múltiplos Braços' : 'Poste Ocupado',
+                                descricao: `Poste #${item.posteIdSelecionado} já vinculado à plaqueta #${plaquetasDoPosteAtual.join(', ') || 'outra'}`,
+                                badgeClass: 'bg-rose-100 text-rose-900 border-rose-300',
+                                icon: 'electric_bolt'
+                            });
+                        }
+
+                        filaMontada.push({
+                            ...item,
+                            isNovaPlaqueta: true,
+                            idRegistroPlaqueta: null,
+                            instanciasDuplicadas: [],
+                            totalDuplicatasBanco: 0,
+                            coordCadastradaRaw: 'Não cadastrada (Nova)',
+                            coordCadastradaParsed: null,
+                            distanciaMetros: 0,
+                            empresa: 'ILUMITERRA - SEGUNDO CONTRATO',
+                            temConflitoPosteOcupado: temConflitoPosteOcupado,
+                            temConflitoPosteMigrado: temConflitoPosteMigrado,
+                            outroPosteAnteriorId: outroPosteVinculado ? outroPosteVinculado.id : null,
+                            outroPosteAnterior: outroPosteVinculado || null,
+                            outroPosteAnteriorCoords: (outroPosteVinculado && outroPosteVinculado.latitude && outroPosteVinculado.longitude) 
+                                ? { lat: parseFloat(outroPosteVinculado.latitude), lng: parseFloat(outroPosteVinculado.longitude) } 
+                                : null,
+                            temDuplicatasBanco: false,
+                            temDesvioAlto: false,
+                            motivosAprovacao: motivosAprovacao,
+                            selecionado: false
+                        });
+                        return;
+                    }
 
                     // Mapear todas as instâncias válidas calculando a distância de cada uma até a OS
                     const instsValidas = [];
@@ -3968,6 +4055,7 @@
 
                     filaMontada.push({
                         ...item,
+                        isNovaPlaqueta: false,
                         idRegistroPlaqueta: melhorInstancia.id,
                         instanciasDuplicadas: instsValidas,
                         totalDuplicatasBanco: instsValidas.length,
@@ -4010,12 +4098,14 @@
 
         function atualizarKPIsAprovacao() {
             const total = filaAprovacaoCache.length;
+            const novasPlaquetas = filaAprovacaoCache.filter(i => i.isNovaPlaqueta).length;
             const conflitosPoste = filaAprovacaoCache.filter(i => i.temConflitoPosteOcupado || i.temConflitoPosteMigrado).length;
             const duplicadasBanco = filaAprovacaoCache.filter(i => i.temDuplicatasBanco).length;
-            const desvioAlto = filaAprovacaoCache.filter(i => i.temDesvioAlto).length;
-            const desvioBaixo = filaAprovacaoCache.filter(i => !i.temDesvioAlto).length;
+            const desvioAlto = filaAprovacaoCache.filter(i => !i.isNovaPlaqueta && i.temDesvioAlto).length;
+            const desvioBaixo = filaAprovacaoCache.filter(i => !i.isNovaPlaqueta && !i.temDesvioAlto).length;
 
             const elTotal = document.getElementById('kpi-aprov-total-pendentes');
+            const elNovas = document.getElementById('kpi-aprov-novas-plaquetas');
             const elConfPostes = document.getElementById('kpi-aprov-conflito-postes');
             const elDupBanco = document.getElementById('kpi-aprov-duplicadas-banco');
             const elAlta = document.getElementById('kpi-aprov-alta-dist');
@@ -4023,6 +4113,7 @@
             const badgeAba = document.getElementById('badge-contador-pendentes-aprovacao');
 
             if (elTotal) elTotal.innerText = total;
+            if (elNovas) elNovas.innerText = novasPlaquetas;
             if (elConfPostes) elConfPostes.innerText = conflitosPoste;
             if (elDupBanco) elDupBanco.innerText = duplicadasBanco;
             if (elAlta) elAlta.innerText = desvioAlto;
@@ -4072,21 +4163,24 @@
 
                 // 3. Filtro de Motivo / Alerta
                 if (aprovFiltroMotivo && aprovFiltroMotivo !== 'todas') {
-                    if (aprovFiltroMotivo === 'conflito_poste') {
+                    if (aprovFiltroMotivo === 'nova_plaqueta') {
+                        if (!item.isNovaPlaqueta) return false;
+                    } else if (aprovFiltroMotivo === 'conflito_poste') {
                         if (!item.temConflitoPosteOcupado && !item.temConflitoPosteMigrado) return false;
                     } else if (aprovFiltroMotivo === 'duplicata_banco') {
                         if (!item.temDuplicatasBanco) return false;
                     } else if (aprovFiltroMotivo === 'desvio_alto') {
-                        if (!item.temDesvioAlto) return false;
+                        if (item.isNovaPlaqueta || !item.temDesvioAlto) return false;
                     } else if (aprovFiltroMotivo === 'baixa') {
-                        if (item.distanciaMetros > 15) return false;
+                        if (item.isNovaPlaqueta || item.distanciaMetros > 15) return false;
                     } else if (aprovFiltroMotivo === 'alta') {
-                        if (item.distanciaMetros <= 50) return false;
+                        if (item.isNovaPlaqueta || item.distanciaMetros <= 50) return false;
                     }
                 }
 
                 // 4. Filtro de Faixa de Distância
                 if (aprovFiltroDist && aprovFiltroDist !== 'todas') {
+                    if (item.isNovaPlaqueta) return false; // Novas plaquetas não possuem faixa de distância cadastrada
                     if (aprovFiltroDist === 'baixa') {
                         if (item.distanciaMetros > 15) return false;
                     } else if (aprovFiltroDist === 'media') {
@@ -4125,17 +4219,25 @@
                 // Classificação de cor pela distância
                 let badgeDistClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
                 let dotColor = "bg-emerald-500";
-                if (item.distanciaMetros > 50) {
-                    badgeDistClass = "bg-rose-50 text-rose-700 border-rose-200";
-                    dotColor = "bg-rose-500";
-                } else if (item.distanciaMetros > 15) {
-                    badgeDistClass = "bg-amber-50 text-amber-800 border-amber-200";
-                    dotColor = "bg-amber-500";
-                }
+                let distFormatada = "";
 
-                const distFormatada = item.distanciaMetros < 1000 
-                    ? `${item.distanciaMetros.toFixed(1)} m` 
-                    : `${(item.distanciaMetros / 1000).toFixed(2)} km`;
+                if (item.isNovaPlaqueta) {
+                    badgeDistClass = "bg-teal-50 text-teal-800 border-teal-300";
+                    dotColor = "bg-teal-500";
+                    distFormatada = "Nova Plaqueta";
+                } else {
+                    if (item.distanciaMetros > 50) {
+                        badgeDistClass = "bg-rose-50 text-rose-700 border-rose-200";
+                        dotColor = "bg-rose-500";
+                    } else if (item.distanciaMetros > 15) {
+                        badgeDistClass = "bg-amber-50 text-amber-800 border-amber-200";
+                        dotColor = "bg-amber-500";
+                    }
+
+                    distFormatada = item.distanciaMetros < 1000 
+                        ? `${item.distanciaMetros.toFixed(1)} m` 
+                        : `${(item.distanciaMetros / 1000).toFixed(2)} km`;
+                }
 
                 const dtFech = item.dataFechamento 
                     ? new Date(item.dataFechamento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -4328,54 +4430,92 @@
                         .map(inst => inst.id);
                 }
 
-                // 1. Atualizar localizacao_plaquetas e gravar histórico via RPC Transacional Auditada
+                // 1. Atualizar ou Inserir em localizacao_plaquetas e gravar histórico
                 const userNome = localStorage.getItem('usuario_nome') || localStorage.getItem('user_nome') || 'Auditoria OS';
                 const modoTexto = options.modoVinculoPoste === 'SOMAR' ? ' [Luminária Adicional / Braço Somado]' : '';
                 let obsTexto = isSnapPoste
-                    ? `Aprovada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})`
-                    : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`;
+                    ? (item.isNovaPlaqueta ? `Nova plaqueta cadastrada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})` : `Aprovada com calibração ao Poste Aéreo #${posteAereoId}${modoTexto} (OS #${item.protocolo})`)
+                    : (item.isNovaPlaqueta ? `Nova plaqueta cadastrada via aprovação da OS #${item.protocolo}` : `Aprovada coordenada da OS #${item.protocolo} (Desvio: ${item.distanciaMetros}m)`);
 
                 if (idsEfetivosParaRemover.length > 0) {
                     obsTexto += ` [${idsEfetivosParaRemover.length} duplicata(s) removida(s)]`;
                 }
 
-                const { data: rpcRes, error: rpcErr } = await client.rpc('atualizar_posicao_plaqueta_auditada', {
-                    p_identificacao: item.plaquetaId,
-                    p_nova_lat: newLat,
-                    p_nova_lng: newLng,
-                    p_origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
-                    p_numero_os: String(item.protocolo || ''),
-                    p_usuario: userNome,
-                    p_observacao: obsTexto,
-                    p_desvio_metros: !isNaN(parseFloat(item.distanciaMetros)) ? parseFloat(item.distanciaMetros) : null,
-                    p_extra_payload: { 
-                        limpar_obs: limparObsoletas,
-                        id_registro_alvo: idParaPreservarEAtualizar,
-                        ids_remover: idsEfetivosParaRemover
-                    }
-                });
+                let rpcSucesso = false;
 
-                let rpcSucesso = !rpcErr && rpcRes && rpcRes.success;
-
-                if (!rpcSucesso) {
-                    console.warn("Aviso ao aprovar via RPC, usando fallback direto:", rpcErr || rpcRes?.error);
-                    let queryUpdate = client.from('localizacao_plaquetas')
-                        .update({
+                if (item.isNovaPlaqueta) {
+                    // Inserção direta de nova plaqueta aprovada
+                    const { data: insData, error: insErr } = await client.from('localizacao_plaquetas')
+                        .insert([{
+                            identificacao: item.plaquetaId.toUpperCase(),
                             Latitude: newLat,
                             Longitude: newLng,
-                            "Observação": limparObsoletas ? '' : undefined
-                        });
+                            "QTD. Lum.": 1,
+                            Empresa: item.empresa || 'ILUMITERRA - SEGUNDO CONTRATO',
+                            "Observação": ''
+                        }])
+                        .select('id')
+                        .maybeSingle();
 
-                    if (idParaPreservarEAtualizar) {
-                        queryUpdate = queryUpdate.eq('id', idParaPreservarEAtualizar);
-                    } else {
-                        queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
+                    if (insErr) {
+                        alert(`Erro ao cadastrar nova plaqueta #${item.plaquetaId}: ` + insErr.message);
+                        return false;
                     }
 
-                    const { error: errUpdate } = await queryUpdate;
-                    if (errUpdate) {
-                        alert(`Erro ao atualizar plaqueta #${item.plaquetaId}: ` + errUpdate.message);
-                        return false;
+                    // Gravar histórico de nova plaqueta
+                    try {
+                        await client.from('historico_localizacao_plaquetas').insert([{
+                            identificacao: item.plaquetaId.toUpperCase(),
+                            latitude: newLat,
+                            longitude: newLng,
+                            numero_os: item.protocolo,
+                            origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'CADASTRO_NOVA_PLAQUETA',
+                            usuario: userNome,
+                            observacao: obsTexto,
+                            desvio_metros: null
+                        }]);
+                    } catch (hErr) { console.warn("Aviso ao gravar histórico de nova plaqueta:", hErr); }
+
+                    rpcSucesso = true; // Marca como concluído com sucesso para o fluxo seguinte
+                } else {
+                    const { data: rpcRes, error: rpcErr } = await client.rpc('atualizar_posicao_plaqueta_auditada', {
+                        p_identificacao: item.plaquetaId,
+                        p_nova_lat: newLat,
+                        p_nova_lng: newLng,
+                        p_origem: isSnapPoste ? 'SNAP_POSTE_AEREO' : 'APROVACAO_OS',
+                        p_numero_os: String(item.protocolo || ''),
+                        p_usuario: userNome,
+                        p_observacao: obsTexto,
+                        p_desvio_metros: !isNaN(parseFloat(item.distanciaMetros)) ? parseFloat(item.distanciaMetros) : null,
+                        p_extra_payload: { 
+                            limpar_obs: limparObsoletas,
+                            id_registro_alvo: idParaPreservarEAtualizar,
+                            ids_remover: idsEfetivosParaRemover
+                        }
+                    });
+
+                    rpcSucesso = !rpcErr && rpcRes && rpcRes.success;
+
+                    if (!rpcSucesso) {
+                        console.warn("Aviso ao aprovar via RPC, usando fallback direto:", rpcErr || rpcRes?.error);
+                        let queryUpdate = client.from('localizacao_plaquetas')
+                            .update({
+                                Latitude: newLat,
+                                Longitude: newLng,
+                                "Observação": limparObsoletas ? '' : undefined
+                            });
+
+                        if (idParaPreservarEAtualizar) {
+                            queryUpdate = queryUpdate.eq('id', idParaPreservarEAtualizar);
+                        } else {
+                            queryUpdate = queryUpdate.eq('identificacao', item.plaquetaId);
+                        }
+
+                        const { error: errUpdate } = await queryUpdate;
+                        if (errUpdate) {
+                            alert(`Erro ao atualizar plaqueta #${item.plaquetaId}: ` + errUpdate.message);
+                            return false;
+                        }
                     }
                 }
 
@@ -4484,13 +4624,17 @@
                 return;
             }
 
+            const msgDescarte = item.isNovaPlaqueta
+                ? `Deseja descartar o cadastro da Nova Plaqueta <strong>#${item.plaquetaId}</strong> informada na OS <strong>#${item.protocolo}</strong>? Ela não será adicionada à base de plaquetas.`
+                : `Deseja descartar a sugestão da OS <strong>#${item.protocolo}</strong> para a Plaqueta <strong>#${item.plaquetaId}</strong> e manter a localização cadastrada atual?`;
+
             window.showConfirmModal({
-                title: 'Descartar Sugestão da OS',
-                message: `Deseja descartar a sugestão da OS <strong>#${item.protocolo}</strong> para a Plaqueta <strong>#${item.plaquetaId}</strong> e manter a localização cadastrada atual?`,
+                title: item.isNovaPlaqueta ? 'Descartar Nova Plaqueta' : 'Descartar Sugestão da OS',
+                message: msgDescarte,
                 icon: 'delete',
                 iconBgClass: 'bg-rose-100 text-rose-700',
                 confirmBtnClass: 'bg-rose-600 text-white hover:bg-rose-700',
-                confirmText: 'Descartar Sugestão',
+                confirmText: item.isNovaPlaqueta ? 'Descartar Plaqueta' : 'Descartar Sugestão',
                 onConfirm: async () => {
                     await executarDescarteOS(item);
                 }
@@ -4931,8 +5075,8 @@
             }, 10);
 
             // Inicializar / Redesenhar Mapa Mapbox
-            const cOrig = [item.coordCadastradaParsed.lng, item.coordCadastradaParsed.lat];
             const cOS = [item.coordReparoParsed.lng, item.coordReparoParsed.lat];
+            const cOrig = item.coordCadastradaParsed ? [item.coordCadastradaParsed.lng, item.coordCadastradaParsed.lat] : cOS;
 
             if (!compMapboxInstance) {
                 mapboxgl.accessToken = MAPBOX_TOKEN;
@@ -5034,7 +5178,7 @@
                     }
                 });
 
-            } else {
+            } else if (!item.isNovaPlaqueta && item.coordCadastradaParsed) {
                 if (boxDup) boxDup.classList.add('hidden');
 
                 // Plaqueta única normal / Ponto de Referência
@@ -5068,16 +5212,18 @@
                     .addTo(compMapboxInstance);
                 compMarkers.push(compMarkerOrig);
                 bounds.extend(cOrig);
+            } else {
+                if (boxDup) boxDup.classList.add('hidden');
             }
 
             // Distância geodésica entre os dois pontos para verificar sobreposição
-            const distCalcGeo = (typeof calcularDistanciaHaversine === 'function') 
+            const distCalcGeo = (typeof calcularDistanciaHaversine === 'function' && item.coordCadastradaParsed) 
                 ? calcularDistanciaHaversine(item.coordCadastradaParsed, item.coordReparoParsed)
                 : null;
             const distEntrePontos = (distCalcGeo !== null) ? distCalcGeo : (item.distanciaMetros || 0);
 
             // Se os pontos forem idênticos ou extremamente próximos (< 0.5m) E não houver distância gravada relevante (> 0.5m)
-            const saoPontosIdenticos = distEntrePontos < 0.5 && (!item.distanciaMetros || item.distanciaMetros < 0.5);
+            const saoPontosIdenticos = !item.isNovaPlaqueta && distEntrePontos < 0.5 && (!item.distanciaMetros || item.distanciaMetros < 0.5);
 
             // Adicionar Marcador Âmbar (Ponto da OS / Nova Posição)
             const isHist = Boolean(item.isHistoricoViewer);

@@ -469,7 +469,7 @@ class AuditoriaController {
 
         const activeCount = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) ? window.activeAuditCols.length : 11;
         const isAuditColsHidden = document.getElementById('os-table')?.classList.contains('hide-audit-cols') || activeCount === 0;
-        const colspanVal = (4 + activeCount).toString();
+        const colspanVal = (5 + activeCount).toString();
 
         // Keep empty state row
         const emptyRowHtml = `
@@ -796,9 +796,37 @@ class AuditoriaController {
         };
 
         const isCompleted = item.isAuditoriaConcluida;
+        const isModoRotaAtivo = !!(window.modoSelecaoRotaAuditoria);
+        const rawCoord = item.coordenadaReparo || item.coordenadaInicial;
+        const coordPair = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(rawCoord) : { lat: 0, lng: 0 };
+        const lat = coordPair.lat || 0;
+        const lng = coordPair.lng || 0;
+        const isChecked = !!(window.selectedOSsParaRota && window.selectedOSsParaRota.has(item.protocolo || item.id));
+        const firstAddr = (addressLines && addressLines[0]) ? addressLines[0].replace(/"/g, '&quot;') : '';
+        const safeTecnico = (item.tecnico || item.operadorFinalizacao || '').replace(/"/g, '&quot;');
+        const safeProb = (item.problemaEncontrado || item.problemaInicial || '').replace(/"/g, '&quot;');
+        const safePlaq = (item.plaquetaFinal || item.plaquetaInicial || '').replace(/"/g, '&quot;');
+
+        const checkboxTdHtml = `
+            <td class="td-checkbox-rota ${isModoRotaAtivo ? '' : 'hidden'} py-3 px-2 text-center align-middle" onclick="event.stopPropagation()">
+                <input type="checkbox" class="chk-item-rota-auditoria w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" 
+                    ${isChecked ? 'checked' : ''}
+                    data-id="${item.id}"
+                    data-protocolo="${item.protocolo}"
+                    data-lat="${lat}"
+                    data-lng="${lng}"
+                    data-endereco="${firstAddr}"
+                    data-tecnico="${safeTecnico}"
+                    data-problema="${safeProb}"
+                    data-plaqueta="${safePlaq}"
+                    data-data="${item.formattedDateConclusaoShort || ''}"
+                    onchange="window.toggleItemRotaAuditoria(this, event)" />
+            </td>
+        `;
 
         return `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.protocolo || item.id}" data-completed="${isCompleted}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
+                ${checkboxTdHtml}
                 <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}</td>
                 <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
@@ -884,7 +912,7 @@ class AuditoriaController {
 
         const emptyRowHtml = `
             <tr id="no-completed-results" class="${listToUse.length === 0 ? '' : 'hidden'}">
-                <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                <td colspan="8" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                         <span class="text-xs">Nenhum serviço finalizado encontrado.</span>
@@ -1172,8 +1200,33 @@ class AuditoriaController {
             </td>
         `;
 
+        const isModoRotaAtivo = !!(window.modoSelecaoRotaAuditoria);
+        const isChecked = !!(window.selectedOSsParaRota && window.selectedOSsParaRota.has(item.protocolo || item.id));
+        const safeAddr = (item.endereco || item.bairro || '').replace(/"/g, '&quot;');
+        const safeTecnico = (item.tecnico || item.operadorFinalizacao || '').replace(/"/g, '&quot;');
+        const safeProb = (item.problemaEncontrado || item.problemaInicial || '').replace(/"/g, '&quot;');
+        const safePlaq = (item.plaquetaFinal || item.plaquetaInicial || '').replace(/"/g, '&quot;');
+
+        const checkboxTdHtml = `
+            <td class="td-checkbox-rota ${isModoRotaAtivo ? '' : 'hidden'} py-3 px-2 text-center align-middle" onclick="event.stopPropagation()">
+                <input type="checkbox" class="chk-item-rota-auditoria w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" 
+                    ${isChecked ? 'checked' : ''}
+                    data-id="${item.id}"
+                    data-protocolo="${item.protocolo}"
+                    data-lat="${lat || 0}"
+                    data-lng="${lng || 0}"
+                    data-endereco="${safeAddr}"
+                    data-tecnico="${safeTecnico}"
+                    data-problema="${safeProb}"
+                    data-plaqueta="${safePlaq}"
+                    data-data="${dateConclusaoText || ''}"
+                    onchange="window.toggleItemRotaAuditoria(this, event)" />
+            </td>
+        `;
+
         return `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] relative z-0 hover:z-10 bg-surface-container-lowest align-middle" data-id="${item.protocolo || item.id}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
+                ${checkboxTdHtml}
                 ${protocolTdHtml}
                 <td class="py-3 px-4 text-on-surface-variant whitespace-nowrap truncate align-middle font-medium">${dateConclusaoText}</td>
                 ${col2TdHtml}
@@ -2310,9 +2363,45 @@ class AuditoriaController {
                                      <div class="space-y-1">
                                          <div class="font-bold text-emerald-800 text-xs border-b border-emerald-200/60 pb-1">✅ Fechamento #${p.fechamento || p.numeroFechamento || 1}</div>
                                          <div><b class="text-slate-600">Plaqueta:</b> <span class="font-semibold text-emerald-900">${(p.plaquetaFinal && p.plaquetaFinal !== 'Não informada') ? p.plaquetaFinal : (pIdx === 0 ? (item.plaquetaFinal || 'Não informada') : 'Não informada')}</span></div>
-                                         <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
+                                         <div class="flex items-center gap-1.5 flex-wrap">
+                                            <div><b class="text-slate-600">Coordenada:</b> <span class="font-medium text-emerald-900">${(p.coordenadaFinal && p.coordenadaFinal !== 'Não informada') ? p.coordenadaFinal : (pIdx === 0 ? (item.coordenadaReparo || 'Não informada') : 'Não informada')}</span></div>
+                                            ${p.precisaoGpsMetros !== null && p.precisaoGpsMetros !== undefined ? `
+                                                <span class="inline-flex items-center gap-0.5 text-[9.5px] font-bold px-1.5 py-0.5 rounded-full ${p.precisaoGpsMetros <= 20 ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' : (p.precisaoGpsMetros <= 50 ? 'bg-blue-100 text-blue-800 border border-blue-200' : (p.precisaoGpsMetros <= 100 ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-rose-100 text-rose-800 border border-rose-200'))}" title="Precisão do sinal GPS capturado pelo operador">
+                                                    <span>🎯 ±${Math.round(p.precisaoGpsMetros)}m</span>
+                                                </span>
+                                            ` : ''}
+                                        </div>
                                          <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
                                          ${isRealAddr(endFinVal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFinVal}</span></div>` : ''}
+                                         ${p.posteId ? `
+                                         <div class="mt-1.5 p-1.5 rounded-lg bg-purple-50/80 border border-purple-200/80 text-[11px] space-y-1">
+                                             <div class="flex items-center justify-between gap-1 flex-wrap">
+                                                 <span class="inline-flex items-center gap-1 font-bold text-purple-900">
+                                                     <span class="material-symbols-outlined text-[14px] text-purple-700">electric_bolt</span>
+                                                     <span>Poste #${p.posteId}</span>
+                                                 </span>
+                                                 ${p.posteDistanciaMetros !== null && p.posteDistanciaMetros !== undefined ? `
+                                                     <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200" title="Distância entre o GPS do operador e o Poste Selecionado">
+                                                         ${p.posteDistanciaMetros}m do reparo
+                                                     </span>
+                                                 ` : ''}
+                                             </div>
+                                             ${(p.posteLat && p.posteLng) ? `
+                                                 <div class="text-[10px] font-mono text-purple-800/80 flex items-center justify-between">
+                                                     <span>${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
+                                                     <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 text-amber-700 hover:text-amber-800 font-semibold cursor-pointer" title="Ver Poste no Street View 360°">
+                                                         <span class="material-symbols-outlined text-[12px]">streetview</span>
+                                                         <span>Street View</span>
+                                                     </a>
+                                                 </div>
+                                             ` : ''}
+                                         </div>
+                                         ` : (p.posteNaoEncontrado ? `
+                                         <div class="mt-1 p-1 rounded bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
+                                             <span class="material-symbols-outlined text-[13px] text-amber-600">info</span>
+                                             <span>Operador marcou poste não encontrado no mapa</span>
+                                         </div>
+                                         ` : '')}
                                      </div>
                                      ${navFin.hasNav ? `
                                      <div class="flex items-center gap-1.5 pt-1.5 border-t border-emerald-200/60 mt-1.5">
@@ -2457,8 +2546,22 @@ class AuditoriaController {
                             ` : ''}
                             ${(s.coordenada_inicio || s.coordenada_fim) ? `
                             <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
-                                ${s.coordenada_inicio ? `<div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>` : ''}
-                                ${s.coordenada_fim ? `<div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>` : ''}
+                                ${s.coordenada_inicio ? `
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>
+                                        ${(s.precisao_gps_inicio !== null && s.precisao_gps_inicio !== undefined) ? `
+                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_inicio <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_inicio <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_inicio)}m</span>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                                ${s.coordenada_fim ? `
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>
+                                        ${(s.precisao_gps_fim !== null && s.precisao_gps_fim !== undefined) ? `
+                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_fim <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_fim <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_fim)}m</span>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
                             </div>
                             ` : ''}
                             ${(s.materiais && s.materiais.length > 0) ? `
