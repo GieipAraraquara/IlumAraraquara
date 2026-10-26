@@ -1532,7 +1532,7 @@
         html += '  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">';
         html += '    <div>';
         html += '      <label class="block text-xs font-semibold uppercase tracking-wider text-slate-600 mb-1">Nº Plaqueta do Poste ' + (exigirPlaqueta ? '<span class="text-red-500 font-bold">*</span>' : '<span class="text-slate-400 font-normal lowercase">(opcional)</span>') + '</label>';
-        html += '      <input type="text" id="plaqueta_' + idx + '" placeholder="Ex: U8162" maxlength="5" oninput="mascaraPlaqueta(this)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:ring-2 focus:ring-blue-600 outline-none" />';
+        html += '      <input type="text" id="plaqueta_' + idx + '" placeholder="Ex: N0477" maxlength="5" pattern="[A-Za-z][0-9]{4}" title="Uma letra seguida de 4 números (ex: N0477)" oninput="mascaraPlaqueta(this)" class="w-full bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-sm font-bold text-slate-800 uppercase focus:ring-2 focus:ring-blue-600 outline-none" />';
         html += '    </div>';
 
         html += '    <div>';
@@ -1640,7 +1640,17 @@
 
       function mascaraPlaqueta(i) {
         if (!i) return;
-        i.value = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 5);
+        var v = i.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        var res = '';
+        if (v.length > 0) {
+          // O primeiro caractere deve ser obrigatoriamente uma letra
+          var primeiraLetra = v.substring(0, 1).replace(/[^A-Z]/g, '');
+          res += primeiraLetra;
+          // Os 4 caracteres seguintes devem ser dígitos
+          var restoNumeros = v.substring(1).replace(/[^0-9]/g, '').substring(0, 4);
+          res += restoNumeros;
+        }
+        i.value = res;
       }
 
       function mascaraCoord(i) {
@@ -2361,11 +2371,18 @@
               zoomBox.classList.remove('hidden');
               zoomBox.classList.add('flex');
               var maxZ = capabilities.zoom.max || 1;
-              var btn3x = document.getElementById('btnZoom3x');
-              if (btn3x) {
-                if (maxZ < 3) btn3x.classList.add('hidden');
-                else btn3x.classList.remove('hidden');
-              }
+              var zoomLevels = [1, 2, 3, 5, 7, 10, 12, 15];
+              zoomLevels.forEach(z => {
+                var btn = document.getElementById('btnZoom' + z + 'x');
+                if (btn) {
+                  // Oculta botões cujo zoom exceda o máximo de hardware do celular
+                  if (z > 1 && z > maxZ) {
+                    btn.classList.add('hidden');
+                  } else {
+                    btn.classList.remove('hidden');
+                  }
+                }
+              });
               this.destacarBotaoZoom(1);
             } else {
               zoomBox.classList.add('hidden');
@@ -2382,9 +2399,8 @@
               expBox.classList.add('flex');
               expSlider.min = capabilities.exposureCompensation.min;
               expSlider.max = capabilities.exposureCompensation.max;
-              expSlider.step = capabilities.exposureCompensation.step || 0.5;
+              expSlider.step = capabilities.exposureCompensation.step || 0.2;
               expSlider.value = 0;
-              document.getElementById('cameraExposureLabel').innerText = '0';
             } else {
               expBox.classList.add('hidden');
               expBox.classList.remove('flex');
@@ -2446,8 +2462,8 @@
         },
 
         destacarBotaoZoom(valor) {
-          ['btnZoom1x', 'btnZoom2x', 'btnZoom3x'].forEach(id => {
-            var b = document.getElementById(id);
+          [1, 2, 3, 5, 7, 10, 12, 15].forEach(z => {
+            var b = document.getElementById('btnZoom' + z + 'x');
             if (!b) return;
             b.classList.remove('bg-white', 'text-black');
             b.classList.add('text-white');
@@ -2462,9 +2478,6 @@
         async ajustarExposicao(val) {
           if (!this.track) return;
           var numVal = parseFloat(val);
-          var lbl = document.getElementById('cameraExposureLabel');
-          if (lbl) lbl.innerText = numVal > 0 ? ('+' + numVal) : String(numVal);
-
           try {
             await this.track.applyConstraints({
               advanced: [{ exposureCompensation: numVal }]
@@ -2472,6 +2485,12 @@
           } catch (eExp) {
             console.warn('⚠️ [Câmera] Falha ao ajustar exposição:', eExp);
           }
+        },
+
+        async resetarExposicao() {
+          var slider = document.getElementById('cameraExposureSlider');
+          if (slider) slider.value = 0;
+          await this.ajustarExposicao(0);
         },
 
         dispararFoto() {
@@ -3183,13 +3202,19 @@
           var fotos = stObj.fotosEstagios || {};
           var faltantesPonto = [];
 
-          // 1. Validação da Plaqueta (se exigido pelas regras operacionais)
+          // 1. Validação da Plaqueta (se exigido pelas regras operacionais ou se preenchida)
+          var plaqInput = document.getElementById('plaqueta_' + i);
+          var plaqVal = plaqInput ? plaqInput.value.trim().toUpperCase() : '';
+          var regexPlaqueta = /^[A-Z][0-9]{4}$/;
+
           if (exigirPlaqueta) {
-            var plaqInput = document.getElementById('plaqueta_' + i);
-            var plaqVal = plaqInput ? plaqInput.value.trim() : '';
             if (!plaqVal) {
-              faltantesPonto.push('Nº da Plaqueta');
+              faltantesPonto.push('Nº da Plaqueta (obrigatório)');
+            } else if (!regexPlaqueta.test(plaqVal)) {
+              faltantesPonto.push('Nº da Plaqueta inválido (formato obrigatório: 1 letra e 4 números, ex: N0477)');
             }
+          } else if (plaqVal && !regexPlaqueta.test(plaqVal)) {
+            faltantesPonto.push('Nº da Plaqueta inválido (formato obrigatório: 1 letra e 4 números, ex: N0477)');
           }
 
           // 2. Validação das Coordenadas GPS (se exigido pelas regras operacionais)
@@ -5084,19 +5109,27 @@
 
             <!-- Controle Lateral Flutuante: Compensação de Exposição/Brilho (Crucial para Plaqueta) -->
             <div id="cameraExposureControl" class="hidden absolute right-3 top-1/2 -translate-y-1/2 z-20 flex-col items-center gap-2 bg-black/50 backdrop-blur-md p-2 rounded-2xl border border-white/15 text-white">
-                <span class="material-symbols-outlined text-[16px] text-amber-300">wb_sunny</span>
-                <input type="range" id="cameraExposureSlider" min="-2" max="2" step="0.5" value="0" orient="vertical" oninput="window.cameraInterna.ajustarExposicao(this.value)" class="h-28 w-1.5 accent-amber-400 bg-white/20 rounded-lg cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
-                <span class="text-[9px] font-mono text-white/70" id="cameraExposureLabel">0</span>
+                <span class="material-symbols-outlined text-[18px] text-amber-300">wb_sunny</span>
+                <input type="range" id="cameraExposureSlider" min="-2" max="2" step="0.2" value="0" orient="vertical" oninput="window.cameraInterna.ajustarExposicao(this.value)" class="h-32 w-2 accent-amber-400 bg-white/20 rounded-lg cursor-pointer" style="writing-mode: bt-lr; -webkit-appearance: slider-vertical;" />
+                <!-- Botão de Reset sem texto -->
+                <button type="button" onclick="window.cameraInterna.resetarExposicao()" class="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 active:scale-90 text-white flex items-center justify-center transition-all cursor-pointer" title="Redefinir Brilho">
+                    <span class="material-symbols-outlined text-[15px]">restart_alt</span>
+                </button>
             </div>
         </div>
 
         <!-- Barra Inferior: Controles de Zoom, Botão de Disparo / Confirmar -->
-        <div class="p-4 sm:p-6 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-20 flex flex-col items-center gap-3">
-            <!-- Controles Rápidos de Zoom (1x, 2x, 3x) -->
-            <div id="cameraZoomControls" class="hidden items-center gap-2 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full border border-white/15">
-                <button type="button" onclick="window.cameraInterna.ajustarZoom(1)" id="btnZoom1x" class="px-2.5 py-1 text-xs font-bold rounded-full bg-white text-black transition-all">1x</button>
-                <button type="button" onclick="window.cameraInterna.ajustarZoom(2)" id="btnZoom2x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all">2x</button>
-                <button type="button" onclick="window.cameraInterna.ajustarZoom(3)" id="btnZoom3x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all">3x</button>
+        <div class="p-3 sm:p-5 bg-gradient-to-t from-black/95 via-black/80 to-transparent z-20 flex flex-col items-center gap-3">
+            <!-- Controles Rápidos de Zoom (1x, 2x, 3x, 5x, 7x, 10x, 12x, 15x) -->
+            <div id="cameraZoomControls" class="hidden max-w-full overflow-x-auto no-scrollbar items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/20">
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(1)" id="btnZoom1x" class="px-2.5 py-1 text-xs font-bold rounded-full bg-white text-black transition-all flex-shrink-0">1x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(2)" id="btnZoom2x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">2x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(3)" id="btnZoom3x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">3x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(5)" id="btnZoom5x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">5x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(7)" id="btnZoom7x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">7x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(10)" id="btnZoom10x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">10x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(12)" id="btnZoom12x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">12x</button>
+                <button type="button" onclick="window.cameraInterna.ajustarZoom(15)" id="btnZoom15x" class="px-2.5 py-1 text-xs font-bold rounded-full text-white hover:bg-white/20 transition-all flex-shrink-0">15x</button>
             </div>
 
             <!-- Botões de Ação: Disparo (ao vivo) ou Confirmar/Repetir (quando congelada) -->
