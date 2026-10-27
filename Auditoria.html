@@ -3395,12 +3395,13 @@
             rows.forEach(row => {
                 let showRow = true;
 
-                // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS
+                // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS (ou ser OS Rejeitada)
+                const isRejeitadaRow = row.getAttribute('data-rejeitada') === 'true';
                 const activeColIndices = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) 
                     ? window.activeAuditCols 
                     : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-                if (activeColIndices.length === 0) {
+                if (activeColIndices.length === 0 && !isRejeitadaRow) {
                     // Se o usuário desmarcou todas as colunas de auditoria, nenhuma linha com critério de auditoria deve passar
                     showRow = false;
                 } else {
@@ -3412,7 +3413,7 @@
                             break;
                         }
                     }
-                    if (!hasSInActiveCols) {
+                    if (!hasSInActiveCols && !isRejeitadaRow) {
                         showRow = false;
                     }
                 }

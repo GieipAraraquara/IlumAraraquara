@@ -31,6 +31,9 @@ class AuditoriaController {
 
     isItemDivergent(item) {
         if (!item || item.isDireto) return false;
+        // OSs Rejeitadas/Recusadas exigem obrigatoriamente avaliação na Auditoria
+        if (item.normalizedStatus === 'rejeitada') return true;
+
         if (this.isManutentorUser()) {
             // Para manutentor, exclui: Outra plaqueta próxima, Anexo Plaqueta Divergente, Anexo Faltante e Reincidência 30d
             return Boolean(
@@ -248,9 +251,11 @@ class AuditoriaController {
             });
             window.chamadosListCache = this.chamadosList;
             
-            // Filter STRICTLY for CURRENTLY CONCLUDED OSs ('concluida')
+            // Filter for CONCLUDED OSs ('concluida') and REJECTED OSs ('rejeitada' which require audit evaluation)
             // Reopened OSs ('aberta') are excluded even if they retain a past data_conclusao timestamp.
-            this.concludedList = this.chamadosList.filter(item => item.normalizedStatus === 'concluida');
+            this.concludedList = this.chamadosList.filter(item => 
+                item.normalizedStatus === 'concluida' || item.normalizedStatus === 'rejeitada'
+            );
 
             // Ordenar da data mais antiga para a mais nova (ascendente)
             this.concludedList.sort((a, b) => {
@@ -265,7 +270,7 @@ class AuditoriaController {
             // Separação entre Praças, Demandas Emergenciais (Atendimento Direto) e Viário Concluídas
             this.emergenciaServicesList = this.chamadosList.filter(item => item.isDireto);
             this.pracaServicesList = this.chamadosList.filter(item => item.isPraca && !item.isDireto);
-            this.viariaConcludedList = this.concludedList.filter(item => !item.isPraca && !item.isDireto);
+            this.viariaConcludedList = this.concludedList.filter(item => item.normalizedStatus === 'concluida' && !item.isPraca && !item.isDireto);
 
             // Calcula se cada plaqueta dos fechamentos foi reparada nos 30 dias anteriores
             this.processarReincidencias30Dias(this.concludedList);
@@ -824,11 +829,14 @@ class AuditoriaController {
             </td>
         `;
 
+        const isRejeitadaItem = item.normalizedStatus === 'rejeitada';
+        const rejeitadaBadgeHtml = isRejeitadaItem ? ` <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="OS Rejeitada / Recusada">Rejeitada</span>` : '';
+
         return `
-            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.protocolo || item.id}" data-completed="${isCompleted}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
+            <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.protocolo || item.id}" data-completed="${isCompleted}" data-rejeitada="${isRejeitadaItem}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
                 ${checkboxTdHtml}
-                <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}</td>
-                <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort}</td>
+                <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}${rejeitadaBadgeHtml}</td>
+                <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort || item.formattedDateAberturaShort || ''}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
                 
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="0">${renderBadge(item.isProblemaDivergente, 0)}</td>

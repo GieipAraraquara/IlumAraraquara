@@ -2344,33 +2344,131 @@
             return false;
           }
 
-          // Busca de dispositivo traseiro prioritário (em celulares multi-câmera, prioriza a lente principal 'back 0' ou 'camera 0')
-          var targetDeviceId = null;
-          try {
-            if (this.facingMode === 'environment' && typeof navigator.mediaDevices.enumerateDevices === 'function') {
-              var devices = await navigator.mediaDevices.enumerateDevices();
-              var videoDevices = devices.filter(d => d.kind === 'videoinput');
-              var backDevices = videoDevices.filter(d => {
-                var label = (d.label || '').toLowerCase();
-                return label.includes('back') || label.includes('traseira') || label.includes('rear') || label.includes('environment');
+          // Se a intenção for câmera frontal (ex: selfie), usa diretamente facingMode: user
+          if (this.facingMode === 'user') {
+            try {
+              this.stream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                  facingMode: { ideal: 'user' },
+                  width: { ideal: 1920 },
+                  height: { ideal: 1080 }
+                }
               });
-
-              // Filtra fora lentes ultrawide/macro que têm foco fixo ou distância focal diferente
-              var mainCam = backDevices.find(d => {
-                var lbl = (d.label || '').toLowerCase();
-                return (lbl.includes('0') || lbl.includes('main') || lbl.includes('primary') || lbl.includes('wide')) && !lbl.includes('ultra') && !lbl.includes('macro');
-              });
-
-              if (mainCam && mainCam.deviceId) {
-                targetDeviceId = mainCam.deviceId;
-              } else if (backDevices.length > 0 && backDevices[0].deviceId) {
-                targetDeviceId = backDevices[0].deviceId;
-              }
+              videoEl.srcObject = this.stream;
+              await videoEl.play();
+              this.track = this.stream.getVideoTracks()[0];
+              this.configurarRecursosHardware();
+              return true;
+            } catch(eFront) {
+              console.warn('⚠️ [Câmera] Falha ao abrir frontal:', eFront);
+              return false;
             }
-          } catch(eDev) {
-            console.warn('⚠️ [Câmera] Não foi possível enumerar dispositivos específicos:', eDev);
           }
 
+          // =========================================================================
+          // ALGORITMO PROFISSIONAL DE SELEÇÃO DA CÂMERA PRINCIPAL (1x COM AUTOFOCO)
+          // =========================================================================
+          // 1º Passo: Abrir stream genérico voltado para trás.
+          // Isso garante que o navegador conceda as permissões de dispositivo e preencha
+          // todos os 'labels' e metadados reais que de outra forma vêm vazios ("").
+          var streamInicial = null;
+          try {
+            streamInicial = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                facingMode: { ideal: 'environment' },
+                width: { ideal: 1920 },
+                height: { ideal: 1080 }
+              }
+            });
+          } catch(errStreamIni) {
+            console.warn('⚠️ [Câmera] Falha no stream inicial genérico:', errStreamIni);
+          }
+
+          var targetDeviceId = null;
+
+          try {
+            if (typeof navigator.mediaDevices.enumerateDevices === 'function') {
+              var allDevices = await navigator.mediaDevices.enumerateDevices();
+              var videoDevices = allDevices.filter(d => d.kind === 'videoinput');
+
+              // Identifica câmeras traseiras candidatas
+              var backCandidates = videoDevices.filter(d => {
+                var lbl = (d.label || '').toLowerCase();
+                // Se o label for vazio ou indicar traseira, ou não indicar frontal
+                var isFront = lbl.includes('front') || lbl.includes('frontal') || lbl.includes('user') || lbl.includes('selfie');
+                return !isFront;
+              });
+
+              if (backCandidates.length > 1) {
+                // Pontua cada câmera candidata para encontrar a lente PRINCIPAL (1x padrão com melhor foco):
+                // Penaliza: 'ultra', 'wide-angle' quando separada de normal, 'macro', 'depth', 'tele', '0.5', '0.6', 'aux'
+                // Bonifica: 'main', 'primary', 'camera 0', 'back 0', '1x', ausência de termos ultrawide
+                var scoredCandidates = backCandidates.map(c => {
+                  var lbl = (c.label || '').toLowerCase();
+                  var score = 100;
+
+                  // Penalidades severas para lentes secundárias
+                  if (lbl.includes('ultra') || lbl.includes('super wide')) score -= 80;
+                  if (lbl.includes('macro')) score -= 70;
+                  if (lbl.includes('depth') || lbl.includes('tof')) score -= 70;
+                  if (lbl.includes('tele') || lbl.includes('periscope')) score -= 40;
+                  if (lbl.includes('0.5') || lbl.includes('0.6')) score -= 90;
+                  if (lbl.includes('aux') || lbl.includes('secondary')) score -= 50;
+
+                  // Bônus para identificadores de câmera principal
+                  if (lbl.includes('main') || lbl.includes('primary')) score += 50;
+                  if (lbl.includes('back 0') || lbl.includes('camera 0') || lbl.includes('camera2 0')) {
+                    // No Android, se não contiver 'ultra', camera 0 ou camera2 0 é frequentemente a principal
+                    if (!lbl.includes('ultra')) score += 30;
+                  }
+                  if (lbl.includes('wide') && !lbl.includes('ultra')) score += 10;
+
+                  return { deviceId: c.deviceId, label: c.label, score: score };
+                });
+
+                scoredCandidates.sort((a, b) => b.score - a.score);
+                if (scoredCandidates.length > 0 && scoredCandidates[0].score > 30) {
+                  targetDeviceId = scoredCandidates[0].deviceId;
+                  console.log('📷 [Câmera] Lente principal selecionada por pontuação:', scoredCandidates[0].label, '(Score:', scoredCandidates[0].score, ')');
+                }
+              } else if (backCandidates.length === 1) {
+                targetDeviceId = backCandidates[0].deviceId;
+              }
+            }
+          } catch(eScan) {
+            console.warn('⚠️ [Câmera] Erro na varredura de câmeras:', eScan);
+          }
+
+          // Se já tínhamos aberto o stream inicial e o dispositivo atual já é o ideal, mantém ele
+          if (streamInicial) {
+            var trackAtual = streamInicial.getVideoTracks()[0];
+            var settings = trackAtual ? trackAtual.getSettings() : {};
+            if (targetDeviceId && settings.deviceId === targetDeviceId) {
+              this.stream = streamInicial;
+              videoEl.srcObject = this.stream;
+              await videoEl.play();
+              this.track = trackAtual;
+              this.configurarRecursosHardware();
+              return true;
+            } else if (!targetDeviceId) {
+              // Mantém o stream inicial se não detectou deviceId específico
+              this.stream = streamInicial;
+              videoEl.srcObject = this.stream;
+              await videoEl.play();
+              this.track = trackAtual;
+              this.configurarRecursosHardware();
+              return true;
+            } else {
+              // Fecha o stream inicial provisório para abrir o stream específico da câmera principal
+              try {
+                streamInicial.getTracks().forEach(t => t.stop());
+              } catch(eClose) {}
+            }
+          }
+
+          // 2º Passo: Conecta à câmera principal selecionada
           var videoConstraints = {
             width: { ideal: 1920 },
             height: { ideal: 1080 }
@@ -2379,7 +2477,7 @@
           if (targetDeviceId) {
             videoConstraints.deviceId = { exact: targetDeviceId };
           } else {
-            videoConstraints.facingMode = { ideal: this.facingMode };
+            videoConstraints.facingMode = { ideal: 'environment' };
           }
 
           try {
@@ -2394,12 +2492,12 @@
             this.configurarRecursosHardware();
             return true;
           } catch (err) {
-            console.warn('⚠️ [Câmera] Tentativa com deviceId falhou, tentando fallback genérico:', err);
+            console.warn('⚠️ [Câmera] Falha ao conectar deviceId específico, usando fallback genérico:', err);
             try {
               this.stream = await navigator.mediaDevices.getUserMedia({
                 audio: false,
                 video: {
-                  facingMode: { ideal: this.facingMode },
+                  facingMode: { ideal: 'environment' },
                   width: { ideal: 1920 },
                   height: { ideal: 1080 }
                 }
