@@ -1632,43 +1632,64 @@
         return res;
       }
 
-      var ultimoMsGerado = 0;
-      var contadorColisao = 0;
+      var ultimoIndiceTempoGerado = -1;
+      var contadorColisaoTempo = 0;
+      var BASE34_ALPHABET = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+      function converterParaBase34(num, tamanhoMinimo) {
+        var n = Math.floor(Math.max(0, num));
+        var res = '';
+        do {
+          res = BASE34_ALPHABET[n % 34] + res;
+          n = Math.floor(n / 34);
+        } while (n > 0);
+        return res.padStart(tamanhoMinimo || 1, '0');
+      }
 
       function gerarNovoProtocolo(tipoOS) {
         var agora = new Date();
-        var dia = agora.getDate().toString().padStart(2, '0');
-        var mes = (agora.getMonth() + 1).toString().padStart(2, '0');
         
-        // Mapeamento do ano: A para 26, B para 27, C para 28, etc.
+        // 1. Prefixo (1 caractere): 'P' para praça, 'I' para iluminação/viária
+        var prefixo = (tipoOS === 'praca') ? 'P' : 'I';
+
+        // 2. TimeCode (4 caracteres em Base 34):
+        // Divide o dia (86.400s) em intervalos de 100ms (décimos de segundo), totalizando 864.000 unidades (0 a 863.999).
+        // 00:00:00.0 => 0000 | 23:59:59.9 => MZDR
+        var hora = agora.getHours();
+        var min = agora.getMinutes();
+        var sec = agora.getSeconds();
+        var ms = agora.getMilliseconds();
+        var decimos = Math.floor(ms / 100);
+
+        var indiceTempo = (hora * 36000 + min * 600 + sec * 10 + decimos);
+
+        // Garantia anti-colisão se for chamado consecutivamente no mesmo décimo de segundo
+        if (indiceTempo <= ultimoIndiceTempoGerado) {
+          contadorColisaoTempo++;
+          indiceTempo = (indiceTempo + contadorColisaoTempo) % 864000;
+        } else {
+          contadorColisaoTempo = 0;
+          ultimoIndiceTempoGerado = indiceTempo;
+        }
+
+        var timeCode = converterParaBase34(indiceTempo, 4);
+
+        // 3. Data (dateStr - 3 caracteres):
+        // Dia: 1 dígito em Base 34 (1 a 31 => '1' a 'X')
+        var diaBase34 = BASE34_ALPHABET[agora.getDate()];
+        
+        // Mês: 1 dígito em Base 34 (1 a 12 => '1' a 'C')
+        var mesBase34 = BASE34_ALPHABET[agora.getMonth() + 1];
+
+        // Ano (Letra mapeada): A para 2026, B para 2027, etc.
         var ano2Digitos = agora.getFullYear() % 100;
         var offsetAno = ano2Digitos - 26;
         var anoLetra = (offsetAno >= 0 && offsetAno < 26)
           ? String.fromCharCode(65 + offsetAno)
           : ano2Digitos.toString();
 
-        var dateStr = dia + mes + anoLetra; // Formato DDMM + LetraAno (ex: 0409A)
-        
-        // Prefixo simplificado: I para viária, P para praça
-        var prefixo = (tipoOS === 'praca') ? 'P' : 'I';
-        
-        // Considera horas, minutos, segundos e milissegundos com precisão temporal
-        var hora = agora.getHours().toString().padStart(2, '0');
-        var min = agora.getMinutes().toString().padStart(2, '0');
-        var sec = agora.getSeconds().toString().padStart(2, '0');
-        var ms = agora.getMilliseconds().toString().padStart(3, '0');
+        var dateStr = diaBase34 + mesBase34 + anoLetra;
 
-        var numTimestamp = parseInt(hora + min + sec + ms, 10);
-        // Garantia anti-colisão se chamado consecutivamente no mesmo milissegundo
-        if (numTimestamp <= ultimoMsGerado) {
-          contadorColisao++;
-          numTimestamp += contadorColisao;
-        } else {
-          contadorColisao = 0;
-          ultimoMsGerado = numTimestamp;
-        }
-
-        var timeCode = numTimestamp.toString(36).toUpperCase().padStart(6, '0');
         return prefixo + timeCode + dateStr;
       }
 
