@@ -23,10 +23,10 @@
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=30"></script>
-    <script src="js/services/MapService.js?v=74"></script>
+    <script src="js/services/MapService.js?v=77"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/PerimetrosBloqueadosService.js?v=1"></script>
-    <script src="js/controllers/PainelController.js?v=33"></script>
+    <script src="js/controllers/PainelController.js?v=34"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -5823,6 +5823,7 @@
         if (!(item instanceof window.ChamadoModel) && window.ChamadoModel) {
             item = new window.ChamadoModel(item);
         }
+        window.currentModalItem = item;
 
         if (elProt) elProt.innerText = `Protocolo #${item.protocolo}`;
         
@@ -5976,6 +5977,60 @@
         }
     });
 </script>
+
+<!-- Modal de Visualização do Ponto no Mapbox -->
+<div id="modal-mapa-ponto" onclick="if (event.target === this) window.closeMapaPontoModal()" class="fixed inset-0 z-[65000] hidden flex items-center justify-center p-2 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">
+    <div id="modal-mapa-ponto-box" class="bg-white border border-slate-200 rounded-2xl shadow-2xl max-w-4xl w-full h-[90vh] sm:h-[85vh] max-h-[750px] overflow-hidden flex flex-col text-slate-900 transform transition-all duration-300 scale-95 opacity-0">
+        <!-- Header do Modal -->
+        <div class="flex items-center justify-between px-3 sm:px-6 py-3 border-b border-slate-200 bg-slate-50 flex-shrink-0 gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+                <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[24px]">location_on</span>
+                </div>
+                <div class="min-w-0">
+                    <h3 class="hidden sm:inline-block text-sm sm:text-base font-bold text-slate-900 truncate" id="modal-mapa-protocolo">Protocolo #---</h3>
+                </div>
+            </div>
+
+            <!-- Ações do Cabeçalho: Botões Waze / Google Maps e Fechar -->
+            <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <a id="modal-mapa-btn-gmaps" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('gmaps', event)" target="_blank" title="Navegar via Google Maps" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-blue-600">map</span>
+                    <span class="text-[11px] sm:text-xs">Maps</span>
+                </a>
+                <a id="modal-mapa-btn-waze" href="javascript:void(0);" onclick="(window.abrirNavegacaoExterna || function(t,e){if(e)e.preventDefault();var u=(window.currentMapaNavLinks||{})[t];if(u&&u.startsWith('http'))window.open(u,'_blank');})('waze', event)" target="_blank" title="Navegar via Waze" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-cyan-50 text-cyan-800 hover:bg-cyan-100 border border-cyan-200 active:scale-95 transition-all cursor-pointer">
+                    <span class="material-symbols-outlined text-[16px] text-cyan-600">navigation</span>
+                    <span class="text-[11px] sm:text-xs">Waze</span>
+                </a>
+                <button onclick="window.closeMapaPontoModal()" class="text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center ml-0.5" title="Fechar Modal (Esc)">
+                    <span class="material-symbols-outlined text-[20px] sm:text-[22px]">close</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Canvas do Mapa & Card Informativo Flutuante -->
+        <div class="flex-1 min-h-0 w-full relative bg-slate-100 overflow-hidden">
+            <div id="mapa-ponto-canvas" class="w-full h-full"></div>
+
+            <!-- Card Informativo Glassmorphism -->
+            <div class="absolute bottom-3 left-3 right-3 sm:bottom-4 sm:left-4 sm:right-auto sm:max-w-sm bg-white/95 backdrop-blur-md border border-slate-200 p-3.5 sm:p-4 rounded-xl shadow-xl text-xs space-y-2 z-10 text-slate-800">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                    <span class="font-bold text-slate-900 flex items-center gap-1">
+                        <span class="material-symbols-outlined text-[16px] text-blue-600">pin_drop</span>
+                        <span>Detalhes da Localização</span>
+                    </span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200" id="modal-mapa-card-tipo">Endereço</span>
+                </div>
+                <div class="space-y-1.5">
+                    <p class="leading-relaxed"><strong>Ponto:</strong> <span id="modal-mapa-card-ponto" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-plaqueta-row" class="hidden"><strong>Plaqueta:</strong> <span id="modal-mapa-card-plaqueta" class="text-slate-700 font-medium">---</span></p>
+                    <p><strong>Problema:</strong> <span id="modal-mapa-card-problema" class="text-slate-700 font-medium">---</span></p>
+                    <p id="modal-mapa-card-coords-row" class="hidden"><strong>Coordenadas:</strong> <span id="modal-mapa-card-coords" class="font-mono text-[11px] text-blue-600 font-bold">---</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal Detalhes OS Auditoria/Painel -->
 <div id="modalDetalhesOSAuditoria" onclick="if (event.target === this) fecharDetalhesOSModal()" class="fixed inset-0 z-[60000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-md transition-opacity duration-300">

@@ -762,6 +762,18 @@ class AuditoriaController {
                         'O poste aéreo clicado pelo operador já possuía uma plaqueta vinculada diferente da digitada.'
                     );
 
+                case 12: // OS Rejeitada
+                    const motivoRej = item.motivoAprovacao || item.motivo_rejeicao || item.motivo || 'Motivo não informado';
+                    return `
+                        <div class="flex flex-col gap-1 text-[11px] leading-tight">
+                            <div class="p-1.5 rounded bg-slate-800/90 border border-slate-700/80">
+                                <span class="text-[10px] uppercase font-bold text-rose-400 block mb-0.5">Status: Rejeitada / Recusada</span>
+                                <span class="text-slate-200">Motivo: <strong>${esc(motivoRej)}</strong></span>
+                            </div>
+                            <div class="text-[10px] text-slate-300">Esta OS foi rejeitada e requer avaliação detalhada em auditoria.</div>
+                        </div>
+                    `;
+
                 default:
                     return '';
             }
@@ -829,13 +841,12 @@ class AuditoriaController {
             </td>
         `;
 
-        const isRejeitadaItem = item.normalizedStatus === 'rejeitada';
-        const rejeitadaBadgeHtml = isRejeitadaItem ? ` <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 border border-rose-200" title="OS Rejeitada / Recusada">Rejeitada</span>` : '';
+        const isRejeitadaItem = Boolean(item.isRejeitada || item.normalizedStatus === 'rejeitada');
 
         return `
             <tr class="border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${isCompleted ? 'opacity-70' : ''}" data-id="${item.protocolo || item.id}" data-completed="${isCompleted}" data-rejeitada="${isRejeitadaItem}" onclick="window.abrirDetalhesOSModal('${item.protocolo || item.id}')">
                 ${checkboxTdHtml}
-                <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}${rejeitadaBadgeHtml}</td>
+                <td class="py-3 px-4 font-medium whitespace-nowrap truncate align-middle text-on-surface">${item.protocolo}</td>
                 <td class="py-3 px-3 text-on-surface-variant whitespace-nowrap truncate align-middle">${item.formattedDateConclusaoShort || item.formattedDateAberturaShort || ''}</td>
                 <td class="py-3 px-4 whitespace-nowrap truncate align-middle">${locationDisplayHtml}</td>
                 
@@ -851,6 +862,7 @@ class AuditoriaController {
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="9">${renderBadge(item.isProblemaExterno, 9)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="10">${renderBadge(item.isReincidencia30d, 10)}</td>
                 <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="11">${renderBadge(item.isPostePlaquetaDivergente, 11)}</td>
+                <td class="col-audit py-3 px-1 text-center align-middle border-l border-outline-variant/20" data-audit-col="12">${renderBadge(isRejeitadaItem, 12)}</td>
                 
                 <td class="py-3 px-3 whitespace-nowrap truncate text-center align-middle border-l border-outline-variant/20">
                     <div class="flex items-center justify-center gap-1 action-buttons">
@@ -887,7 +899,7 @@ class AuditoriaController {
 
         const emptyRowHtml = `
             <tr id="no-praca-results" class="${listToUse.length === 0 ? '' : 'hidden'}">
-                <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                     <div class="flex flex-col items-center justify-center gap-1.5">
                         <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                         <span class="text-xs">Nenhum serviço em praça encontrado.</span>
@@ -1356,6 +1368,22 @@ class AuditoriaController {
                             if (idx >= 0) this.chamadosList[idx] = fullItem;
                             else this.chamadosList.push(fullItem);
                         }
+                        if (this.concludedList && Array.isArray(this.concludedList)) {
+                            const idx = this.concludedList.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperClean || cid === upperClean;
+                            });
+                            if (idx >= 0) this.concludedList[idx] = fullItem;
+                        }
+                        if (this.viariaConcludedList && Array.isArray(this.viariaConcludedList)) {
+                            const idx = this.viariaConcludedList.findIndex(c => {
+                                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                                return p === upperClean || cid === upperClean;
+                            });
+                            if (idx >= 0) this.viariaConcludedList[idx] = fullItem;
+                        }
                         if (window.chamadosListCache && Array.isArray(window.chamadosListCache)) {
                             const idx = window.chamadosListCache.findIndex(c => {
                                 const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
@@ -1396,6 +1424,8 @@ class AuditoriaController {
             });
         }
         if (!item) return;
+
+        this.currentModalItem = item;
 
         const modal = document.getElementById('modalDetalhesOSAuditoria');
         const isModalAlreadyOpen = modal && !modal.classList.contains('hidden');
@@ -1846,22 +1876,26 @@ class AuditoriaController {
                 if (r === 'admin') isAdminUser = true;
                 if (r === 'manutentor') isManutentorUser = true;
             }
-            if (!isAdminUser && window.usuarioLogadoSupabase) {
+            if (window.usuarioLogadoSupabase) {
                 const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
+                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) {
+                    isManutentorUser = true;
+                } else if (!isAdminUser && (r.includes('admin') || r.includes('gestor') || r.includes('supervisor'))) {
+                    isAdminUser = true;
+                }
             }
-            if (!isManutentorUser && window.usuarioLogadoSupabase) {
-                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isManutentorUser = true;
-            }
-            if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
-                isAdminUser = true;
-            }
-            if (!isManutentorUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('manutentor')) {
+            const localRole = String(localStorage.getItem('user_role') || '').toLowerCase();
+            if (localRole.includes('manutentor')) {
                 isManutentorUser = true;
+            } else if (!isAdminUser && localRole.includes('admin')) {
+                isAdminUser = true;
             }
             if (!isManutentorUser && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
                 isManutentorUser = true;
+            }
+            // Se for explicitamente identificado como manutentor, nunca deve ser considerado admin
+            if (isManutentorUser) {
+                isAdminUser = false;
             }
         } catch(e) {}
 
@@ -2077,7 +2111,7 @@ class AuditoriaController {
                         <span class="material-symbols-outlined text-[16px]">chat</span>
                         <span>Observações de Abertura (Munícipe / Solicitante)</span>
                     </strong>
-                    <button type="button" onclick="window.auditoriaController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                    <button type="button" onclick="window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.auditoriaController || window.painelController).abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
                         <span class="material-symbols-outlined text-[13px]">add_comment</span>
                         <span>+ Nova Observação</span>
                     </button>
@@ -2510,26 +2544,27 @@ class AuditoriaController {
                                 <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">
                                     ${isDesconsiderada ? 'DESCONSIDERADA' : (s.status || 'REGISTRADA')}
                                 </span>
-                                ${(isAdminUser || isManutentorUser) ? `
-                                    ${isDesconsiderada ? `
+                                ${isDesconsiderada ? (isAdminUser ? `
                                     <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar esta sessão para cálculos de medição">
-                                        <span class="material-symbols-outlined text-[12px]">undo</span>
-                                        <span>Reconsiderar</span>
-                                    </button>
-                                    ` : `
+                                         <span class="material-symbols-outlined text-[12px]">undo</span>
+                                         <span>Reconsiderar</span>
+                                     </button>
+                                ` : '') : ((isAdminUser || isManutentorUser) ? `
                                     <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar esta sessão dos cálculos de medição">
-                                        <span class="material-symbols-outlined text-[12px]">block</span>
-                                        <span>Desconsiderar</span>
+                                         <span class="material-symbols-outlined text-[12px]">block</span>
+                                         <span>Desconsiderar</span>
                                     </button>
-                                    `}
-                                ` : ''}
+                                ` : '')}
                             </div>
                         </div>
                         
                         ${isDesconsiderada ? `
-                        <div class="p-1.5 rounded-lg bg-rose-50/80 border border-rose-200 text-[10px] text-rose-900 flex items-center gap-1 font-medium">
-                            <span class="material-symbols-outlined text-[13px] text-rose-600 shrink-0">info</span>
-                            <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                        <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[10.5px] text-rose-900 flex items-start gap-1.5 font-medium leading-relaxed">
+                            <span class="material-symbols-outlined text-[15px] text-rose-600 shrink-0 mt-0.5">info</span>
+                            <div>
+                                <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                                ${s.motivo_desconsideracao ? `<br><span class="text-rose-800 text-[10px] italic">Motivo: "${s.motivo_desconsideracao}" ${s.desconsiderada_por ? `(por ${s.desconsiderada_por})` : ''}</span>` : ''}
+                            </div>
                         </div>
                         ` : ''}
                         
@@ -2696,19 +2731,17 @@ class AuditoriaController {
                                         📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
                                     </span>
                                     ${badgeStatus}
-                                    ${(isAdminUser || isManutentorUser) && f.id ? `
-                                        ${isDesconsiderado ? `
+                                    ${f.id ? (isDesconsiderado ? (isAdminUser ? `
                                         <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar este fechamento para cálculos de medição">
-                                            <span class="material-symbols-outlined text-[12px]">undo</span>
-                                            <span>Reconsiderar</span>
-                                        </button>
-                                        ` : `
+                                             <span class="material-symbols-outlined text-[12px]">undo</span>
+                                             <span>Reconsiderar</span>
+                                         </button>
+                                        ` : '') : ((isAdminUser || isManutentorUser) ? `
                                         <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar este fechamento dos cálculos de medição">
-                                            <span class="material-symbols-outlined text-[12px]">block</span>
-                                            <span>Desconsiderar</span>
+                                             <span class="material-symbols-outlined text-[12px]">block</span>
+                                             <span>Desconsiderar</span>
                                         </button>
-                                        `}
-                                    ` : ''}
+                                        ` : '')) : ''}
                                 </div>
                             </div>
 
@@ -2869,7 +2902,7 @@ class AuditoriaController {
                     <span class="material-symbols-outlined text-[18px]">history</span>
                     <span>Histórico do protocolo</span>
                 </span>
-                <button type="button" onclick="window.auditoriaController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                <button type="button" onclick="window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.auditoriaController || window.painelController).abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
                     <span class="material-symbols-outlined text-[14px]">add_comment</span>
                     <span>+ Nova Observação</span>
                 </button>
@@ -4116,7 +4149,40 @@ class AuditoriaController {
     }
 }
 
-// Global helpers for row click details modal & material editing
+// Global helpers for row click details modal & material editing & observations
+window.abrirModalAdicionarObservacao = function(protocoloOrId) {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalAdicionarObservacao === 'function') {
+            return window.auditoriaController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+        if (window.painelController && typeof window.painelController.abrirModalAdicionarObservacao === 'function') {
+            return window.painelController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirModalAdicionarObservacao === 'function') {
+            return window.painelController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalAdicionarObservacao === 'function') {
+            return window.auditoriaController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+    }
+
+    // Fallback: instancia temporária ou busca genérica
+    if (window.AuditoriaController) {
+        const ctrl = window.auditoriaController || new window.AuditoriaController();
+        return ctrl.abrirModalAdicionarObservacao(protocoloOrId);
+    }
+    if (window.PainelController) {
+        const ctrl = window.painelController || new window.PainelController();
+        return ctrl.abrirModalAdicionarObservacao(protocoloOrId);
+    }
+};
+
 window.editarMateriaisAdmin = function(id) {
     const path = (window.location.pathname || '').toLowerCase();
     const sidebar = document.querySelector('app-sidebar');
@@ -4333,6 +4399,37 @@ window.desfazerAuditoriaModal = function(idOrProtocol) {
 // Se PainelController.js não tiver sido carregado na tela de Auditoria, garante alternarDesconsiderarSessao disponível
 if (typeof window.alternarDesconsiderarSessao !== 'function') {
     window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsiderar) {
+        if (!desconsiderar) {
+            let isAdmin = false;
+            try {
+                if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                    const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                    if (r === 'admin') isAdmin = true;
+                }
+                if (!isAdmin && window.usuarioLogadoSupabase) {
+                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                    if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+                }
+                if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                    isAdmin = true;
+                }
+            } catch (e) {}
+
+            if (!isAdmin) {
+                if (typeof window.showNotificationModal === 'function') {
+                    window.showNotificationModal({
+                        title: 'Acesso Restrito',
+                        message: 'Apenas usuários administradores possuem permissão para reconsiderar uma sessão de atendimento.',
+                        icon: 'lock',
+                        iconBgClass: 'bg-rose-100 text-rose-700'
+                    });
+                } else {
+                    alert('Acesso Restrito: Apenas administradores possuem permissão para reconsiderar uma sessão.');
+                }
+                return;
+            }
+        }
+
         const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
         let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
         const protocol = item ? (item.protocolo || osId) : osId;
@@ -4359,11 +4456,46 @@ if (typeof window.alternarDesconsiderarSessao !== 'function') {
                     updatedItem._isEnriched = true;
                 }
 
+                const usuarioLogado = (window.AuthGuard && typeof window.AuthGuard.getUsuarioAtual === 'function') 
+                    ? window.AuthGuard.getUsuarioAtual() 
+                    : (localStorage.getItem('usuario_nome') || 'Administrador');
+
                 const updateInMemory = (targetList) => {
                     if (!Array.isArray(targetList)) return;
                     const idx = targetList.findIndex(o => o && (String(o.protocolo || "").toUpperCase() === String(protocol).toUpperCase() || String(o.id || "") === String(protocol)));
-                    if (idx >= 0 && updatedItem) {
-                        targetList[idx] = updatedItem;
+                    if (idx >= 0) {
+                        if (updatedItem) {
+                            targetList[idx] = updatedItem;
+                        }
+                        const obj = targetList[idx];
+                        if (obj) {
+                            let sessoes = obj.historicoSessoes || obj.historico_sessoes;
+                            if (typeof sessoes === 'string') {
+                                try { sessoes = JSON.parse(sessoes); } catch(e) {}
+                            }
+                            if (Array.isArray(sessoes)) {
+                                sessoes.forEach(s => {
+                                    if (parseInt(s.numero, 10) === parseInt(numeroSessao, 10)) {
+                                        s.desconsiderada = Boolean(desconsiderar);
+                                        s.desconsiderada_em = desconsiderar ? new Date().toISOString() : null;
+                                        s.desconsiderada_por = desconsiderar ? usuarioLogado : null;
+                                        s.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
+                                    }
+                                });
+                                obj.historicoSessoes = sessoes;
+                                obj.historico_sessoes = sessoes;
+                                if (obj.sessoesList && Array.isArray(obj.sessoesList)) {
+                                    obj.sessoesList.forEach(s => {
+                                        if (parseInt(s.numero, 10) === parseInt(numeroSessao, 10)) {
+                                            s.desconsiderada = Boolean(desconsiderar);
+                                            s.desconsiderada_em = desconsiderar ? new Date().toISOString() : null;
+                                            s.desconsiderada_por = desconsiderar ? usuarioLogado : null;
+                                            s.motivo_desconsideracao = desconsiderar ? (motivoJustificativa || null) : null;
+                                        }
+                                    });
+                                }
+                            }
+                        }
                     }
                 };
 
@@ -4434,6 +4566,37 @@ if (typeof window.alternarDesconsiderarSessao !== 'function') {
 
 if (typeof window.alternarDesconsiderarFechamento !== 'function') {
     window.alternarDesconsiderarFechamento = async function(fechamentoId, osId, numeroFechamento, desconsiderar) {
+        if (!desconsiderar) {
+            let isAdmin = false;
+            try {
+                if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                    const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                    if (r === 'admin') isAdmin = true;
+                }
+                if (!isAdmin && window.usuarioLogadoSupabase) {
+                    const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                    if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+                }
+                if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                    isAdmin = true;
+                }
+            } catch (e) {}
+
+            if (!isAdmin) {
+                if (typeof window.showNotificationModal === 'function') {
+                    window.showNotificationModal({
+                        title: 'Acesso Restrito',
+                        message: 'Apenas usuários administradores possuem permissão para reconsiderar um fechamento de atendimento.',
+                        icon: 'lock',
+                        iconBgClass: 'bg-rose-100 text-rose-700'
+                    });
+                } else {
+                    alert('Acesso Restrito: Apenas administradores possuem permissão para reconsiderar um fechamento.');
+                }
+                return;
+            }
+        }
+
         const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || (window.painelController ? window.painelController.chamadosList : []) || []);
         let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
         const protocol = item ? (item.protocolo || osId) : osId;
@@ -4571,22 +4734,31 @@ if (typeof window.reabrirOSAdmin !== 'function') {
         else if (isConcluida) actionTitle = 'Reabrir OS Concluída';
         else if (isRejeitada) actionTitle = 'Reabrir OS Rejeitada';
 
-        const doReopen = async (justification) => {
+        const doReopen = async (justification, dateOption = 'atualizar') => {
             try {
+                const updateDate = (dateOption !== 'manter');
                 if (item) {
                     item.status = 'Aberta';
                     item.rawStatus = 'Aberta';
                     item.normalizedStatus = 'aberto';
                     item.motivoAprovacao = '';
+                    if (updateDate) {
+                        const nowIso = new Date().toISOString();
+                        item.dataAbertura = nowIso;
+                        if (item.rawRow) item.rawRow.data_abertura = nowIso;
+                    }
                     if (item.rawRow) item.rawRow.motivo_aprovacao = '';
                     if (item._originalModel) {
                         item._originalModel.rawStatus = 'Aberta';
                         item._originalModel.normalizedStatus = 'aberto';
                         item._originalModel.motivoAprovacao = '';
+                        if (updateDate) {
+                            item._originalModel.dataAbertura = new Date().toISOString();
+                        }
                     }
                 }
                 const repo = new window.ChamadosRepository();
-                await repo.updateStatus(protocol || osId, 'Aberta', justification);
+                await repo.updateStatus(protocol || osId, 'Aberta', justification, updateDate);
                 if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
                 
                 if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
@@ -4619,6 +4791,7 @@ if (typeof window.reabrirOSAdmin !== 'function') {
                 confirmText: 'Reabrir OS',
                 showJustification: true,
                 requireJustification: true,
+                showDateOption: true,
                 onConfirm: doReopen
             });
         } else {
@@ -4627,7 +4800,8 @@ if (typeof window.reabrirOSAdmin !== 'function') {
                 just = prompt(`Justificativa obrigatória para reabrir a OS #${protocol}:`);
                 if (just === null) return;
             }
-            doReopen(just.trim());
+            const updateDateChoice = confirm('Deseja atualizar a data de abertura para a data de hoje?\n\n[OK] Sim, atualizar data\n[Cancelar] Não, manter data original');
+            doReopen(just.trim(), updateDateChoice ? 'atualizar' : 'manter');
         }
     };
 }

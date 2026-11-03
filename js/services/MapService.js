@@ -109,22 +109,107 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     if (typeof osId === 'object' && osId !== null) {
         item = osId;
     }
-    if (!item && window.painelController && Array.isArray(window.painelController.chamadosList)) {
-        item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
-    }
+    const cleanId = String(osId || '').replace(/^#/, '').trim().toUpperCase();
+
     if (!item && window.auditoriaController) {
-        if (Array.isArray(window.auditoriaController.concludedList)) {
-            item = window.auditoriaController.concludedList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        if (window.auditoriaController.currentModalItem) {
+            const curP = String(window.auditoriaController.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const curId = String(window.auditoriaController.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (curP === cleanId || curId === cleanId) {
+                item = window.auditoriaController.currentModalItem;
+            }
+        }
+        if (!item && Array.isArray(window.auditoriaController.concludedList)) {
+            item = window.auditoriaController.concludedList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
+        }
+        if (!item && Array.isArray(window.auditoriaController.viariaConcludedList)) {
+            item = window.auditoriaController.viariaConcludedList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
         }
         if (!item && Array.isArray(window.auditoriaController.chamadosList)) {
-            item = window.auditoriaController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+            item = window.auditoriaController.chamadosList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
         }
     }
+    if (!item && window.painelController) {
+        if (window.painelController.currentModalItem) {
+            const curP = String(window.painelController.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const curId = String(window.painelController.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (curP === cleanId || curId === cleanId) {
+                item = window.painelController.currentModalItem;
+            }
+        }
+        if (!item && Array.isArray(window.painelController.chamadosList)) {
+            item = window.painelController.chamadosList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
+        }
+    }
+    if (!item && Array.isArray(window.chamadosListCache)) {
+        item = window.chamadosListCache.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+    }
     if (!item && window.relatorioController && Array.isArray(window.relatorioController.chamadosList)) {
-        item = window.relatorioController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        item = window.relatorioController.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
     }
     if (!item && window.medicaoController && Array.isArray(window.medicaoController.chamadosList)) {
-        item = window.medicaoController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        item = window.medicaoController.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+    }
+    if (!item && window.currentModalItem) {
+        const curP = String(window.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+        const curId = String(window.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+        if (curP === cleanId || curId === cleanId) {
+            item = window.currentModalItem;
+        }
+    }
+    if (!item && Array.isArray(window.dadosOSsAbertasCache)) {
+        const found = window.dadosOSsAbertasCache.find(c => {
+            const mod = c._originalModel || c;
+            const p = String(mod.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(mod.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+        if (found) {
+            item = found._originalModel || found;
+        }
+    }
+    if (!item && window.supabaseClient && window.ChamadosRepository) {
+        try {
+            const repo = new window.ChamadosRepository();
+            const fullRow = await repo.fetchById(cleanId);
+            if (fullRow) {
+                const ModelClass = window.ChamadoModel;
+                item = (fullRow instanceof ModelClass) ? fullRow : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fullRow) : (ModelClass ? new ModelClass(fullRow) : fullRow));
+                if (window.auditoriaController && Array.isArray(window.auditoriaController.chamadosList)) {
+                    window.auditoriaController.chamadosList.push(item);
+                }
+            }
+        } catch (errRepo) {
+            console.warn('⚠️ [MapService] Erro ao buscar item sob demanda no repositório:', errRepo);
+        }
     }
 
     // Fallback search in static DOM table rows if controller list is empty
@@ -499,22 +584,108 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
     if (typeof osId === 'object' && osId !== null) {
         item = osId;
     }
-    if (!item && window.painelController && Array.isArray(window.painelController.chamadosList)) {
-        item = window.painelController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
-    }
+    const cleanId = String(osId || '').replace(/^#/, '').trim().toUpperCase();
+
     if (!item && window.auditoriaController) {
-        if (Array.isArray(window.auditoriaController.concludedList)) {
-            item = window.auditoriaController.concludedList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        if (window.auditoriaController.currentModalItem) {
+            const curP = String(window.auditoriaController.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const curId = String(window.auditoriaController.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (curP === cleanId || curId === cleanId) {
+                item = window.auditoriaController.currentModalItem;
+            }
+        }
+        if (!item && Array.isArray(window.auditoriaController.concludedList)) {
+            item = window.auditoriaController.concludedList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
+        }
+        if (!item && Array.isArray(window.auditoriaController.viariaConcludedList)) {
+            item = window.auditoriaController.viariaConcludedList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
         }
         if (!item && Array.isArray(window.auditoriaController.chamadosList)) {
-            item = window.auditoriaController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+            item = window.auditoriaController.chamadosList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
         }
     }
+    if (!item && window.painelController) {
+        if (window.painelController.currentModalItem) {
+            const curP = String(window.painelController.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const curId = String(window.painelController.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (curP === cleanId || curId === cleanId) {
+                item = window.painelController.currentModalItem;
+            }
+        }
+        if (!item && Array.isArray(window.painelController.chamadosList)) {
+            item = window.painelController.chamadosList.find(c => {
+                const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+                const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId || cid === cleanId;
+            });
+        }
+    }
+    if (!item && Array.isArray(window.chamadosListCache)) {
+        item = window.chamadosListCache.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+    }
     if (!item && window.relatorioController && Array.isArray(window.relatorioController.chamadosList)) {
-        item = window.relatorioController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        item = window.relatorioController.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
     }
     if (!item && window.medicaoController && Array.isArray(window.medicaoController.chamadosList)) {
-        item = window.medicaoController.chamadosList.find(c => String(c.id) === String(osId) || String(c.protocolo) === String(osId));
+        item = window.medicaoController.chamadosList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+    }
+    if (!item && window.currentModalItem) {
+        const curP = String(window.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+        const curId = String(window.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+        if (curP === cleanId || curId === cleanId) {
+            item = window.currentModalItem;
+        }
+    }
+    if (!item && Array.isArray(window.dadosOSsAbertasCache)) {
+        const found = window.dadosOSsAbertasCache.find(c => {
+            const mod = c._originalModel || c;
+            const p = String(mod.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const cid = String(mod.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanId || cid === cleanId;
+        });
+        if (found) {
+            item = found._originalModel || found;
+        }
+    }
+    // Fallback: se ainda assim não encontrou na memória e temos o ChamadosRepository, tenta buscar sob demanda
+    if (!item && window.supabaseClient && window.ChamadosRepository) {
+        try {
+            const repo = new window.ChamadosRepository();
+            const fullRow = await repo.fetchById(cleanId);
+            if (fullRow) {
+                const ModelClass = window.ChamadoModel;
+                item = (fullRow instanceof ModelClass) ? fullRow : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fullRow) : (ModelClass ? new ModelClass(fullRow) : fullRow));
+                if (window.auditoriaController && Array.isArray(window.auditoriaController.chamadosList)) {
+                    window.auditoriaController.chamadosList.push(item);
+                }
+            }
+        } catch (errRepo) {
+            console.warn('⚠️ [MapService] Erro ao buscar item sob demanda no repositório:', errRepo);
+        }
     }
 
     if (!item) {

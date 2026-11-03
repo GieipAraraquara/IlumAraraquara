@@ -15,7 +15,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=31"></script>
-    <script src="js/services/ConfiguracoesService.js?v=1"></script>
+    <script src="js/services/ConfiguracoesService.js?v=2"></script>
     <script src="js/services/MedicaoService.js?v=1"></script>
     <script src="js/services/PerimetrosBloqueadosService.js?v=1"></script>
     
@@ -470,9 +470,8 @@
                                 Abrir Tela de Medição
                             </a>
                         </div>
-
-
-
+                    </div>
+                </section>
 
                 <!-- ABA 6: USUÁRIOS & SENHAS -->
                 <section id="tab-usuarios" class="tab-content hidden space-y-4">
@@ -960,10 +959,12 @@
                 const client = window.supabaseClient || window.supabase;
                 if (!client) throw new Error('Cliente Supabase não inicializado.');
 
-                const { data, error } = await client
-                    .from('profiles')
-                    .select('id, nome, email, role, status, ativo, created_at')
-                    .order('nome', { ascending: true });
+                let query = client.from('profiles').select('*');
+                try {
+                    query = query.order('nome', { ascending: true });
+                } catch (e) {}
+
+                const { data, error } = await query;
 
                 if (error) throw error;
 
@@ -973,9 +974,9 @@
                 console.error('❌ Erro ao listar usuários de profiles:', err);
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="py-6 text-center text-red-500 font-medium">
+                        <td colspan="6" class="py-6 text-center text-red-500 font-medium">
                             <span class="material-symbols-outlined text-2xl block mb-1">warning</span>
-                            Erro ao carregar usuários: ${err.message}
+                            Erro ao carregar usuários: ${err.message || 'Falha na conexão com a base de dados'}
                         </td>
                     </tr>
                 `;

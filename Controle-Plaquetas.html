@@ -1737,6 +1737,49 @@
             </div>
         </div>
 
+        <!-- Campo de Justificativa / Observação -->
+        <div class="mt-4">
+            <label for="modal-justification-input" class="block text-label-sm font-medium text-on-surface-variant mb-1.5">
+                Justificativa / Observação <span class="text-xs opacity-60 font-normal">(Opcional)</span>:
+            </label>
+
+            <textarea id="modal-justification-input" rows="2" class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/80 focus:border-primary focus:ring-1 focus:ring-primary outline-none text-body-md text-on-surface placeholder:text-on-surface-variant/50 resize-none transition-colors text-xs" placeholder="Informe o motivo ou observação sobre esta alteração..."></textarea>
+
+            <!-- Botões de Mensagens Padrão (Quick Presets) -->
+            <div class="mt-2.5">
+                <div class="flex items-center gap-1 text-[11px] font-semibold text-on-surface-variant/70 mb-1.5">
+                    <span class="material-symbols-outlined text-[14px] text-primary">chat_bubble_outline</span>
+                    <span>Mensagens Padrão:</span>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" 
+                            onclick="setModalJustification('Medição incorreta ou inconsistente.')" 
+                            title="Medição incorreta ou inconsistente."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Medição incorreta</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Serviço duplicado em outra OS.')" 
+                            title="Serviço duplicado em outra OS."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Serviço duplicado</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Horário ou material informado erroneamente.')" 
+                            title="Horário ou material informado erroneamente."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Horário/Material errôneo</span>
+                    </button>
+                    <button type="button" 
+                            onclick="setModalJustification('Atendimento desconsiderado pela auditoria.')" 
+                            title="Atendimento desconsiderado pela auditoria."
+                            class="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-container-high hover:bg-secondary/15 hover:text-secondary hover:border-secondary/40 border border-outline-variant/60 transition-all text-on-surface-variant flex items-center gap-1 cursor-pointer active:scale-95">
+                        <span>Auditoria desconsiderou</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="mt-6 flex items-center justify-end gap-3">
             <button type="button" onclick="window.closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
                 Cancelar
@@ -1770,6 +1813,19 @@
         let mapboxInstance = null;
         let mapboxMarkerInstance = null;
         let timeoutDebounceBusca = null;
+        let pendingActionCallback = null;
+
+        window.setModalJustification = function(text) {
+            const input = document.getElementById('modal-justification-input');
+            if (!input) return;
+            if (input.value.trim() === text) {
+                input.value = '';
+            } else {
+                input.value = text;
+            }
+            input.focus();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        };
 
         // Modal Padrão de Confirmação HTML
         window.closeConfirmModal = function() {
@@ -1783,7 +1839,7 @@
             }, 200);
         };
 
-        window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm }) {
+        window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = false, requireJustification = false }) {
             const modal = document.getElementById('confirm-modal');
             const modalBox = document.getElementById('confirm-modal-box');
             const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1791,6 +1847,8 @@
             const modalTitle = document.getElementById('modal-title');
             const modalMessage = document.getElementById('modal-message');
             const modalConfirmBtn = document.getElementById('modal-confirm-btn');
+            const modalJustificationInput = document.getElementById('modal-justification-input');
+            const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
 
             if (!modal || !modalBox) return;
 
@@ -1801,10 +1859,65 @@
             if (modalConfirmBtn) {
                 modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-rose-600 text-white hover:bg-rose-700'} active:scale-95 transition-all shadow-sm cursor-pointer`;
                 modalConfirmBtn.textContent = confirmText || 'Confirmar';
+            }
+
+            if (justificationContainer) {
+                if (showJustification === false) {
+                    justificationContainer.classList.add('hidden');
+                } else {
+                    justificationContainer.classList.remove('hidden');
+                }
+
+                const labelBadge = justificationContainer.querySelector('label span');
+                if (labelBadge) {
+                    if (requireJustification) {
+                        labelBadge.textContent = '(Obrigatório)';
+                        labelBadge.className = 'text-xs text-rose-600 font-bold ml-1';
+                    } else {
+                        labelBadge.textContent = '(Opcional)';
+                        labelBadge.className = 'text-xs opacity-60 font-normal ml-1';
+                    }
+                }
+
+                let errorMsg = justificationContainer.querySelector('.modal-justification-error');
+                if (!errorMsg) {
+                    errorMsg = document.createElement('p');
+                    errorMsg.className = 'modal-justification-error text-[11px] text-rose-600 font-semibold mt-1 hidden flex items-center gap-1';
+                    errorMsg.innerHTML = '<span class="material-symbols-outlined text-[14px]">error</span><span>Por favor, informe a justificativa para prosseguir.</span>';
+                    justificationContainer.appendChild(errorMsg);
+                }
+                errorMsg.classList.add('hidden');
+            }
+
+            if (modalJustificationInput) {
+                modalJustificationInput.value = '';
+                modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+                modalJustificationInput.oninput = () => {
+                    const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                    if (err) err.classList.add('hidden');
+                    modalJustificationInput.classList.remove('border-rose-500', 'ring-2', 'ring-rose-300');
+                };
+            }
+
+            pendingActionCallback = onConfirm;
+
+            if (modalConfirmBtn) {
                 modalConfirmBtn.onclick = async () => {
+                    const justification = (modalJustificationInput && showJustification !== false) ? modalJustificationInput.value.trim() : '';
+
+                    if (requireJustification && showJustification !== false && !justification) {
+                        if (modalJustificationInput) {
+                            modalJustificationInput.classList.add('border-rose-500', 'ring-2', 'ring-rose-300');
+                            modalJustificationInput.focus();
+                        }
+                        const err = justificationContainer ? justificationContainer.querySelector('.modal-justification-error') : null;
+                        if (err) err.classList.remove('hidden');
+                        return;
+                    }
+
                     window.closeConfirmModal();
-                    if (typeof onConfirm === 'function') {
-                        await onConfirm();
+                    if (typeof pendingActionCallback === 'function') {
+                        await pendingActionCallback(justification);
                     }
                 };
             }

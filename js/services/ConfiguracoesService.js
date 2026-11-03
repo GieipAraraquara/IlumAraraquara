@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Repositório e Serviço de Configurações do Sistema
  * Gerencia persistência no Supabase e cache local em memória/sessão.
  */
@@ -103,10 +103,13 @@ class ConfiguracoesService {
 
         // Identificar usuário logado para auditoria
         try {
-            if (window.AuthGuard && window.AuthGuard._cachedAuthData && window.AuthGuard._cachedAuthData.user) {
-                payload.updated_by = window.AuthGuard._cachedAuthData.user.id;
+            const user = window.AuthGuard?._cachedAuthData?.user || (await client.auth.getUser())?.data?.user;
+            if (user && user.id) {
+                payload.updated_by = String(user.id);
             }
-        } catch (e) {}
+        } catch (e) {
+            console.warn('⚠️ Não foi possível obter ID do usuário para auditoria:', e);
+        }
 
         const { data, error } = await client
             .from(this.tableName)
@@ -115,7 +118,12 @@ class ConfiguracoesService {
             .single();
 
         if (error) {
-            console.error('❌ [ConfiguracoesService] Erro ao salvar configurações:', error);
+            console.error('❌ [ConfiguracoesService] Erro ao salvar configurações:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
             throw error;
         }
 

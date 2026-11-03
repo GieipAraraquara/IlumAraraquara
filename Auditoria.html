@@ -19,10 +19,10 @@
     <script src="js/repositories/ChamadosRepository.js?v=40"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=33"></script>
-    <script src="js/services/MapService.js?v=75"></script>
+    <script src="js/services/MapService.js?v=76"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=73"></script>
+    <script src="js/controllers/AuditoriaController.js?v=76"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -763,8 +763,21 @@
                                 <div class="resizer"></div>
                             </th>
 
-                            <!-- Column 15 (Ações com Filtro Pendentes/Concluídas) -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="15">
+                            <!-- Audit Column 13 (OS Rejeitada?) -->
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="15" data-audit-col="12" title="Aponta SIM quando: A Ordem de Serviço foi rejeitada ou recusada na aprovação operacional.">
+                                <div class="vertical-header-text">
+                                    <div>OS</div>
+                                    <div>Rejeitada?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-rose-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>A Ordem de Serviço foi rejeitada ou recusada na aprovação operacional.</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 16 (Ações com Filtro Pendentes/Concluídas) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="16">
                                 <div class="relative inline-block text-left group/action-filter">
                                     <button class="flex items-center justify-center gap-1 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary mx-auto" id="action-filter-trigger" title="Filtrar por Status de Conclusão">
                                         <span class="font-label-md uppercase tracking-wider">Ações</span>
@@ -833,6 +846,10 @@
                 <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="praca-services-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant overflow-visible z-20 relative">
+                            <!-- Checkbox de Rota (Oculto por padrão, ativado via modo rota) -->
+                            <th class="th-checkbox-rota hidden py-3 px-2 w-[44px] min-w-[44px] text-center align-middle" data-col="chk">
+                                <input type="checkbox" id="chk-rota-auditoria-all-praca" onchange="window.toggleSelecionarTodasRota(this, 'praca')" class="w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" title="Marcar/Desmarcar todas visíveis" />
+                            </th>
                             <!-- Column 1: Protocolo com Filtro -->
                             <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 140px; min-width: 140px;" data-col="0">
                                 <div class="relative inline-block text-left group/praca-protocol-filter">
@@ -1037,7 +1054,7 @@
                     <tbody class="font-data-tabular text-data-tabular text-on-surface">
                         <!-- Empty State Row for Praca Services -->
                         <tr id="no-praca-results" class="hidden">
-                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                            <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                                 <div class="flex flex-col items-center justify-center gap-1.5">
                                     <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                                     <span class="text-xs">Nenhum serviço em praça encontrado para os filtros selecionados.</span>
@@ -1724,6 +1741,29 @@
             </div>
         </div>
 
+        <!-- Opção de Atualização de Data (ex: ao reabrir OS) -->
+        <div id="modal-date-option-container" class="mt-4 pt-3 border-t border-outline-variant/40 hidden">
+            <label class="block text-label-sm font-medium text-on-surface-variant mb-2">
+                Data de Abertura da OS:
+            </label>
+            <div class="space-y-2">
+                <label class="flex items-start gap-2.5 p-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer text-xs text-on-surface">
+                    <input type="radio" name="modal-reopen-date-opt" value="atualizar" checked class="mt-0.5 text-primary focus:ring-primary cursor-pointer">
+                    <div>
+                        <span class="font-semibold block text-primary">Atualizar para a data e hora atual</span>
+                        <span class="text-[11px] text-on-surface-variant leading-tight block mt-0.5">Define o momento atual como nova data de abertura (redefine prazos de atendimento).</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2.5 p-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer text-xs text-on-surface">
+                    <input type="radio" name="modal-reopen-date-opt" value="manter" class="mt-0.5 text-primary focus:ring-primary cursor-pointer">
+                    <div>
+                        <span class="font-semibold block">Manter a data de abertura original</span>
+                        <span class="text-[11px] text-on-surface-variant leading-tight block mt-0.5">Preserva a data original em que a OS foi aberta no sistema.</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <div class="mt-6 flex items-center justify-end gap-3">
             <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
                 Cancelar
@@ -1884,7 +1924,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false, showDateOption = false }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1894,6 +1934,7 @@
         const modalConfirmBtn = document.getElementById('modal-confirm-btn');
         const modalJustificationInput = document.getElementById('modal-justification-input');
         const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
+        const dateOptionContainer = document.getElementById('modal-date-option-container');
 
         if (!modal || !modalBox) return;
 
@@ -1904,6 +1945,16 @@
         if (modalConfirmBtn) {
             modalConfirmBtn.className = `px-6 py-2 rounded-xl text-label-md font-semibold ${confirmBtnClass || 'bg-primary text-white hover:bg-primary/90'} active:scale-95 transition-all shadow-sm cursor-pointer`;
             modalConfirmBtn.textContent = confirmText || 'Confirmar';
+        }
+
+        if (dateOptionContainer) {
+            if (showDateOption) {
+                dateOptionContainer.classList.remove('hidden');
+                const defaultRadio = dateOptionContainer.querySelector('input[name="modal-reopen-date-opt"][value="atualizar"]');
+                if (defaultRadio) defaultRadio.checked = true;
+            } else {
+                dateOptionContainer.classList.add('hidden');
+            }
         }
 
         if (justificationContainer) {
@@ -1958,8 +2009,14 @@
                     return;
                 }
 
+                let dateOption = 'atualizar';
+                if (dateOptionContainer && showDateOption) {
+                    const checkedRadio = dateOptionContainer.querySelector('input[name="modal-reopen-date-opt"]:checked');
+                    if (checkedRadio) dateOption = checkedRadio.value;
+                }
+
                 if (typeof pendingActionCallback === 'function') {
-                    pendingActionCallback(justification);
+                    pendingActionCallback(justification, dateOption);
                 }
                 closeConfirmModal();
             };
@@ -2541,12 +2598,12 @@
         // Inicializa redimensionamento da Tabela de Auditoria
         initTableResizer('os-table', {
             '0': 90, '1': 60, '2': 120, 
-            '3': 30, '4': 30, '5': 30, '6': 30, '7': 30, '8': 30, '9': 30, '10': 30, '11': 30, '12': 30, '13': 30, '14': 30,
-            '15': 60 
+            '3': 30, '4': 30, '5': 30, '6': 30, '7': 30, '8': 30, '9': 30, '10': 30, '11': 30, '12': 30, '13': 30, '14': 30, '15': 30,
+            '16': 60 
         }, { 
             '0': 200, '1': 120, '2': 400, 
-            '3': 70, '4': 70, '5': 70, '6': 70, '7': 70, '8': 70, '9': 70, '10': 70, '11': 70, '12': 70, '13': 70, '14': 70,
-            '15': 130 
+            '3': 70, '4': 70, '5': 70, '6': 70, '7': 70, '8': 70, '9': 70, '10': 70, '11': 70, '12': 70, '13': 70, '14': 70, '15': 70,
+            '16': 130 
         }, 'tableColWidths');
 
         // Inicializa redimensionamento da Tabela de Serviços em Praças
@@ -2590,7 +2647,8 @@
         { index: 8, colIndex: 11, label: 'Material Divergente?', short: 'Material Divergente' },
         { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' },
         { index: 10, colIndex: 13, label: 'Reincidência 30d?', short: 'Reincidência 30d' },
-        { index: 11, colIndex: 14, label: 'Poste/Plaqueta Divergente?', short: 'Poste/Plaqueta Div.' }
+        { index: 11, colIndex: 14, label: 'Poste/Plaqueta Divergente?', short: 'Poste/Plaqueta Div.' },
+        { index: 12, colIndex: 15, label: 'OS Rejeitada?', short: 'OS Rejeitada' }
     ];
 
     // Colunas restritas que NÃO devem ser disponibilizadas nem exibidas para o Manutentor
@@ -2605,7 +2663,7 @@
     }
 
     // Estado global de índices de colunas ativas
-    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
     function renderAuditColsCheckboxes() {
         const container = document.getElementById('audit-cols-checkboxes-container');
@@ -3395,13 +3453,12 @@
             rows.forEach(row => {
                 let showRow = true;
 
-                // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS (ou ser OS Rejeitada)
-                const isRejeitadaRow = row.getAttribute('data-rejeitada') === 'true';
+                // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS
                 const activeColIndices = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) 
                     ? window.activeAuditCols 
-                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
-                if (activeColIndices.length === 0 && !isRejeitadaRow) {
+                if (activeColIndices.length === 0) {
                     // Se o usuário desmarcou todas as colunas de auditoria, nenhuma linha com critério de auditoria deve passar
                     showRow = false;
                 } else {
@@ -3413,14 +3470,16 @@
                             break;
                         }
                     }
-                    if (!hasSInActiveCols && !isRejeitadaRow) {
+                    if (!hasSInActiveCols) {
                         showRow = false;
                     }
                 }
 
+                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
+
                 // 1. Date Filter
                 if (showRow && activeDatePredicate) {
-                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
                     const rowDate = parseTableDate(dateStr);
                     if (!rowDate || !activeDatePredicate(rowDate)) {
                         showRow = false;
@@ -3429,14 +3488,14 @@
 
                 // 2. Protocol Prefix Filter (Column 0)
                 if (showRow && activeProtocolPrefix) {
-                    const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
+                    const protText = (row.cells[offset + 0]?.textContent || '').trim().toUpperCase();
                     if (!protText.startsWith(activeProtocolPrefix.toUpperCase())) {
                         showRow = false;
                     }
                 }
 
                 // 2b. Protocol Specific Search Filter (Column 0)
-                if (showRow && !matchColumnText(row, 0, protocolSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 0, protocolSearchQuery)) {
                     showRow = false;
                 }
 
@@ -3477,29 +3536,30 @@
 
             rows.forEach(row => {
                 let showRow = true;
+                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
 
                 // Protocol Search Filter (Col 0)
-                if (showRow && !matchColumnText(row, 0, pracaProtocolSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 0, pracaProtocolSearchQuery)) {
                     showRow = false;
                 }
 
                 // Date Filter (Col 1)
                 if (showRow && pracaActiveDatePredicate) {
-                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
                     const rowDate = parseTableDate(dateStr);
                     if (!rowDate || !pracaActiveDatePredicate(rowDate)) {
                         showRow = false;
                     }
                 }
 
-                // Plaqueta Filter (Col 2)
-                if (showRow && !matchColumnText(row, 2, pracaPlaquetaSearchQuery)) {
+                // Plaqueta / Praça Filter (Col 2)
+                if (showRow && !matchColumnText(row, offset + 2, pracaPlaquetaSearchQuery)) {
                     showRow = false;
                 }
 
                 // Status Filter (Col 5)
                 if (showRow && pracaActiveStatusFilter && pracaActiveStatusFilter.length > 0 && !pracaActiveStatusFilter.includes('all')) {
-                    const statusTd = row.cells[5];
+                    const statusTd = row.cells[offset + 5] || row.querySelector('td[data-status-value]');
                     const statusVal = statusTd?.getAttribute('data-status-value') || '';
                     const statusText = (statusTd?.textContent || '').trim().toLowerCase();
 
@@ -3521,7 +3581,7 @@
 
                 // Problem Filter (Col 4)
                 if (showRow && pracaActiveProblemFilter && pracaActiveProblemFilter.length > 0 && !pracaActiveProblemFilter.includes('all')) {
-                    const probTd = row.cells[4];
+                    const probTd = row.cells[offset + 4] || row.querySelector('td[data-problem-value]');
                     const probVal = probTd?.getAttribute('data-problem-value') || '';
                     const probText = (probTd?.textContent || '').trim().toLowerCase();
                     
@@ -3791,15 +3851,16 @@
 
             rows.forEach(row => {
                 let showRow = true;
+                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
 
                 // Protocol Search Filter (Col 0)
-                if (showRow && !matchColumnText(row, 0, compProtocolSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 0, compProtocolSearchQuery)) {
                     showRow = false;
                 }
 
                 // Date Filter (Col 1)
                 if (showRow && compActiveDatePredicate) {
-                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
                     const rowDate = parseTableDate(dateStr);
                     if (!rowDate || !compActiveDatePredicate(rowDate)) {
                         showRow = false;
@@ -3807,18 +3868,18 @@
                 }
 
                 // Plaqueta Filter (Col 2)
-                if (showRow && !matchColumnText(row, 2, compPlaquetaSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 2, compPlaquetaSearchQuery)) {
                     showRow = false;
                 }
 
                 // Material Filter (Col 6 - Accent Insensitive)
-                if (showRow && !matchColumnText(row, 6, compMaterialSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 6, compMaterialSearchQuery)) {
                     showRow = false;
                 }
 
                 // Problem Filter (Col 4)
                 if (showRow && compActiveProblemFilter && compActiveProblemFilter.length > 0 && !compActiveProblemFilter.includes('all')) {
-                    const probTd = row.cells[4];
+                    const probTd = row.cells[offset + 4];
                     const probVal = probTd?.getAttribute('data-problem-value') || '';
                     const probText = (probTd?.textContent || '').trim().toLowerCase();
                     
@@ -4014,15 +4075,16 @@
 
             rows.forEach(row => {
                 let showRow = true;
+                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
 
                 // Protocol Search Filter (Col 0)
-                if (showRow && !matchColumnText(row, 0, emgProtocolSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 0, emgProtocolSearchQuery)) {
                     showRow = false;
                 }
 
                 // Date Filter (Col 1)
                 if (showRow && emgActiveDatePredicate) {
-                    const dateStr = row.cells[1]?.textContent.trim() || '';
+                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
                     const rowDate = parseTableDate(dateStr);
                     if (!rowDate || !emgActiveDatePredicate(rowDate)) {
                         showRow = false;
@@ -4030,18 +4092,18 @@
                 }
 
                 // Plaqueta Filter (Col 2)
-                if (showRow && !matchColumnText(row, 2, emgPlaquetaSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 2, emgPlaquetaSearchQuery)) {
                     showRow = false;
                 }
 
                 // Material Filter (Col 6 - Accent Insensitive)
-                if (showRow && !matchColumnText(row, 6, emgMaterialSearchQuery)) {
+                if (showRow && !matchColumnText(row, offset + 6, emgMaterialSearchQuery)) {
                     showRow = false;
                 }
 
                 // Problem Filter (Col 4)
                 if (showRow && emgActiveProblemFilter && emgActiveProblemFilter.length > 0 && !emgActiveProblemFilter.includes('all')) {
-                    const probTd = row.cells[4];
+                    const probTd = row.cells[offset + 4];
                     const probVal = probTd?.getAttribute('data-problem-value') || '';
                     const probText = (probTd?.textContent || '').trim().toLowerCase();
                     
@@ -4590,8 +4652,10 @@
         document.querySelectorAll('.chk-item-rota-auditoria').forEach(cb => { cb.checked = false; });
         const allOs = document.getElementById('chk-rota-auditoria-all-os');
         const allComp = document.getElementById('chk-rota-auditoria-all-comp');
+        const allPraca = document.getElementById('chk-rota-auditoria-all-praca');
         if (allOs) allOs.checked = false;
         if (allComp) allComp.checked = false;
+        if (allPraca) allPraca.checked = false;
         window.toggleModoRotaAuditoria(false);
     };
 
@@ -4600,8 +4664,10 @@
         document.querySelectorAll('.chk-item-rota-auditoria').forEach(cb => { cb.checked = false; });
         const allOs = document.getElementById('chk-rota-auditoria-all-os');
         const allComp = document.getElementById('chk-rota-auditoria-all-comp');
+        const allPraca = document.getElementById('chk-rota-auditoria-all-praca');
         if (allOs) allOs.checked = false;
         if (allComp) allComp.checked = false;
+        if (allPraca) allPraca.checked = false;
         window.atualizarContadorSelecaoRota();
     };
 
@@ -4628,7 +4694,7 @@
     };
 
     window.toggleSelecionarTodasRota = function(masterCheckbox, tipo) {
-        const tableId = tipo === 'os' ? '#os-table' : '#completed-services-table';
+        const tableId = tipo === 'os' ? '#os-table' : (tipo === 'praca' ? '#praca-services-table' : '#completed-services-table');
         const isChecked = masterCheckbox.checked;
         const rows = document.querySelectorAll(`${tableId} tbody tr:not([id^="no-"])`);
 

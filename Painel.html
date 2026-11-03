@@ -23,7 +23,7 @@
     <script src="js/services/MapService.js?v=75"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/ConfiguracoesService.js?v=1"></script>
-    <script src="js/controllers/PainelController.js?v=48"></script>
+    <script src="js/controllers/PainelController.js?v=50"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js?v=33"></script>
@@ -780,6 +780,29 @@
             </div>
         </div>
 
+        <!-- Opção de Atualização de Data (ex: ao reabrir OS) -->
+        <div id="modal-date-option-container" class="mt-4 pt-3 border-t border-outline-variant/40 hidden">
+            <label class="block text-label-sm font-medium text-on-surface-variant mb-2">
+                Data de Abertura da OS:
+            </label>
+            <div class="space-y-2">
+                <label class="flex items-start gap-2.5 p-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer text-xs text-on-surface">
+                    <input type="radio" name="modal-reopen-date-opt" value="atualizar" checked class="mt-0.5 text-primary focus:ring-primary cursor-pointer">
+                    <div>
+                        <span class="font-semibold block text-primary">Atualizar para a data e hora atual</span>
+                        <span class="text-[11px] text-on-surface-variant leading-tight block mt-0.5">Define o momento atual como nova data de abertura (redefine prazos de atendimento).</span>
+                    </div>
+                </label>
+                <label class="flex items-start gap-2.5 p-2.5 rounded-xl border border-outline-variant/60 bg-surface-container-low hover:bg-surface-container-high transition-colors cursor-pointer text-xs text-on-surface">
+                    <input type="radio" name="modal-reopen-date-opt" value="manter" class="mt-0.5 text-primary focus:ring-primary cursor-pointer">
+                    <div>
+                        <span class="font-semibold block">Manter a data de abertura original</span>
+                        <span class="text-[11px] text-on-surface-variant leading-tight block mt-0.5">Preserva a data original em que a OS foi aberta no sistema.</span>
+                    </div>
+                </label>
+            </div>
+        </div>
+
         <div class="mt-6 flex items-center justify-end gap-3">
             <button onclick="closeConfirmModal()" class="px-4 py-2 rounded-xl text-label-md font-medium text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
                 Cancelar
@@ -1151,7 +1174,7 @@
         input.dispatchEvent(new Event('input', { bubbles: true }));
     };
 
-    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false, showCancelBtn = true }) {
+    window.showConfirmModal = function({ title, message, icon, iconBgClass, confirmBtnClass, confirmText, onConfirm, showJustification = true, requireJustification = false, showCancelBtn = true, showDateOption = false }) {
         const modal = document.getElementById('confirm-modal');
         const modalBox = document.getElementById('confirm-modal-box');
         const modalIconBg = document.getElementById('modal-icon-bg');
@@ -1162,6 +1185,7 @@
         const modalCancelBtn = modalBox ? modalBox.querySelector('button[onclick="closeConfirmModal()"]') : null;
         const modalJustificationInput = document.getElementById('modal-justification-input');
         const justificationContainer = modalJustificationInput ? modalJustificationInput.closest('.mt-4') : null;
+        const dateOptionContainer = document.getElementById('modal-date-option-container');
 
         if (!modal || !modalBox) return;
 
@@ -1179,6 +1203,16 @@
                 modalCancelBtn.classList.add('hidden');
             } else {
                 modalCancelBtn.classList.remove('hidden');
+            }
+        }
+
+        if (dateOptionContainer) {
+            if (showDateOption) {
+                dateOptionContainer.classList.remove('hidden');
+                const defaultRadio = dateOptionContainer.querySelector('input[name="modal-reopen-date-opt"][value="atualizar"]');
+                if (defaultRadio) defaultRadio.checked = true;
+            } else {
+                dateOptionContainer.classList.add('hidden');
             }
         }
 
@@ -1234,8 +1268,14 @@
                     return;
                 }
 
+                let dateOption = 'atualizar';
+                if (dateOptionContainer && showDateOption) {
+                    const checkedRadio = dateOptionContainer.querySelector('input[name="modal-reopen-date-opt"]:checked');
+                    if (checkedRadio) dateOption = checkedRadio.value;
+                }
+
                 if (typeof pendingActionCallback === 'function') {
-                    pendingActionCallback(justification);
+                    pendingActionCallback(justification, dateOption);
                 }
                 closeConfirmModal();
             };

@@ -1451,22 +1451,26 @@ class PainelController {
                 if (r === 'admin') isAdminUser = true;
                 if (r === 'manutentor') isManutentorUser = true;
             }
-            if (!isAdminUser && window.usuarioLogadoSupabase) {
+            if (window.usuarioLogadoSupabase) {
                 const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdminUser = true;
+                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) {
+                    isManutentorUser = true;
+                } else if (!isAdminUser && (r.includes('admin') || r.includes('gestor') || r.includes('supervisor'))) {
+                    isAdminUser = true;
+                }
             }
-            if (!isManutentorUser && window.usuarioLogadoSupabase) {
-                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
-                if (r.includes('manutencao') || r.includes('manutentor') || r.includes('tecnico')) isManutentorUser = true;
-            }
-            if (!isAdminUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
-                isAdminUser = true;
-            }
-            if (!isManutentorUser && String(localStorage.getItem('user_role') || '').toLowerCase().includes('manutentor')) {
+            const localRole = String(localStorage.getItem('user_role') || '').toLowerCase();
+            if (localRole.includes('manutentor')) {
                 isManutentorUser = true;
+            } else if (!isAdminUser && localRole.includes('admin')) {
+                isAdminUser = true;
             }
             if (!isManutentorUser && (window.isManutentorView || (document.body && document.body.classList.contains('manutentor-view')) || window.location.href.toLowerCase().includes('manutentor'))) {
                 isManutentorUser = true;
+            }
+            // Se for explicitamente identificado como manutentor, nunca deve ser considerado admin
+            if (isManutentorUser) {
+                isAdminUser = false;
             }
         } catch(e) {}
 
@@ -1634,7 +1638,7 @@ class PainelController {
                         <span class="material-symbols-outlined text-[16px]">chat</span>
                         <span>Observações de Abertura (Munícipe / Solicitante)</span>
                     </strong>
-                    <button type="button" onclick="window.painelController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                    <button type="button" onclick="(window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.painelController || window.auditoriaController).abrirModalAdicionarObservacao('${item.protocolo || item.id}'))" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
                         <span class="material-symbols-outlined text-[13px]">add_comment</span>
                         <span>+ Nova Observação</span>
                     </button>
@@ -2046,26 +2050,27 @@ class PainelController {
                                 <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeBg}">
                                     ${isDesconsiderada ? 'DESCONSIDERADA' : (s.status || 'REGISTRADA')}
                                 </span>
-                                ${(isAdminUser || isManutentorUser) ? `
-                                    ${isDesconsiderada ? `
+                                ${isDesconsiderada ? (isAdminUser ? `
                                     <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar esta sessão para cálculos de medição">
                                         <span class="material-symbols-outlined text-[12px]">undo</span>
                                         <span>Reconsiderar</span>
                                     </button>
-                                    ` : `
+                                ` : '') : ((isAdminUser || isManutentorUser) ? `
                                     <button type="button" onclick="window.alternarDesconsiderarSessao('${item.protocolo || item.id}', ${s.numero || 1}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar esta sessão dos cálculos de medição">
                                         <span class="material-symbols-outlined text-[12px]">block</span>
                                         <span>Desconsiderar</span>
                                     </button>
-                                    `}
-                                ` : ''}
+                                ` : '')}
                             </div>
                         </div>
                         
                         ${isDesconsiderada ? `
-                        <div class="p-1.5 rounded-lg bg-rose-50/80 border border-rose-200 text-[10px] text-rose-900 flex items-center gap-1 font-medium">
-                            <span class="material-symbols-outlined text-[13px] text-rose-600 shrink-0">info</span>
-                            <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                        <div class="p-2 rounded-lg bg-rose-50 border border-rose-200 text-[10.5px] text-rose-900 flex items-start gap-1.5 font-medium leading-relaxed">
+                            <span class="material-symbols-outlined text-[15px] text-rose-600 shrink-0 mt-0.5">info</span>
+                            <div>
+                                <span>Esta sessão foi <b>desconsiderada</b> e não será contabilizada no cálculo de horas e materiais da medição.</span>
+                                ${s.motivo_desconsideracao ? `<br><span class="text-rose-800 text-[10px] italic">Motivo: "${s.motivo_desconsideracao}" ${s.desconsiderada_por ? `(por ${s.desconsiderada_por})` : ''}</span>` : ''}
+                            </div>
                         </div>
                         ` : ''}
                         
@@ -2234,19 +2239,17 @@ class PainelController {
                                         📅 ${dataStr} • 👤 ${f.operador || 'Técnico Responsável'}
                                     </span>
                                     ${badgeStatus}
-                                    ${(isAdminUser || isManutentorUser) && f.id ? `
-                                        ${isDesconsiderado ? `
+                                    ${f.id ? (isDesconsiderado ? (isAdminUser ? `
                                         <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, false)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Reconsiderar este fechamento para cálculos de medição">
-                                            <span class="material-symbols-outlined text-[12px]">undo</span>
-                                            <span>Reconsiderar</span>
-                                        </button>
-                                        ` : `
+                                             <span class="material-symbols-outlined text-[12px]">undo</span>
+                                             <span>Reconsiderar</span>
+                                         </button>
+                                        ` : '') : ((isAdminUser || isManutentorUser) ? `
                                         <button type="button" onclick="window.alternarDesconsiderarFechamento('${f.id}', '${item.protocolo || item.id}', ${numFech}, true)" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-white text-rose-700 hover:bg-rose-50 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desconsiderar este fechamento dos cálculos de medição">
-                                            <span class="material-symbols-outlined text-[12px]">block</span>
-                                            <span>Desconsiderar</span>
+                                             <span class="material-symbols-outlined text-[12px]">block</span>
+                                             <span>Desconsiderar</span>
                                         </button>
-                                        `}
-                                    ` : ''}
+                                        ` : '')) : ''}
                                 </div>
                             </div>
 
@@ -2472,7 +2475,7 @@ class PainelController {
                     <span class="material-symbols-outlined text-[18px]">history</span>
                     <span>Histórico do protocolo</span>
                 </span>
-                <button type="button" onclick="window.painelController.abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
+                <button type="button" onclick="(window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.painelController || window.auditoriaController).abrirModalAdicionarObservacao('${item.protocolo || item.id}'))" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
                     <span class="material-symbols-outlined text-[14px]">add_comment</span>
                     <span>+ Nova Observação</span>
                 </button>
@@ -3742,10 +3745,25 @@ class PainelController {
      * @param {string} protocoloOrId
      */
     abrirModalAdicionarObservacao(protocoloOrId) {
-        const item = (this.chamadosList || []).find(c => 
-            String(c.protocolo || '').toUpperCase() === String(protocoloOrId || '').toUpperCase() || 
-            String(c.id || '') === String(protocoloOrId || '')
-        );
+        const rawList = (this.chamadosList && this.chamadosList.length > 0)
+            ? this.chamadosList
+            : (window.chamadosListCache || window.dadosOSsAbertasCache || (window.currentModalItem ? [window.currentModalItem] : []));
+
+        const upperProt = String(protocoloOrId || '').replace(/^#/, '').trim().toUpperCase();
+
+        let item = rawList.find(c => {
+            const p = String(c.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const id = String(c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === upperProt || id === upperProt;
+        });
+
+        if (!item && window.currentModalItem) {
+            const currProt = String(window.currentModalItem.protocolo || '').replace(/^#/, '').trim().toUpperCase();
+            const currId = String(window.currentModalItem.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (currProt === upperProt || currId === upperProt) {
+                item = window.currentModalItem;
+            }
+        }
 
         const protocol = item ? (item.protocolo || protocoloOrId) : protocoloOrId;
         if (!protocol) {
@@ -3828,7 +3846,12 @@ class PainelController {
                 btnSalvar.innerHTML = `<span class="material-symbols-outlined text-[16px] animate-spin">sync</span><span>Salvando...</span>`;
 
                 try {
-                    await this.service.adicionarObservacaoOS(protocol, texto, 'Painel');
+                    const serv = this.service || (window.ChamadosService ? new window.ChamadosService() : null);
+                    if (!serv) {
+                        throw new Error('Serviço ChamadosService não disponível.');
+                    }
+                    const origemTela = (window.location.pathname || '').toLowerCase().includes('mapa') ? 'Mapa' : 'Painel';
+                    await serv.adicionarObservacaoOS(protocol, texto, origemTela);
 
                     // Fecha o modal de formulário
                     modalEl.remove();
@@ -3836,6 +3859,11 @@ class PainelController {
                     // Recarrega a listagem de logs no modal de detalhes se estiver aberto
                     if (typeof this.carregarLogsNoModal === 'function') {
                         await this.carregarLogsNoModal(protocol);
+                    } else if (window.painelController && typeof window.painelController.carregarLogsNoModal === 'function') {
+                        await window.painelController.carregarLogsNoModal(protocol);
+                    } else if (window.PainelController && typeof window.PainelController.prototype.carregarLogsNoModal === 'function') {
+                        const tempCtrl = new window.PainelController();
+                        await tempCtrl.carregarLogsNoModal(protocol);
                     }
 
                     // Toast de confirmação
@@ -3856,7 +3884,40 @@ class PainelController {
     }
 }
 
-// Global helpers for row click details modal & material editing
+// Global helpers for row click details modal & material editing & observations
+window.abrirModalAdicionarObservacao = function(protocoloOrId) {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? sidebar.getAttribute('active') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalAdicionarObservacao === 'function') {
+            return window.auditoriaController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+        if (window.painelController && typeof window.painelController.abrirModalAdicionarObservacao === 'function') {
+            return window.painelController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.abrirModalAdicionarObservacao === 'function') {
+            return window.painelController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+        if (window.auditoriaController && typeof window.auditoriaController.abrirModalAdicionarObservacao === 'function') {
+            return window.auditoriaController.abrirModalAdicionarObservacao(protocoloOrId);
+        }
+    }
+
+    // Fallback: instancia temporária ou busca genérica
+    if (window.AuditoriaController) {
+        const ctrl = window.auditoriaController || new window.AuditoriaController();
+        return ctrl.abrirModalAdicionarObservacao(protocoloOrId);
+    }
+    if (window.PainelController) {
+        const ctrl = window.painelController || new window.PainelController();
+        return ctrl.abrirModalAdicionarObservacao(protocoloOrId);
+    }
+};
+
 window.editarMateriaisAdmin = function(id) {
     const path = (window.location.pathname || '').toLowerCase();
     const sidebar = document.querySelector('app-sidebar');
@@ -4089,22 +4150,31 @@ window.reabrirOSAdmin = function(osId) {
     else if (isConcluida) actionTitle = 'Reabrir OS Concluída';
     else if (isRejeitada) actionTitle = 'Reabrir OS Rejeitada';
 
-    const doReopen = async (justification) => {
+    const doReopen = async (justification, dateOption = 'atualizar') => {
         try {
+            const updateDate = (dateOption !== 'manter');
             if (item) {
                 item.status = 'Aberta';
                 item.rawStatus = 'Aberta';
                 item.normalizedStatus = 'aberto';
                 item.motivoAprovacao = '';
+                if (updateDate) {
+                    const nowIso = new Date().toISOString();
+                    item.dataAbertura = nowIso;
+                    if (item.rawRow) item.rawRow.data_abertura = nowIso;
+                }
                 if (item.rawRow) item.rawRow.motivo_aprovacao = '';
                 if (item._originalModel) {
                     item._originalModel.rawStatus = 'Aberta';
                     item._originalModel.normalizedStatus = 'aberto';
                     item._originalModel.motivoAprovacao = '';
+                    if (updateDate) {
+                        item._originalModel.dataAbertura = new Date().toISOString();
+                    }
                 }
             }
             const repo = new window.ChamadosRepository();
-            await repo.updateStatus(protocol || osId, 'Aberta', justification);
+            await repo.updateStatus(protocol || osId, 'Aberta', justification, updateDate);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
             if (window.painelController && typeof window.painelController.loadData === 'function') {
@@ -4134,6 +4204,7 @@ window.reabrirOSAdmin = function(osId) {
             confirmText: 'Reabrir OS',
             showJustification: true,
             requireJustification: true,
+            showDateOption: true,
             onConfirm: doReopen
         });
     } else {
@@ -4142,7 +4213,8 @@ window.reabrirOSAdmin = function(osId) {
             just = prompt(`Justificativa obrigatória para reabrir a OS #${protocol}:`);
             if (just === null) return;
         }
-        doReopen(just.trim());
+        const updateDateChoice = confirm('Deseja atualizar a data de abertura para a data de hoje?\n\n[OK] Sim, atualizar data\n[Cancelar] Não, manter data original');
+        doReopen(just.trim(), updateDateChoice ? 'atualizar' : 'manter');
     }
 };
 
@@ -4379,6 +4451,37 @@ document.addEventListener('click', (e) => {
 
 // Global helper para desconsiderar ou reconsiderar uma sessão de trabalho de praça
 window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsiderar) {
+    if (!desconsiderar) {
+        let isAdmin = false;
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (r === 'admin') isAdmin = true;
+            }
+            if (!isAdmin && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+            }
+            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                isAdmin = true;
+            }
+        } catch (e) {}
+
+        if (!isAdmin) {
+            if (typeof window.showNotificationModal === 'function') {
+                window.showNotificationModal({
+                    title: 'Acesso Restrito',
+                    message: 'Apenas usuários administradores possuem permissão para reconsiderar uma sessão de atendimento.',
+                    icon: 'lock',
+                    iconBgClass: 'bg-rose-100 text-rose-700'
+                });
+            } else {
+                alert('Acesso Restrito: Apenas administradores possuem permissão para reconsiderar uma sessão.');
+            }
+            return;
+        }
+    }
+
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? (item.protocolo || osId) : osId;
@@ -4506,6 +4609,37 @@ window.alternarDesconsiderarSessao = async function(osId, numeroSessao, desconsi
 
 // Global helper para desconsiderar ou reconsiderar um fechamento de OS (tabela fechamentos_os)
 window.alternarDesconsiderarFechamento = async function(fechamentoId, osId, numeroFechamento, desconsiderar) {
+    if (!desconsiderar) {
+        let isAdmin = false;
+        try {
+            if (window.AuthGuard && window.AuthGuard._cachedAuthData) {
+                const r = window.AuthGuard.getUserRole(window.AuthGuard._cachedAuthData.user, window.AuthGuard._cachedAuthData.profile);
+                if (r === 'admin') isAdmin = true;
+            }
+            if (!isAdmin && window.usuarioLogadoSupabase) {
+                const r = String(window.usuarioLogadoSupabase.role || window.usuarioLogadoSupabase.cargo || '').toLowerCase();
+                if (r.includes('admin') || r.includes('gestor') || r.includes('supervisor')) isAdmin = true;
+            }
+            if (!isAdmin && String(localStorage.getItem('user_role') || '').toLowerCase().includes('admin')) {
+                isAdmin = true;
+            }
+        } catch (e) {}
+
+        if (!isAdmin) {
+            if (typeof window.showNotificationModal === 'function') {
+                window.showNotificationModal({
+                    title: 'Acesso Restrito',
+                    message: 'Apenas usuários administradores possuem permissão para reconsiderar um fechamento de atendimento.',
+                    icon: 'lock',
+                    iconBgClass: 'bg-rose-100 text-rose-700'
+                });
+            } else {
+                alert('Acesso Restrito: Apenas administradores possuem permissão para reconsiderar um fechamento.');
+            }
+            return;
+        }
+    }
+
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     let item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
     const protocol = item ? (item.protocolo || osId) : osId;

@@ -1,21 +1,38 @@
 # Variáveis de Ambiente e Segredos
 .env
 .env.local
+.env.*.local
 *.env
 
-# Módulos Node
+# Módulos Node e logs
 node_modules/
-npm-debug.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json.log
 
-# Build e arquivos Vercel
+# Build e arquivos de deploy / Vercel
 .vercel/
-.DS_Store
 
-# Testes locais de Push Notifications
+# Sistema Operacional e Editores / IDEs
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.suo
+*.user
+
+# Testes locais e arquivos temporários / scratch
 push_subscriptions.json
+*.tmp
+*.temp
+*.log
 
 # Backups e Dumps com dados sensíveis
 Google Apps Script - Backup*/
 migration_dump/
 Importar-BancoDeDados/
-*.bat
+*.sql.bak
+*.bak
+

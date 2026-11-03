@@ -669,7 +669,7 @@ class ChamadosRepository {
     /**
      * Updates status for an OS across ordens_servico and ordens_servico_pracas
      */
-    async updateStatus(idOrProtocol, newStatus, justification = '') {
+    async updateStatus(idOrProtocol, newStatus, justification = '', updateDate = true) {
         try {
             const client = this.getClient();
             const updatePayload = {
@@ -686,8 +686,10 @@ class ChamadosRepository {
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;
                 updatePayload.motivo_aprovacao = null;
-                // Registra o momento de liberação da OS como data de abertura para medições e prazos
-                updatePayload.data_abertura = nowIso;
+                // Registra o momento de liberação da OS como data de abertura para medições e prazos apenas se updateDate for true
+                if (updateDate) {
+                    updatePayload.data_abertura = nowIso;
+                }
             } else if (newStatus === 'Pendente') {
                 updatePayload.data_conclusao = null;
                 updatePayload.data_fechamento = null;

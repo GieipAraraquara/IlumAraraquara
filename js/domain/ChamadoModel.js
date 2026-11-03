@@ -1470,6 +1470,10 @@ class ChamadoModel {
         return this._reincidencia30dInfo || null;
     }
 
+    get isRejeitada() {
+        return this.normalizedStatus === 'rejeitada';
+    }
+
     get hasDivergence() {
         if (this.isDireto) return false;
         return this.isProblemaDivergente ||
@@ -1483,7 +1487,8 @@ class ChamadoModel {
                this.isMaterialDivergente ||
                this.isProblemaExterno ||
                this.isReincidencia30d ||
-               this.isPostePlaquetaDivergente;
+               this.isPostePlaquetaDivergente ||
+               this.isRejeitada;
     }
 
     /**
@@ -2769,6 +2774,14 @@ class ChamadoModel {
             headerText2: 'Divergente?',
             modelProperty: 'isPostePlaquetaDivergente',
             explicacao: 'O operador selecionou no mapa um poste da base aérea previamente vinculado à Plaqueta A, porém digitou a Plaqueta B na finalização.'
+        },
+        {
+            key: 'osRejeitada',
+            label: 'OS Rejeitada?',
+            headerText1: 'OS',
+            headerText2: 'Rejeitada?',
+            modelProperty: 'isRejeitada',
+            explicacao: 'A Ordem de Serviço foi rejeitada/recusada e necessita de avaliação da auditoria.'
         }
     ];
 }
