@@ -307,9 +307,10 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
         const cRep = targetItem.coordenadaReparo || targetItem.coordenada_reparo;
         const cIni = targetItem.coordenadaInicial || targetItem.coordenada_inicial || targetItem.coordenada;
         
-        const isConcluida = targetItem.normalizedStatus === 'concluida' 
+        const forcarInicial = Boolean(targetItem.forcarCoordenadaInicial);
+        const isConcluida = !forcarInicial && (targetItem.normalizedStatus === 'concluida' 
             || String(targetItem.statusBadgeLabel || targetItem.status || '').toLowerCase().includes('conclu')
-            || Boolean(targetItem.dataConclusao);
+            || Boolean(targetItem.dataConclusao));
 
         let pt = null;
         if (window.ChamadoModel && typeof window.ChamadoModel.parseLatLng === 'function') {

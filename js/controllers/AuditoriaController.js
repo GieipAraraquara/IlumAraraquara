@@ -319,6 +319,20 @@ class AuditoriaController {
     processarReincidencias30Dias(concludedList = []) {
         if (!Array.isArray(concludedList) || concludedList.length === 0) return;
 
+        // Garante lista de OSs únicas por id/protocolo para evitar duplicidades caso a lista tenha itens repetidos
+        const uniqueMap = new Map();
+        concludedList.forEach(c => {
+            if (!c) return;
+            const key = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+            if (key) {
+                // Prefere manter a versão mais completa/enriquecida
+                if (!uniqueMap.has(key) || c._isEnriched) {
+                    uniqueMap.set(key, c);
+                }
+            }
+        });
+        const osList = Array.from(uniqueMap.values());
+
         const isPlaquetaValida = (val) => {
             if (!val || typeof val !== 'string') return false;
             const clean = val.trim().toUpperCase();
@@ -378,7 +392,7 @@ class AuditoriaController {
         // Extrai todas as ocorrências de plaquetas reparadas com suas respectivas datas e referências de OS
         const registrosPorPlaqueta = new Map();
 
-        concludedList.forEach(item => {
+        osList.forEach(item => {
             const ts = getTimestampOS(item);
             if (!ts) return;
 
@@ -387,12 +401,17 @@ class AuditoriaController {
                 if (!registrosPorPlaqueta.has(plq)) {
                     registrosPorPlaqueta.set(plq, []);
                 }
-                registrosPorPlaqueta.get(plq).push({
-                    timestamp: ts,
-                    protocolo: String(item.protocolo || item.id || '').trim(),
-                    dataStr: item.formattedDateConclusaoShort || (item.dataConclusao ? new Date(item.dataConclusao).toLocaleDateString('pt-BR') : ''),
-                    os: item
-                });
+                const lista = registrosPorPlaqueta.get(plq);
+                const protLimpo = String(item.protocolo || item.id || '').replace(/^#/, '').trim().toUpperCase();
+                // Evita inserir a mesma OS mais de uma vez no histórico da mesma plaqueta
+                if (!lista.some(r => String(r.protocolo || '').replace(/^#/, '').trim().toUpperCase() === protLimpo)) {
+                    lista.push({
+                        timestamp: ts,
+                        protocolo: String(item.protocolo || item.id || '').trim(),
+                        dataStr: item.formattedDateConclusaoShort || (item.dataConclusao ? new Date(item.dataConclusao).toLocaleDateString('pt-BR') : ''),
+                        os: item
+                    });
+                }
             });
         });
 
@@ -404,25 +423,30 @@ class AuditoriaController {
         const MS_30_DIAS = 30 * 24 * 60 * 60 * 1000;
 
         // Para cada OS, verifica se alguma de suas plaquetas foi reparada em outra OS no intervalo de 30 dias anteriores
-        concludedList.forEach(item => {
+        osList.forEach(item => {
             const tsAtual = getTimestampOS(item);
             const plaquetasItem = extrairPlaquetasReparadasOS(item);
-            const meuProt = String(item.protocolo || item.id || '').trim().toUpperCase();
+            const meuProt = String(item.protocolo || item.id || '').replace(/^#/, '').trim().toUpperCase();
 
             let reincidente = false;
             const reincidenciasEncontradas = [];
+            const vistos = new Set();
 
             if (tsAtual > 0 && plaquetasItem.length > 0) {
                 for (const plq of plaquetasItem) {
                     const historico = registrosPorPlaqueta.get(plq) || [];
                     for (const anterior of historico) {
-                        const protAnterior = String(anterior.protocolo || '').toUpperCase();
+                        const protAnterior = String(anterior.protocolo || '').replace(/^#/, '').trim().toUpperCase();
                         // Deve ser outra OS (protocolo diferente)
                         if (protAnterior === meuProt) continue;
+
+                        const chaveUnica = `${plq}_${protAnterior}`;
+                        if (vistos.has(chaveUnica)) continue;
 
                         const diffMs = tsAtual - anterior.timestamp;
                         // O reparo anterior ocorreu antes da OS atual (diffMs > 0) e em até 30 dias (<= 30 dias)
                         if (diffMs > 0 && diffMs <= MS_30_DIAS) {
+                            vistos.add(chaveUnica);
                             reincidente = true;
                             const diasAtras = Math.max(1, Math.round(diffMs / (24 * 60 * 60 * 1000)));
                             reincidenciasEncontradas.push({
@@ -2514,9 +2538,19 @@ class AuditoriaController {
                                          if (!plqVal || !Array.isArray(item.reincidencia30dInfo) || item.reincidencia30dInfo.length === 0) return '';
                                          const reincsPonto = item.reincidencia30dInfo.filter(r => String(r.plaqueta || '').trim().toUpperCase() === plqVal);
                                          if (reincsPonto.length === 0) return '';
+                                         const reincsUnicas = [];
+                                         const protVistos = new Set();
+                                         reincsPonto.forEach(r => {
+                                             const protKey = String(r.protocoloAnterior || '').replace(/^#/, '').trim().toUpperCase();
+                                             if (protKey && !protVistos.has(protKey)) {
+                                                 protVistos.add(protKey);
+                                                 reincsUnicas.push(r);
+                                             }
+                                         });
+                                         if (reincsUnicas.length === 0) return '';
                                          return `
                                              <div class="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-rose-200/60 mt-1.5">
-                                                 ${reincsPonto.map(r => `
+                                                 ${reincsUnicas.map(r => `
                                                      <button type="button" 
                                                          onclick="event.stopPropagation(); window.abrirDetalhesOSModal('${r.protocoloAnterior}')" 
                                                          class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-bold bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300 active:scale-95 transition-all shadow-2xs cursor-pointer" 

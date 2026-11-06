@@ -5340,14 +5340,29 @@
         var prot = input ? input.value.trim().toUpperCase() : '';
         if (!prot) return;
 
-        if (window.dadosViariaValidos && window.dadosViariaValidos.protocolo === prot) {
-          if (typeof window.abrirMapaPonto === 'function') {
-            window.abrirMapaPonto(window.dadosViariaValidos);
+        const abrirComDadosAbertura = (dados) => {
+          if (!dados || typeof window.abrirMapaPonto !== 'function') return;
+          // Clona o item garantindo foco estrito na abertura
+          const itemAbertura = Object.assign({}, dados, {
+            forcarCoordenadaInicial: true,
+            coordenadaReparo: null,
+            plaquetaFinal: null,
+            problemaEncontrado: null,
+            normalizedStatus: 'pendente'
+          });
+          // Se tiver coordenada inicial explícita, assegura que seja usada
+          if (dados.coordenadaInicial) {
+            itemAbertura.coordenada = dados.coordenadaInicial;
           }
+          window.abrirMapaPonto(itemAbertura);
+        };
+
+        if (window.dadosViariaValidos && window.dadosViariaValidos.protocolo === prot) {
+          abrirComDadosAbertura(window.dadosViariaValidos);
         } else {
           verificarEValidarProtocoloViaria(true).then(() => {
-            if (window.dadosViariaValidos && typeof window.abrirMapaPonto === 'function') {
-              window.abrirMapaPonto(window.dadosViariaValidos);
+            if (window.dadosViariaValidos) {
+              abrirComDadosAbertura(window.dadosViariaValidos);
             }
           });
         }
@@ -5358,19 +5373,22 @@
           var itemPraca = null;
           if (window.ChamadoModel) {
             itemPraca = window.ChamadoModel.fromRow(dadosPracaAtual);
-            if (!itemPraca.coordenadaReparo && typeof coordsGpsPracaAtual !== 'undefined' && coordsGpsPracaAtual) {
-              itemPraca.coordenadaReparo = coordsGpsPracaAtual;
-            }
+            itemPraca.forcarCoordenadaInicial = true;
+            itemPraca.coordenadaReparo = null;
+            itemPraca.plaquetaFinal = null;
+            itemPraca.problemaEncontrado = null;
+            itemPraca.normalizedStatus = 'pendente';
           } else {
             itemPraca = {
               id: dadosPracaAtual.id || dadosPracaAtual.protocolo,
               protocolo: dadosPracaAtual.protocolo,
               endereco: dadosPracaAtual.praca_nome ? ("🌳 " + dadosPracaAtual.praca_nome + " - " + (dadosPracaAtual.endereco || '')) : (dadosPracaAtual.endereco || 'Endereço da Praça'),
-              coordenadaInicial: dadosPracaAtual.coordenada_inicial || (typeof coordsGpsPracaAtual !== 'undefined' ? coordsGpsPracaAtual : ''),
-              coordenadaReparo: dadosPracaAtual.coordenada_reparo || dadosPracaAtual.coordenada_inicial || (typeof coordsGpsPracaAtual !== 'undefined' ? coordsGpsPracaAtual : ''),
+              coordenadaInicial: dadosPracaAtual.coordenada_inicial || '',
+              coordenadaReparo: null,
+              forcarCoordenadaInicial: true,
               addressPoints: [dadosPracaAtual.endereco || dadosPracaAtual.praca_nome || 'Praça Pública'],
               statusBadgeLabel: dadosPracaAtual.status || 'Aberta',
-              normalizedStatus: (dadosPracaAtual.status || '').toLowerCase().includes('conclu') ? 'concluida' : 'pendente',
+              normalizedStatus: 'pendente',
               problemaInicial: 'Manutenção de Praça Pública'
             };
           }

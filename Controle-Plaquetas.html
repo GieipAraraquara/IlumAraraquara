@@ -3886,6 +3886,116 @@
             }
         }
 
+        // Função auxiliar para gerar o HTML do Popup do Poste de forma assíncrona com os dados reais
+        async function gerarHtmlPopupPoste(idPoste, plaquetasArr, lat, lng) {
+            const temPlaqueta = plaquetasArr && plaquetasArr.length > 0;
+            let lumInfo = 'Não informada';
+            let lumData = '';
+            let releInfo = 'Não informado';
+            let releData = '';
+
+            if (temPlaqueta) {
+                // Buscar detalhes da primeira plaqueta vinculada
+                try {
+                    const dadosPlaq = await obterDadosDetalhadosPlaqueta(plaquetasArr[0]);
+                    if (dadosPlaq) {
+                        if (dadosPlaq.marca_luminaria || dadosPlaq.potencia_luminaria) {
+                            const marca = dadosPlaq.marca_luminaria || '';
+                            const pot = dadosPlaq.potencia_luminaria ? `${dadosPlaq.potencia_luminaria}W` : '';
+                            lumInfo = `${marca} ${pot}`.trim();
+                        }
+                        if (dadosPlaq.data_troca_luminaria) {
+                            lumData = formatarDataIsoPtBr(dadosPlaq.data_troca_luminaria);
+                        }
+                        if (dadosPlaq.marca_rele) {
+                            releInfo = dadosPlaq.marca_rele;
+                        }
+                        if (dadosPlaq.data_troca_rele) {
+                            releData = formatarDataIsoPtBr(dadosPlaq.data_troca_rele);
+                        }
+                    }
+                } catch (errPlaq) {
+                    console.warn('Erro ao obter detalhes da plaqueta para o popup do poste:', errPlaq);
+                }
+            }
+
+            return `
+                <div class="p-3 text-xs text-slate-800 space-y-2 min-w-[260px]">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-1.5 font-bold text-slate-900">
+                        <span class="flex items-center gap-1 text-purple-700">
+                            <span class="material-symbols-outlined text-[16px]">electric_bolt</span>
+                            <span>Poste #${idPoste}</span>
+                        </span>
+                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${temPlaqueta ? 'bg-sky-100 text-sky-800 border border-sky-200' : 'bg-slate-100 text-slate-600'}">
+                            ${temPlaqueta ? `${plaquetasArr.length} Plaqueta(s)` : 'Sem Plaqueta'}
+                        </span>
+                    </div>
+
+                    ${temPlaqueta ? `
+                        <div class="bg-sky-50 border border-sky-100 p-2 rounded-lg space-y-1">
+                            <div class="text-[11px] font-bold text-sky-900 flex items-center gap-1">
+                                <span class="material-symbols-outlined text-[14px]">sell</span>
+                                <span>Plaqueta(s) Vinculada(s):</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                ${plaquetasArr.map(p => `<span class="px-1.5 py-0.5 bg-white border border-sky-200 rounded text-[11px] font-mono font-bold text-sky-700">#${p}</span>`).join('')}
+                            </div>
+                        </div>
+
+                        <div class="space-y-1.5 text-[11px] bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                            <!-- Luminária -->
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 font-medium">💡 Luminária:</span>
+                                    <span class="font-bold text-slate-800 font-mono">${lumInfo}</span>
+                                </div>
+                                ${lumData ? `
+                                    <div class="flex items-center justify-between text-[10px] text-slate-500 mt-0.5">
+                                        <span>Data Troca:</span>
+                                        <span class="font-semibold text-emerald-700 font-mono flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[12px]">calendar_today</span>
+                                            <span>${lumData}</span>
+                                        </span>
+                                    </div>
+                                ` : ''}
+                            </div>
+
+                            <div class="border-t border-slate-200/60 pt-1"></div>
+
+                            <!-- Relé -->
+                            <div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 font-medium">⚡ Relé:</span>
+                                    <span class="font-bold text-slate-800 font-mono">${releInfo}</span>
+                                </div>
+                                ${releData ? `
+                                    <div class="flex items-center justify-between text-[10px] text-slate-500 mt-0.5">
+                                        <span>Data Troca:</span>
+                                        <span class="font-semibold text-blue-700 font-mono flex items-center gap-0.5">
+                                            <span class="material-symbols-outlined text-[12px]">calendar_today</span>
+                                            <span>${releData}</span>
+                                        </span>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                    ` : `
+                        <div class="text-[11px] text-slate-500 italic p-1 bg-slate-50 rounded text-center">
+                            Poste disponível sem plaqueta cadastrada.
+                        </div>
+                    `}
+
+                    <div class="text-[10px] text-slate-400 font-mono flex items-center justify-between pt-1 border-t border-slate-100">
+                        <span>Coord: ${lat.toFixed(5)}, ${lng.toFixed(5)}</span>
+                        <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}" target="_blank" class="text-purple-600 hover:text-purple-800 font-bold flex items-center gap-0.5">
+                            <span>Street View</span>
+                            <span class="material-symbols-outlined text-[12px]">open_in_new</span>
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+
         // Função auxiliar para gerar o HTML do Popup da Plaqueta (Modo Plaquetas)
         function gerarHtmlPopupPlaqueta(plq) {
             const pot = plq.potencia_luminaria ? `${plq.potencia_luminaria}` : '';

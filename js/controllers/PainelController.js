@@ -4047,6 +4047,34 @@ window.abrirDetalhesOSModal = function(id) {
     }
 };
 
+// Helper utilitário para atualizar apenas a visualização ativa na tela após alteração de status/prioridade
+window.reloadActiveViewAfterStatusChange = async function(forceRefresh = true) {
+    const path = (window.location.pathname || '').toLowerCase();
+    const sidebar = document.querySelector('app-sidebar');
+    const activePage = sidebar ? (sidebar.getAttribute('active') || '') : '';
+    const isAuditoria = path.includes('auditoria') || activePage === 'auditoria' || !!document.getElementById('tabelaChamadosAuditoria');
+
+    if (isAuditoria) {
+        if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
+            await window.auditoriaController.loadData();
+        }
+    } else {
+        if (window.painelController && typeof window.painelController.loadData === 'function') {
+            await window.painelController.loadData(forceRefresh);
+            if (typeof window.applyCombinedFilters === 'function') {
+                window.applyCombinedFilters();
+            }
+        }
+    }
+
+    if (typeof window.carregarMapaOSsAbertas === 'function') {
+        await window.carregarMapaOSsAbertas(true);
+    }
+    if (typeof window.carregarDadosMapaOSs === 'function') {
+        await window.carregarDadosMapaOSs();
+    }
+};
+
 window.aprovarOSAdmin = function(osId) {
     const list = (window.chamadosListCache || window.dadosOSsAbertasCache || (window.painelController ? window.painelController.chamadosList : []) || (window.auditoriaController ? window.auditoriaController.chamadosList : []) || []);
     const item = list.find(c => String(c.protocolo || "").toUpperCase() === String(osId || "").toUpperCase() || String(c.id || "") === String(osId));
@@ -4058,21 +4086,7 @@ window.aprovarOSAdmin = function(osId) {
             await repo.updateStatus(protocol || osId, 'Aberta');
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData(true);
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
-                }
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao aprovar a Ordem de Serviço: ' + (err.message || err));
         }
@@ -4115,21 +4129,7 @@ window.bloquearOSAdmin = function(osId) {
             await repo.updateStatus(protocol || osId, 'Bloqueada', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData(true);
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
-                }
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao bloquear a Ordem de Serviço: ' + (err.message || err));
         }
@@ -4176,21 +4176,7 @@ window.liberarOSBloqueadaAdmin = function(osId) {
             await repo.updateStatus(protocol || osId, 'Aberta');
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData(true);
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
-                }
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao liberar a Ordem de Serviço: ' + (err.message || err));
         }
@@ -4253,18 +4239,7 @@ window.reabrirOSAdmin = function(osId) {
             await repo.updateStatus(protocol || osId, 'Aberta', justification, updateDate);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData();
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao reabrir a Ordem de Serviço: ' + (err.message || err));
         }
@@ -4333,18 +4308,7 @@ window.alterarPrioridadeOS = function(osId, targetPriority = 'Urgente') {
             const repo = new window.ChamadosRepository();
             await repo.updatePriority(protocol || osId, targetPriority);
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData();
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao atualizar prioridade: ' + (err.message || err));
         }
@@ -4392,18 +4356,7 @@ window.rejeitarOSManutentor = function(osId) {
             await repo.updateStatus(protocol || osId, 'Rejeitada', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData();
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao rejeitar a Ordem de Serviço: ' + (err.message || err));
         }
@@ -4441,21 +4394,7 @@ window.cancelarOSAdmin = function(osId) {
             await repo.updateStatus(protocol || osId, 'Cancelada', justification);
             if (typeof window.fecharDetalhesOSModal === 'function') window.fecharDetalhesOSModal();
             
-            if (window.painelController && typeof window.painelController.loadData === 'function') {
-                await window.painelController.loadData(true);
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
-                }
-            }
-            if (window.auditoriaController && typeof window.auditoriaController.loadData === 'function') {
-                await window.auditoriaController.loadData();
-            }
-            if (typeof window.carregarMapaOSsAbertas === 'function') {
-                await window.carregarMapaOSsAbertas(true);
-            }
-            if (typeof window.carregarDadosMapaOSs === 'function') {
-                await window.carregarDadosMapaOSs();
-            }
+            await window.reloadActiveViewAfterStatusChange(true);
         } catch(err) {
             alert('Erro ao cancelar a Ordem de Serviço: ' + (err.message || err));
         }

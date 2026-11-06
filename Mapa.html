@@ -521,6 +521,7 @@
                 <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Status:</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-secondary/80 flex items-center justify-center text-[7px] text-white font-bold">✓</span> Resolvida</span>
                 <span id="legendaStatusCanceladaItem" class="flex items-center gap-1"><span class="text-error font-bold text-[12px]">✖</span> Cancelada</span>
+                <span id="legendaStatusRejeitadaItem" class="flex items-center gap-1"><span class="text-[12px]">⛔</span> Rejeitada</span>
 
                 <span class="border-l border-outline-variant pl-2 font-bold text-on-surface">Tipo:</span>
                 <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-slate-600"></span> Normal</span>
@@ -1346,6 +1347,8 @@
             if (btnCanc) btnCanc.style.display = 'none';
             const legCanc = document.getElementById('legendaStatusCanceladaItem');
             if (legCanc) legCanc.style.display = 'none';
+            const legRejeit = document.getElementById('legendaStatusRejeitadaItem');
+            if (legRejeit) legRejeit.style.display = 'none';
         }
 
         const stat = document.getElementById('statMapaOSsAbertas');
@@ -1560,7 +1563,7 @@
                 data: formattedDate,
                 dataObjeto: c.dataAbertura,
                 prioridade: c.prioridade || 'Normal',
-                status: c.rawStatus || c.status || (c.normalizedStatus === 'bloqueada' ? 'Bloqueada' : (c.normalizedStatus === 'concluida' ? 'Concluída' : (c.normalizedStatus === 'cancelada' ? 'Cancelada' : 'Aberta'))),
+                status: c.rawStatus || c.status || (c.normalizedStatus === 'bloqueada' ? 'Bloqueada' : (c.normalizedStatus === 'concluida' ? 'Concluída' : (c.normalizedStatus === 'cancelada' ? 'Cancelada' : (c.normalizedStatus === 'rejeitada' ? 'Rejeitada' : 'Aberta')))),
                 normalizedStatus: c.normalizedStatus,
                 municipe: c.municipeNome || '',
                 telefoneCelular: '',
@@ -1653,7 +1656,8 @@
 
             const isEmAndamento = normSt === "em_andamento" || origSt === "em_andamento" || st.includes("andamento") || st.includes("iniciad");
             const isResolv = !isEmAndamento && (st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || normSt === "concluida" || origSt === "concluida" || Boolean(os._originalModel && (os._originalModel.dataConclusao || os._originalModel.dataFechamento)));
-            const isCanc = st.includes("cancel") || normSt === "cancelada" || origSt === "cancelada";
+            const isRejeit = normSt === "rejeitada" || origSt === "rejeitada" || st.includes("rejeit") || st.includes("recus");
+            const isCanc = st.includes("cancel") || normSt === "cancelada" || origSt === "cancelada" || isRejeit;
             const isAberta = (isEmAndamento || (!isResolv && !isCanc)) && !isBloqueada;
 
             if (currentUserRole === 'manutentor' && isCanc) {
@@ -1742,7 +1746,8 @@
         listaOSs.forEach(os => {
             if (os.pontos) totalPontos += os.pontos.length;
             const st = (os.status || "Aberta").toLowerCase();
-            const isAberta = (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+            const normSt = (os.normalizedStatus || "").toLowerCase();
+            const isAberta = (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel") && !st.includes("rejeit") && !st.includes("recus") && normSt !== 'rejeitada' && normSt !== 'cancelada');
 
             if (isAberta) {
                 const dias = calcularDiasEmAberto(os.data);
@@ -2017,7 +2022,19 @@
                     const corBorda = isFiscalOS ? '#facc15' : '#ffffff';
                     const bordaStyle = `border: 2px solid ${corBorda}; box-shadow: 0 2px 6px rgba(0,0,0,0.3);`;
 
-                    if (isCancelada) {
+                    const isRejeitada = (os.normalizedStatus === 'rejeitada') || (os._originalModel && os._originalModel.normalizedStatus === 'rejeitada') || stLower.includes('rejeit') || stLower.includes('recus');
+
+                    if (isRejeitada) {
+                        const elRejeit = document.createElement('div');
+                        elRejeit.className = 'marker-rejeitada' + bordaFiscalClass;
+                        elRejeit.title = `OS #${os.protocolo} (Rejeitada)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
+                        elRejeit.style.cssText = 'font-size: 19px; cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; line-height: 1; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.35));';
+                        elRejeit.innerHTML = '⛔';
+
+                        marker = new mapboxgl.Marker({ element: elRejeit })
+                            .setLngLat([pt.lng, pt.lat])
+                            .addTo(mapOSsInstance);
+                    } else if (isCancelada) {
                         const elCanc = document.createElement('div');
                         elCanc.className = 'marker-cancelada-x' + bordaFiscalClass;
                         elCanc.title = `OS #${os.protocolo} (Cancelada)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
@@ -2777,7 +2794,8 @@
 
         const isAbertaFn = (os) => {
             const st = (os.status || "Aberta").toLowerCase();
-            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+            const normSt = (os.normalizedStatus || "").toLowerCase();
+            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel") && !st.includes("rejeit") && !st.includes("recus") && normSt !== 'rejeitada' && normSt !== 'cancelada');
         };
 
         const osList = Array.from(osMap.values());
@@ -2850,8 +2868,11 @@
             }).join('');
 
             const stLower = (os.status || "Aberta").toLowerCase();
+            const isRejeitPopup = (os.normalizedStatus === 'rejeitada') || (os._originalModel && os._originalModel.normalizedStatus === 'rejeitada') || stLower.includes('rejeit') || stLower.includes('recus');
             let badgeAging = "";
-            if (stLower.includes('cancel')) {
+            if (isRejeitPopup) {
+                badgeAging = '<span class="px-2 py-0.5 rounded-full font-bold text-xs text-rose-800 bg-rose-100 border border-rose-300">⛔ Rejeitada</span>';
+            } else if (stLower.includes('cancel')) {
                 badgeAging = '<span class="px-2 py-0.5 rounded-full font-bold text-xs text-white bg-error">❌ Cancelada</span>';
             } else if (stLower.includes('bloq')) {
                 badgeAging = '<span class="px-2 py-0.5 rounded-full font-bold text-xs text-white bg-amber-700">🔒 Bloqueada</span>';
@@ -3041,7 +3062,8 @@
 
         const isAbertaFn = (os) => {
             const st = (os.status || "Aberta").toLowerCase();
-            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel"));
+            const normSt = (os.normalizedStatus || "").toLowerCase();
+            return (!st.includes("conclu") && !st.includes("resolv") && !st.includes("fechad") && !st.includes("cancel") && !st.includes("rejeit") && !st.includes("recus") && normSt !== 'rejeitada' && normSt !== 'cancelada');
         };
 
         const osList = Array.from(osMap.values());
