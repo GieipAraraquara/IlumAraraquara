@@ -29,7 +29,9 @@ class ConfiguracoesService {
             email_notificacoes: '',
             notificar_abertura_os: true,
             notificar_os_atrasada: true,
-            notificar_relatorio_mensal: false
+            notificar_relatorio_mensal: false,
+            marcas_luminaria_viaria: ['INSIGHT'],
+            marcas_rele_padrao: ['EXATRON']
         };
     }
 

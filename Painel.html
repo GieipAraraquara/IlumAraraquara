@@ -611,7 +611,7 @@
                                                 <span>Cancelada</span>
                                             </label>
                                             <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface-container-low rounded cursor-pointer transition-colors">
-                                                <input type="checkbox" name="status-filter" value="rejeitada" checked class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
+                                                <input type="checkbox" name="status-filter" value="rejeitada" class="status-checkbox rounded text-secondary focus:ring-secondary cursor-pointer">
                                                 <span>Rejeitada / Recusada</span>
                                             </label>
                                             <div class="border-t border-outline-variant my-1 pt-1">
@@ -1699,7 +1699,7 @@
     // Unified Filtering Logic (Date, Protocol, Status, Problema, and Search)
     (function() {
         let activeDatePredicate = null;
-        let activeStatusFilter = ['aberto', 'em_andamento', 'pendente', 'rejeitada'];
+        let activeStatusFilter = ['aberto', 'em_andamento', 'bloqueada', 'pendente'];
         let activeProblemFilter = ['all'];
         let protocolSearchQuery = '';
         let searchQuery = '';
@@ -2040,8 +2040,8 @@
             // Indicators update
             [dateIndicator, pendentesDateIndicator].forEach(ind => ind?.classList.toggle('hidden', !activeDatePredicate));
             [protocolIndicator, pendentesProtocolIndicator].forEach(ind => ind?.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !currentPrefix));
-            [statusIndicator, pendentesStatusIndicator].forEach(ind => ind?.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === 6));
-            [problemIndicator, pendentesProblemIndicator].forEach(ind => ind?.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === 4));
+            [statusIndicator, pendentesStatusIndicator].forEach(ind => ind?.classList.toggle('hidden', activeStatusFilter.includes('all') || activeStatusFilter.length === inlineStatusCheckboxes.length));
+            [problemIndicator, pendentesProblemIndicator].forEach(ind => ind?.classList.toggle('hidden', activeProblemFilter.includes('all') || activeProblemFilter.length === inlineProblemCheckboxes.length));
         }
 
         window.toggleProtocolPrefix = function(prefix) {

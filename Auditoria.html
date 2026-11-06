@@ -15,14 +15,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=58"></script>
+    <script src="js/domain/ChamadoModel.js?v=59"></script>
     <script src="js/repositories/ChamadosRepository.js?v=40"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script src="js/services/ChamadosService.js?v=33"></script>
     <script src="js/services/MapService.js?v=76"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=76"></script>
+    <script src="js/controllers/AuditoriaController.js?v=77"></script>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="sidebar.js"></script>
@@ -171,7 +171,24 @@
         }
         #main-content {
             overflow-x: hidden !important;
+            scroll-behavior: smooth;
+            will-change: scroll-position;
         }
+
+        /* Performance optimizations for Firefox & Chromium */
+        #os-table, #praca-services-table, #completed-services-table, #emergencia-services-table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        /* Otimização de renderização de linhas off-screen */
+        #os-table tbody tr,
+        #praca-services-table tbody tr,
+        #completed-services-table tbody tr,
+        #emergencia-services-table tbody tr {
+            contain: layout style;
+        }
+
         .th-vertical .header-tooltip {
             display: none !important;
         }
@@ -465,7 +482,7 @@
     </div>
 
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible relative z-30">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible relative z-30">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Tabela de Auditoria de OS</h3>
                 <div class="flex gap-2 items-center">
@@ -776,8 +793,21 @@
                                 <div class="resizer"></div>
                             </th>
 
-                            <!-- Column 16 (Ações com Filtro Pendentes/Concluídas) -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="16">
+                            <!-- Audit Column 14 (Exclusivo Admin - Sessão > 6h?) -->
+                            <th class="th-vertical col-audit tooltip-right border-l border-outline-variant/30" style="width: 36px; min-width: 34px;" data-col="16" data-audit-col="13" title="Aponta SIM quando: Exclusivo para Praças: alguma sessão de trabalho teve duração superior a 6 horas.">
+                                <div class="vertical-header-text">
+                                    <div>Sessão</div>
+                                    <div>> 6h?</div>
+                                </div>
+                                <div class="header-tooltip">
+                                    <div class="font-bold text-amber-400 mb-1 text-[11px] uppercase tracking-wider">Aponta SIM quando:</div>
+                                    <div>Exclusivo para OS de Praça: houver alguma sessão de trabalho com duração superior a 6 horas (360 minutos).</div>
+                                </div>
+                                <div class="resizer"></div>
+                            </th>
+
+                            <!-- Column 17 (Ações com Filtro Pendentes/Concluídas) -->
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center relative overflow-visible align-bottom pb-3 border-l border-outline-variant/30" style="width: 75px; min-width: 65px;" data-col="17">
                                 <div class="relative inline-block text-left group/action-filter">
                                     <button class="flex items-center justify-center gap-1 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary mx-auto" id="action-filter-trigger" title="Filtrar por Status de Conclusão">
                                         <span class="font-label-md uppercase tracking-wider">Ações</span>
@@ -831,7 +861,7 @@
         </div>
 
         <!-- Tabela de Serviços em Praças -->
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface flex items-center gap-2">
                     <span class="material-symbols-outlined text-[20px] text-emerald-600">park</span>
@@ -1068,7 +1098,7 @@
         </div>
 
         <!-- Tabela de Serviços Finalizados (Viário) -->
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-8 overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-8 overflow-visible">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface flex items-center gap-2">
                     <span class="material-symbols-outlined text-[20px] text-blue-600">alt_route</span>
@@ -1445,7 +1475,7 @@
         </div>
 
         <!-- Tabela de Demandas Emergenciais (Atendimento Direto) -->
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-amber-200/80 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-amber-200/80 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md mt-6 mb-6 overflow-visible">
             <div class="px-5 py-4 border-b border-amber-200/60 bg-amber-50/60 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-amber-950 flex items-center gap-2">
                     <span class="material-symbols-outlined text-[20px] text-amber-600">electric_bolt</span>
@@ -2648,12 +2678,13 @@
         { index: 9, colIndex: 12, label: 'Problema Externo?', short: 'Problema Externo' },
         { index: 10, colIndex: 13, label: 'Reincidência 30d?', short: 'Reincidência 30d' },
         { index: 11, colIndex: 14, label: 'Poste/Plaqueta Divergente?', short: 'Poste/Plaqueta Div.' },
-        { index: 12, colIndex: 15, label: 'OS Rejeitada?', short: 'OS Rejeitada' }
+        { index: 12, colIndex: 15, label: 'OS Rejeitada?', short: 'OS Rejeitada' },
+        { index: 13, colIndex: 16, label: 'Sessão > 6h?', short: 'Sessão > 6h' }
     ];
 
     // Colunas restritas que NÃO devem ser disponibilizadas nem exibidas para o Manutentor
-    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante, 10: Reincidência 30d, 11: Poste/Plaqueta Divergente
-    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7, 10, 11];
+    // 4: Plaqueta Próxima, 6: Anexo Plaqueta Divergente, 7: Anexo Faltante, 10: Reincidência 30d, 11: Poste/Plaqueta Divergente, 13: Sessão > 6h
+    const MANUTENTOR_EXCLUDED_COLS = [4, 6, 7, 10, 11, 13];
 
     function getAuditColsDefs() {
         if (window.isCurrentUserManutentor && window.isCurrentUserManutentor()) {
@@ -2663,7 +2694,7 @@
     }
 
     // Estado global de índices de colunas ativas
-    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    window.activeAuditCols = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
     function renderAuditColsCheckboxes() {
         const container = document.getElementById('audit-cols-checkboxes-container');
@@ -3272,7 +3303,18 @@
         });
 
         // Close open dropdown popups on window scroll or resize, unless user is typing inside a filter input
+        const allDropdownElements = [
+            dateDropdown, protocolDropdown, actionDropdown, statusDropdown, problemDropdown,
+            pracaDateDropdown, pracaProtocolDropdown, pracaPlaquetaDropdown, pracaStatusDropdown, pracaProblemDropdown,
+            compDateDropdown, compProtocolDropdown, compPlaquetaDropdown, compMaterialDropdown, compProblemDropdown,
+            emgDateDropdown, emgProtocolDropdown, emgPlaquetaDropdown, emgMaterialDropdown, emgProblemDropdown
+        ];
+
         window.addEventListener('scroll', (e) => {
+            // Se nenhum dropdown estiver aberto, não faça nada durante o scroll (evita reflow no Firefox)
+            const hasAnyOpen = allDropdownElements.some(d => d && !d.classList.contains('hidden') && d.style.display !== 'none');
+            if (!hasAnyOpen) return;
+
             const activeEl = document.activeElement;
             if (activeEl && (
                 activeEl.id === 'protocol-search-input' ||
@@ -3296,8 +3338,8 @@
                 return;
             }
             closeAllFilterDropdowns();
-        }, true);
-        window.addEventListener('resize', closeAllFilterDropdowns);
+        }, { capture: true, passive: true });
+        window.addEventListener('resize', closeAllFilterDropdowns, { passive: true });
 
         function parseTableDate(dateStr) {
             const [day, month] = dateStr.split('/').map(Number);
@@ -3456,7 +3498,7 @@
                 // 0. Divergence Filter: Deve ter pelo menos uma divergência ('S') nas colunas que estão ATIVAS
                 const activeColIndices = (window.activeAuditCols && Array.isArray(window.activeAuditCols)) 
                     ? window.activeAuditCols 
-                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+                    : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
 
                 if (activeColIndices.length === 0) {
                     // Se o usuário desmarcou todas as colunas de auditoria, nenhuma linha com critério de auditoria deve passar

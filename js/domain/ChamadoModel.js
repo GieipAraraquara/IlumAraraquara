@@ -333,8 +333,10 @@ class ChamadoModel {
                     foto_entrada: s.foto_entrada || s.foto || (idx === 0 ? this.fotoEntrada : null),
                     fotos_andamento: Array.isArray(s.fotos_andamento) ? s.fotos_andamento : (s.fotos_andamento ? [s.fotos_andamento] : []),
                     foto_saida: s.foto_saida || null,
-                    coordenada_inicio: s.coordenada_inicio || s.coordenada || null,
-                    coordenada_fim: s.coordenada_fim || null,
+                    coordenada_inicio: s.coordenada_inicio || s.coordenada || s.gps_inicio || null,
+                    precisao_gps_inicio: (s.precisao_gps_inicio !== undefined && s.precisao_gps_inicio !== null) ? Number(s.precisao_gps_inicio) : ((s.precisao_inicio !== undefined && s.precisao_inicio !== null) ? Number(s.precisao_inicio) : null),
+                    coordenada_fim: s.coordenada_fim || s.gps_fim || null,
+                    precisao_gps_fim: (s.precisao_gps_fim !== undefined && s.precisao_gps_fim !== null) ? Number(s.precisao_gps_fim) : ((s.precisao_fim !== undefined && s.precisao_fim !== null) ? Number(s.precisao_fim) : null),
                     materiais: s.materiais || [],
                     descricao_servico: s.descricao_servico || s.descricao || s.relatorio_tecnico || s.observacao || null
                 };
@@ -1474,6 +1476,25 @@ class ChamadoModel {
         return this.normalizedStatus === 'rejeitada';
     }
 
+    /**
+     * Verifica se alguma sessão de trabalho da praça excedeu 6 horas (360 minutos).
+     * Aplica-se exclusivamente a OS de Praça com sessões registradas.
+     */
+    get isSessaoAcima6h() {
+        if (!this.isPraca) return false;
+        const sessoes = this.sessoesList || [];
+        return sessoes.some(s => !s.desconsiderada && typeof s.duracao_minutos === 'number' && s.duracao_minutos > 360);
+    }
+
+    /**
+     * Retorna detalhes das sessões que excederam 6 horas para tooltip explicativo
+     */
+    get sessoesAcima6hInfo() {
+        if (!this.isPraca) return [];
+        const sessoes = this.sessoesList || [];
+        return sessoes.filter(s => !s.desconsiderada && typeof s.duracao_minutos === 'number' && s.duracao_minutos > 360);
+    }
+
     get hasDivergence() {
         if (this.isDireto) return false;
         return this.isProblemaDivergente ||
@@ -1488,7 +1509,8 @@ class ChamadoModel {
                this.isProblemaExterno ||
                this.isReincidencia30d ||
                this.isPostePlaquetaDivergente ||
-               this.isRejeitada;
+               this.isRejeitada ||
+               this.isSessaoAcima6h;
     }
 
     /**
@@ -2782,6 +2804,14 @@ class ChamadoModel {
             headerText2: 'Rejeitada?',
             modelProperty: 'isRejeitada',
             explicacao: 'A Ordem de Serviço foi rejeitada/recusada e necessita de avaliação da auditoria.'
+        },
+        {
+            key: 'sessaoAcima6h',
+            label: 'Sessão > 6h?',
+            headerText1: 'Sessão',
+            headerText2: '> 6h?',
+            modelProperty: 'isSessaoAcima6h',
+            explicacao: 'Exclusivo para OS de Praça: aponta SIM quando houver alguma sessão de trabalho com duração superior a 6 horas (360 minutos).'
         }
     ];
 }

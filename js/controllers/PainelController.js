@@ -2093,26 +2093,102 @@ class PainelController {
                                 <p class="whitespace-pre-line text-[10.5px] leading-tight font-medium text-slate-800">${s.descricao_servico}</p>
                             </div>
                             ` : ''}
-                            ${(s.coordenada_inicio || s.coordenada_fim) ? `
-                            <div class="text-[10px] text-slate-500 flex flex-col gap-0.5 pt-1 border-t border-slate-100/80">
-                                ${s.coordenada_inicio ? `
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <div><b class="text-slate-600">📍 GPS Início:</b> ${s.coordenada_inicio}</div>
-                                        ${(s.precisao_gps_inicio !== null && s.precisao_gps_inicio !== undefined) ? `
-                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_inicio <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_inicio <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_inicio)}m</span>
-                                        ` : ''}
-                                    </div>
-                                ` : ''}
-                                ${s.coordenada_fim ? `
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <div><b class="text-slate-600">📍 GPS Fim:</b> ${s.coordenada_fim}</div>
-                                        ${(s.precisao_gps_fim !== null && s.precisao_gps_fim !== undefined) ? `
-                                            <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_fim <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_fim <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}">±${Math.round(s.precisao_gps_fim)}m</span>
-                                        ` : ''}
-                                    </div>
-                                ` : ''}
-                            </div>
-                            ` : ''}
+                            ${(s.coordenada_inicio || s.coordenada_fim) ? (() => {
+                                const coordOs = item.coordenadaInicial || (item.rawPontos && item.rawPontos[0] && (item.rawPontos[0].coordenada_inicial || item.rawPontos[0].coordenada)) || item.coordenadaReparo || null;
+                                
+                                const calcDistOs = (coord) => {
+                                    if (!coord || !coordOs || !window.ChamadoModel || typeof window.ChamadoModel.calcularDistanciaMetros !== 'function') return null;
+                                    try {
+                                        return window.ChamadoModel.calcularDistanciaMetros(coordOs, coord);
+                                    } catch (e) {
+                                        return null;
+                                    }
+                                };
+
+                                const parseCoord = (cVal) => {
+                                    if (!cVal) return null;
+                                    if (typeof cVal === 'string') {
+                                        const p = cVal.split(',').map(x => parseFloat(x.trim()));
+                                        if (p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1]) && p[0] !== 0 && p[1] !== 0) return { lat: p[0], lng: p[1] };
+                                    } else if (typeof cVal === 'object' && cVal.lat && cVal.lng) {
+                                        const lat = parseFloat(cVal.lat), lng = parseFloat(cVal.lng);
+                                        if (!isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0) return { lat, lng };
+                                    }
+                                    return null;
+                                };
+
+                                const distIni = calcDistOs(s.coordenada_inicio);
+                                const distFim = calcDistOs(s.coordenada_fim);
+                                const parsedIni = parseCoord(s.coordenada_inicio);
+                                const parsedFim = parseCoord(s.coordenada_fim);
+
+                                const renderDistBadge = (distVal, label) => {
+                                    if (distVal === null || isNaN(distVal)) return '';
+                                    const isDiv = distVal > 100;
+                                    const distTxt = distVal < 1000 ? `${Math.round(distVal)}m` : `${(distVal / 1000).toFixed(1)}km (${Math.round(distVal)}m)`;
+                                    const badgeCls = isDiv 
+                                        ? 'bg-rose-100 text-rose-800 border-rose-300 font-bold' 
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 font-medium';
+                                    const titleStr = `Distância do operador em relação ao local da OS na ${label}: ${Math.round(distVal)} metros ${isDiv ? '(superior ao limite de 100m)' : '(dentro do limite de 100m)'}`;
+                                    return `
+                                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-mono border ${badgeCls}" title="${titleStr}">
+                                            <span class="material-symbols-outlined text-[11px]">${isDiv ? 'warning' : 'straighten'}</span>
+                                            <span>OS: <b>${distTxt}</b></span>
+                                        </span>
+                                    `;
+                                };
+
+                                return `
+                                <div class="text-[10px] text-slate-500 flex flex-col gap-1.5 pt-1.5 border-t border-slate-100/80">
+                                    ${s.coordenada_inicio ? `
+                                        <div class="flex items-center justify-between gap-1.5 flex-wrap p-1.5 rounded-lg bg-slate-50 border border-slate-200/60">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <div><b class="text-slate-700">📍 GPS Abertura:</b> <span class="font-mono text-[9.5px] text-slate-600">${s.coordenada_inicio}</span></div>
+                                                ${(s.precisao_gps_inicio !== null && s.precisao_gps_inicio !== undefined) ? `
+                                                    <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_inicio <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_inicio <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}" title="Precisão do GPS">±${Math.round(s.precisao_gps_inicio)}m</span>
+                                                ` : ''}
+                                                ${renderDistBadge(distIni, 'abertura')}
+                                            </div>
+                                            ${parsedIni ? `
+                                            <div class="flex items-center gap-1">
+                                                <a href="https://www.google.com/maps/search/?api=1&query=${parsedIni.lat},${parsedIni.lng}" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition-colors" title="Ver GPS da abertura no Google Maps">
+                                                    <span>Maps</span>
+                                                    <span class="material-symbols-outlined text-[9px]">open_in_new</span>
+                                                </a>
+                                                <a href="https://waze.com/ul?ll=${parsedIni.lat},${parsedIni.lng}&navigate=yes" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-100 text-cyan-800 hover:bg-cyan-200 border border-cyan-300 transition-colors" title="Ver GPS da abertura no Waze">
+                                                    <span>Waze</span>
+                                                    <span class="material-symbols-outlined text-[9px]">open_in_new</span>
+                                                </a>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    ` : ''}
+                                    ${s.coordenada_fim ? `
+                                        <div class="flex items-center justify-between gap-1.5 flex-wrap p-1.5 rounded-lg bg-slate-50 border border-slate-200/60">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <div><b class="text-slate-700">📍 GPS Fechamento:</b> <span class="font-mono text-[9.5px] text-slate-600">${s.coordenada_fim}</span></div>
+                                                ${(s.precisao_gps_fim !== null && s.precisao_gps_fim !== undefined) ? `
+                                                    <span class="inline-flex items-center text-[9px] font-bold px-1 py-0.2 rounded-full ${s.precisao_gps_fim <= 20 ? 'bg-emerald-100 text-emerald-800' : (s.precisao_gps_fim <= 50 ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800')}" title="Precisão do GPS">±${Math.round(s.precisao_gps_fim)}m</span>
+                                                ` : ''}
+                                                ${renderDistBadge(distFim, 'fechamento')}
+                                            </div>
+                                            ${parsedFim ? `
+                                            <div class="flex items-center gap-1">
+                                                <a href="https://www.google.com/maps/search/?api=1&query=${parsedFim.lat},${parsedFim.lng}" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 border border-emerald-300 transition-colors" title="Ver GPS do fechamento no Google Maps">
+                                                    <span>Maps</span>
+                                                    <span class="material-symbols-outlined text-[9px]">open_in_new</span>
+                                                </a>
+                                                <a href="https://waze.com/ul?ll=${parsedFim.lat},${parsedFim.lng}&navigate=yes" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-cyan-100 text-cyan-800 hover:bg-cyan-200 border border-cyan-300 transition-colors" title="Ver GPS do fechamento no Waze">
+                                                    <span>Waze</span>
+                                                    <span class="material-symbols-outlined text-[9px]">open_in_new</span>
+                                                </a>
+                                            </div>
+                                            ` : ''}
+                                        </div>
+                                    ` : ''}
+                                </div>
+                                `;
+                            })() : ''}
                             ${(s.materiais && s.materiais.length > 0) ? `
                             <div class="pt-1.5 border-t border-slate-100/80 text-[10px]">
                                 <b class="text-slate-600 flex items-center gap-1 font-semibold mb-1">

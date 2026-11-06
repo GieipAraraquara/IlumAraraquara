@@ -900,10 +900,21 @@ window.initScrollToBottomButton = function() {
         }
     };
 
-    mainContent.removeEventListener('scroll', updateVisibility);
-    mainContent.addEventListener('scroll', updateVisibility, { passive: true });
-    window.removeEventListener('resize', updateVisibility);
-    window.addEventListener('resize', updateVisibility, { passive: true });
+    let isScrollingUpdate = false;
+    const throttledUpdateVisibility = () => {
+        if (!isScrollingUpdate) {
+            isScrollingUpdate = true;
+            window.requestAnimationFrame(() => {
+                updateVisibility();
+                isScrollingUpdate = false;
+            });
+        }
+    };
+
+    mainContent.removeEventListener('scroll', throttledUpdateVisibility);
+    mainContent.addEventListener('scroll', throttledUpdateVisibility, { passive: true });
+    window.removeEventListener('resize', throttledUpdateVisibility);
+    window.addEventListener('resize', throttledUpdateVisibility, { passive: true });
 
     updateVisibility();
     setTimeout(updateVisibility, 300);

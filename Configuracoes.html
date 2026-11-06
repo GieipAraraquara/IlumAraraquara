@@ -393,6 +393,39 @@
                                     <div class="w-11 h-6 bg-surface-container-highest peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-secondary"></div>
                                 </label>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Card de Marcas Autorizadas de Ativos (Luminárias Viárias e Relés) -->
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <div class="flex items-center justify-between mb-1">
+                            <h2 class="text-lg font-bold text-on-surface flex items-center gap-2">
+                                <span class="material-symbols-outlined text-secondary">verified</span>
+                                Marcas Autorizadas de Ativos (Plaquetas & Postes)
+                            </h2>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-secondary border border-secondary/20">Vínculo Automático na Baixa</span>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mb-6">Defina quais marcas prefixadas disparam o registro de troca de luminária e relé no controle de postes. Separe por vírgula se houver mais de uma.</p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="p-4 rounded-xl border border-outline-variant/40 bg-surface-container-low">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1 flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[16px] text-amber-500">lightbulb</span>
+                                    Marcas de Luminária Pública Viária
+                                </label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Apenas materiais com estes prefixos atualizam potência e luminária no poste (ex: INSIGHT).</span>
+                                <input type="text" id="marcas_luminaria_viaria" name="marcas_luminaria_viaria" placeholder="Ex: INSIGHT" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface" />
+                            </div>
+
+                            <div class="p-4 rounded-xl border border-outline-variant/40 bg-surface-container-low">
+                                <label class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1 flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[16px] text-blue-500">power</span>
+                                    Marcas de Relé Fotoelétrico Padrão
+                                </label>
+                                <span class="text-xs text-on-surface-variant block mb-3">Apenas materiais com estes prefixos atualizam a data da última troca de relé (ex: EXATRON).</span>
+                                <input type="text" id="marcas_rele_padrao" name="marcas_rele_padrao" placeholder="Ex: EXATRON" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface" />
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -569,6 +602,10 @@
                                                     <button type="button" onclick="selecionarFiltroHeader('role', 'ouvidoria')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
                                                         <span>Ouvidoria</span>
                                                         <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="ouvidoria">check</span>
+                                                    </button>
+                                                    <button type="button" onclick="selecionarFiltroHeader('role', 'fiscal')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
+                                                        <span>Fiscal</span>
+                                                        <span class="material-symbols-outlined text-xs text-secondary check-role hidden" data-val="fiscal">check</span>
                                                     </button>
                                                     <button type="button" onclick="selecionarFiltroHeader('role', 'manutentor')" class="w-full text-left px-2 py-1.5 rounded-lg hover:bg-surface-container-high text-xs flex items-center justify-between font-medium">
                                                         <span>Manutentor</span>
@@ -989,6 +1026,8 @@
             const r = String(role || '').toLowerCase();
             if (r.includes('admin') || r.includes('gestor')) {
                 return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">Administrador</span>';
+            } else if (r.includes('fiscal')) {
+                return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-100 text-indigo-800 border border-indigo-200">Fiscal</span>';
             } else if (r.includes('ouvidor')) {
                 return '<span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">Ouvidoria</span>';
             } else if (r.includes('manutentor')) {
@@ -1089,6 +1128,7 @@
                         <td class="py-2.5 px-3 whitespace-nowrap">
                             <select onchange="alterarRoleUsuario('${u.id}', this.value)" class="bg-surface-container-low border border-outline-variant/60 rounded-lg px-2 py-1 text-xs font-semibold focus:border-secondary focus:ring-1 focus:ring-secondary cursor-pointer">
                                 <option value="ouvidoria" ${String(u.role).toLowerCase() === 'ouvidoria' ? 'selected' : ''}>Ouvidoria</option>
+                                <option value="fiscal" ${String(u.role).toLowerCase() === 'fiscal' ? 'selected' : ''}>Fiscal</option>
                                 <option value="operador" ${['campo', 'operador', 'tecnico', 'executor'].includes(String(u.role).toLowerCase()) ? 'selected' : ''}>Operador de Campo</option>
                                 <option value="manutentor" ${String(u.role).toLowerCase() === 'manutentor' ? 'selected' : ''}>Manutentor</option>
                                 <option value="admin" ${['admin', 'gestor'].includes(String(u.role).toLowerCase()) ? 'selected' : ''}>Administrador</option>
@@ -1187,6 +1227,7 @@
                 const uRole = (u.role || '').toLowerCase();
                 let matchRole = true;
                 if (headerFiltersState.role === 'admin') matchRole = uRole.includes('admin') || uRole.includes('gestor');
+                else if (headerFiltersState.role === 'fiscal') matchRole = uRole.includes('fiscal');
                 else if (headerFiltersState.role === 'ouvidoria') matchRole = uRole.includes('ouvidor');
                 else if (headerFiltersState.role === 'manutentor') matchRole = uRole.includes('manutentor');
                 else if (headerFiltersState.role === 'operador') matchRole = uRole.includes('campo') || uRole.includes('operador') || uRole.includes('tecnico');
@@ -1621,6 +1662,23 @@
                 }
             });
 
+            // Marcas Autorizadas de Ativos
+            const inputMarcasLum = document.getElementById('marcas_luminaria_viaria');
+            if (inputMarcasLum) {
+                const arrLum = Array.isArray(dados.marcas_luminaria_viaria) 
+                    ? dados.marcas_luminaria_viaria 
+                    : (dados.marcas_luminaria_viaria ? [dados.marcas_luminaria_viaria] : ['INSIGHT']);
+                inputMarcasLum.value = arrLum.join(', ');
+            }
+
+            const inputMarcasRel = document.getElementById('marcas_rele_padrao');
+            if (inputMarcasRel) {
+                const arrRel = Array.isArray(dados.marcas_rele_padrao) 
+                    ? dados.marcas_rele_padrao 
+                    : (dados.marcas_rele_padrao ? [dados.marcas_rele_padrao] : ['EXATRON']);
+                inputMarcasRel.value = arrRel.join(', ');
+            }
+
             // Carregar Janela de Medição
             try {
                 let janelaConfig = { diaInicio: 21, diaFim: 20, mesmoMes: false };
@@ -1659,7 +1717,11 @@
                 exigir_foto_antes: document.getElementById('exigir_foto_antes').checked,
                 exigir_foto_depois: document.getElementById('exigir_foto_depois').checked,
                 exigir_geolocalizacao_conclusao: document.getElementById('exigir_geolocalizacao_conclusao').checked,
-                permitir_conclusao_sem_plaqueta: document.getElementById('permitir_conclusao_sem_plaqueta').checked
+                permitir_conclusao_sem_plaqueta: document.getElementById('permitir_conclusao_sem_plaqueta').checked,
+                marcas_luminaria_viaria: (document.getElementById('marcas_luminaria_viaria')?.value || 'INSIGHT')
+                    .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+                marcas_rele_padrao: (document.getElementById('marcas_rele_padrao')?.value || 'EXATRON')
+                    .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
             };
         }
 

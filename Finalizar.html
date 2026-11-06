@@ -3999,7 +3999,7 @@
                   
                   // 1. Verificar se a plaqueta já existe no cadastro oficial (busca todas as ocorrências para detectar duplicatas)
                   var resPlaq = await client.from('localizacao_plaquetas')
-                    .select('id, identificacao, Latitude, Longitude')
+                    .select('id, identificacao, Latitude, Longitude, "Observação"')
                     .ilike('identificacao', plaqUpper);
 
                   var plaquetasCadastradas = (resPlaq && resPlaq.data) ? resPlaq.data : [];
@@ -4075,16 +4075,39 @@
                     // O desvio de 15 metros é calculado em cima da distância do poste (ou GPS se sem poste) para a posição original cadastrada da plaqueta
                     var distM = temCoordValida ? calcularDistanciaMetros(latCad, lngCad, pLatCalib, pLngCalib) : null;
 
+                    // EXCEÇÃO: Se o técnico selecionou exatamente o poste ao qual esta plaqueta já está vinculada
+                    var ehMesmoPosteVinculado = false;
+                    if (ehSnapPoste && pt.poste_id_selecionado) {
+                      var plqsDoPoste = parsePlaquetasPoste ? parsePlaquetasPoste(pt.poste_plaqueta_vinculada) : String(pt.poste_plaqueta_vinculada || '').split(',').map(s => s.trim().toUpperCase());
+                      if (plqsDoPoste.includes(plaqUpper)) {
+                        ehMesmoPosteVinculado = true;
+                      }
+                    }
+
                     // REGRA DE DISTÂNCIA (> 15 metros entre o poste/alvo e o ponto original cadastrado)
-                    if (temCoordValida && distM !== null && distM > 15) {
+                    // Exceção: Se o operador selecionou o mesmo poste onde a plaqueta já está vinculada oficialmente, dispensa a trava de 15m.
+                    if (temCoordValida && distM !== null && distM > 15 && !ehMesmoPosteVinculado) {
                       console.log(`⚠️ [Plaqueta #${plaqUpper}] Desvio de ${distM}m (> 15m) entre a posição cadastrada original e o poste/alvo. Mantendo cadastro atual e enviando para fila de aprovação.`);
                       continue;
+                    }
+
+                    // Texto de observação para registrar a última verificação
+                    var novaObsValidacao = ehSnapPoste && pt.poste_id_selecionado
+                      ? 'Validada no Poste #' + pt.poste_id_selecionado + ' via Finalização OS #' + protFinal
+                      : 'Validada via Finalização OS #' + protFinal;
+
+                    // Se a plaqueta já possui uma observação (ex.: DUPLICADO), preserva a tag relevante
+                    var obsAtual = String(registroPlaq['Observação'] || '').trim();
+                    var obsParaSalvar = novaObsValidacao;
+                    if (obsAtual && obsAtual.toUpperCase().includes('DUPLICAD')) {
+                      obsParaSalvar = obsAtual + ' | ' + novaObsValidacao;
                     }
 
                     // Se a distância for <= 15 metros (ou não tinha coordenada anterior válida) e sem conflitos, calibra na posição exata do poste
                     await client.from('localizacao_plaquetas').update({
                       Latitude: pLatCalib,
-                      Longitude: pLngCalib
+                      Longitude: pLngCalib,
+                      "Observação": obsParaSalvar
                     }).eq('id', registroPlaq.id);
 
                     // Atualiza o vínculo do poste na base aérea caso tenha sido selecionado
@@ -4110,8 +4133,10 @@
                     }
 
                     var obsHist = ehSnapPoste
-                      ? 'Calibração em Poste Aéreo #' + pt.poste_id_selecionado + ' (desvio original <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal
-                      : 'Calibração fina (desvio <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal;
+                      ? (ehMesmoPosteVinculado
+                          ? 'Validada no Poste vinculado #' + pt.poste_id_selecionado + ' (desvio ajustado: ' + (distM !== null ? distM + 'm' : '0m') + ') via OS #' + protFinal
+                          : 'Validada no Poste #' + pt.poste_id_selecionado + ' (desvio original <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ') via OS #' + protFinal)
+                      : 'Validada via OS #' + protFinal + ' (desvio <= 15m: ' + (distM !== null ? distM + 'm' : 'nova') + ')';
 
                     await client.from('historico_localizacao_plaquetas').insert([{
                       identificacao: plaqUpper,
@@ -4516,6 +4541,113 @@
         }
       }
 
+      function atualizarUiGpsPraca(lat, lng, acc) {
+        var badge = document.getElementById('gpsBadgePraca');
+        var coordsText = document.getElementById('coordsTextPraca');
+        var aviso = document.getElementById('gpsAvisoPraca');
+
+        coordsGpsPracaAtual = lat + ", " + lng;
+        precisaoGpsPracaAtual = acc;
+
+        if (badge) {
+          if (acc <= 20) {
+            badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
+            badge.innerText = '🎯 ±' + acc + 'm';
+            if (aviso) aviso.classList.add('hidden');
+          } else if (acc <= 50) {
+            badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200';
+            badge.innerText = '📡 ±' + acc + 'm';
+            if (aviso) aviso.classList.add('hidden');
+          } else if (acc <= 100) {
+            badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
+            badge.innerText = '⚠️ ±' + acc + 'm';
+            if (aviso) {
+              aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-amber-50 text-amber-800 border border-amber-200';
+              aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-amber-600">warning</span><span>Sinal GPS com precisão moderada (±' + acc + 'm).</span>';
+              aviso.classList.remove('hidden');
+            }
+          } else {
+            badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200';
+            badge.innerText = '⚠️ ±' + acc + 'm';
+            if (aviso) {
+              aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-rose-50 text-rose-800 border border-rose-200';
+              aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-rose-600">location_searching</span><span>Sinal GPS fraco (±' + acc + 'm). Aproxime-se de área aberta para melhorar a precisão.</span>';
+              aviso.classList.remove('hidden');
+            }
+          }
+        }
+        if (coordsText) coordsText.innerText = 'Lat: ' + lat + ' | Lng: ' + lng;
+
+        if (typeof L !== 'undefined') {
+          var latNum = parseFloat(lat);
+          var lngNum = parseFloat(lng);
+          var containerPraca = document.getElementById('mapaCanvasPraca');
+          if (mapPraca) {
+            var pracaDomNode = mapPraca.getContainer ? mapPraca.getContainer() : null;
+            if (!pracaDomNode || pracaDomNode !== containerPraca || !document.body.contains(pracaDomNode)) {
+              try { mapPraca.remove(); } catch(e) {}
+              mapPraca = null;
+              markerPraca = null;
+            }
+          }
+
+          if (!mapPraca) {
+            mapPraca = L.map('mapaCanvasPraca').setView([latNum, lngNum], 17);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+              maxZoom: 19,
+              attribution: '© OpenStreetMap'
+            }).addTo(mapPraca);
+            markerPraca = L.marker([latNum, lngNum]).addTo(mapPraca);
+          } else {
+            mapPraca.setView([latNum, lngNum], 17);
+            if (markerPraca) markerPraca.setLatLng([latNum, lngNum]);
+          }
+          setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 100);
+          setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
+        }
+      }
+
+      function capturarGpsPracaTempoReal(timeoutMs) {
+        return new Promise(function(resolve) {
+          if (!navigator.geolocation) {
+            resolve(null);
+            return;
+          }
+
+          var to = timeoutMs || 10000;
+          var options = {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: to
+          };
+
+          navigator.geolocation.getCurrentPosition(
+            function(pos) {
+              var lat = pos.coords.latitude.toFixed(6);
+              var lng = pos.coords.longitude.toFixed(6);
+              var acc = Math.round(pos.coords.accuracy || 0);
+              atualizarUiGpsPraca(lat, lng, acc);
+              resolve({
+                coords: lat + ", " + lng,
+                precisao: acc
+              });
+            },
+            function(err) {
+              console.warn('⚠️ Leitura do GPS em tempo real falhou ou expirou timeout, usando fallback anterior se disponível:', err);
+              if (coordsGpsPracaAtual) {
+                resolve({
+                  coords: coordsGpsPracaAtual,
+                  precisao: precisaoGpsPracaAtual
+                });
+              } else {
+                resolve(null);
+              }
+            },
+            options
+          );
+        });
+      }
+
       function iniciarGpsPracaComMapa() {
         var badge = document.getElementById('gpsBadgePraca');
         var coordsText = document.getElementById('coordsTextPraca');
@@ -4537,79 +4669,18 @@
           badge.innerText = '📡 Localizando...';
         }
 
-        navigator.geolocation.getCurrentPosition(function(pos) {
-          var lat = pos.coords.latitude.toFixed(6);
-          var lng = pos.coords.longitude.toFixed(6);
-          var acc = Math.round(pos.coords.accuracy || 0);
-
-          coordsGpsPracaAtual = lat + ", " + lng;
-          precisaoGpsPracaAtual = acc;
-
-          if (badge) {
-            if (acc <= 20) {
-              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200';
-              badge.innerText = '🎯 ±' + acc + 'm';
-              if (aviso) aviso.classList.add('hidden');
-            } else if (acc <= 50) {
-              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200';
-              badge.innerText = '📡 ±' + acc + 'm';
-              if (aviso) aviso.classList.add('hidden');
-            } else if (acc <= 100) {
-              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200';
-              badge.innerText = '⚠️ ±' + acc + 'm';
-              if (aviso) {
-                aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-amber-50 text-amber-800 border border-amber-200';
-                aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-amber-600">warning</span><span>Sinal GPS com precisão moderada (±' + acc + 'm).</span>';
-                aviso.classList.remove('hidden');
-              }
-            } else {
-              badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200';
-              badge.innerText = '⚠️ ±' + acc + 'm';
-              if (aviso) {
-                aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-rose-50 text-rose-800 border border-rose-200';
-                aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-rose-600">location_searching</span><span>Sinal GPS fraco (±' + acc + 'm). Aproxime-se de área aberta para melhorar a precisão.</span>';
-                aviso.classList.remove('hidden');
-              }
+        capturarGpsPracaTempoReal(12000).then(function(res) {
+          if (!res && badge) {
+            badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200';
+            badge.innerText = '⚠️ Sem sinal';
+            if (coordsText) coordsText.innerText = 'Ative a localização e permissão de GPS no seu aparelho.';
+            if (aviso) {
+              aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-red-50 text-red-700 border border-red-200';
+              aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-red-600">error</span><span>Não foi possível obter a localização. Certifique-se de que o GPS está ativado.</span>';
+              aviso.classList.remove('hidden');
             }
           }
-          if (coordsText) coordsText.innerText = 'Lat: ' + lat + ' | Lng: ' + lng;
-
-          if (typeof L !== 'undefined') {
-            var latNum = parseFloat(lat);
-            var lngNum = parseFloat(lng);
-            var containerPraca = document.getElementById('mapaCanvasPraca');
-            if (mapPraca) {
-              var pracaDomNode = mapPraca.getContainer ? mapPraca.getContainer() : null;
-              if (!pracaDomNode || pracaDomNode !== containerPraca || !document.body.contains(pracaDomNode)) {
-                try { mapPraca.remove(); } catch(e) {}
-                mapPraca = null;
-                markerPraca = null;
-              }
-            }
-
-            if (!mapPraca) {
-              mapPraca = L.map('mapaCanvasPraca').setView([latNum, lngNum], 17);
-              L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-              }).addTo(mapPraca);
-              markerPraca = L.marker([latNum, lngNum]).addTo(mapPraca);
-            } else {
-              mapPraca.setView([latNum, lngNum], 17);
-              if (markerPraca) markerPraca.setLatLng([latNum, lngNum]);
-            }
-            setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 100);
-            setTimeout(function() { if (mapPraca) mapPraca.invalidateSize(); }, 400);
-          }
-        }, function(err) {
-          if (badge) { badge.className = 'px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200'; badge.innerText = '⚠️ Sem sinal'; }
-          if (coordsText) coordsText.innerText = 'Ative a localização e permissão de GPS no seu aparelho.';
-          if (aviso) {
-            aviso.className = 'text-xs rounded-lg p-2 font-medium flex items-center gap-1.5 mt-1 bg-red-50 text-red-700 border border-red-200';
-            aviso.innerHTML = '<span class="material-symbols-outlined text-[16px] text-red-600">error</span><span>Não foi possível obter a localização. Certifique-se de que o GPS está ativado.</span>';
-            aviso.classList.remove('hidden');
-          }
-        }, { enableHighAccuracy: true, timeout: 12000 });
+        });
       }
 
       function exibirModalAlertaValidacao(titulo, mensagem) {
@@ -4911,6 +4982,11 @@
           var descServicoPracaEl = document.getElementById('descricaoServicoPraca');
           var descServicoTexto = descServicoPracaEl ? descServicoPracaEl.value.trim() : "";
 
+          // Força leitura de GPS em tempo real (sem cache) no exato instante do registro da sessão
+          var leituraGpsMomento = await capturarGpsPracaTempoReal(8000);
+          var coordRegistroMomento = (leituraGpsMomento && leituraGpsMomento.coords) ? leituraGpsMomento.coords : coordsGpsPracaAtual;
+          var precisaoRegistroMomento = (leituraGpsMomento && typeof leituraGpsMomento.precisao === 'number') ? leituraGpsMomento.precisao : precisaoGpsPracaAtual;
+
           if (novoStatus === 'Em Andamento') {
             historicoSessoes.push({
               numero: historicoSessoes.length + 1,
@@ -4923,8 +4999,8 @@
               foto_entrada: fotoEntradaUrl || dadosPracaAtual.foto_entrada || null,
               fotos_andamento: urlsAndamento,
               foto_saida: null,
-              coordenada_inicio: coordsGpsPracaAtual || null,
-              precisao_gps_inicio: (typeof precisaoGpsPracaAtual === 'number') ? precisaoGpsPracaAtual : null,
+              coordenada_inicio: coordRegistroMomento || null,
+              precisao_gps_inicio: (typeof precisaoRegistroMomento === 'number') ? precisaoRegistroMomento : null,
               coordenada_fim: null,
               precisao_gps_fim: null,
               materiais: (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : [],
@@ -4935,8 +5011,8 @@
             if (sessaoAberta) {
               sessaoAberta.fim = agoraIso;
               sessaoAberta.status = (statusFinal === 'Concluída') ? 'CONCLUÍDA' : 'ENCERRADA';
-              sessaoAberta.coordenada_fim = coordsGpsPracaAtual || null;
-              sessaoAberta.precisao_gps_fim = (typeof precisaoGpsPracaAtual === 'number') ? precisaoGpsPracaAtual : null;
+              sessaoAberta.coordenada_fim = coordRegistroMomento || null;
+              sessaoAberta.precisao_gps_fim = (typeof precisaoRegistroMomento === 'number') ? precisaoRegistroMomento : null;
               if (descServicoTexto) {
                 sessaoAberta.descricao_servico = descServicoTexto;
               }
@@ -5115,6 +5191,9 @@
           renderizarTabelaMateriaisPraca();
           var descPracaReset = document.getElementById('descricaoServicoPraca');
           if (descPracaReset) descPracaReset.value = "";
+          // Reseta a coordenada atual para não reaproveitar valor anterior em ações futuras
+          coordsGpsPracaAtual = null;
+          precisaoGpsPracaAtual = null;
 
         } catch(err) {
           if (window.offlineSyncService && (!navigator.onLine || err.message.includes('fetch') || err.message.includes('network'))) {

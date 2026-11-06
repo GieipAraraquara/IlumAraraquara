@@ -556,7 +556,8 @@
                         console.log('🚀 [Login DEBUG] authData resolvido pelo AuthGuard:', authData);
                         console.log('🚀 [Login DEBUG] targetUrl resultante:', targetUrl);
                     } else {
-                        targetUrl = (profile?.role === 'ouvidoria' || profile?.cargo_solicitado === 'ouvidoria') ? 'Abrir.html' : 'Painel.html';
+                        const userRole = (profile?.role || profile?.cargo_solicitado || '').toLowerCase();
+                        targetUrl = (userRole === 'ouvidoria' || userRole === 'fiscal') ? 'Abrir.html' : 'Painel.html';
                     }
                     exibirAlerta('Login efetuado com sucesso! Redirecionando...', 'sucesso');
                     setTimeout(() => {

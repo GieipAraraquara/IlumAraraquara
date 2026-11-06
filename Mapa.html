@@ -189,6 +189,11 @@
         .sidebar-collapsed .sidebar-px { padding-left: 0.75rem; padding-right: 0.75rem; justify-content: center; }
         .sidebar-collapsed .sidebar-profile-info { display: none; }
 
+        /* Borda Amarela para OSs abertas por Fiscais */
+        .marker-borda-fiscal {
+            border-color: #facc15 !important; /* Amarelo sólido e nítido */
+        }
+
         /* Pulse halo animation for duplicate markers */
         @keyframes pulseHaloDuplicado {
             0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.4); }
@@ -524,6 +529,7 @@
                 <span class="flex items-center gap-1 font-bold text-amber-600" title="2 ou mais OSs Abertas concorrentes"><span class="w-3.5 h-3.5 rounded-full bg-amber-500 border border-white flex items-center justify-center text-[8px] text-white">⚠️</span> Duplicata</span>
                 <span class="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400" title="1 OS Aberta + histórico anterior no local"><span class="w-3.5 h-3.5 rounded-full bg-amber-600 border border-white flex items-center justify-center text-[8px] text-white">📁</span> Reincidente</span>
                 <span class="flex items-center gap-1 font-bold text-slate-600 dark:text-slate-400" title="Apenas chamados finalizados neste local"><span class="w-3.5 h-3.5 rounded-full bg-slate-600 border border-white flex items-center justify-center text-[8px] text-white">🕒</span> Histórico</span>
+                <span class="flex items-center gap-1 font-bold text-amber-500" title="OS aberta por usuário com perfil Fiscal"><span class="w-3 h-3 rounded-full bg-[#188038] border-2 border-[#facc15] inline-block"></span> Aberta por Fiscal</span>
                 
                 <span class="border-l border-outline-variant pl-2 font-bold text-rose-700 flex items-center gap-1.5 cursor-pointer hover:underline" onclick="toggleVisibilidadePerimetrosBloqueados()" id="legenda-perimetros-bloqueados-item" title="Clique para alternar visibilidade dos perímetros restritos">
                     <span class="w-3.5 h-3.5 rounded bg-rose-500/30 border-2 border-rose-600 flex items-center justify-center text-[9px] text-rose-800">🚫</span>
@@ -1360,6 +1366,28 @@
         }
 
         try {
+            // Carrega perfis de fiscais da tabela profiles para mapear quem são os fiscais (id, email, nome)
+            if (window.supabaseClient && (!window.fiscaisIdentificadoresSet || forceReload)) {
+                try {
+                    const { data: profsFiscais } = await window.supabaseClient
+                        .from('profiles')
+                        .select('id, email, nome, role')
+                        .ilike('role', '%fiscal%');
+                    
+                    const setFiscais = new Set();
+                    if (profsFiscais && profsFiscais.length > 0) {
+                        profsFiscais.forEach(p => {
+                            if (p.id) setFiscais.add(String(p.id).toLowerCase().trim());
+                            if (p.email) setFiscais.add(String(p.email).toLowerCase().trim());
+                            if (p.nome) setFiscais.add(String(p.nome).toLowerCase().trim());
+                        });
+                    }
+                    window.fiscaisIdentificadoresSet = setFiscais;
+                } catch(eProf) {
+                    console.warn("⚠️ [Mapa] Erro ao carregar profiles com role fiscal:", eProf);
+                }
+            }
+
             let service = (typeof getChamadosService === 'function' ? getChamadosService() : null) || window.chamadosService;
             if (!service && typeof window.ChamadosService === 'function') {
                 window.chamadosService = new window.ChamadosService();
@@ -1536,15 +1564,32 @@
                 normalizedStatus: c.normalizedStatus,
                 municipe: c.municipeNome || '',
                 telefoneCelular: '',
-                telefoneFixo: '',
                 operador: c.operador || '',
                 operadorAbertura: c.displayOperadorAbertura || c.operadorAbertura || c.rawRow?.operador || '',
                 operadorFinalizacao: c.operadorFinalizacao || c.rawRow?.operador_finalizacao || c.rawRow?.finalizado_por || c.rawRow?.usuario_finalizacao || '',
+                userEmail: c.userEmail || c.rawRow?.user_email || '',
+                userId: c.userId || c.rawRow?.user_id || '',
                 descricao: c.problemaInicial || '',
                 logs: c.observacaoFinal || '',
                 fotos: c.fotosEvidencias || [],
                 pontos: pontosProcessados,
-                _originalModel: c
+                _originalModel: c,
+                get isAbertaPorFiscal() {
+                    const fiscaisSet = window.fiscaisIdentificadoresSet;
+                    const uId = String(this.userId || '').toLowerCase().trim();
+                    const uEmail = String(this.userEmail || '').toLowerCase().trim();
+                    const uOp = String(this.operadorAbertura || '').toLowerCase().trim();
+                    const rawRole = String(this._originalModel?.rawRow?.user_role || this._originalModel?.rawRow?.role || '').toLowerCase();
+
+                    if (rawRole.includes('fiscal')) return true;
+                    if (uOp.includes('fiscal') || uEmail.includes('fiscal')) return true;
+                    if (fiscaisSet && fiscaisSet.size > 0) {
+                        if (uId && fiscaisSet.has(uId)) return true;
+                        if (uEmail && fiscaisSet.has(uEmail)) return true;
+                        if (uOp && fiscaisSet.has(uOp)) return true;
+                    }
+                    return false;
+                }
             };
         });
     }
@@ -1606,9 +1651,10 @@
                 return false;
             }
 
-            const isResolv = st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || normSt === "concluida" || origSt === "concluida" || Boolean(os._originalModel && (os._originalModel.dataConclusao || os._originalModel.dataFechamento));
+            const isEmAndamento = normSt === "em_andamento" || origSt === "em_andamento" || st.includes("andamento") || st.includes("iniciad");
+            const isResolv = !isEmAndamento && (st.includes("conclu") || st.includes("resolv") || st.includes("fechad") || normSt === "concluida" || origSt === "concluida" || Boolean(os._originalModel && (os._originalModel.dataConclusao || os._originalModel.dataFechamento)));
             const isCanc = st.includes("cancel") || normSt === "cancelada" || origSt === "cancelada";
-            const isAberta = !isResolv && !isCanc && !isBloqueada;
+            const isAberta = (isEmAndamento || (!isResolv && !isCanc)) && !isBloqueada;
 
             if (currentUserRole === 'manutentor' && isCanc) {
                 return false;
@@ -1619,41 +1665,44 @@
             if (statusFiltro === 'canceladas' && !isCanc) return false;
 
             // 2. Filtro de Data / Período
-            const dataOS = obterDataObjetoOS(os);
-            const filterState = (typeof getFiltroDataMapaState === 'function' ? getFiltroDataMapaState() : null) || window.filtroDataMapaState || { tipo: 'ativas' };
+            // Regra de negócio: OSs abertas sempre sobressaem ao filtro de data para evitar que OSs atrasadas fiquem ocultas
+            if (!isAberta) {
+                const dataOS = obterDataObjetoOS(os);
+                const filterState = (typeof getFiltroDataMapaState === 'function' ? getFiltroDataMapaState() : null) || window.filtroDataMapaState || { tipo: 'ativas' };
 
-            if (filterState.tipo !== 'ativas') {
-                if (!dataOS) return false;
+                if (filterState.tipo !== 'ativas') {
+                    if (!dataOS) return false;
 
-                const dataZero = new Date(dataOS);
-                dataZero.setHours(0, 0, 0, 0);
+                    const dataZero = new Date(dataOS);
+                    dataZero.setHours(0, 0, 0, 0);
 
-                if (filterState.tipo === 'hoje') {
-                    if (dataZero.getTime() !== hoje.getTime()) return false;
-                } else if (filterState.tipo === 'ontem') {
-                    const ontem = new Date(hoje);
-                    ontem.setDate(hoje.getDate() - 1);
-                    if (dataZero.getTime() !== ontem.getTime()) return false;
-                } else if (filterState.tipo === '7dias') {
-                    const limite = new Date(hoje);
-                    limite.setDate(hoje.getDate() - 7);
-                    if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filterState.tipo === '30dias') {
-                    const limite = new Date(hoje);
-                    limite.setDate(hoje.getDate() - 30);
-                    if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filterState.tipo === '90dias') {
-                    const limite = new Date(hoje);
-                    limite.setDate(hoje.getDate() - 90);
-                    if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filterState.tipo === '365dias') {
-                    const limite = new Date(hoje);
-                    limite.setDate(hoje.getDate() - 365);
-                    if (dataOS < limite || dataOS > hojeFim) return false;
-                } else if (filterState.tipo === 'custom' && filterState.start && filterState.end) {
-                    const startDt = new Date(filterState.start + 'T00:00:00');
-                    const endDt = new Date(filterState.end + 'T23:59:59');
-                    if (dataOS < startDt || dataOS > endDt) return false;
+                    if (filterState.tipo === 'hoje') {
+                        if (dataZero.getTime() !== hoje.getTime()) return false;
+                    } else if (filterState.tipo === 'ontem') {
+                        const ontem = new Date(hoje);
+                        ontem.setDate(hoje.getDate() - 1);
+                        if (dataZero.getTime() !== ontem.getTime()) return false;
+                    } else if (filterState.tipo === '7dias') {
+                        const limite = new Date(hoje);
+                        limite.setDate(hoje.getDate() - 7);
+                        if (dataOS < limite || dataOS > hojeFim) return false;
+                    } else if (filterState.tipo === '30dias') {
+                        const limite = new Date(hoje);
+                        limite.setDate(hoje.getDate() - 30);
+                        if (dataOS < limite || dataOS > hojeFim) return false;
+                    } else if (filterState.tipo === '90dias') {
+                        const limite = new Date(hoje);
+                        limite.setDate(hoje.getDate() - 90);
+                        if (dataOS < limite || dataOS > hojeFim) return false;
+                    } else if (filterState.tipo === '365dias') {
+                        const limite = new Date(hoje);
+                        limite.setDate(hoje.getDate() - 365);
+                        if (dataOS < limite || dataOS > hojeFim) return false;
+                    } else if (filterState.tipo === 'custom' && filterState.start && filterState.end) {
+                        const startDt = new Date(filterState.start + 'T00:00:00');
+                        const endDt = new Date(filterState.end + 'T23:59:59');
+                        if (dataOS < startDt || dataOS > endDt) return false;
+                    }
                 }
             }
 
@@ -1888,10 +1937,14 @@
                         if (maxDiasAbertas > 7) corMarkerDup = "#d93025";
                         else if (maxDiasAbertas > 3) corMarkerDup = "#f2994a";
 
+                        const temFiscalDup = ossAbertas.some(item => item.os.isAbertaPorFiscal);
                         const elDup = document.createElement('div');
-                        elDup.className = 'marker-duplicado-badge';
+                        elDup.className = 'marker-duplicado-badge' + (temFiscalDup ? ' marker-borda-fiscal' : '');
                         elDup.style.backgroundColor = corMarkerDup;
-                        elDup.title = `⚠️ ${qtdAbertas} OSs Abertas concorrentes neste local (${totalOSsUnicas} no total)`;
+                        if (temFiscalDup) {
+                            elDup.style.borderColor = '#facc15';
+                        }
+                        elDup.title = `⚠️ ${qtdAbertas} OSs Abertas concorrentes neste local (${totalOSsUnicas} no total)${temFiscalDup ? ' [Possui OS aberta por Fiscal]' : ''}`;
                         elDup.innerHTML = `<span class="marker-duplicado-text">⚠️${qtdAbertas}</span>`;
 
                         marker = new mapboxgl.Marker({ element: elDup })
@@ -1907,11 +1960,15 @@
                     } else if (qtdAbertas === 1 && qtdHistorico >= 1) {
                         const osAbertaItem = ossAbertas[0];
                         const corAberta = osAbertaItem.corMarker || "#188038";
+                        const isFiscalReinc = Boolean(osAbertaItem.os.isAbertaPorFiscal);
 
                         const elReinc = document.createElement('div');
-                        elReinc.className = 'marker-reincidente-badge';
+                        elReinc.className = 'marker-reincidente-badge' + (isFiscalReinc ? ' marker-borda-fiscal' : '');
                         elReinc.style.backgroundColor = corAberta;
-                        elReinc.title = `📁 OS #${osAbertaItem.os.protocolo} (Aberta) + ${qtdHistorico} atendimento(s) anterior(es) no local`;
+                        if (isFiscalReinc) {
+                            elReinc.style.borderColor = '#facc15';
+                        }
+                        elReinc.title = `📁 OS #${osAbertaItem.os.protocolo} (Aberta) + ${qtdHistorico} atendimento(s) anterior(es) no local${isFiscalReinc ? ' [Aberta por Fiscal]' : ''}`;
                         elReinc.innerHTML = `<span class="marker-reincidente-text">📁${totalOSsUnicas}</span>`;
 
                         marker = new mapboxgl.Marker({ element: elReinc })
@@ -1955,10 +2012,15 @@
                         || Boolean(os.praca || os.nomePraca)
                         || (pt.plaqueta && String(pt.plaqueta).trim().toUpperCase().startsWith('P'));
 
+                    const isFiscalOS = Boolean(os.isAbertaPorFiscal);
+                    const bordaFiscalClass = isFiscalOS ? ' marker-borda-fiscal' : '';
+                    const corBorda = isFiscalOS ? '#facc15' : '#ffffff';
+                    const bordaStyle = `border: 2px solid ${corBorda}; box-shadow: 0 2px 6px rgba(0,0,0,0.3);`;
+
                     if (isCancelada) {
                         const elCanc = document.createElement('div');
-                        elCanc.className = 'marker-cancelada-x';
-                        elCanc.title = `OS #${os.protocolo} (Cancelada)`;
+                        elCanc.className = 'marker-cancelada-x' + bordaFiscalClass;
+                        elCanc.title = `OS #${os.protocolo} (Cancelada)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
                         elCanc.style.cssText = 'font-size: 18px; font-weight: 900; color: #d93025; opacity: 0.7; cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; line-height: 1; text-shadow: 0 0 3px #ffffff;';
                         elCanc.innerHTML = '✖';
 
@@ -1967,9 +2029,9 @@
                             .addTo(mapOSsInstance);
                     } else if (stLower.includes('bloq')) {
                         const elBloq = document.createElement('div');
-                        elBloq.className = 'marker-bloqueada';
-                        elBloq.title = `OS #${os.protocolo} (Bloqueada)`;
-                        elBloq.style.cssText = 'width: 22px; height: 22px; background: #b45309; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.4); cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: bold;';
+                        elBloq.className = 'marker-bloqueada' + bordaFiscalClass;
+                        elBloq.title = `OS #${os.protocolo} (Bloqueada)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
+                        elBloq.style.cssText = `width: 22px; height: 22px; background: #b45309; ${bordaStyle} border-radius: 50%; cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; font-weight: bold;`;
                         elBloq.innerHTML = '🔒';
 
                         marker = new mapboxgl.Marker({ element: elBloq })
@@ -1977,9 +2039,12 @@
                             .addTo(mapOSsInstance);
                     } else if (isResolvida && isPraca) {
                         const elPracaResolv = document.createElement('div');
-                        elPracaResolv.className = 'marker-praca-badge';
-                        elPracaResolv.title = `OS de Praça #${os.protocolo} (Concluída)`;
+                        elPracaResolv.className = 'marker-praca-badge' + bordaFiscalClass;
+                        elPracaResolv.title = `OS de Praça #${os.protocolo} (Concluída)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
                         elPracaResolv.style.backgroundColor = 'rgba(26, 115, 232, 0.85)';
+                        if (isFiscalOS) {
+                            elPracaResolv.style.borderColor = '#facc15';
+                        }
                         elPracaResolv.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 12h2L12 2 5.05 12H7l-3.9 6h6.9v4h4v-4h6.9L17 12z"/></svg>`;
 
                         marker = new mapboxgl.Marker({ element: elPracaResolv })
@@ -1987,9 +2052,9 @@
                             .addTo(mapOSsInstance);
                     } else if (isResolvida) {
                         const elResolv = document.createElement('div');
-                        elResolv.className = 'marker-resolvida-circle';
-                        elResolv.title = `OS #${os.protocolo} (Resolvida)`;
-                        elResolv.style.cssText = 'width: 18px; height: 18px; background: rgba(26, 115, 232, 0.8); border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: bold;';
+                        elResolv.className = 'marker-resolvida-circle' + bordaFiscalClass;
+                        elResolv.title = `OS #${os.protocolo} (Resolvida)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
+                        elResolv.style.cssText = `width: 18px; height: 18px; background: rgba(26, 115, 232, 0.8); ${bordaStyle} border-radius: 50%; cursor: pointer; z-index: 4; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 10px; font-weight: bold;`;
                         elResolv.innerHTML = '✓';
 
                         marker = new mapboxgl.Marker({ element: elResolv })
@@ -1998,9 +2063,12 @@
                     } else if (isPraca) {
                         const elPraca = document.createElement('div');
                         const isUrg = os.prioridade === "Urgente";
-                        elPraca.className = `marker-praca-badge ${isUrg ? 'marker-praca-urgente' : ''}`;
-                        elPraca.title = `OS de Praça #${os.protocolo}${isUrg ? " (URGENTE)" : ""}`;
+                        elPraca.className = `marker-praca-badge ${isUrg ? 'marker-praca-urgente' : ''}${bordaFiscalClass}`;
+                        elPraca.title = `OS de Praça #${os.protocolo}${isUrg ? " (URGENTE)" : ""}${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
                         elPraca.style.backgroundColor = corMarker;
+                        if (isFiscalOS) {
+                            elPraca.style.borderColor = '#facc15';
+                        }
                         elPraca.innerHTML = `<svg viewBox="0 0 24 24"><path d="M17 12h2L12 2 5.05 12H7l-3.9 6h6.9v4h4v-4h6.9L17 12z"/></svg>`;
 
                         marker = new mapboxgl.Marker({ element: elPraca })
@@ -2008,9 +2076,9 @@
                             .addTo(mapOSsInstance);
                     } else if (os.prioridade === "Urgente") {
                         const el = document.createElement('div');
-                        el.className = 'marker-urgente-badge';
-                        el.title = `OS #${os.protocolo} (URGENTE)`;
-                        el.style.cssText = `width: 22px; height: 22px; background: ${corMarker}; border: 2px solid #ffffff; border-radius: 4px; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: pointer; z-index: 10;`;
+                        el.className = 'marker-urgente-badge' + bordaFiscalClass;
+                        el.title = `OS #${os.protocolo} (URGENTE)${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
+                        el.style.cssText = `width: 22px; height: 22px; background: ${corMarker}; border: 2px solid ${corBorda}; border-radius: 4px; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.35); cursor: pointer; z-index: 10;`;
                         el.innerHTML = '<span style="transform: rotate(-45deg); color: #ffffff; font-size: 11px; font-weight: bold; line-height: 1;">⚡</span>';
 
                         marker = new mapboxgl.Marker({ element: el })
@@ -2018,9 +2086,9 @@
                             .addTo(mapOSsInstance);
                     } else {
                         const elNormal = document.createElement('div');
-                        elNormal.className = 'marker-normal-circle';
-                        elNormal.title = `OS #${os.protocolo}`;
-                        elNormal.style.cssText = `width: 16px; height: 16px; background: ${corMarker}; border: 2px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 6px rgba(0,0,0,0.3); cursor: pointer; z-index: 5;`;
+                        elNormal.className = 'marker-normal-circle' + bordaFiscalClass;
+                        elNormal.title = `OS #${os.protocolo}${isFiscalOS ? ' [Aberta por Fiscal]' : ''}`;
+                        elNormal.style.cssText = `width: 16px; height: 16px; background: ${corMarker}; ${bordaStyle} border-radius: 50%; cursor: pointer; z-index: 5;`;
 
                         marker = new mapboxgl.Marker({ element: elNormal })
                             .setLngLat([pt.lng, pt.lat])

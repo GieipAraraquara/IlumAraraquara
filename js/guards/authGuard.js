@@ -44,6 +44,8 @@ window.AuthGuard = {
         if (profileRoleCandidates.length > 0) {
             if (profileRoleCandidates.some(c => c.includes('admin') || c.includes('gestor') || c.includes('gerente') || c.includes('supervisor'))) {
                 finalRole = 'admin';
+            } else if (profileRoleCandidates.some(c => c.includes('fiscal'))) {
+                finalRole = 'fiscal';
             } else if (profileRoleCandidates.some(c => c.includes('ouvidor') || c.includes('ouvidoria'))) {
                 finalRole = 'ouvidoria';
             } else if (profileRoleCandidates.some(c => c.includes('manutencao') || c.includes('manutentor'))) {
@@ -68,6 +70,8 @@ window.AuthGuard = {
 
             if (metadataCandidates.some(c => c.includes('admin') || c.includes('gestor') || c.includes('gerente') || c.includes('supervisor'))) {
                 finalRole = 'admin';
+            } else if (metadataCandidates.some(c => c.includes('fiscal'))) {
+                finalRole = 'fiscal';
             } else if (metadataCandidates.some(c => c.includes('ouvidor') || c.includes('ouvidoria'))) {
                 finalRole = 'ouvidoria';
             } else if (metadataCandidates.some(c => c.includes('manutencao') || c.includes('manutentor'))) {
@@ -83,6 +87,8 @@ window.AuthGuard = {
         if (!finalRole && email) {
             if (email.includes('admin') || email.includes('gestor') || email.includes('gerente') || email.includes('supervisor')) {
                 finalRole = 'admin';
+            } else if (email.includes('fiscal')) {
+                finalRole = 'fiscal';
             } else if (email.includes('ouvidoria') || email.includes('ouvidor')) {
                 finalRole = 'ouvidoria';
             } else if (email.includes('manutentor') || email.includes('manutencao')) {
@@ -148,7 +154,7 @@ window.AuthGuard = {
 
         let destination = 'Painel.html';
 
-        if (role === 'ouvidoria' || authData.profile?.isGovBr || role === 'cidadao') {
+        if (role === 'ouvidoria' || role === 'fiscal' || authData.profile?.isGovBr || role === 'cidadao') {
             destination = 'Abrir.html';
         } else if (role === 'operador' || role === 'campo' || ['campo', 'executor', 'tecnico', 'operador', 'operacional'].includes(role)) {
             destination = 'Finalizar.html';
@@ -317,6 +323,7 @@ window.AuthGuard = {
                             localStorage.getItem('govbr_user_authenticated') === 'true';
         const isCidadao = isGovBrAuth || userRole === 'cidadao' || authData.profile?.provider === 'govbr' || authData.profile?.isGovBr === true;
         const isOuvidoria = userRole === 'ouvidoria';
+        const isFiscal = userRole === 'fiscal';
         const isOperador = userRole === 'operador' || userRole === 'campo' || ['campo', 'executor', 'tecnico', 'operador', 'operacional'].includes(userRole);
         const isManutentor = userRole === 'manutentor';
 
@@ -333,9 +340,10 @@ window.AuthGuard = {
             return null;
         }
 
-        // 3. Validação para Cidadão (Gov.br) ou Ouvidoria: Acesso permitido EXCLUSIVAMENTE a Abrir.html
-        if ((isCidadao || isOuvidoria) && isProtectedPage && !aberturaPageNames.includes(currentPageName)) {
-            console.warn(`⛔ [AuthGuard] Acesso negado: Perfil ${isOuvidoria ? 'Ouvidoria' : 'Cidadão'} só possui acesso à Abertura de OS. Redirecionando para Abrir.html.`);
+        // 3. Validação para Cidadão (Gov.br), Ouvidoria ou Fiscal: Acesso permitido EXCLUSIVAMENTE a Abrir.html
+        if ((isCidadao || isOuvidoria || isFiscal) && isProtectedPage && !aberturaPageNames.includes(currentPageName)) {
+            const roleNomeExibicao = isFiscal ? 'Fiscal' : (isOuvidoria ? 'Ouvidoria' : 'Cidadão');
+            console.warn(`⛔ [AuthGuard] Acesso negado: Perfil ${roleNomeExibicao} só possui acesso à Abertura de OS. Redirecionando para Abrir.html.`);
             try { if (document.documentElement) document.documentElement.style.display = 'none'; } catch(e) {}
             window.location.href = 'Abrir.html';
             return null;

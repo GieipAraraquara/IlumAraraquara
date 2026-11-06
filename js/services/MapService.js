@@ -360,7 +360,7 @@ window.abrirMapaPonto = async function(osId, pointIndex = 0, event) {
     if (btnWazeInit) btnWazeInit.href = initWaze;
 
     // 3. Display Modal with Animation
-    modal.style.zIndex = '65000';
+    modal.style.zIndex = '85000';
     modal.classList.remove('hidden');
     setTimeout(() => {
         modalBox.classList.remove('scale-95', 'opacity-0');
@@ -906,7 +906,7 @@ window.abrirMapaPontosManutencao = async function(osId, event) {
     if (btnWaze) btnWaze.href = linkWaze;
 
     // 7. Exibir Modal com Transição Suave
-    modal.style.zIndex = '65000';
+    modal.style.zIndex = '85000';
     modal.classList.remove('hidden');
     setTimeout(() => {
         modalBox.classList.remove('scale-95', 'opacity-0');
