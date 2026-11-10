@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-v150';
+const CACHE_NAME = 'luz-araraquara-v151';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -44,13 +44,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Não interceptar chamadas de API do Supabase (REST, Auth, Storage) ou domínios externos
+  // Não interceptar chamadas de API do Supabase (REST, Auth, Storage) ou CDNs / domínios externos
   const requestUrl = new URL(event.request.url);
   if (requestUrl.pathname.startsWith('/rest/') || 
       requestUrl.pathname.startsWith('/auth/') || 
       requestUrl.pathname.startsWith('/storage/') ||
       requestUrl.hostname.includes('supabase') || 
-      requestUrl.hostname.includes('ngrok')) {
+      requestUrl.hostname.includes('jsdelivr.net') ||
+      requestUrl.hostname.includes('unpkg.com') ||
+      requestUrl.hostname.includes('cdnjs.cloudflare.com') ||
+      requestUrl.hostname.includes('tailwindcss.com') ||
+      requestUrl.hostname.includes('ngrok') ||
+      requestUrl.origin !== self.location.origin) {
     return;
   }
 
