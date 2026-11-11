@@ -153,7 +153,7 @@
     </script>
 
     <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link rel="stylesheet" href="css/tailwind.min.css" />
 
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
@@ -169,31 +169,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
-
-    <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              "primary": "#000000",
-              "secondary": "#0051d5",
-              "background": "#f8fafc",
-              "surface": "#ffffff",
-              "surface-container": "#f1f5f9",
-              "on-surface": "#0f172a",
-              "on-surface-variant": "#475569",
-              "outline": "#94a3b8",
-              "outline-variant": "#e2e8f0",
-              "error": "#dc2626"
-            },
-            fontFamily: {
-              sans: ["Inter", "sans-serif"]
-            }
-          }
-        }
-      }
-    </script>
 
     <style>
       .material-symbols-outlined {
@@ -1027,6 +1002,59 @@
       var coordsGpsPracaAtual = null;
       var precisaoGpsPracaAtual = null;
 
+      /**
+       * Verifica e retorna os materiais apenas se houver uma sessão aberta ativa para a praça.
+       * Se a sessão estiver finalizada (ou nunca iniciada), retorna sempre array vazio ([]).
+       */
+      function obterMateriaisSessaoAbertaPraca(dadosPraca) {
+        if (!dadosPraca) return [];
+
+        var stNorm = (dadosPraca.status || '').toLowerCase().trim();
+        var isStatusAndamento = stNorm.includes('andamento');
+
+        var historico = [];
+        if (dadosPraca.historico_sessoes) {
+          try {
+            historico = typeof dadosPraca.historico_sessoes === 'string'
+              ? JSON.parse(dadosPraca.historico_sessoes)
+              : (Array.isArray(dadosPraca.historico_sessoes) ? dadosPraca.historico_sessoes : []);
+          } catch(e) { historico = []; }
+        }
+
+        // Identifica se existe uma sessão aberta ativa no histórico (sem 'fim' ou status 'EM ANDAMENTO')
+        var sessaoAberta = Array.isArray(historico)
+          ? historico.find(function(s) {
+              return s && (!s.fim || (s.status && s.status.toString().toUpperCase() === 'EM ANDAMENTO'));
+            })
+          : null;
+
+        // Se a sessão foi finalizada (status não é "Em Andamento" e não há sessão aberta ativa):
+        // O carrinho NÃO deve ser restaurado, devendo vir sempre limpo!
+        if (!isStatusAndamento && !sessaoAberta) {
+          return [];
+        }
+
+        // Se há uma sessão aberta, restaura apenas os materiais pertencentes a essa sessão aberta:
+        if (sessaoAberta && Array.isArray(sessaoAberta.materiais) && sessaoAberta.materiais.length > 0) {
+          return [...sessaoAberta.materiais];
+        }
+
+        // Fallback para registros legados em andamento sem array historico_sessoes detalhado
+        if (isStatusAndamento && (!historico || historico.length <= 1) && dadosPraca.materiais) {
+          try {
+            var matsLeg = typeof dadosPraca.materiais === 'string'
+              ? JSON.parse(dadosPraca.materiais)
+              : (Array.isArray(dadosPraca.materiais) ? dadosPraca.materiais : []);
+            if (Array.isArray(matsLeg) && matsLeg.length > 0) {
+              return matsLeg;
+            }
+          } catch(e) {}
+        }
+
+        // Sessão aberta, mas ainda sem materiais inseridos nela
+        return [];
+      }
+
       var NOMES_DIRETOS_ADMITIDOS = ["IGOR", "FERNANDO", "CARLOS", "ANA", "ERNESTO", "VALTER"];
 
       // -------------------------------------------------------------------------
@@ -1243,7 +1271,19 @@
               iniciarGpsPracaComMapa();
             }
             if (draft.carrinhoMateriaisPraca && Array.isArray(draft.carrinhoMateriaisPraca)) {
-              carrinhoMateriaisPraca = draft.carrinhoMateriaisPraca;
+              var podeRestaurarDraft = false;
+              if (draft.dadosPracaAtual) {
+                var stDraft = (draft.dadosPracaAtual.status || '').toLowerCase().trim();
+                var matsAbertos = typeof obterMateriaisSessaoAbertaPraca === 'function' ? obterMateriaisSessaoAbertaPraca(draft.dadosPracaAtual) : [];
+                if (stDraft.includes('andamento') || (matsAbertos && matsAbertos.length > 0)) {
+                  podeRestaurarDraft = true;
+                }
+              }
+              if (podeRestaurarDraft) {
+                carrinhoMateriaisPraca = draft.carrinhoMateriaisPraca;
+              } else {
+                carrinhoMateriaisPraca = [];
+              }
               renderizarTabelaMateriaisPraca();
             }
             restaurouAlgo = true;
@@ -3425,11 +3465,13 @@
         inputMat.value = '';
         inputQtd.value = '1';
         renderizarTabelaMateriaisPraca();
+        if (typeof agendarSalvarRascunho === 'function') agendarSalvarRascunho();
       }
 
       function removerMaterialPraca(idx) {
         carrinhoMateriaisPraca.splice(idx, 1);
         renderizarTabelaMateriaisPraca();
+        if (typeof agendarSalvarRascunho === 'function') agendarSalvarRascunho();
       }
 
       function renderizarTabelaMateriaisPraca() {
@@ -4306,15 +4348,7 @@
               status: "Aberta"
             };
           }
-          if (dadosPracaAtual.materiais) {
-            try {
-              carrinhoMateriaisPraca = typeof dadosPracaAtual.materiais === 'string'
-                ? JSON.parse(dadosPracaAtual.materiais)
-                : (Array.isArray(dadosPracaAtual.materiais) ? dadosPracaAtual.materiais : []);
-            } catch(e) { carrinhoMateriaisPraca = []; }
-          } else {
-            carrinhoMateriaisPraca = [];
-          }
+          carrinhoMateriaisPraca = obterMateriaisSessaoAbertaPraca(dadosPracaAtual);
           renderizarTabelaMateriaisPraca();
 
           document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
@@ -4356,15 +4390,7 @@
             elQtd.value = dadosPracaAtual.qtd_eletricistas || dadosPracaAtual.qtd_eletricista || 1;
           }
 
-          if (dadosPracaAtual.materiais) {
-            try {
-              carrinhoMateriaisPraca = typeof dadosPracaAtual.materiais === 'string'
-                ? JSON.parse(dadosPracaAtual.materiais)
-                : (Array.isArray(dadosPracaAtual.materiais) ? dadosPracaAtual.materiais : []);
-            } catch(e) { carrinhoMateriaisPraca = []; }
-          } else {
-            carrinhoMateriaisPraca = [];
-          }
+          carrinhoMateriaisPraca = obterMateriaisSessaoAbertaPraca(dadosPracaAtual);
           renderizarTabelaMateriaisPraca();
 
           document.getElementById('infoPracaNome').innerText = "🌳 " + (dadosPracaAtual.praca_nome || "Praça Pública");
@@ -5026,9 +5052,7 @@
               var dtFm = new Date(agoraIso);
               var diffMs = dtFm.getTime() - dtInc.getTime();
               sessaoAberta.duracao_minutos = Math.max(1, Math.round(diffMs / 60000));
-              if (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) {
-                sessaoAberta.materiais = [...carrinhoMateriaisPraca];
-              }
+              sessaoAberta.materiais = (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : [];
             }
           }
 
@@ -5039,22 +5063,21 @@
           }, 0);
 
           var todosMateriaisPraca = [];
-          historicoSessoes.forEach(function(s) {
-            if (Array.isArray(s.materiais)) {
-              s.materiais.forEach(function(m) {
-                todosMateriaisPraca.push(m);
-              });
-            }
-          });
-          if (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) {
-            carrinhoMateriaisPraca.forEach(function(m) {
-              todosMateriaisPraca.push(m);
+          if (Array.isArray(historicoSessoes) && historicoSessoes.length > 0) {
+            historicoSessoes.forEach(function(s) {
+              if (Array.isArray(s.materiais)) {
+                s.materiais.forEach(function(m) {
+                  todosMateriaisPraca.push(m);
+                });
+              }
             });
+          } else if (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) {
+            todosMateriaisPraca = [...carrinhoMateriaisPraca];
           }
 
           var payload = {
             status: statusFinal,
-            materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
+            materiais: todosMateriaisPraca,
             qtd_eletricistas: qtdElet,
             historico_sessoes: historicoSessoes,
             tempo_total_minutos: tempoTotalMinutos,
@@ -5184,6 +5207,12 @@
           document.getElementById('msgSucessoTexto').innerHTML = htmlSucesso;
           document.getElementById('modalSucesso').classList.remove('hidden');
 
+          dadosPracaAtual.status = statusFinal;
+          dadosPracaAtual.historico_sessoes = historicoSessoes;
+          dadosPracaAtual.materiais = todosMateriaisPraca;
+          var badgeStatusPracaEl = document.getElementById('badgeStatusPraca');
+          if (badgeStatusPracaEl) badgeStatusPracaEl.innerText = statusFinal;
+
           atualizarBotoesSessaoPraca(novoStatus);
           removerFotoEntradaPraca();
           limparFotosAndamentoPraca();
@@ -5201,6 +5230,12 @@
               await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
               document.getElementById('msgSucessoTexto').innerHTML = "📱 Modo Offline: Atualização da Praça <strong class='text-emerald-700 font-bold'>" + dadosPracaAtual.protocolo + "</strong> salva localmente para envio automático.";
               document.getElementById('modalSucesso').classList.remove('hidden');
+              dadosPracaAtual.status = statusFinal;
+              dadosPracaAtual.historico_sessoes = historicoSessoes;
+              dadosPracaAtual.materiais = todosMateriaisPraca;
+              var badgeStatusPracaOff = document.getElementById('badgeStatusPraca');
+              if (badgeStatusPracaOff) badgeStatusPracaOff.innerText = statusFinal;
+              atualizarBotoesSessaoPraca(novoStatus);
               removerFotoEntradaPraca();
               limparFotosAndamentoPraca();
               carrinhoMateriaisPraca = [];

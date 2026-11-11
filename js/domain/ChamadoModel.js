@@ -206,13 +206,171 @@ class ChamadoModel {
         // Regex para capturar #PROTOCOLO ou protocolos no formato IP... / PC...
         const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/g;
 
-        return safeText.replace(regex, (match, p1, p2) => {
+        let formatted = safeText.replace(regex, (match, p1, p2) => {
             const rawProt = p1 || p2;
             const cleanProt = String(rawProt).replace(/^#/, '').trim();
             const displayProt = '#' + cleanProt;
             const iconSize = isTable ? '12px' : '13px';
             return `<button type="button" onclick="${stopProp}window.abrirDetalhesOSModal('${cleanProt}')" class="${btnClass}" title="Abrir Ordem de Serviço ${displayProt}"><span class="material-symbols-outlined text-[${iconSize}] text-blue-600 pointer-events-none">open_in_new</span><span>${displayProt}</span></button>`;
         });
+
+        // Se options.currentProtocolo foi passado e não foi solicitado omitButton, anexa botão de comparar no mapa
+        const currentProt = options.currentProtocolo || options.protocolo || (options.item && (options.item.protocolo || options.item.id));
+        if (currentProt && !options.omitButton) {
+            const lowerMotivo = safeText.toLowerCase();
+            const isReparo = lowerMotivo.includes('reparo recente') || lowerMotivo.includes('reincid') || lowerMotivo.includes('reincidencia');
+            if (isReparo || options.incluirBotaoComparar) {
+                const matchProt = safeText.match(/(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/i);
+                if (matchProt) {
+                    const protMotivo = (matchProt[1] || matchProt[2] || '').replace(/^#/, '').trim();
+                    if (protMotivo) {
+                        const btnClassComp = isTable
+                            ? 'inline-flex items-center gap-1 font-sans font-bold text-[10.5px] bg-amber-600 hover:bg-amber-700 text-white px-1.5 py-0.5 rounded shadow-2xs transition-all cursor-pointer select-none active:scale-95 ml-1'
+                            : 'inline-flex items-center gap-1.5 font-sans font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg shadow-2xs transition-all cursor-pointer select-none active:scale-95 ml-1.5';
+                        const iconSizeComp = isTable ? '12px' : '14px';
+                        const btnLabelComp = 'Comparar';
+                        formatted = `<span class="inline-flex items-center flex-wrap gap-1">${formatted}<button type="button" onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event))" class="${btnClassComp}" title="Comparar a OS #${currentProt} com o Reparo Recente #${protMotivo} no mapa Mapbox"><span class="material-symbols-outlined text-[${iconSizeComp}] pointer-events-none">map</span><span>${btnLabelComp}</span></button></span>`;
+                    }
+                }
+            }
+        }
+
+        return formatted;
+    }
+
+
+    /**
+     * Extrai informações estruturadas do motivo da pendência (protocolos, tipo de motivo, texto limpo)
+     * @param {string} motivoTexto Texto bruto do motivo
+     * @returns {object} { textoLimpo, protocolos, protocolo, isReparo }
+     */
+    static extrairInfoMotivo(motivoTexto) {
+        if (!motivoTexto || typeof motivoTexto !== 'string') {
+            return { textoLimpo: '', protocolos: [], protocolo: '', isReparo: false };
+        }
+
+        const lower = motivoTexto.toLowerCase();
+        const isReparo = lower.includes('reparo recente') || lower.includes('reincid') || lower.includes('reincidencia') || /\(h[aá]\s+\d+d?\s+a\s+\d+m?\)/i.test(motivoTexto);
+
+        const regexProtAll = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/gi;
+        const protocolos = [];
+        let match;
+        while ((match = regexProtAll.exec(motivoTexto)) !== null) {
+            const raw = (match[1] || match[2] || '').trim().replace(/^#/, '');
+            if (raw && !protocolos.includes(raw)) {
+                protocolos.push(raw);
+            }
+        }
+
+        let textoLimpo = motivoTexto
+            .replace(/\(h[aá]\s+(\d+)d\s+a\s+(\d+)m\)/gi, (m, d, dist) => {
+                const dTxt = d === '1' ? '1 dia' : `${d} dias`;
+                const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+                return `(há ${dTxt}, a ${mTxt})`;
+            })
+            .replace(/\((hoje|ontem)\s+a\s+(\d+)m\)/gi, (m, quando, dist) => {
+                const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+                return `(${quando}, a ${mTxt})`;
+            })
+            .replace(/\(h[aá]\s+(\d+)\s+dias?[,\s]+a\s+(\d+)\s+metros?\)/gi, (m, d, dist) => {
+                const dTxt = d === '1' ? '1 dia' : `${d} dias`;
+                const mTxt = dist === '1' ? '1 metro' : `${dist} metros`;
+                return `(há ${dTxt}, a ${mTxt})`;
+            });
+
+        for (const prot of protocolos) {
+            const escProt = prot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            textoLimpo = textoLimpo.replace(new RegExp(`(?:#\\s*${escProt}\\b|\\b${escProt}\\b)`, 'gi'), '');
+        }
+
+        textoLimpo = textoLimpo
+            .replace(/\s{2,}/g, ' ')
+            .replace(/\s+([,;.])/g, '$1')
+            .replace(/\(\s+/g, '(')
+            .replace(/\s+\)/g, ')')
+            .replace(/\s+(?:com|de|da|do|em|:|-)\s*$/i, '')
+            .trim();
+
+        return {
+            textoLimpo,
+            protocolos,
+            protocolo: protocolos[0] || '',
+            isReparo
+        };
+    }
+
+    /**
+     * Renderiza o bloco de Motivo de Pendência/Aprovação formatado para o modal de detalhes da OS.
+     * Quando for Reparo Recente (ou tiver protocolo associado), exibe em 2 linhas limpas:
+     * - Linha 1: Texto descritivo limpo (ex: "Reparo recente (há 12 dias, a 42 metros)")
+     * - Linha 2: Os dois botões com mesma estrutura física: Protocolo e Comparar no Mapa
+     */
+    static renderMotivoDetalhesHtml(item, options = {}) {
+        if (!item) return '';
+        const motivo = String(item.motivoAprovacao || item.motivo || '').trim();
+        if (!motivo) return '';
+
+        const currentProt = String(item.protocolo || item.id || options.currentProtocolo || '').replace(/^#/, '').trim();
+        const info = ChamadoModel.extrairInfoMotivo(motivo);
+        const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : 'event.stopPropagation(); ';
+
+        const escapeHtml = (str) => String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        if (info.protocolos && info.protocolos.length > 0) {
+            const btnBaseClass = 'inline-flex items-center justify-center gap-1.5 px-3 h-[30px] box-border rounded-lg text-xs font-semibold leading-none shadow-2xs transition-all cursor-pointer select-none active:scale-95';
+            const btnProtClass = `${btnBaseClass} bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-300 hover:border-blue-400`;
+            const btnCompClass = `${btnBaseClass} bg-white hover:bg-amber-100/80 text-amber-900 hover:text-amber-950 border border-amber-300 hover:border-amber-400`;
+
+            const btnsProtocolos = info.protocolos.map(cleanProt => `
+                <button type="button" 
+                        onclick="${stopProp}window.abrirDetalhesOSModal('${cleanProt}')" 
+                        class="${btnProtClass}" 
+                        title="Abrir Ordem de Serviço #${cleanProt}">
+                    <span class="material-symbols-outlined text-[15px] leading-none text-blue-600 pointer-events-none">open_in_new</span>
+                    <span class="leading-none">#${cleanProt}</span>
+                </button>
+            `.trim()).join('');
+
+            let btnComparar = '';
+            if (info.isReparo && currentProt && info.protocolo) {
+                btnComparar = `
+                    <button type="button" 
+                            onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" 
+                            class="${btnCompClass}" 
+                            title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                        <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
+                        <span class="leading-none">Comparar</span>
+                    </button>
+                `.trim();
+            }
+
+            return `
+                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
+                    <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
+                        <span>${escapeHtml(info.textoLimpo || motivo)}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                        ${btnsProtocolos}
+                        ${btnComparar}
+                    </div>
+                </div>
+            `.trim();
+        }
+
+        return `
+            <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl px-3 py-2 text-xs font-semibold text-amber-950 shadow-2xs mt-1 leading-relaxed">
+                ${escapeHtml(motivo)}
+            </div>
+        `.trim();
+    }
+
+    get motivoDetalhesHtml() {
+        return ChamadoModel.renderMotivoDetalhesHtml(this);
     }
 
     get motivoFormatadoHtml() {
@@ -970,8 +1128,11 @@ class ChamadoModel {
             // Extração de precisão do GPS capturado pelo operador
             const precisaoGps = pFin ? (pFin.precisao_gps_metros !== undefined && pFin.precisao_gps_metros !== null ? Number(pFin.precisao_gps_metros) : (pFin.precisaoGps !== undefined && pFin.precisaoGps !== null ? Number(pFin.precisaoGps) : null)) : null;
 
+            const isAberturaComp = Boolean(pIni && (pIni.usarMesmoEndereco || pIni.usar_mesmo_endereco));
+
             result.push({
                 numero: i + 1,
+                isAberturaCompartilhada: isAberturaComp,
                 fechamento: numFech,
                 numeroFechamento: numFech,
                 hasInicialData: hasInicialData,

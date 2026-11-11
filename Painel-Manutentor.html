@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
@@ -20,17 +20,17 @@
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script>window.isManutentorView = true;</script>
-    <script src="js/services/ChamadosService.js?v=30"></script>
+    <script src="js/services/ChamadosService.js?v=34"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
-    <script src="js/controllers/PainelController.js?v=41"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/controllers/PainelController.js?v=51"></script>
+    <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js"></script>
     <script src="header.js"></script>
     
     <!-- Mapbox GL JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <!-- Mapbox GL JS (defer para não bloquear renderização inicial) -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js" defer></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
     
     <!-- Fonts & Icons -->
@@ -39,108 +39,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "background": "#fcf8fa",
-                        "on-primary-fixed": "#131b2e",
-                        "error": "#ba1a1a",
-                        "surface-bright": "#fcf8fa",
-                        "surface-container-lowest": "#ffffff",
-                        "primary-fixed-dim": "#bec6e0",
-                        "on-error-container": "#93000a",
-                        "on-surface": "#1b1b1d",
-                        "primary": "#000000",
-                        "outline": "#76777d",
-                        "on-background": "#1b1b1d",
-                        "on-tertiary-container": "#75859d",
-                        "tertiary-fixed-dim": "#b7c8e1",
-                        "on-tertiary": "#ffffff",
-                        "surface-dim": "#dcd9db",
-                        "primary-container": "#131b2e",
-                        "surface-tint": "#565e74",
-                        "on-secondary": "#ffffff",
-                        "inverse-surface": "#303032",
-                        "on-error": "#ffffff",
-                        "secondary-container": "#316bf3",
-                        "inverse-on-surface": "#f3f0f2",
-                        "surface-container-high": "#eae7e9",
-                        "on-tertiary-fixed-variant": "#38485d",
-                        "surface-container": "#f0edef",
-                        "on-primary-fixed-variant": "#3f465c",
-                        "surface": "#fcf8fa",
-                        "on-tertiary-fixed": "#0b1c30",
-                        "outline-variant": "#c6c6cd",
-                        "surface-container-highest": "#e4e2e4",
-                        "tertiary-fixed": "#d3e4fe",
-                        "primary-fixed": "#dae2fd",
-                        "on-secondary-fixed-variant": "#003ea8",
-                        "on-secondary-fixed": "#00174b",
-                        "on-primary-container": "#7c839b",
-                        "secondary-fixed": "#dbe1ff",
-                        "on-secondary-container": "#fefcff",
-                        "surface-variant": "#e4e2e4",
-                        "error-container": "#ffdad6",
-                        "secondary-fixed-dim": "#b4c5ff",
-                        "inverse-primary": "#bec6e0",
-                        "tertiary-container": "#0b1c30",
-                        "on-primary": "#ffffff",
-                        "surface-container-low": "#f6f3f5",
-                        "on-surface-variant": "#45464d",
-                        "secondary": "#0051d5",
-                        "tertiary": "#000000"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.125rem",
-                        "lg": "0.25rem",
-                        "xl": "0.5rem",
-                        "full": "0.75rem"
-                    },
-                    "spacing": {
-                        "unit": "4px",
-                        "max-width-content": "1440px",
-                        "container-padding": "24px",
-                        "sidebar-width": "260px",
-                        "card-gap": "20px",
-                        "gutter": "16px"
-                    },
-                    "fontFamily": {
-                        "headline-lg": ["Inter"],
-                        "body-md": ["Inter"],
-                        "headline-md": ["Inter"],
-                        "data-tabular": ["Inter"],
-                        "body-lg": ["Inter"],
-                        "label-md": ["Inter"],
-                        "label-sm": ["Inter"],
-                        "headline-sm": ["Inter"]
-                    },
-                    "fontSize": {
-                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
-                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
-                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
-                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
-                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
-                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
-                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
-                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
-                    },
-                    "animation": {
-                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
-                    },
-                    "keyframes": {
-                        "fadeInUp": {
-                            "0%": { opacity: "0", transform: "translateY(20px)" },
-                            "100%": { opacity: "1", transform: "translateY(0)" }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     
     <style>
         select, select.problem-select {
@@ -204,77 +102,30 @@
         .resizer.resizing::after {
             background-color: #0051d5; /* Azul Secundário */
         }
+    
+        body {
+            background-color: #fcf8fa;
+            background-image: radial-gradient(at 0% 0%, #ffffff 0%, transparent 70%), radial-gradient(at 100% 100%, #f1edf0 0%, transparent 70%);
+            background-attachment: fixed;
+        /* Garante que as tabelas do Painel Manutentor mantenham border-collapse consistente e sem vazamento */
+        #os-table,
+        #pendentes-os-table {
+            border-collapse: collapse !important;
+            border-spacing: 0 !important;
+        }
+
+        /* Virtualização Nativa do Browser: renderiza somente as linhas visíveis na tela */
+        #os-table tbody tr,
+        #pendentes-os-table tbody tr {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 54px;
+        }
+
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed manutentor-view">
 
-<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
-<script>
-    const canvas = document.getElementById('bg-canvas');
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    
-    const vertexShader = `
-        varying vec2 v_texCoord;
-        void main() {
-            v_texCoord = uv;
-            gl_Position = vec4(position, 1.0);
-        }
-    `;
-    
-    const fragmentShader = `
-        precision highp float;
-        uniform float u_time;
-        uniform vec2 u_resolution;
-        varying vec2 v_texCoord;
 
-        void main() {
-            vec2 uv = v_texCoord;
-            float t = u_time * 0.2;
-            vec3 color1 = vec3(0.988, 0.973, 0.98); 
-            vec3 color2 = vec3(0.957, 0.941, 0.953);
-            vec3 accent = vec3(0.059, 0.09, 0.165); 
-            
-            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
-            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
-            vec3 base = mix(color1, color2, w1 * w2);
-            
-            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
-            vec3 finalColor = mix(base, accent, edge * 0.02);
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-    `;
-    
-    const uniforms = {
-        u_time: { value: 0 },
-        u_resolution: { value: new THREE.Vector2() }
-    };
-    
-    const material = new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms
-    });
-    
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-    
-    function resize() {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
-    }
-    window.addEventListener('resize', resize);
-    resize();
-    
-    function animate(time) {
-        uniforms.u_time.value = time * 0.001;
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
-    }
-    requestAnimationFrame(animate);
-</script>
 
 <app-sidebar active="painel-manutentor" mode="manutentor"></app-sidebar>
 
@@ -295,22 +146,22 @@
 
     <!-- KPI Grid -->
     <div class="grid grid-cols-12 gap-card-gap mb-card-gap max-w-max-width-content mx-auto">
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de OS</div>
             <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+12% vs mês anterior</span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Aberto</div>
             <div class="font-headline-lg text-headline-lg text-error overflow-visible"><div class="h-8 w-16 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Requer atenção</span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Concluídas</div>
             <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm"><div class="h-3.5 w-28 bg-surface-container-high animate-pulse rounded inline-block"></div></span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Tempo Médio de Resolução</div>
             <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_down</span><span class="font-label-sm text-label-sm">-0.5 dias vs mês anterior</span></div>
@@ -318,7 +169,7 @@
     </div>
 
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
             </div>
@@ -1221,7 +1072,7 @@
 
 <script>
     // Column Resizing Logic with Neighbor Push-Pull & Strict Bounds
-    document.addEventListener('DOMContentLoaded', function () {
+    function initPainelManutentorTableResizer() {
         const table = document.getElementById('os-table');
         if (!table) return;
 
@@ -1295,6 +1146,8 @@
         };
 
         resizers.forEach(function (resizer) {
+            if (resizer._resizerBound) return;
+            resizer._resizerBound = true;
             resizer.addEventListener('mousedown', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -1325,7 +1178,14 @@
                 document.addEventListener('mouseup', mouseUpHandler);
             });
         });
-    });
+    }
+    window.initPainelManutentorTableResizer = initPainelManutentorTableResizer;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPainelManutentorTableResizer);
+    } else {
+        initPainelManutentorTableResizer();
+    }
 </script>
 
 <script>
@@ -1595,7 +1455,8 @@
                     showRow = false;
                 }
 
-                if (showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+                const hasSearchQuery = Boolean(searchQuery && searchQuery.trim().length > 0);
+                if (!hasSearchQuery && showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
                     if (!activeStatusFilter.includes(rowStatus)) {
                         showRow = false;
                     }
@@ -1764,6 +1625,10 @@
         // Search input handler
         searchInput?.addEventListener('input', (e) => {
             searchQuery = e.target.value;
+            if (window.painelController) {
+                window.painelController.activeFilters.search = e.target.value;
+                window.painelController.renderTable();
+            }
             applyCombinedFilters();
         });
 

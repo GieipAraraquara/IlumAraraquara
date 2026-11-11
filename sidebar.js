@@ -1,19 +1,31 @@
 class AppSidebar extends HTMLElement {
-    async connectedCallback() {
-        this.render();
+    _scheduleRender() {
+        if (this._renderPending) return;
+        this._renderPending = true;
+        requestAnimationFrame(() => {
+            this._renderPending = false;
+            this.render();
+        });
+    }
 
+    async connectedCallback() {
+        try {
+            document.head.querySelectorAll('style:not([id])').forEach(s => {
+                s.setAttribute('data-spa-page-style', 'true');
+            });
+        } catch (e) {}
         // Ouve evento de autenticação pronta para re-renderizar o menu com base no perfil do usuário
-        this._authListener = () => this.render();
+        this._authListener = () => this._scheduleRender();
         window.addEventListener('auth-ready', this._authListener);
 
         if (window.AuthGuard) {
             try {
                 await window.AuthGuard.requireAuth();
-                this.render();
             } catch (e) {
                 console.warn('⚠️ [Sidebar] Erro ao obter dados do usuário via AuthGuard:', e);
             }
         }
+        this._scheduleRender();
     }
 
     disconnectedCallback() {
@@ -519,31 +531,47 @@ function updateSidebarActiveState(targetUrl) {
 
 function syncStylesFromDoc(doc) {
     if (!doc || !doc.head) return;
-    const styles = doc.head.querySelectorAll('style, link[rel="stylesheet"]');
-    styles.forEach(style => {
-        if (style.tagName.toLowerCase() === 'style') {
-            const content = style.textContent;
-            if (content && content.trim()) {
-                const exists = Array.from(document.head.querySelectorAll('style')).some(s => s.textContent === content);
-                if (!exists) {
-                    const newStyle = document.createElement('style');
-                    newStyle.textContent = content;
-                    document.head.appendChild(newStyle);
-                }
-            }
-        } else if (style.tagName.toLowerCase() === 'link') {
-            const href = style.getAttribute('href');
-            if (href) {
-                const exists = Array.from(document.head.querySelectorAll('link[rel="stylesheet"]')).some(l => l.getAttribute('href') === href);
-                if (!exists) {
-                    const newLink = document.createElement('link');
-                    newLink.rel = 'stylesheet';
-                    newLink.href = href;
-                    document.head.appendChild(newLink);
-                }
+
+    // 1. Sincroniza links de folhas de estilo externas (ex: mapbox-gl.css)
+    const links = doc.head.querySelectorAll('link[rel="stylesheet"]');
+    links.forEach(link => {
+        const href = link.getAttribute('href');
+        if (href) {
+            const exists = Array.from(document.head.querySelectorAll('link[rel="stylesheet"]')).some(l => l.getAttribute('href') === href);
+            if (!exists) {
+                const newLink = document.createElement('link');
+                newLink.rel = 'stylesheet';
+                newLink.href = href;
+                document.head.appendChild(newLink);
             }
         }
     });
+
+    // 2. Sincroniza blocos <style> específicos da página ativa, substituindo os anteriores para evitar vazamento (style leak)
+    const docStyles = Array.from(doc.head.querySelectorAll('style')).filter(s => {
+        const id = (s.id || '').toLowerCase();
+        return !id.includes('tailwind');
+    });
+
+    if (docStyles.length > 0) {
+        // Remove estilos de página anteriores injetados pelo SPA ou do documento original que não sejam Tailwind
+        const currentStyles = Array.from(document.head.querySelectorAll('style')).filter(s => {
+            const id = (s.id || '').toLowerCase();
+            return !id.includes('tailwind') && (s.hasAttribute('data-spa-page-style') || !s.id);
+        });
+        currentStyles.forEach(s => s.remove());
+
+        // Adiciona os estilos específicos da página alvo marcados para gerenciamento limpo
+        docStyles.forEach(style => {
+            const cssText = style.textContent;
+            if (cssText && cssText.trim()) {
+                const newStyle = document.createElement('style');
+                newStyle.setAttribute('data-spa-page-style', 'true');
+                newStyle.textContent = cssText;
+                document.head.appendChild(newStyle);
+            }
+        });
+    }
 }
 
 function reinitPageControllers(targetUrl) {
@@ -557,13 +585,27 @@ function reinitPageControllers(targetUrl) {
         } else {
             console.warn('⚠️ [SPA] MedicaoController não disponível para inicialização.');
         }
-    } else if (page.includes('painel')) {
+    } else if (page.includes('painel') && !page.includes('manutentor')) {
         const Controller = window.PainelController || (typeof PainelController !== 'undefined' ? PainelController : null);
         if (Controller) {
             window.painelController = new Controller();
             window.painelController.init();
         } else {
             console.warn('⚠️ [SPA] PainelController não disponível para inicialização.');
+        }
+        if (typeof window.initPainelTableResizer === 'function') {
+            window.initPainelTableResizer();
+        }
+    } else if (page.includes('manutentor')) {
+        const Controller = window.PainelController || (typeof PainelController !== 'undefined' ? PainelController : null);
+        if (Controller) {
+            window.painelController = new Controller();
+            window.painelController.init();
+        } else {
+            console.warn('⚠️ [SPA] PainelController não disponível para inicialização.');
+        }
+        if (typeof window.initPainelManutentorTableResizer === 'function') {
+            window.initPainelManutentorTableResizer();
         }
     } else if (page.includes('auditoria')) {
         const Controller = window.AuditoriaController || (typeof AuditoriaController !== 'undefined' ? AuditoriaController : null);
@@ -572,6 +614,9 @@ function reinitPageControllers(targetUrl) {
             window.auditoriaController.init();
         } else {
             console.warn('⚠️ [SPA] AuditoriaController não disponível para inicialização.');
+        }
+        if (typeof window.initAuditoriaTablesResizers === 'function') {
+            window.initAuditoriaTablesResizers();
         }
     } else if (page.includes('mapa')) {
         window.mapOSsInstance = null;
@@ -736,9 +781,13 @@ window.navigateSPA = async function(targetUrl, pushState = true) {
             return !isSrc && !isThreeCanvas;
         });
 
+        // Limpar scripts inline SPA anteriores para evitar acúmulo no body
+        document.querySelectorAll('script[data-spa-inline-script="true"]').forEach(s => s.remove());
+
         bodyInlineScripts.forEach(script => {
             try {
                 const newScript = document.createElement('script');
+                newScript.setAttribute('data-spa-inline-script', 'true');
                 newScript.textContent = script.textContent;
                 document.body.appendChild(newScript);
             } catch(e) {

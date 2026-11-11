@@ -1,4 +1,4 @@
-const CACHE_NAME = 'luz-araraquara-v151';
+const CACHE_NAME = 'luz-araraquara-v152';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -41,6 +41,23 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') {
+    return;
+  }
+
+  // Stale-While-Revalidate para fontes, CSS compilado e bibliotecas de vendor (carregamento instantâneo)
+  if (requestUrl.pathname.includes('/fonts/') || requestUrl.pathname.includes('/css/') || requestUrl.pathname.includes('/js/vendor/')) {
+    event.respondWith(
+      caches.match(event.request).then((cachedResponse) => {
+        const fetchPromise = fetch(event.request).then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          }
+          return networkResponse;
+        }).catch(() => {});
+        return cachedResponse || fetchPromise;
+      })
+    );
     return;
   }
 

@@ -19,128 +19,24 @@
     <script src="js/domain/ChamadoModel.js?v=56"></script>
     <script src="js/repositories/ChamadosRepository.js?v=43"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=33"></script>
+    <script src="js/services/ChamadosService.js?v=34"></script>
     <script src="js/services/MapService.js?v=75"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/ConfiguracoesService.js?v=1"></script>
-    <script src="js/controllers/PainelController.js?v=50"></script>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="js/controllers/PainelController.js?v=51"></script>
+    <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js?v=33"></script>
     <script src="header.js"></script>
     
-    <!-- Mapbox GL JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js"></script>
+    <!-- Mapbox GL JS (defer para não bloquear renderização inicial) -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js" defer></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
     
     <!-- Fonts & Icons -->
     <link rel="stylesheet" href="fonts/material-symbols.css" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    
-    <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    "colors": {
-                        "background": "#fcf8fa",
-                        "on-primary-fixed": "#131b2e",
-                        "error": "#ba1a1a",
-                        "surface-bright": "#fcf8fa",
-                        "surface-container-lowest": "#ffffff",
-                        "primary-fixed-dim": "#bec6e0",
-                        "on-error-container": "#93000a",
-                        "on-surface": "#1b1b1d",
-                        "primary": "#000000",
-                        "outline": "#76777d",
-                        "on-background": "#1b1b1d",
-                        "on-tertiary-container": "#75859d",
-                        "tertiary-fixed-dim": "#b7c8e1",
-                        "on-tertiary": "#ffffff",
-                        "surface-dim": "#dcd9db",
-                        "primary-container": "#131b2e",
-                        "surface-tint": "#565e74",
-                        "on-secondary": "#ffffff",
-                        "inverse-surface": "#303032",
-                        "on-error": "#ffffff",
-                        "secondary-container": "#316bf3",
-                        "inverse-on-surface": "#f3f0f2",
-                        "surface-container-high": "#eae7e9",
-                        "on-tertiary-fixed-variant": "#38485d",
-                        "surface-container": "#f0edef",
-                        "on-primary-fixed-variant": "#3f465c",
-                        "surface": "#fcf8fa",
-                        "on-tertiary-fixed": "#0b1c30",
-                        "outline-variant": "#c6c6cd",
-                        "surface-container-highest": "#e4e2e4",
-                        "tertiary-fixed": "#d3e4fe",
-                        "primary-fixed": "#dae2fd",
-                        "on-secondary-fixed-variant": "#003ea8",
-                        "on-secondary-fixed": "#00174b",
-                        "on-primary-container": "#7c839b",
-                        "secondary-fixed": "#dbe1ff",
-                        "on-secondary-container": "#fefcff",
-                        "surface-variant": "#e4e2e4",
-                        "error-container": "#ffdad6",
-                        "secondary-fixed-dim": "#b4c5ff",
-                        "inverse-primary": "#bec6e0",
-                        "tertiary-container": "#0b1c30",
-                        "on-primary": "#ffffff",
-                        "surface-container-low": "#f6f3f5",
-                        "on-surface-variant": "#45464d",
-                        "secondary": "#0051d5",
-                        "tertiary": "#000000"
-                    },
-                    "borderRadius": {
-                        "DEFAULT": "0.125rem",
-                        "lg": "0.25rem",
-                        "xl": "0.5rem",
-                        "full": "0.75rem"
-                    },
-                    "spacing": {
-                        "unit": "4px",
-                        "max-width-content": "1440px",
-                        "container-padding": "24px",
-                        "sidebar-width": "260px",
-                        "card-gap": "20px",
-                        "gutter": "16px"
-                    },
-                    "fontFamily": {
-                        "headline-lg": ["Inter"],
-                        "body-md": ["Inter"],
-                        "headline-md": ["Inter"],
-                        "data-tabular": ["Inter"],
-                        "body-lg": ["Inter"],
-                        "label-md": ["Inter"],
-                        "label-sm": ["Inter"],
-                        "headline-sm": ["Inter"]
-                    },
-                    "fontSize": {
-                        "headline-lg": ["30px", { "lineHeight": "36px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
-                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
-                        "headline-md": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.01em", "fontWeight": "600" }],
-                        "data-tabular": ["14px", { "lineHeight": "20px", "fontWeight": "500" }],
-                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
-                        "label-md": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
-                        "label-sm": ["11px", { "lineHeight": "14px", "fontWeight": "500" }],
-                        "headline-sm": ["18px", { "lineHeight": "28px", "fontWeight": "600" }]
-                    },
-                    "animation": {
-                        "fade-in-up": "fadeInUp 0.5s ease-out forwards",
-                    },
-                    "keyframes": {
-                        "fadeInUp": {
-                            "0%": { opacity: "0", transform: "translateY(20px)" },
-                            "100%": { opacity: "1", transform: "translateY(0)" }
-                        }
-                    }
-                }
-            }
-        }
-    </script>
     
     <style>
         select, select.problem-select {
@@ -227,77 +123,28 @@
             align-items: center !important;
             justify-content: center !important;
         }
+        body {
+            background-color: #fcf8fa;
+            background-image: radial-gradient(at 0% 0%, #ffffff 0%, transparent 70%), radial-gradient(at 100% 100%, #f1edf0 0%, transparent 70%);
+            background-attachment: fixed;
+        }
+
+        /* Garante que as tabelas do Painel mantenham border-collapse consistente e sem vazamento */
+        #os-table,
+        #pendentes-os-table {
+            border-collapse: collapse !important;
+            border-spacing: 0 !important;
+        }
+
+        /* Virtualização Nativa do Browser: renderiza somente as linhas visíveis na tela */
+        #os-table tbody tr,
+        #pendentes-os-table tbody tr {
+            content-visibility: auto;
+            contain-intrinsic-size: auto 54px;
+        }
     </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased overflow-hidden relative sidebar-collapsed">
-
-<canvas class="fixed inset-0 w-full h-full -z-10" id="bg-canvas"></canvas>
-<script>
-    const canvas = document.getElementById('bg-canvas');
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-    const geometry = new THREE.PlaneGeometry(2, 2);
-    
-    const vertexShader = `
-        varying vec2 v_texCoord;
-        void main() {
-            v_texCoord = uv;
-            gl_Position = vec4(position, 1.0);
-        }
-    `;
-    
-    const fragmentShader = `
-        precision highp float;
-        uniform float u_time;
-        uniform vec2 u_resolution;
-        varying vec2 v_texCoord;
-
-        void main() {
-            vec2 uv = v_texCoord;
-            float t = u_time * 0.2;
-            vec3 color1 = vec3(0.988, 0.973, 0.98); 
-            vec3 color2 = vec3(0.957, 0.941, 0.953);
-            vec3 accent = vec3(0.059, 0.09, 0.165); 
-            
-            float w1 = sin(uv.x * 2.0 + t) * 0.5 + 0.5;
-            float w2 = sin(uv.y * 3.0 - t * 1.5) * 0.5 + 0.5;
-            vec3 base = mix(color1, color2, w1 * w2);
-            
-            float edge = smoothstep(0.7, 1.0, length(uv - 0.5));
-            vec3 finalColor = mix(base, accent, edge * 0.02);
-            gl_FragColor = vec4(finalColor, 1.0);
-        }
-    `;
-    
-    const uniforms = {
-        u_time: { value: 0 },
-        u_resolution: { value: new THREE.Vector2() }
-    };
-    
-    const material = new THREE.ShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms
-    });
-    
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-    
-    function resize() {
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        uniforms.u_resolution.value.set(window.innerWidth, window.innerHeight);
-    }
-    window.addEventListener('resize', resize);
-    resize();
-    
-    function animate(time) {
-        uniforms.u_time.value = time * 0.001;
-        renderer.render(scene, camera);
-        requestAnimationFrame(animate);
-    }
-    requestAnimationFrame(animate);
-</script>
 
 <app-sidebar active="painel"></app-sidebar>
 
@@ -318,22 +165,22 @@
 
     <!-- KPI Grid -->
     <div class="grid grid-cols-12 gap-card-gap mb-card-gap max-w-max-width-content mx-auto">
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:200ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Total de OS</div>
             <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+12% vs mês anterior</span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:300ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Aberto</div>
             <div class="font-headline-lg text-headline-lg text-error overflow-visible"><div class="h-8 w-16 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-error"><span class="material-symbols-outlined text-[16px]">warning</span><span class="font-label-sm text-label-sm">Requer atenção</span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Concluídas</div>
             <div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm"><div class="h-3.5 w-28 bg-surface-container-high animate-pulse rounded inline-block"></div></span></div>
         </div>
-        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
+        <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]">
             <div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Tempo Médio de Resolução</div>
             <div class="font-headline-lg text-headline-lg text-secondary overflow-visible"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div>
             <div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_down</span><span class="font-label-sm text-label-sm">-0.5 dias vs mês anterior</span></div>
@@ -342,7 +189,7 @@
 
     <!-- Tabela Nova: Pendentes para aprovação -->
     <div id="container-pendentes-aprovacao" class="hidden grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto mb-card-gap opacity-0 animate-fade-in-up [animation-delay:550ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <span class="material-symbols-outlined text-amber-600 text-[20px]">pending_actions</span>
@@ -430,7 +277,7 @@
     </div>
 
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
-        <div class="col-span-12 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
+        <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
             </div>
@@ -815,7 +662,7 @@
 </div>
 
 <!-- Modal de Abertura de Nova Ordem de Serviço -->
-<div id="modal-abertura-os" class="fixed inset-0 z-50 hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
+<div id="modal-abertura-os" class="fixed inset-0 z-[70000] hidden flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-md transition-opacity duration-300">
     <div id="modal-abertura-os-box" class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-3xl w-full h-[92vh] max-h-[850px] overflow-hidden flex flex-col text-on-surface transform transition-all duration-300 scale-95 opacity-0">
         <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/50 flex-shrink-0">
             <div class="flex items-center gap-3">
@@ -1550,7 +1397,7 @@
 
 <script>
     // Column Resizing Logic with Neighbor Push-Pull & Strict Bounds (Independent per table)
-    document.addEventListener('DOMContentLoaded', function () {
+    function initPainelTableResizer() {
         const tables = document.querySelectorAll('#os-table, #pendentes-os-table');
         if (tables.length === 0) return;
 
@@ -1662,6 +1509,8 @@
             };
 
             resizers.forEach(function (resizer) {
+                if (resizer._resizerBound) return;
+                resizer._resizerBound = true;
                 resizer.addEventListener('mousedown', function (e) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -1692,7 +1541,14 @@
                 });
             });
         });
-    });
+    }
+    window.initPainelTableResizer = initPainelTableResizer;
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initPainelTableResizer);
+    } else {
+        initPainelTableResizer();
+    }
 </script>
 
 <script>
@@ -1970,7 +1826,9 @@
             }
 
             // 3. Status Filter (Aplica-se apenas à tabela de Ordens de Serviço Recentes)
-            if (!isPendentesTable && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+            // Se houver busca digitada na barra superior (searchQuery), ignora o filtro de status da OS para que OS concluídas e de outros tipos apareçam
+            const hasSearchQuery = Boolean(searchQuery && searchQuery.trim().length > 0);
+            if (!hasSearchQuery && !isPendentesTable && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
                 const statusBadge = row.querySelector('.status-badge');
                 const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
                 if (!activeStatusFilter.includes(rowStatus)) {
@@ -2183,6 +2041,10 @@
         // Search input handler
         searchInput?.addEventListener('input', (e) => {
             searchQuery = e.target.value;
+            if (window.painelController) {
+                window.painelController.activeFilters.search = e.target.value;
+                window.painelController.renderTable();
+            }
             applyCombinedFilters();
         });
 
@@ -2401,13 +2263,40 @@
         return Math.round(R * c);
     }
 
-    window.abrirMapaPendentesAprovacaoModal = function() {
+    window.abrirMapaPendentesAprovacaoModal = async function(protocoloFoco = null, protocoloMotivo = null) {
         console.log("🗺️ [Mapa Pendentes] Abrindo visualização de OS pendentes e seus motivos vinculados...");
         let listaPendentes = [];
-        if (window.painelController && Array.isArray(window.painelController.pendentesList) && window.painelController.pendentesList.length > 0) {
-            listaPendentes = window.painelController.pendentesList;
-        } else if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
-            listaPendentes = window.painelController.chamadosList.filter(c => c.normalizedStatus === 'pendente' || (c.status || '').toLowerCase().trim() === 'pendente');
+        if (protocoloFoco) {
+            const cleanFoco = String(protocoloFoco || '').replace(/^#/, '').trim().toUpperCase();
+            let itemFoco = (window.painelController && Array.isArray(window.painelController.chamadosList))
+                ? window.painelController.chamadosList.find(c => String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase() === cleanFoco)
+                : null;
+            if (!itemFoco && window.painelController && Array.isArray(window.painelController.pendentesList)) {
+                itemFoco = window.painelController.pendentesList.find(c => String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase() === cleanFoco);
+            }
+            if (!itemFoco && window.ChamadosRepository) {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    const fetched = await repo.fetchById(cleanFoco);
+                    if (fetched) {
+                        const ModelClass = window.ChamadoModel;
+                        itemFoco = (fetched instanceof ModelClass) ? fetched : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fetched) : (ModelClass ? new ModelClass(fetched) : fetched));
+                    }
+                } catch(e) {
+                    console.warn('Erro ao carregar OS foco sob demanda:', e);
+                }
+            }
+            if (itemFoco) {
+                listaPendentes = [itemFoco];
+            }
+        }
+
+        if (listaPendentes.length === 0) {
+            if (window.painelController && Array.isArray(window.painelController.pendentesList) && window.painelController.pendentesList.length > 0) {
+                listaPendentes = window.painelController.pendentesList;
+            } else if (window.painelController && Array.isArray(window.painelController.chamadosList)) {
+                listaPendentes = window.painelController.chamadosList.filter(c => c.normalizedStatus === 'pendente' || (c.status || '').toLowerCase().trim() === 'pendente');
+            }
         }
 
         if (listaPendentes.length === 0) {
@@ -2440,8 +2329,34 @@
         };
 
         const todosChamados = (window.painelController && Array.isArray(window.painelController.chamadosList))
-            ? window.painelController.chamadosList
-            : listaPendentes;
+            ? [...window.painelController.chamadosList]
+            : [...listaPendentes];
+
+        // Garante que todas as OSs citadas nos motivos (incluindo reparo recente) estejam carregadas em todosChamados
+        for (const item of listaPendentes) {
+            const motivosDoItem = extrairProtocolosDoMotivo(item.motivoAprovacao || '');
+            if (protocoloMotivo) {
+                motivosDoItem.push(String(protocoloMotivo).replace(/^#/, '').trim());
+            }
+            for (const protCit of motivosDoItem) {
+                const cleanProtCit = String(protCit || '').replace(/^#/, '').trim();
+                if (!cleanProtCit || cleanProtCit.toLowerCase() === String(item.protocolo || item.id || '').replace(/^#/, '').trim().toLowerCase()) continue;
+                const exists = todosChamados.some(c => String(c.protocolo || c.id || '').replace(/^#/, '').trim().toLowerCase() === cleanProtCit.toLowerCase());
+                if (!exists && window.ChamadosRepository) {
+                    try {
+                        const repo = new window.ChamadosRepository();
+                        const fetched = await repo.fetchById(cleanProtCit);
+                        if (fetched) {
+                            const ModelClass = window.ChamadoModel;
+                            const modelObj = (fetched instanceof ModelClass) ? fetched : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fetched) : (ModelClass ? new ModelClass(fetched) : fetched));
+                            todosChamados.push(modelObj);
+                        }
+                    } catch(e) {
+                        console.warn('⚠️ [Mapa] Erro ao carregar OS motivo sob demanda:', e);
+                    }
+                }
+            }
+        }
 
         const pontosParaExibir = [];
         const conexoes = [];
@@ -2498,6 +2413,12 @@
             const dataFmt = item.formattedDateShort || item.dataCriacao || '';
             const motivoTexto = item.motivoAprovacao || '';
             const protocolosCitados = extrairProtocolosDoMotivo(motivoTexto);
+            if (protocoloMotivo) {
+                const cleanExplicitMot = String(protocoloMotivo).replace(/^#/, '').trim();
+                if (cleanExplicitMot && !protocolosCitados.some(p => p.toLowerCase() === cleanExplicitMot.toLowerCase())) {
+                    protocolosCitados.push(cleanExplicitMot);
+                }
+            }
 
             let ptPendente = null;
 
@@ -2775,6 +2696,8 @@
                         statusLabel: stBadge,
                         distanciaAoPendente: distMetros,
                         dataCriacao: osMotivo.formattedDateShort || osMotivo.dataCriacao || '',
+                        dataConclusao: osMotivo.dataConclusao || osMotivo.dataFechamento || '',
+                        materiais: osMotivo.materialUtilizado || osMotivo.materiais || '',
                         lat: melhorPontoMotivo.lat,
                         lng: melhorPontoMotivo.lng,
                         hasCoord: melhorPontoMotivo.hasCoord
@@ -2798,6 +2721,7 @@
                     melhorPontoPendente.hasCoord &&
                     ptMotivoExistente.hasCoord &&
                     (
+                        Boolean(protocoloFoco) ||
                         (matchTipo === 'plaqueta' && (distMetros === null || distMetros <= 100)) ||
                         (matchTipo === 'endereco' && (distMetros === null || distMetros <= 60)) ||
                         (distMetros !== null && distMetros <= 55)
@@ -2819,12 +2743,29 @@
         pendentesConexoesCache = conexoes;
 
         const badgeCount = document.getElementById('modal-mapa-pendentes-badge-count');
-        if (badgeCount) {
-            const countPend = pontosParaExibir.filter(p => p.tipoMarcador === 'pendente').length;
-            const countMot = pontosParaExibir.filter(p => p.tipoMarcador === 'motivo').length;
-            badgeCount.textContent = countMot > 0 
-                ? `${countPend} pendente(s) + ${countMot} motivo(s)`
-                : `${countPend} ponto(s) pendente(s)`;
+        const tituloEl = document.getElementById('modal-mapa-pendentes-titulo');
+        const subtituloEl = document.getElementById('modal-mapa-pendentes-subtitulo');
+
+        if (protocoloFoco) {
+            const cleanP = String(protocoloFoco).replace(/^#/, '');
+            const cleanM = String(protocoloMotivo || '').replace(/^#/, '');
+            if (tituloEl) tituloEl.textContent = cleanM ? `Comparação no Mapa: OS #${cleanP} vs Reparo #${cleanM}` : `Comparação no Mapa: OS #${cleanP}`;
+            if (subtituloEl) subtituloEl.textContent = 'Comparação visual entre a OS pendente e o reparo anterior no mesmo local.';
+            if (badgeCount) {
+                badgeCount.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-100 text-indigo-800 border border-indigo-200';
+                badgeCount.textContent = 'Comparação de Reparo Recente';
+            }
+        } else {
+            if (tituloEl) tituloEl.textContent = 'Mapa de OS Pendentes para Aprovação';
+            if (subtituloEl) subtituloEl.textContent = 'Exibindo os pontos de localização de todas as Ordens de Serviço aguardando aprovação.';
+            if (badgeCount) {
+                badgeCount.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-100 text-amber-800 border border-amber-200';
+                const countPend = pontosParaExibir.filter(p => p.tipoMarcador === 'pendente').length;
+                const countMot = pontosParaExibir.filter(p => p.tipoMarcador === 'motivo').length;
+                badgeCount.textContent = countMot > 0 
+                    ? `${countPend} pendente(s) + ${countMot} motivo(s)`
+                    : `${countPend} ponto(s) pendente(s)`;
+            }
         }
 
         modal.style.display = 'flex';
@@ -2834,6 +2775,18 @@
             modalBox.classList.remove('scale-95', 'opacity-0');
             modalBox.classList.add('scale-100', 'opacity-100');
             inicializarMapaPendentes(pontosParaExibir, conexoes);
+            if (protocoloFoco) {
+                setTimeout(() => {
+                    window.destacarConexaoOS(String(protocoloFoco).replace(/^#/, ''));
+                    if (pendentesMapboxMarkers && pendentesMapboxMarkers.length > 0) {
+                        try {
+                            const pendMarker = pendentesMapboxMarkers.find(m => m && m._element && m._element.innerText && m._element.innerText.includes('PENDENTE'));
+                            if (pendMarker && typeof pendMarker.togglePopup === 'function') pendMarker.togglePopup();
+                            else if (pendentesMapboxMarkers[0] && typeof pendentesMapboxMarkers[0].togglePopup === 'function') pendentesMapboxMarkers[0].togglePopup();
+                        } catch(e) {}
+                    }
+                }, 300);
+            }
         }, 50);
     };
 
@@ -3019,7 +2972,8 @@
                             ${p.plaqueta ? `<div><strong>Plaqueta:</strong> <span class="font-mono text-slate-800 font-semibold">${p.plaqueta}</span></div>` : ''}
                             <div><strong>Status Atual:</strong> <span class="text-slate-700 font-medium">${p.statusLabel || 'Auditada / Concluída'}</span></div>
                             <div><strong>Problema:</strong> <span class="text-slate-700">${p.problema || 'Não informado'}</span></div>
-                            ${p.dataCriacao ? `<div><strong>Data:</strong> <span class="text-slate-500">${p.dataCriacao}</span></div>` : ''}
+                            ${p.dataConclusao ? `<div><strong>Data Reparo:</strong> <span class="text-emerald-700 font-semibold">${typeof p.dataConclusao === 'object' && p.dataConclusao.toLocaleDateString ? p.dataConclusao.toLocaleDateString('pt-BR') : String(p.dataConclusao).split('T')[0]}</span></div>` : (p.dataCriacao ? `<div><strong>Data Abertura:</strong> <span class="text-slate-500">${p.dataCriacao}</span></div>` : '')}
+                            ${p.materiais ? `<div><strong>Material/Serviço:</strong> <span class="text-slate-700 font-mono text-[11px]">${p.materiais}</span></div>` : ''}
                         </div>
                         
                         <div class="flex flex-col gap-1.5 pt-1.5 border-t border-slate-100">
@@ -3219,6 +3173,10 @@
         setTimeout(() => {
             modal.classList.add('hidden');
             modal.style.display = 'none';
+            const tituloEl = document.getElementById('modal-mapa-pendentes-titulo');
+            const subtituloEl = document.getElementById('modal-mapa-pendentes-subtitulo');
+            if (tituloEl) tituloEl.textContent = 'Mapa de OS Pendentes para Aprovação';
+            if (subtituloEl) subtituloEl.textContent = 'Exibindo os pontos de localização de todas as Ordens de Serviço aguardando aprovação.';
         }, 200);
     };
 </script>

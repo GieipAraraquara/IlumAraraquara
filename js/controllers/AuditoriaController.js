@@ -1365,8 +1365,56 @@ class AuditoriaController {
     }
 
     /**
-     * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
+     * Abre a Ordem de Serviço selecionada no modal para edição
      */
+    async abrirEdicaoOS(idOrItem, event) {
+        if (event && typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+        if (typeof window.fecharDetalhesOSModal === 'function') {
+            window.fecharDetalhesOSModal();
+        }
+        const modalDet = document.getElementById('modalDetalhesOSAuditoria');
+        if (modalDet) modalDet.classList.add('hidden');
+
+        if (window.painelController && typeof window.painelController.abrirEdicaoOS === 'function') {
+            return window.painelController.abrirEdicaoOS(idOrItem, event);
+        }
+
+        let item = null;
+        if (idOrItem && typeof idOrItem === 'object') {
+            item = idOrItem;
+        } else {
+            const cleanId = String(idOrItem || '').replace(/^#/, '').trim().toUpperCase();
+            item = (this.chamadosList || []).find(c => {
+                const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId;
+            }) || (window.chamadosListCache || []).find(c => {
+                const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId;
+            });
+
+            if (!item && window.ChamadosRepository) {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    const fetched = await repo.fetchById(cleanId);
+                    if (fetched) {
+                        const ModelClass = window.ChamadoModel;
+                        item = (fetched instanceof ModelClass) ? fetched : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fetched) : (ModelClass ? new ModelClass(fetched) : fetched));
+                    }
+                } catch (err) {
+                    console.warn('⚠️ [AuditoriaController] Erro ao buscar OS para edição:', err);
+                }
+            }
+        }
+
+        if (item && typeof window.abrirModalEditarOS === 'function') {
+            window.abrirModalEditarOS(item);
+        } else if (typeof window.abrirModalEditarOS === 'function' && idOrItem) {
+            window.abrirModalEditarOS(typeof idOrItem === 'object' ? idOrItem : { id: idOrItem, protocolo: idOrItem });
+        }
+    }
+
     /**
      * Exibe o modal de detalhes completos da Ordem de Serviço selecionada
      */
@@ -2039,7 +2087,10 @@ class AuditoriaController {
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
-                ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-flex items-center flex-wrap gap-1 mt-0.5 shadow-2xs">${motivoAprovacaoHtml}</span></div>` : ''}
+                ${item.motivoAprovacao ? `
+                <div class="mt-2 pt-2 border-t border-outline-variant/30 text-xs">
+                    ${(window.ChamadoModel && typeof window.ChamadoModel.renderMotivoDetalhesHtml === 'function') ? window.ChamadoModel.renderMotivoDetalhesHtml(item) : `<div class="font-semibold text-amber-900 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-200 inline-flex items-center flex-wrap gap-1.5 shadow-2xs text-xs leading-relaxed">${motivoAprovacaoHtml}</div>`}
+                </div>` : ''}
             </div>
 
             <!-- Bloco 2: Ações Administrativas -->
@@ -2064,6 +2115,13 @@ class AuditoriaController {
                                 <span class="material-symbols-outlined text-[15px]">thumb_down</span>
                                 <span>OS Rejeitada</span>
                             </button>` : '')}
+                        ` : ''}
+
+                        ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? `
+                            <button type="button" onclick="window.abrirEdicaoOS ? window.abrirEdicaoOS('${item.protocolo || item.id}', event) : (window.painelController && window.painelController.abrirEdicaoOS('${item.protocolo || item.id}', event))" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-secondary text-white hover:bg-secondary-container hover:text-on-secondary-container active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar dados desta Ordem de Serviço">
+                                <span class="material-symbols-outlined text-[16px]">edit</span>
+                                <span>Editar OS</span>
+                            </button>
                         ` : ''}
 
                         ${(isAdminUser || isManutentorUser) ? `
@@ -2375,9 +2433,11 @@ class AuditoriaController {
                     const rawIniList = Array.isArray(item.rawPontosInicial) 
                         ? item.rawPontosInicial 
                         : (typeof item.rawPontosInicial === 'string' ? (JSON.parse(item.rawPontosInicial || '[]') || []) : []);
-                    const qtdAbertura = parseInt(item.quantidade || (item.raw && item.raw.quantidade), 10) || (item.qtdInicial || 1);
-                    const totalPtsAbertura = Math.max(rawIniList.length, qtdAbertura);
-                    const isAberturaCompartilhada = !hasIni && (totalPtsAbertura > 1);
+                    const rawPtIni = (rawIniList && rawIniList[pIdx]) ? rawIniList[pIdx] : null;
+                    const isAberturaCompartilhada = Boolean(
+                        p.isAberturaCompartilhada ||
+                        (rawPtIni && (rawPtIni.usarMesmoEndereco || rawPtIni.usar_mesmo_endereco))
+                    );
 
                     const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, endIniVal) : (isAberturaCompartilhada && p.coordenadaInicial ? buildNavLinks(p.coordenadaInicial, endIniVal) : { hasNav: false });
                     const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, endFinVal) : { hasNav: false };

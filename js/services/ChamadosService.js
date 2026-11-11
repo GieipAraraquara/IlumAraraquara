@@ -77,14 +77,18 @@ class ChamadosService {
 
             // General top-bar search filter
             if (search) {
-                const term = search.toLowerCase().trim();
+                const cleanStr = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                const term = cleanStr(search);
                 const fmt = window.ChamadoModel ? window.ChamadoModel.formatLocationText : (v => String(v || ''));
-                const matchProtocol = fmt(item.protocolo).toLowerCase().includes(term);
-                const matchPlaqueta = fmt(item.plaquetaInicial).toLowerCase().includes(term);
-                const matchAddress = fmt(item.endereco).toLowerCase().includes(term);
-                const matchCoord = fmt(item.coordenadaInicial).toLowerCase().includes(term);
-                const matchMunicipe = fmt(item.municipeNome).toLowerCase().includes(term);
-                if (!matchProtocol && !matchPlaqueta && !matchAddress && !matchCoord && !matchMunicipe) return false;
+                const matchProtocol = cleanStr(fmt(item.protocolo)).includes(term);
+                const matchPlaqueta = cleanStr(fmt(item.plaquetaInicial)).includes(term);
+                const matchAddress = cleanStr(fmt(item.endereco)).includes(term);
+                const matchCoord = cleanStr(fmt(item.coordenadaInicial)).includes(term);
+                const matchMunicipe = cleanStr(fmt(item.municipeNome)).includes(term);
+                const matchOperador = cleanStr(item.operadorAbertura).includes(term) || cleanStr(item.operadorFinalizacao).includes(term);
+                const matchStatus = cleanStr(item.statusBadgeLabel || item.normalizedStatus || item.rawStatus).includes(term);
+                const matchPoints = Array.isArray(item.addressPointsIniciais) && item.addressPointsIniciais.some(pt => cleanStr(pt).includes(term));
+                if (!matchProtocol && !matchPlaqueta && !matchAddress && !matchCoord && !matchMunicipe && !matchOperador && !matchStatus && !matchPoints) return false;
             }
 
             // Protocol prefix filter (Praça 'P' / Viária 'I')
@@ -117,7 +121,9 @@ class ChamadosService {
             }
 
             // Status filter
-            if (status && status !== 'all') {
+            // Quando há texto digitado na barra de busca superior (search), ignora o filtro de status da OS para que OS concluídas e de outros tipos apareçam
+            const hasSearchQuery = Boolean(search && String(search).trim().length > 0);
+            if (!hasSearchQuery && status && status !== 'all') {
                 if (Array.isArray(status)) {
                     if (status.length === 0) return false;
                     if (!status.includes('all') && !status.includes(item.normalizedStatus)) return false;

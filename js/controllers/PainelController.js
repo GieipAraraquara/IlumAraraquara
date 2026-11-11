@@ -216,10 +216,12 @@ class PainelController {
                 if (noResultsRowPendentes) noResultsRowPendentes.classList.remove('hidden');
             } else {
                 if (noResultsRowPendentes) noResultsRowPendentes.classList.add('hidden');
+                const fragmentPendentes = document.createDocumentFragment();
                 pendentesList.forEach(item => {
                     const tr = this.createRowElement(item, true);
-                    tbodyPendentes.appendChild(tr);
+                    fragmentPendentes.appendChild(tr);
                 });
+                tbodyPendentes.appendChild(fragmentPendentes);
             }
         }
 
@@ -233,10 +235,12 @@ class PainelController {
                 if (noResultsRowMain) noResultsRowMain.classList.remove('hidden');
             } else {
                 if (noResultsRowMain) noResultsRowMain.classList.add('hidden');
+                const fragmentMain = document.createDocumentFragment();
                 filteredList.forEach(item => {
                     const tr = this.createRowElement(item);
-                    tbodyMain.appendChild(tr);
+                    fragmentMain.appendChild(tr);
                 });
+                tbodyMain.appendChild(fragmentMain);
             }
         }
     }
@@ -254,7 +258,7 @@ class PainelController {
         const isEmAndamento = item.normalizedStatus === 'em_andamento';
         const isAberto = item.normalizedStatus === 'aberto';
 
-        tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-all duration-200 cursor-pointer group hover:shadow-[0_2px_8px_-2px_rgba(0,0,0,0.1)] hover:-translate-y-[1px] relative z-0 hover:z-10 bg-surface-container-lowest align-middle ${(isCancelada || isRejeitada) ? 'opacity-70' : ''}`;
+        tr.className = `border-b border-outline-variant hover:bg-surface-container-low transition-colors duration-150 cursor-pointer relative bg-surface-container-lowest align-middle ${(isCancelada || isRejeitada) ? 'opacity-70' : ''}`;
         const targetId = item.protocolo || item.id || '';
         tr.setAttribute('data-id', targetId);
         tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${targetId}')`);
@@ -311,13 +315,6 @@ class PainelController {
             `;
         } else {
             const points = item.addressPointsIniciais;
-            console.log(`📌 [PainelController] Renderizando OS ${item.protocolo}:`, {
-                endereco: item.endereco,
-                plaquetaInicial: item.plaquetaInicial,
-                coordenadaInicial: item.coordenadaInicial,
-                rawPontos: item.rawPontos,
-                pointsResultantes: points
-            });
 
             if (points.length > 1) {
                 tdEndereco.innerHTML = `
@@ -428,7 +425,12 @@ class PainelController {
             const hasMotivo = Boolean(item.motivoAprovacao);
 
             if (hasMotivo) {
-                const motivoConteudo = this.formatarMotivoComLinks(item.motivoAprovacao, { isTable: true, stopPropagation: true });
+                const motivoConteudo = this.formatarMotivoComLinks(item.motivoAprovacao, { 
+                    isTable: true, 
+                    stopPropagation: true, 
+                    currentProtocolo: item.protocolo || item.id,
+                    item: item 
+                });
                 tdStatus.innerHTML = `
                     <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] leading-tight font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs" style="font-size: 11px;" title="${motivoFull}">
                         <span class="material-symbols-outlined text-[14px] text-amber-600 shrink-0" style="font-size: 14px;">info</span>
@@ -533,10 +535,53 @@ class PainelController {
      * @param {object} options { isTable: boolean, stopPropagation: boolean }
      * @returns {string} HTML com botões interativos
      */
+    /**
+     * Formata o motivo de pendência/aprovação com links interativos para abrir OSs duplicadas
+     * e opção para comparar diretamente no mapa de Reparo Recente.
+     * @param {string} motivo Texto do motivo
+     * @param {object} options { isTable: boolean, stopPropagation: boolean, currentProtocolo: string, item: object, omitButton: boolean }
+     * @returns {string} HTML com botões interativos
+     */
     formatarMotivoComLinks(motivo, options = {}) {
+        if (!motivo) return '';
+        let baseHtml = '';
         if (window.ChamadoModel && typeof window.ChamadoModel.formatarMotivoHtml === 'function') {
-            return window.ChamadoModel.formatarMotivoHtml(motivo, options);
+            baseHtml = window.ChamadoModel.formatarMotivoHtml(motivo, { ...options, omitButton: true });
+        } else {
+            baseHtml = this._fallbackFormatarMotivo(motivo, options);
         }
+
+        // Se options.omitButton estiver ativo, retorna apenas o texto com links
+        if (options.omitButton) {
+            return baseHtml;
+        }
+
+        const currentProt = options.currentProtocolo || options.protocolo || (options.item && (options.item.protocolo || options.item.id));
+        const protMotivo = this.extrairProtocoloMotivo(motivo);
+        const isReparo = this.isReparoRecenteMotivo(motivo);
+
+        // Se identificamos o protocolo do motivo e a OS atual, e se trata de reparo recente (ou solicitado explicitamente):
+        if (protMotivo && currentProt && (isReparo || options.incluirBotaoComparar)) {
+            const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : '';
+            const isTable = Boolean(options.isTable);
+            const btnClass = isTable
+                ? 'inline-flex items-center gap-1 font-sans font-bold text-[10.5px] bg-amber-600 hover:bg-amber-700 text-white px-1.5 py-0.5 rounded shadow-2xs transition-all cursor-pointer select-none active:scale-95 ml-1'
+                : 'inline-flex items-center gap-1.5 font-sans font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white px-2.5 py-1 rounded-lg shadow-2xs transition-all cursor-pointer select-none active:scale-95 ml-1.5';
+            const iconSize = isTable ? '12px' : '14px';
+            const btnLabel = 'Comparar';
+
+            const btnComparar = `<button type="button" onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event))" class="${btnClass}" title="Comparar a OS #${currentProt} com o Reparo Recente #${protMotivo} no mapa Mapbox"><span class="material-symbols-outlined text-[${iconSize}] pointer-events-none">map</span><span>${btnLabel}</span></button>`;
+
+            return `<span class="inline-flex items-center flex-wrap gap-1">${baseHtml}${btnComparar}</span>`;
+        }
+
+        return baseHtml;
+    }
+
+    /**
+     * Fallback para formatação do motivo caso ChamadoModel.formatarMotivoHtml não esteja disponível
+     */
+    _fallbackFormatarMotivo(motivo, options = {}) {
         if (!motivo) return '';
         const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : '';
         const isTable = Boolean(options.isTable);
@@ -571,6 +616,232 @@ class PainelController {
     }
 
     /**
+     * Extrai o protocolo da OS motivo citada no texto (ex: "Reparo recente #IP12RY3100926" -> "IP12RY3100926")
+     */
+
+    _escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Extrai informações estruturadas do motivo da pendência
+     */
+    extrairInfoMotivo(motivoTexto) {
+        if (window.ChamadoModel && typeof window.ChamadoModel.extrairInfoMotivo === 'function') {
+            return window.ChamadoModel.extrairInfoMotivo(motivoTexto);
+        }
+        if (!motivoTexto || typeof motivoTexto !== 'string') {
+            return { textoLimpo: '', protocolos: [], protocolo: '', isReparo: false };
+        }
+        const lower = motivoTexto.toLowerCase();
+        const isReparo = lower.includes('reparo recente') || lower.includes('reincid') || lower.includes('reincidencia') || /\(h[aá]\s+\d+d?\s+a\s+\d+m?\)/i.test(motivoTexto);
+        const regexProtAll = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/gi;
+        const protocolos = [];
+        let match;
+        while ((match = regexProtAll.exec(motivoTexto)) !== null) {
+            const raw = (match[1] || match[2] || '').trim().replace(/^#/, '');
+            if (raw && !protocolos.includes(raw)) {
+                protocolos.push(raw);
+            }
+        }
+        let textoLimpo = motivoTexto;
+        for (const prot of protocolos) {
+            const escProt = prot.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            textoLimpo = textoLimpo.replace(new RegExp(`(?:#\\s*${escProt}\\b|\\b${escProt}\\b)`, 'gi'), '');
+        }
+        textoLimpo = textoLimpo.replace(/\s{2,}/g, ' ').trim();
+        return { textoLimpo, protocolos, protocolo: protocolos[0] || '', isReparo };
+    }
+
+    /**
+     * Renderiza o bloco de Motivo de Pendência/Aprovação formatado para o modal de detalhes da OS.
+     * Quando for Reparo Recente (ou tiver protocolo associado), exibe em 2 linhas limpas:
+     * - Linha 1: Texto descritivo limpo (ex: "Reparo recente (há 12 dias, a 42 metros)")
+     * - Linha 2: Os dois botões com mesma estrutura física: Protocolo e Comparar no Mapa
+     */
+    renderMotivoAprovacaoDetalhesHtml(item) {
+        if (window.ChamadoModel && typeof window.ChamadoModel.renderMotivoDetalhesHtml === 'function') {
+            return window.ChamadoModel.renderMotivoDetalhesHtml(item);
+        }
+        if (!item || !item.motivoAprovacao) return '';
+        const motivo = String(item.motivoAprovacao).trim();
+        const currentProt = String(item.protocolo || item.id || '').replace(/^#/, '').trim();
+        const info = this.extrairInfoMotivo(motivo);
+        if (info.protocolos && info.protocolos.length > 0) {
+            const btnBaseClass = 'inline-flex items-center justify-center gap-1.5 px-3 h-[30px] box-border rounded-lg text-xs font-semibold leading-none shadow-2xs transition-all cursor-pointer select-none active:scale-95';
+            const btnProtClass = `${btnBaseClass} bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-300 hover:border-blue-400`;
+            const btnCompClass = `${btnBaseClass} bg-white hover:bg-amber-100/80 text-amber-900 hover:text-amber-950 border border-amber-300 hover:border-amber-400`;
+
+            const btns = info.protocolos.map(cleanProt => `
+                <button type="button" onclick="event.stopPropagation(); window.abrirDetalhesOSModal('${cleanProt}')" class="${btnProtClass}" title="Abrir Ordem de Serviço #${cleanProt}">
+                    <span class="material-symbols-outlined text-[15px] leading-none text-blue-600 pointer-events-none">open_in_new</span>
+                    <span class="leading-none">#${cleanProt}</span>
+                </button>
+            `.trim()).join('');
+
+            let btnComp = '';
+            if (info.isReparo && currentProt && info.protocolo) {
+                btnComp = `
+                    <button type="button" onclick="event.stopPropagation(); window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" class="${btnCompClass}" title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                        <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
+                        <span class="leading-none">Comparar</span>
+                    </button>
+                `.trim();
+            }
+
+            return `
+                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
+                    <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
+                        <span>${this._escapeHtml(info.textoLimpo || motivo)}</span>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                        ${btns}
+                        ${btnComp}
+                    </div>
+                </div>
+            `.trim();
+        }
+
+        return `
+            <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl px-3 py-2 text-xs font-semibold text-amber-950 shadow-2xs mt-1 leading-relaxed">
+                ${this._escapeHtml(motivo)}
+            </div>
+        `.trim();
+    }
+
+    extrairProtocoloMotivo(motivoTexto) {
+        if (!motivoTexto || typeof motivoTexto !== 'string') return '';
+        const regex = /(?:#([A-Za-z0-9_-]+)|\b(IP[0-9A-Za-z]{6,14}|PC[0-9A-Za-z]{6,14})\b)/i;
+        const match = regex.exec(motivoTexto);
+        if (match) {
+            const raw = (match[1] || match[2] || '').trim();
+            return raw.replace(/^#/, '');
+        }
+        return '';
+    }
+
+    /**
+     * Verifica se o motivo da pendência refere-se a um Reparo Recente ou Reincidência
+     */
+    isReparoRecenteMotivo(motivoTexto) {
+        if (!motivoTexto || typeof motivoTexto !== 'string') return false;
+        const lower = motivoTexto.toLowerCase();
+        return lower.includes('reparo recente') || lower.includes('reincid') || lower.includes('reincidencia') || /\(h[aá]\s+\d+d\s+a\s+\d+m\)/i.test(motivoTexto);
+    }
+
+    /**
+     * Renderiza o botão destacado "Comparar no Mapa" para exibição no modal de detalhes ou na tabela
+     */
+    renderBotaoCompararReparoRecente(item, options = {}) {
+        if (!item || !item.motivoAprovacao) return '';
+        const motivo = item.motivoAprovacao;
+        const protMotivo = this.extrairProtocoloMotivo(motivo);
+        if (!protMotivo) return '';
+
+        const isReparo = this.isReparoRecenteMotivo(motivo);
+        const currentProt = item.protocolo || item.id || '';
+        const isTable = Boolean(options.isTable);
+        const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : '';
+
+        const btnClass = isTable
+            ? 'inline-flex items-center gap-1 font-sans font-bold text-[10.5px] bg-amber-600 hover:bg-amber-700 text-white px-2 py-0.5 rounded shadow-2xs transition-all cursor-pointer select-none active:scale-95'
+            : 'inline-flex items-center gap-1.5 font-sans font-bold text-xs bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded-lg shadow-xs transition-all cursor-pointer select-none active:scale-95';
+        const iconSize = isTable ? '12px' : '15px';
+        const label = 'Comparar';
+
+        return `<button type="button" onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${protMotivo}', event))" class="${btnClass}" title="Comparar localização da OS #${currentProt} com o ${isReparo ? 'Reparo Recente' : 'OS Motivo'} #${protMotivo} no mapa Mapbox">
+            <span class="material-symbols-outlined text-[${iconSize}] pointer-events-none">map</span>
+            <span>${label}</span>
+        </button>`;
+    }
+
+    /**
+     * Abre a comparação direta da OS pendente e da OS do reparo recente no modal do mapa
+     */
+    async compararReparoRecenteNoMapa(protocoloPendente, protocoloMotivo, event) {
+        if (event && typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        const cleanPendente = String(protocoloPendente || '').replace(/^#/, '').trim();
+        let cleanMotivo = String(protocoloMotivo || '').replace(/^#/, '').trim();
+
+        console.log(`🗺️ [PainelController] Comparando no mapa: Pendente #${cleanPendente} vs Reparo Recente #${cleanMotivo}`);
+
+        // 1. Localizar item pendente na memória ou banco
+        let itemPendente = (this.chamadosList || []).find(c => {
+            const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanPendente.toUpperCase();
+        }) || (this.pendentesList || []).find(c => {
+            const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanPendente.toUpperCase();
+        });
+
+        if (!itemPendente && window.ChamadosRepository) {
+            try {
+                const repo = new window.ChamadosRepository();
+                itemPendente = await repo.fetchById(cleanPendente);
+            } catch(e) {
+                console.warn('⚠️ [PainelController] Falha ao buscar OS pendente:', e);
+            }
+        }
+
+        // Se cleanMotivo não foi fornecido, extrai do motivoAprovacao
+        if (!cleanMotivo && itemPendente && itemPendente.motivoAprovacao) {
+            cleanMotivo = this.extrairProtocoloMotivo(itemPendente.motivoAprovacao);
+        }
+
+        if (!cleanMotivo) {
+            const msg = 'Nenhum protocolo de reparo recente identificado no motivo.';
+            if (window.Toast) window.Toast.show(msg, 'warning');
+            else alert(msg);
+            return;
+        }
+
+        // 2. Localizar item motivo na memória ou banco
+        let itemMotivo = (this.chamadosList || []).find(c => {
+            const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+            return p === cleanMotivo.toUpperCase();
+        });
+
+        if (!itemMotivo || !itemMotivo._isEnriched) {
+            if (window.ChamadosRepository) {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    const fetchedMotivo = await repo.fetchById(cleanMotivo);
+                    if (fetchedMotivo) {
+                        const ModelClass = window.ChamadoModel;
+                        itemMotivo = (fetchedMotivo instanceof ModelClass) ? fetchedMotivo : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fetchedMotivo) : (ModelClass ? new ModelClass(fetchedMotivo) : fetchedMotivo));
+                        itemMotivo._isEnriched = true;
+                        if (Array.isArray(this.chamadosList)) {
+                            const exIdx = this.chamadosList.findIndex(c => String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase() === cleanMotivo.toUpperCase());
+                            if (exIdx >= 0) this.chamadosList[exIdx] = itemMotivo;
+                            else this.chamadosList.push(itemMotivo);
+                        }
+                    }
+                } catch(e) {
+                    console.warn('⚠️ [PainelController] Falha ao buscar OS motivo sob demanda:', e);
+                }
+            }
+        }
+
+        // 3. Abrir o Modal do Mapa
+        if (typeof window.abrirMapaPendentesAprovacaoModal === 'function') {
+            await window.abrirMapaPendentesAprovacaoModal(cleanPendente, cleanMotivo);
+        } else if (typeof window.abrirMapaPonto === 'function') {
+            // Fallback caso o modal de pendentes não esteja disponível
+            window.abrirMapaPonto(itemPendente || cleanPendente, 0, event);
+        } else {
+            console.error('❌ [PainelController] Nenhum modal de mapa disponível no DOM.');
+        }
+    }
+
+    /**
      * Binds search inputs, filter triggers, and modal actions
      */
     setupEventListeners() {
@@ -582,27 +853,39 @@ class PainelController {
             if (typeof origFechar === 'function') origFechar();
         };
         window.voltarModalOS = () => this.voltarModalOS();
+        window.compararReparoRecenteNoMapa = (pPendente, pMotivo, ev) => this.compararReparoRecenteNoMapa(pPendente, pMotivo, ev);
+        window.abrirEdicaoOS = (id, ev) => this.abrirEdicaoOS(id, ev);
 
         // Main search bar input
         const searchInput = document.getElementById('search-input');
         if (searchInput) {
+            if (searchInput.value) {
+                this.activeFilters.search = searchInput.value;
+            }
             searchInput.addEventListener('input', (e) => {
                 this.activeFilters.search = e.target.value;
                 this.renderTable();
+                if (typeof window.applyCombinedFilters === 'function') {
+                    window.applyCombinedFilters();
+                }
             });
         }
 
         // Protocol column search input
         const protocolInput = document.getElementById('protocol-search-input');
         if (protocolInput) {
+            let debounceProtocol;
             protocolInput.addEventListener('input', (e) => {
-                this.activeFilters.protocol = e.target.value;
-                const indicator = document.getElementById('protocol-filter-indicator');
-                if (indicator) {
-                    if (e.target.value.trim() || this.activeFilters.protocolPrefix) indicator.classList.remove('hidden');
-                    else indicator.classList.add('hidden');
-                }
-                this.renderTable();
+                clearTimeout(debounceProtocol);
+                debounceProtocol = setTimeout(() => {
+                    this.activeFilters.protocol = e.target.value;
+                    const indicator = document.getElementById('protocol-filter-indicator');
+                    if (indicator) {
+                        if (e.target.value.trim() || this.activeFilters.protocolPrefix) indicator.classList.remove('hidden');
+                        else indicator.classList.add('hidden');
+                    }
+                    this.renderTable();
+                }, 200);
             });
         }
 
@@ -831,13 +1114,54 @@ class PainelController {
     /**
      * Abre a Ordem de Serviço selecionada no modal para edição
      */
-    abrirEdicaoOS(id, event) {
-        if (event) event.stopPropagation();
-        const item = this.chamadosList.find(c => String(c.id) === String(id) || String(c.protocolo) === String(id));
+    async abrirEdicaoOS(idOrItem, event) {
+        if (event && typeof event.stopPropagation === 'function') {
+            event.stopPropagation();
+        }
+
+        // Se o modal de detalhes estiver aberto, fecha-o para exibir o modal de edição em primeiro plano
+        if (typeof window.fecharDetalhesOSModal === 'function') {
+            window.fecharDetalhesOSModal();
+        }
+        const modalDet = document.getElementById('modalDetalhesOSAuditoria');
+        if (modalDet) modalDet.classList.add('hidden');
+
+        let item = null;
+        if (idOrItem && typeof idOrItem === 'object') {
+            item = idOrItem;
+        } else {
+            const cleanId = String(idOrItem || '').replace(/^#/, '').trim().toUpperCase();
+            item = (this.chamadosList || []).find(c => {
+                const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId;
+            }) || (this.pendentesList || []).find(c => {
+                const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId;
+            }) || (window.chamadosListCache || []).find(c => {
+                const p = String(c.protocolo || c.id || '').replace(/^#/, '').trim().toUpperCase();
+                return p === cleanId;
+            });
+
+            if (!item && window.ChamadosRepository) {
+                try {
+                    const repo = new window.ChamadosRepository();
+                    const fetched = await repo.fetchById(cleanId);
+                    if (fetched) {
+                        const ModelClass = window.ChamadoModel;
+                        item = (fetched instanceof ModelClass) ? fetched : (ModelClass && typeof ModelClass.fromRow === 'function' ? ModelClass.fromRow(fetched) : (ModelClass ? new ModelClass(fetched) : fetched));
+                    }
+                } catch (err) {
+                    console.warn('⚠️ [PainelController] Erro ao buscar OS para edição via repo:', err);
+                }
+            }
+        }
+
         if (item && typeof window.abrirModalEditarOS === 'function') {
             window.abrirModalEditarOS(item);
+        } else if (typeof window.abrirModalEditarOS === 'function' && idOrItem) {
+            window.abrirModalEditarOS(typeof idOrItem === 'object' ? idOrItem : { id: idOrItem, protocolo: idOrItem });
         } else {
-            console.warn('⚠️ OS não encontrada para edição:', id);
+            console.warn('⚠️ OS não encontrada para edição:', idOrItem);
         }
     }
 
@@ -1527,7 +1851,10 @@ class PainelController {
                 <div><b class="text-on-surface-variant font-medium">Cadastrado por (Abertura):</b> <span class="font-semibold text-blue-700">${opAbertura}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Finalizado por (Conclusão):</b> <span class="font-semibold ${item.normalizedStatus === 'concluida' ? 'text-emerald-700' : 'text-on-surface-variant'}">${opFinalizacao}</span></div>
                 <div><b class="text-on-surface-variant font-medium">Prioridade:</b> <span class="font-medium text-on-surface">${item.prioridade || 'Normal'}</span></div>
-                ${item.motivoAprovacao ? `<div class="mt-1"><b class="text-amber-800 font-medium">Motivo Pendência/Aprovação:</b> <span class="font-semibold text-amber-800 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 inline-flex items-center flex-wrap gap-1 mt-0.5 shadow-2xs">${this.formatarMotivoComLinks(item.motivoAprovacao, { isTable: false })}</span></div>` : ''}
+                ${item.motivoAprovacao ? `
+                <div class="mt-2 pt-2 border-t border-outline-variant/30 text-xs">
+                    ${this.renderMotivoAprovacaoDetalhesHtml(item)}
+                </div>` : ''}
             </div>
 
             <!-- Bloco 2: Ações Administrativas -->
@@ -1552,6 +1879,13 @@ class PainelController {
                                 <span class="material-symbols-outlined text-[15px]">thumb_down</span>
                                 <span>OS Rejeitada</span>
                             </button>` : '')}
+                        ` : ''}
+
+                        ${(!isConcluida && !isJaCancelada && !isJaRejeitada) ? `
+                            <button type="button" onclick="window.abrirEdicaoOS ? window.abrirEdicaoOS('${item.protocolo || item.id}', event) : (window.painelController && window.painelController.abrirEdicaoOS('${item.protocolo || item.id}', event))" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-secondary text-white hover:bg-secondary-container hover:text-on-secondary-container active:scale-95 transition-all shadow-2xs cursor-pointer" title="Editar dados desta Ordem de Serviço">
+                                <span class="material-symbols-outlined text-[16px]">edit</span>
+                                <span>Editar OS</span>
+                            </button>
                         ` : ''}
 
                         ${(isAdminUser || isManutentorUser) ? `
@@ -1831,9 +2165,11 @@ class PainelController {
                     const rawIniList = Array.isArray(item.rawPontosInicial) 
                         ? item.rawPontosInicial 
                         : (typeof item.rawPontosInicial === 'string' ? (JSON.parse(item.rawPontosInicial || '[]') || []) : []);
-                    const qtdAbertura = parseInt(item.quantidade || (item.raw && item.raw.quantidade), 10) || (item.qtdInicial || 1);
-                    const totalPtsAbertura = Math.max(rawIniList.length, qtdAbertura);
-                    const isAberturaCompartilhada = !hasIni && (totalPtsAbertura > 1);
+                    const rawPtIni = (rawIniList && rawIniList[pIdx]) ? rawIniList[pIdx] : null;
+                    const isAberturaCompartilhada = Boolean(
+                        p.isAberturaCompartilhada ||
+                        (rawPtIni && (rawPtIni.usarMesmoEndereco || rawPtIni.usar_mesmo_endereco))
+                    );
 
                     const navIni = hasIni ? buildNavLinks(p.coordenadaInicial, endIniVal) : (isAberturaCompartilhada && p.coordenadaInicial ? buildNavLinks(p.coordenadaInicial, endIniVal) : { hasNav: false });
                     const navFin = p.hasFinalData ? buildNavLinks(p.coordenadaFinal, endFinVal) : { hasNav: false };
@@ -4044,6 +4380,24 @@ window.abrirDetalhesOSModal = function(id) {
         window.abrirModalDetalhesPrincipal(id);
     } else {
         console.warn('Controller não encontrado para a OS:', id);
+    }
+};
+
+window.abrirEdicaoOS = function(idOrItem, event) {
+    if (window.painelController && typeof window.painelController.abrirEdicaoOS === 'function') {
+        return window.painelController.abrirEdicaoOS(idOrItem, event);
+    }
+    if (window.auditoriaController && typeof window.auditoriaController.abrirEdicaoOS === 'function') {
+        return window.auditoriaController.abrirEdicaoOS(idOrItem, event);
+    }
+    if (typeof window.fecharDetalhesOSModal === 'function') {
+        window.fecharDetalhesOSModal();
+    }
+    const mDet = document.getElementById('modalDetalhesOSAuditoria');
+    if (mDet) mDet.classList.add('hidden');
+
+    if (typeof window.abrirModalEditarOS === 'function') {
+        return window.abrirModalEditarOS(typeof idOrItem === 'object' ? idOrItem : { id: idOrItem, protocolo: idOrItem });
     }
 };
 

@@ -5,7 +5,7 @@ class AppHeader extends HTMLElement {
         const oninputAttr = this.getAttribute('oninput') ? `oninput="${this.getAttribute('oninput')}"` : '';
 
         this.innerHTML = `
-<header class="bg-surface/80 backdrop-blur-md dark:bg-surface-container/80 docked full-width top-0 h-16 border-b border-outline-variant dark:border-outline flex justify-between items-center px-container-padding ml-[260px] w-[calc(100%-260px)] z-10 fixed transition-all duration-300" id="top-header">
+<header class="bg-surface dark:bg-surface-container docked full-width top-0 h-16 border-b border-outline-variant dark:border-outline flex justify-between items-center px-container-padding ml-[260px] w-[calc(100%-260px)] z-10 fixed transition-all duration-300" id="top-header">
     <div class="flex-1 flex items-center">
         <div class="relative w-96 focus-within:ring-2 focus-within:ring-secondary rounded-lg transition-shadow duration-200">
             <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
