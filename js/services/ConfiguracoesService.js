@@ -31,7 +31,21 @@ class ConfiguracoesService {
             notificar_os_atrasada: true,
             notificar_relatorio_mensal: false,
             marcas_luminaria_viaria: ['INSIGHT'],
-            marcas_rele_padrao: ['EXATRON']
+            marcas_rele_padrao: ['EXATRON'],
+            whitelist_materiais_viaria: [
+                { termo: 'rele fotoeletrico', descricao: 'Relé Fotoelétrico', max_por_ponto: 1 },
+                { termo: 'fita em aco inoxidavel', descricao: 'Fita em Aço Inox (Fechometal)', max_por_ponto: 2 },
+                { termo: 'conector perfurante', descricao: 'Conector Perfurante (CDP)', max_por_ponto: 2 },
+                { termo: 'luminaria publica led', descricao: 'Luminária Pública LED Retangular', max_por_ponto: 1 },
+                { termo: 'placa de identificacao', descricao: 'Placa de Identificação / Plaqueta', max_por_ponto: 1 },
+                { termo: 'plaqueta', descricao: 'Plaqueta de Identificação', max_por_ponto: 1 },
+                { termo: 'servico de manutencao em iluminacao publica viaria', descricao: 'Serviço de Manutenção Viária (Poste CPFL)', max_por_ponto: 1 },
+                { termo: 'servico de troca de rele', descricao: 'Serviço de Troca de Relé Viária', max_por_ponto: 1 },
+                { termo: 'servico de instalacao de plaqueta', descricao: 'Serviço de Instalação de Plaqueta Viária', max_por_ponto: 1 },
+                { termo: 'servico de poda de arvore', descricao: 'Serviço de Poda de Árvore (Munk)', max_por_ponto: 1 },
+                { termo: 'braco para iluminacao publica', descricao: 'Braço Metálico Galvanizado', max_por_ponto: 1 },
+                { termo: 'cabo de cobre', descricao: 'Cabo de Cobre de Ligação', max_por_ponto: 0 }
+            ]
         };
     }
 

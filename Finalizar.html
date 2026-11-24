@@ -4825,7 +4825,26 @@
         }
 
         var stLower = (dadosPracaAtual.status || '').toLowerCase().trim();
-        var isIniciandoSessao = !stLower.includes('andamento');
+        var listaSessoesAtual = [];
+        if (dadosPracaAtual.historico_sessoes) {
+          try {
+            listaSessoesAtual = typeof dadosPracaAtual.historico_sessoes === 'string'
+              ? JSON.parse(dadosPracaAtual.historico_sessoes)
+              : (Array.isArray(dadosPracaAtual.historico_sessoes) ? dadosPracaAtual.historico_sessoes : []);
+          } catch(e) { listaSessoesAtual = []; }
+        }
+        var sessaoAbertaAtiva = Array.isArray(listaSessoesAtual) && listaSessoesAtual.some(function(s) { return !s.fim; });
+        var isIniciandoSessao = !stLower.includes('andamento') && !sessaoAbertaAtiva;
+
+        // BLINDAGEM 1: Se o status ou botão indicar encerramento, mas NÃO houver sessão aberta ativa:
+        if (stLower.includes('andamento') && !sessaoAbertaAtiva) {
+          exibirModalAlertaValidacao(
+            "Nenhuma Sessão Aberta",
+            "Não foi encontrada nenhuma sessão de trabalho em andamento para esta praça. Inicie uma nova sessão antes de tentar encerrar."
+          );
+          atualizarBotoesSessaoPraca("Iniciado");
+          return;
+        }
 
         // Foto é OBRIGATÓRIA tanto para INICIAR quanto para ENCERRAR a sessão!
         if (!fotoEntradaPracaBase64) {
@@ -4838,7 +4857,7 @@
         }
 
         // Se estiver ENCERRANDO a sessão, a DESCRIÇÃO DO SERVIÇO é OBRIGATÓRIA!
-        if (stLower.includes('andamento')) {
+        if (!isIniciandoSessao) {
           var inputDesc = document.getElementById('descricaoServicoPraca');
           var textoDesc = inputDesc ? inputDesc.value.trim() : "";
           if (!textoDesc) {
@@ -5001,6 +5020,43 @@
             } catch(e) { historicoSessoes = []; }
           }
 
+          // BLINDAGEM 2: Se estiver online, consulta a versão atualizada do banco para nunca sobrescrever
+          // ou zerar um histórico de sessões já existente caso o cache local/draft esteja vazio ou defasado.
+          if (navigator.onLine && client && dadosPracaAtual.protocolo) {
+            try {
+              const { data: dbPracaRow } = await client
+                .from('ordens_servico_pracas')
+                .select('historico_sessoes')
+                .eq('protocolo', dadosPracaAtual.protocolo)
+                .maybeSingle();
+
+              if (dbPracaRow && dbPracaRow.historico_sessoes) {
+                var dbSessoes = [];
+                try {
+                  dbSessoes = typeof dbPracaRow.historico_sessoes === 'string'
+                    ? JSON.parse(dbPracaRow.historico_sessoes)
+                    : (Array.isArray(dbPracaRow.historico_sessoes) ? dbPracaRow.historico_sessoes : []);
+                } catch(eParse) { dbSessoes = []; }
+
+                if (Array.isArray(dbSessoes) && dbSessoes.length > 0) {
+                  // Se o histórico local na memória estiver vazio, restaura o que já estava persistido no banco
+                  if (!Array.isArray(historicoSessoes) || historicoSessoes.length === 0) {
+                    historicoSessoes = [...dbSessoes];
+                  } else if (dbSessoes.length > historicoSessoes.length) {
+                    // Preserva sessões prévias do banco e incorpora apenas novas sessões locais
+                    var maxNumDb = dbSessoes.reduce(function(m, s) { return Math.max(m, s.numero || 0); }, 0);
+                    var novasLocais = historicoSessoes.filter(function(locS) {
+                      return !locS.numero || locS.numero > maxNumDb;
+                    });
+                    historicoSessoes = dbSessoes.concat(novasLocais);
+                  }
+                }
+              }
+            } catch(eSyncCheck) {
+              console.warn('⚠️ [Finalizar Praça] Falha ao verificar histórico prévio no banco:', eSyncCheck);
+            }
+          }
+
           if (fotoEntradaUrl && novoStatus === 'Em Andamento') {
             dadosPracaAtual.foto_entrada = fotoEntradaUrl;
           }
@@ -5053,6 +5109,16 @@
               var diffMs = dtFm.getTime() - dtInc.getTime();
               sessaoAberta.duracao_minutos = Math.max(1, Math.round(diffMs / 60000));
               sessaoAberta.materiais = (carrinhoMateriaisPraca && carrinhoMateriaisPraca.length > 0) ? [...carrinhoMateriaisPraca] : [];
+            } else if (novoStatus === 'Iniciado') {
+              // Se foi solicitado encerrar sessão (Iniciado), mas não há nenhuma sessão aberta no array
+              console.error('❌ Tentativa de atualizar praça para "Iniciado" sem sessão aberta no histórico.');
+              msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro: Não há sessão em andamento aberta para ser encerrada.</span>';
+              btnSessao.disabled = false;
+              btnConcluir.disabled = false;
+              btnSessao.classList.remove('opacity-75', 'cursor-not-allowed');
+              btnConcluir.classList.remove('opacity-75', 'cursor-not-allowed');
+              atualizarBotoesSessaoPraca("Iniciado");
+              return;
             }
           }
 

@@ -1626,14 +1626,26 @@ class ChamadoModel {
         return Boolean(this.anexoFaltante);
     }
 
-    get isMaterialDivergente() {
-        if (this.isDireto) return false;
+    /**
+     * Retorna a análise detalhada de divergência de materiais (para modal e auditoria)
+     * @returns {{ hasDivergence: boolean, reasons: Array<string>, details: Array<any> }}
+     */
+    get analiseMaterialDivergente() {
+        const resultado = {
+            hasDivergence: false,
+            reasons: [],
+            itensEstranhos: [],
+            itensExcedentes: []
+        };
+
+        if (this.isDireto) return resultado;
         if (this.audit && this.audit.material_divergente === true) {
-            return true;
+            resultado.hasDivergence = true;
+            resultado.reasons.push('Material divergente apontado na auditoria do banco de dados.');
+            return resultado;
         }
 
-        // 1. Regra específica para Praça Pública:
-        // NÃO é permitido lançar serviços de iluminação pública viária nem nos materiais da OS nem nas sessões de trabalho
+        // 1. Regra para Praça Pública
         if (this.isPraca) {
             const checarServicoProibidoPraca = (nome) => {
                 if (!nome) return false;
@@ -1646,32 +1658,33 @@ class ChamadoModel {
                 );
             };
 
-            // Checa materiais consolidados da Praça
             const matsPraca = this.materiaisConsolidados || [];
             for (const m of matsPraca) {
-                if (checarServicoProibidoPraca(m.nome || m)) return true;
+                const sNome = typeof m === 'string' ? m : (m.nome || m.descricao || m.material || '');
+                if (checarServicoProibidoPraca(sNome)) {
+                    resultado.hasDivergence = true;
+                    resultado.reasons.push(`Serviço de iluminação pública viária lançado indevidamente em OS de Praça: "${sNome}"`);
+                }
             }
 
-            // Checa materiais contidos nas sessões de trabalho
             if (this.sessoesList && Array.isArray(this.sessoesList)) {
                 for (const sess of this.sessoesList) {
                     if (sess.desconsiderada) continue;
                     if (sess.materiais && Array.isArray(sess.materiais)) {
                         for (const sMat of sess.materiais) {
                             const sNome = typeof sMat === 'string' ? sMat : (sMat.nome || sMat.descricao || sMat.material || '');
-                            if (checarServicoProibidoPraca(sNome)) return true;
+                            if (checarServicoProibidoPraca(sNome)) {
+                                resultado.hasDivergence = true;
+                                resultado.reasons.push(`Serviço viário em sessão de trabalho de Praça: "${sNome}"`);
+                            }
                         }
                     }
                 }
             }
-
-            // Se for Praça e não disparou nenhum serviço proibido, não há limitação de quantidade de componentes por ponto
-            return false;
+            return resultado;
         }
 
-        // 2. Validação dinâmica para OS Viária:
-        // Quantidade de componentes principais (relés, luminárias, lâmpadas, etc.) não pode exceder o número de pontos da OS.
-        // Utiliza a lista consolidada (sem duplicar entre fechamentos_os e materialUtilizado)
+        // 2. Validação para OS Viária
         let itens = [];
         if (this.materiaisConsolidados && Array.isArray(this.materiaisConsolidados) && this.materiaisConsolidados.length > 0) {
             itens = this.materiaisConsolidados;
@@ -1694,18 +1707,43 @@ class ChamadoModel {
             }
         }
 
-        if (!itens || itens.length === 0) return false;
+        if (!itens || itens.length === 0) return resultado;
 
-        // Categorias que possuem limite estrito de 1 unidade por ponto de iluminação
-        const categoriasContadas = {
-            SERVICO: 0,
-            RELE: 0,
-            LUMINARIA: 0,
-            LAMPADA: 0,
-            REATOR_DRIVER: 0,
-            BRACO: 0,
-            BASE: 0
-        };
+        // Determina a quantidade de pontos da OS Viária
+        let numPontos = 1;
+        const ptsCount = (this.pontosDetalhados && Array.isArray(this.pontosDetalhados)) ? this.pontosDetalhados.length : 0;
+        const qFinal = Number(this.qtdFinal) || 0;
+        const qInicial = Number(this.qtdInicial) || 0;
+        numPontos = Math.max(1, ptsCount, qFinal, qInicial);
+
+        // Obter whitelist de materiais viários (do cache de configurações ou padrão)
+        const cfg = (window.ConfiguracoesService && window.ConfiguracoesService.cache)
+            ? window.ConfiguracoesService.cache
+            : (window.ConfiguracoesService ? window.ConfiguracoesService.defaultValues : null);
+
+        const whitelist = (cfg && Array.isArray(cfg.whitelist_materiais_viaria) && cfg.whitelist_materiais_viaria.length > 0)
+            ? cfg.whitelist_materiais_viaria
+            : [
+                { termo: 'rele fotoeletrico', descricao: 'Relé Fotoelétrico', max_por_ponto: 1 },
+                { termo: 'fita em aco inoxidavel', descricao: 'Fita em Aço Inox (Fechometal)', max_por_ponto: 2 },
+                { termo: 'conector perfurante', descricao: 'Conector Perfurante (CDP)', max_por_ponto: 2 },
+                { termo: 'luminaria publica led', descricao: 'Luminária Pública LED Retangular', max_por_ponto: 1 },
+                { termo: 'placa de identificacao', descricao: 'Placa de Identificação / Plaqueta', max_por_ponto: 1 },
+                { termo: 'plaqueta', descricao: 'Plaqueta de Identificação', max_por_ponto: 1 },
+                { termo: 'servico de manutencao em iluminacao publica viaria', descricao: 'Serviço de Manutenção Viária (Poste CPFL)', max_por_ponto: 1 },
+                { termo: 'servico de troca de rele', descricao: 'Serviço de Troca de Relé Viária', max_por_ponto: 1 },
+                { termo: 'servico de instalacao de plaqueta', descricao: 'Serviço de Instalação de Plaqueta Viária', max_por_ponto: 1 },
+                { termo: 'servico de poda de arvore', descricao: 'Serviço de Poda de Árvore (Munk)', max_por_ponto: 1 },
+                { termo: 'braco para iluminacao publica', descricao: 'Braço Metálico Galvanizado', max_por_ponto: 1 },
+                { termo: 'cabo de cobre', descricao: 'Cabo de Cobre de Ligação', max_por_ponto: 0 }
+            ];
+
+        // Totais acumulados por regra da whitelist
+        const contagemPorRegra = new Map();
+        whitelist.forEach(w => contagemPorRegra.set(w.termo, 0));
+
+        // Itens que são estritamente proibidos em OS Viária
+        const blacklistViaria = ['refletor', 'concreto', 'solda exodermica', 'exosolda', 'eletroduto'];
 
         for (const item of itens) {
             if (!item) continue;
@@ -1725,47 +1763,66 @@ class ChamadoModel {
 
             const nomeLower = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-            // Regra específica: Se for OS Viária e tiver "REFLETOR", é divergente (refletores são exclusivos de praças/espaços públicos)
-            if (nomeLower.includes('refletor')) {
-                return true;
+            // Checagem 1: Blacklist explícita (Refletor, Concreto, etc.)
+            let disparouBlacklist = false;
+            for (const b of blacklistViaria) {
+                if (nomeLower.includes(b)) {
+                    resultado.hasDivergence = true;
+                    resultado.reasons.push(`Material proíbido para OS Viária: "${nome}" (${b.toUpperCase()})`);
+                    resultado.itensEstranhos.push(nome);
+                    disparouBlacklist = true;
+                    break;
+                }
+            }
+            if (disparouBlacklist) continue;
+
+            // Checagem 2: Whitelist
+            let encontrouNaWhitelist = false;
+            for (const w of whitelist) {
+                if (nomeLower.includes(w.termo)) {
+                    encontrouNaWhitelist = true;
+                    const prev = contagemPorRegra.get(w.termo) || 0;
+                    contagemPorRegra.set(w.termo, prev + qtd);
+                    break;
+                }
             }
 
-            // Identificar serviços de manutenção / troca / mão de obra viária (limite de 1 por ponto)
-            if (nomeLower.includes('servico') || nomeLower.includes('mao de obra') || nomeLower.includes('caminhao') || nomeLower.includes('guindauto')) {
-                categoriasContadas.SERVICO += qtd;
-                continue;
-            }
-
-            // Ignorar placas de identificação, plaquetas e adesivos físicos (quando não forem o serviço contratual de instalação)
-            if (nomeLower.includes('placa') || nomeLower.includes('plaqueta') || nomeLower.includes('identificacao')) {
-                continue;
-            }
-
-            // Identificar categoria exclusiva de materiais (1 por ponto)
-            if (nomeLower.includes('rele') || nomeLower.includes('fotoeletrico')) {
-                categoriasContadas.RELE += qtd;
-            } else if (nomeLower.includes('luminaria') || nomeLower.includes('refletor')) {
-                categoriasContadas.LUMINARIA += qtd;
-            } else if (nomeLower.includes('lampada') || nomeLower.includes('vapor de sodio') || nomeLower.includes('vapor metalico') || nomeLower.includes('vapor mercurio')) {
-                categoriasContadas.LAMPADA += qtd;
-            } else if (nomeLower.includes('reator') || nomeLower.includes('driver')) {
-                categoriasContadas.REATOR_DRIVER += qtd;
-            } else if (nomeLower.includes('braco') || nomeLower.includes('suporte')) {
-                categoriasContadas.BRACO += qtd;
-            } else if (nomeLower.includes('base') || nomeLower.includes('soquete') || nomeLower.includes('tomada rele')) {
-                categoriasContadas.BASE += qtd;
+            if (!encontrouNaWhitelist) {
+                resultado.hasDivergence = true;
+                resultado.reasons.push(`Material estranho / não homologado para OS Viária: "${nome}"`);
+                resultado.itensEstranhos.push(nome);
             }
         }
 
-        // Determina a quantidade de pontos da OS Viária
-        let numPontos = 1;
-        const ptsCount = (this.pontosDetalhados && Array.isArray(this.pontosDetalhados)) ? this.pontosDetalhados.length : 0;
-        const qFinal = Number(this.qtdFinal) || 0;
-        const qInicial = Number(this.qtdInicial) || 0;
-        numPontos = Math.max(1, ptsCount, qFinal, qInicial);
+        // Checagem 3: Quantidade máxima por ponto configurada na Whitelist
+        for (const w of whitelist) {
+            const maxUnitario = Number(w.max_por_ponto) || 0;
+            if (maxUnitario > 0) {
+                const totalLancado = contagemPorRegra.get(w.termo) || 0;
+                const maxPermitido = maxUnitario * numPontos;
+                if (totalLancado > maxPermitido) {
+                    resultado.hasDivergence = true;
+                    resultado.reasons.push(`Quantidade de "${w.descricao || w.termo}" excedeu o limite: ${totalLancado} lançados para ${numPontos} ${numPontos > 1 ? 'pontos' : 'ponto'} (Máx: ${maxPermitido})`);
+                    resultado.itensExcedentes.push({
+                        termo: w.termo,
+                        descricao: w.descricao,
+                        lancado: totalLancado,
+                        maxPermitido
+                    });
+                }
+            }
+        }
 
-        // Divergente se alguma categoria unitária exceder a quantidade de pontos na OS Viária
-        return Object.values(categoriasContadas).some(total => total > numPontos);
+        return resultado;
+    }
+
+    get isMaterialDivergente() {
+        if (this.isDireto) return false;
+        if (this.audit && this.audit.material_divergente === true) {
+            return true;
+        }
+
+        return Boolean(this.analiseMaterialDivergente.hasDivergence);
     }
 
     get isProblemaExterno() {
@@ -3108,7 +3165,7 @@ class ChamadoModel {
             headerText1: 'Material',
             headerText2: 'Divergente?',
             modelProperty: 'isMaterialDivergente',
-            explicacao: 'Componentes principais excedem a quantidade de pontos da OS viária, refletor em OS viária, ou serviços viários lançados em OS de praça.'
+            explicacao: 'Material estranho (fora da whitelist viária), quantidade de itens excedendo o limite por ponto, refletor em OS viária ou serviços viários em praça.'
         },
         {
             key: 'problemaExterno',

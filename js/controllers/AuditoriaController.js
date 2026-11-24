@@ -122,10 +122,10 @@ class AuditoriaController {
             if (!popover) {
                 popover = document.createElement('div');
                 popover.id = 'audit-global-popover';
-                popover.style.cssText = 'position: fixed; display: none; padding: 10px 14px; background-color: #0f172a; color: #ffffff; font-size: 11px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5); border: 1px solid #334155; max-width: 260px; z-index: 99999999; pointer-events: none; opacity: 0; transition: opacity 0.15s ease; text-align: left;';
+                popover.style.cssText = 'position: fixed; display: none; padding: 12px 16px; background-color: #0f172a; color: #ffffff; font-size: 11px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 8px 10px -6px rgba(0,0,0,0.5); border: 1px solid #334155; max-width: 480px; width: max-content; z-index: 99999999; pointer-events: none; opacity: 0; transition: opacity 0.15s ease; text-align: left;';
                 popover.innerHTML = `
-                    <div style="font-weight: 700; color: #fbbf24; margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;">Aponta SIM quando:</div>
-                    <div id="audit-global-popover-text" style="line-height: 1.4; font-size: 11px; font-weight: 400; color: #e2e8f0;"></div>
+                    <div style="font-weight: 700; color: #fbbf24; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;">Aponta SIM quando:</div>
+                    <div id="audit-global-popover-text" style="line-height: 1.45; font-size: 11.5px; font-weight: 400; color: #e2e8f0;"></div>
                 `;
                 document.body.appendChild(popover);
             }
@@ -164,7 +164,19 @@ class AuditoriaController {
 
             activeTarget = target;
             popoverText.innerHTML = explicacao;
-            popover.style.maxWidth = explicacao.includes('<div') ? '320px' : '260px';
+
+            // Se for material ou conteúdo rico com blocos, permite maior largura lateral (até 520px)
+            const isMaterialOrRich = explicacao.includes('Materiais Utilizados') || customTitle.includes('Material');
+            if (isMaterialOrRich) {
+                popover.style.maxWidth = 'min(540px, 92vw)';
+                popover.style.minWidth = '380px';
+            } else if (explicacao.includes('<div')) {
+                popover.style.maxWidth = 'min(420px, 90vw)';
+                popover.style.minWidth = '300px';
+            } else {
+                popover.style.maxWidth = 'min(320px, 85vw)';
+                popover.style.minWidth = 'auto';
+            }
             popover.style.display = 'block';
 
             const rect = target.getBoundingClientRect();
@@ -249,6 +261,15 @@ class AuditoriaController {
      */
     async loadData() {
         try {
+            // Garante pré-carregamento das configurações para aplicar a whitelist nos modelos
+            if (window.ConfiguracoesService && typeof window.ConfiguracoesService.obterConfiguracoes === 'function') {
+                try {
+                    await window.ConfiguracoesService.obterConfiguracoes();
+                } catch(eCfg) {
+                    console.warn('[AuditoriaController] Falha ao pré-carregar configurações de whitelist:', eCfg);
+                }
+            }
+
             let rawList = await this.service.getAuditoriaChamadosList();
             const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
             this.chamadosList = (rawList || []).map(item => {
@@ -669,50 +690,38 @@ class AuditoriaController {
                     const matList = (item.materialsList && item.materialsList.length > 0) 
                         ? item.materialsList 
                         : (item.formattedMaterialUtilizado ? [item.formattedMaterialUtilizado] : ['Mais de um material informado']);
-                    const matItemsHtml = matList.map(m => `<li class="font-medium text-amber-200 leading-snug">${esc(m)}</li>`).join('');
+                    const matItemsHtml = matList.map(m => `<li class="font-medium text-amber-200 leading-snug py-0.5">${esc(m)}</li>`).join('');
                     
                     const ptsCount = (item.pontosDetalhados && Array.isArray(item.pontosDetalhados)) ? item.pontosDetalhados.length : 0;
                     const numPtsReparados = Math.max(1, ptsCount, Number(item.qtdFinal) || 0, Number(item.qtdInicial) || 0);
                     
                     const isPraca = Boolean(item.isPraca);
-                    const hasRefletorViaria = !isPraca && matList.some(m => {
-                        const s = String(m).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                        return s.includes('refletor');
-                    });
-
-                    const hasServicoProibidoPraca = isPraca && matList.some(m => {
-                        const s = String(m).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-                        return (
-                            (s.includes('manutencao em iluminacao publica viaria') && s.includes('poste cpfl')) ||
-                            (s.includes('troca de rele sem analise') && s.includes('viaria')) ||
-                            (s.includes('instalacao de plaqueta') && s.includes('viaria')) ||
-                            (s.includes('poda de arvore') && s.includes('munk'))
-                        );
-                    });
+                    const analise = (typeof item.analiseMaterialDivergente === 'object') ? item.analiseMaterialDivergente : null;
 
                     let rodapeHtml = '';
-                    if (hasRefletorViaria) {
+                    if (analise && analise.hasDivergence && analise.reasons && analise.reasons.length > 0) {
+                        const motivosHtml = analise.reasons.map(r => `<li>${esc(r)}</li>`).join('');
                         rodapeHtml = `
-                            <div class="p-1.5 rounded bg-rose-950/80 border border-rose-800/60 text-[10.5px] text-rose-300">
-                                <strong>Divergência detectada:</strong> Material <u>Refletor</u> lançado em OS Viária (permitido somente em Praças/Espaços Públicos).
-                            </div>
-                        `;
-                    } else if (hasServicoProibidoPraca) {
-                        rodapeHtml = `
-                            <div class="p-1.5 rounded bg-rose-950/80 border border-rose-800/60 text-[10.5px] text-rose-300">
-                                <strong>Divergência detectada:</strong> Serviço de <u>iluminação pública viária</u> lançado indevidamente em OS de Praça Pública.
+                            <div class="p-2 rounded bg-rose-950/90 border border-rose-800/80 text-[10.5px] text-rose-200">
+                                <div class="font-bold text-rose-300 mb-1 flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[15px]">warning</span>
+                                    Divergência detectada pela Whitelist/Regras:
+                                </div>
+                                <ul class="list-disc list-inside space-y-0.5">
+                                    ${motivosHtml}
+                                </ul>
                             </div>
                         `;
                     } else if (isPraca) {
                         rodapeHtml = `
                             <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
-                                Praça Pública: materiais e componentes não possuem limitação de quantidade por ponto.
+                                Praça Pública: materiais e componentes autorizados conforme catálogo, sem limitação unitária por ponto.
                             </div>
                         `;
                     } else {
                         rodapeHtml = `
                             <div class="p-1 rounded bg-slate-800/60 text-[10px] text-slate-300">
-                                Regra: quantidade de serviços de manutenção ou componentes principais (relés, luminárias ou lâmpadas) não pode ultrapassar <strong>${numPtsReparados} un</strong> (1 por ponto).
+                                Regra OS Viária: apenas materiais autorizados na Whitelist contratual e respeitando os tetos configurados para <strong>${numPtsReparados} ${numPtsReparados > 1 ? 'pontos' : 'ponto'}</strong>.
                             </div>
                         `;
                     }

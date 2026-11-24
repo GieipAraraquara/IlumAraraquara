@@ -37,6 +37,9 @@ create table if not exists public.configuracoes_sistema (
     notificar_os_atrasada boolean not null default true,
     notificar_relatorio_mensal boolean not null default false,
     
+    -- === 6. WHITELIST DE MATERIAIS VIÁRIOS ===
+    whitelist_materiais_viaria jsonb default '[]'::jsonb,
+
     -- === AUDITORIA ===
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),

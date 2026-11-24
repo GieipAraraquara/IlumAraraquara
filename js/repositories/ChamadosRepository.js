@@ -238,9 +238,9 @@ class ChamadosRepository {
         }
 
         try {
-            // Janela temporal padrão: últimos 45 dias ou OSs não concluídas
+            // Janela temporal padrão: últimos 90 dias ou OSs não concluídas
             const dataCorte = new Date();
-            dataCorte.setDate(dataCorte.getDate() - 45);
+            dataCorte.setDate(dataCorte.getDate() - 90);
             const dataCorteIso = dataCorte.toISOString();
 
             const colunasView = ChamadosRepository.COLUNAS_VIEW;
@@ -551,9 +551,9 @@ class ChamadosRepository {
         try {
             const client = this.getClient();
 
-            // Janela temporal padrão para auditoria: últimos 45 dias ou OSs não concluídas
+            // Janela temporal padrão para auditoria: últimos 90 dias ou OSs não concluídas
             const dataCorte = new Date();
-            dataCorte.setDate(dataCorte.getDate() - 45);
+            dataCorte.setDate(dataCorte.getDate() - 90);
             const dataCorteIso = dataCorte.toISOString();
 
             const colunasView = ChamadosRepository.COLUNAS_VIEW;

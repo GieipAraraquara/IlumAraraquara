@@ -191,6 +191,11 @@
                     <span class="material-symbols-outlined text-lg">receipt_long</span>
                     Medição & Regras TR
                 </button>
+                <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('whitelist', this)">
+                    <span class="material-symbols-outlined text-lg text-amber-600">inventory_2</span>
+                    <span class="font-semibold text-amber-700">Materiais Viários (Whitelist)</span>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800" id="badge-total-whitelist">0</span>
+                </button>
                 <button class="tab-btn px-5 py-3 text-sm flex items-center gap-2 whitespace-nowrap text-on-surface-variant transition cursor-pointer" onclick="trocarAba('usuarios', this)">
                     <span class="material-symbols-outlined text-lg">manage_accounts</span>
                     Usuários & Senhas
@@ -467,6 +472,54 @@
                                 <span class="material-symbols-outlined text-base text-secondary">open_in_new</span>
                                 Abrir Tela de Medição
                             </a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ABA WHITELIST: MATERIAIS PERMITIDOS EM OS VIÁRIA -->
+                <section id="tab-whitelist" class="tab-content hidden space-y-6">
+                    <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl p-6 shadow-sm">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-outline-variant/40">
+                            <div>
+                                <h2 class="text-lg font-bold text-on-surface mb-1 flex items-center gap-2">
+                                    <span class="material-symbols-outlined text-amber-600">inventory_2</span>
+                                    Whitelist de Materiais para OS Viária (Poste CPFL)
+                                </h2>
+                                <p class="text-xs text-on-surface-variant">
+                                    Cadastre os termos autorizados para Ordens de Serviço Viárias e a quantidade máxima permitida por ponto. Qualquer material estranho ou quantidade excedente disparará a coluna <strong>Material Divergente?</strong> na Auditoria.
+                                </p>
+                            </div>
+                            <button type="button" onclick="adicionarItemWhitelistModal()" class="px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition active:scale-95 cursor-pointer flex-shrink-0">
+                                <span class="material-symbols-outlined text-base">add_circle</span>
+                                Adicionar Material
+                            </button>
+                        </div>
+
+                        <!-- Info Box -->
+                        <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-900 flex items-start gap-2.5">
+                            <span class="material-symbols-outlined text-amber-600 text-[20px] flex-shrink-0 mt-0.5">help</span>
+                            <div class="space-y-1">
+                                <div><strong>Como funciona a validação:</strong> O sistema busca o <em>Termo de Busca / Palavra-Chave</em> dentro da descrição completa de cada material lançado na OS Viária (prefixo <code>I</code>).</div>
+                                <div class="text-[11px] text-amber-800">• <strong>Qtd Máx por Ponto &gt; 0:</strong> Exige que o total do material na OS não ultrapasse <code>(Qtd Máx × Pontos Reparados)</code>. Ex: máx 2 por ponto em OS de 1 ponto permite até 2 unidades.</div>
+                                <div class="text-[11px] text-amber-800">• <strong>Qtd Máx = 0:</strong> Indica <em>Ilimitado / Conforme necessidade</em> (o material é autorizado na viária sem teto fixo unitário por ponto).</div>
+                            </div>
+                        </div>
+
+                        <!-- Tabela de Itens da Whitelist -->
+                        <div class="overflow-x-auto rounded-xl border border-outline-variant/60">
+                            <table class="w-full text-left text-xs" id="tabela-whitelist-materiais">
+                                <thead class="bg-surface-container-high/60 text-on-surface-variant font-semibold border-b border-outline-variant/40 uppercase tracking-wider text-[11px]">
+                                    <tr>
+                                        <th class="py-3 px-4">Descrição Amigável</th>
+                                        <th class="py-3 px-4">Termo / Palavra-Chave (Validador)</th>
+                                        <th class="py-3 px-4 text-center">Qtd Máx / Ponto</th>
+                                        <th class="py-3 px-4 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabela-whitelist-corpo" class="divide-y divide-outline-variant/30">
+                                    <!-- Renderizado via Javascript -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </section>
@@ -1082,6 +1135,72 @@
 
     </main>
 
+    <!-- Modal de Item da Whitelist (Adicionar / Editar) -->
+    <div id="modal-whitelist-item" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
+        <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden flex flex-col text-on-surface transform transition-all duration-200 scale-95 opacity-0" id="modal-whitelist-item-card">
+            
+            <!-- Header do Modal -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/40 bg-surface-container-low/50">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl">inventory_2</span>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-bold text-on-surface" id="modal-whitelist-titulo">Material para OS Viária</h3>
+                        <p class="text-xs text-on-surface-variant">Regra de autorização e teto por ponto</p>
+                    </div>
+                </div>
+                <button type="button" onclick="fecharModalWhitelistItem()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-lg transition">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <!-- Corpo do Modal -->
+            <div class="p-6 space-y-4">
+                <input type="hidden" id="whitelist-item-index" value="-1" />
+
+                <!-- Descrição Amigável -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1">
+                        Descrição Amigável do Material
+                    </label>
+                    <input type="text" id="whitelist-descricao-input" placeholder="Ex: Fita em Aço Inox (Fechometal)" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-semibold focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-on-surface" required />
+                </div>
+
+                <!-- Termo / Palavra Chave -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1">
+                        Termo de Busca / Palavra-Chave (Normalizado)
+                    </label>
+                    <input type="text" id="whitelist-termo-input" placeholder="Ex: fita em aco inoxidavel" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-mono font-medium focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-on-surface" required />
+                    <span class="text-[11px] text-on-surface-variant block mt-1">O sistema valida sem acentos e em minúsculas se a descrição do material da OS contém este texto.</span>
+                </div>
+
+                <!-- Quantidade Máxima por Ponto -->
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-on-surface mb-1">
+                        Quantidade Máxima por Ponto
+                    </label>
+                    <div class="flex items-center gap-3">
+                        <input type="number" min="0" max="100" id="whitelist-max-input" value="1" class="w-28 bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-xs font-bold focus:border-amber-600 focus:ring-1 focus:ring-amber-600 text-on-surface" />
+                        <span class="text-xs text-on-surface-variant">unidades por ponto reparado (use <strong>0</strong> para ilimitado / livre).</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rodapé do Modal -->
+            <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-outline-variant/40 bg-surface-container-low/50">
+                <button type="button" onclick="fecharModalWhitelistItem()" class="px-4 py-2 rounded-xl border border-outline-variant bg-surface-container-lowest text-on-surface text-xs font-semibold hover:bg-surface-container-high transition">
+                    Cancelar
+                </button>
+                <button type="button" onclick="salvarItemWhitelistModal()" class="px-5 py-2 rounded-xl bg-amber-600 text-white text-xs font-bold hover:bg-amber-700 transition flex items-center gap-1.5 active:scale-95 shadow-sm">
+                    <span class="material-symbols-outlined text-base">check</span>
+                    Salvar Item
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal de Redefinição de Senha -->
     <div id="modal-reset-senha" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-opacity duration-200">
         <div class="bg-surface-container-lowest border border-outline-variant/60 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden flex flex-col text-on-surface transform transition-all duration-200 scale-95 opacity-0" id="modal-reset-senha-card">
@@ -1237,6 +1356,157 @@
 
     <script>
         let listaUsuariosCache = [];
+        let whitelistMateriaisCache = [];
+
+        function renderizarTabelaWhitelist() {
+            const tbody = document.getElementById('tabela-whitelist-corpo');
+            const badge = document.getElementById('badge-total-whitelist');
+            if (badge) badge.textContent = whitelistMateriaisCache ? whitelistMateriaisCache.length : 0;
+            if (!tbody) return;
+
+            if (!whitelistMateriaisCache || whitelistMateriaisCache.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="py-8 text-center text-on-surface-variant">
+                            <span class="material-symbols-outlined text-3xl text-outline-variant block mb-1">inventory_2</span>
+                            Nenhum material cadastrado na whitelist de OS Viária.
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = whitelistMateriaisCache.map((item, index) => {
+                const maxTxt = (!item.max_por_ponto || Number(item.max_por_ponto) === 0)
+                    ? `<span class="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-blue-50 text-blue-700 border border-blue-200">Livre / Ilimitado</span>`
+                    : `<span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-amber-50 text-amber-800 border border-amber-200">${item.max_por_ponto} un / ponto</span>`;
+
+                return `
+                    <tr class="hover:bg-surface-container-high/40 transition">
+                        <td class="py-3 px-4 font-semibold text-on-surface">
+                            ${escapeHtml(item.descricao || item.termo)}
+                        </td>
+                        <td class="py-3 px-4 font-mono text-[11px] text-amber-800">
+                            <code>${escapeHtml(item.termo)}</code>
+                        </td>
+                        <td class="py-3 px-4 text-center">
+                            ${maxTxt}
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <div class="flex items-center justify-end gap-1">
+                                <button type="button" onclick="editarItemWhitelistModal(${index})" class="p-1 rounded-lg text-on-surface-variant hover:text-amber-700 hover:bg-amber-100 transition cursor-pointer" title="Editar">
+                                    <span class="material-symbols-outlined text-[18px]">edit</span>
+                                </button>
+                                <button type="button" onclick="removerItemWhitelist(${index})" class="p-1 rounded-lg text-on-surface-variant hover:text-rose-700 hover:bg-rose-100 transition cursor-pointer" title="Remover">
+                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function adicionarItemWhitelistModal() {
+            document.getElementById('modal-whitelist-titulo').textContent = 'Adicionar Material à Whitelist';
+            document.getElementById('whitelist-item-index').value = '-1';
+            document.getElementById('whitelist-descricao-input').value = '';
+            document.getElementById('whitelist-termo-input').value = '';
+            document.getElementById('whitelist-max-input').value = '1';
+            abrirModalWhitelistItem();
+        }
+
+        function editarItemWhitelistModal(index) {
+            const item = whitelistMateriaisCache[index];
+            if (!item) return;
+            document.getElementById('modal-whitelist-titulo').textContent = 'Editar Material da Whitelist';
+            document.getElementById('whitelist-item-index').value = index;
+            document.getElementById('whitelist-descricao-input').value = item.descricao || '';
+            document.getElementById('whitelist-termo-input').value = item.termo || '';
+            document.getElementById('whitelist-max-input').value = (item.max_por_ponto !== undefined && item.max_por_ponto !== null) ? item.max_por_ponto : 1;
+            abrirModalWhitelistItem();
+        }
+
+        function abrirModalWhitelistItem() {
+            const modal = document.getElementById('modal-whitelist-item');
+            const card = document.getElementById('modal-whitelist-item-card');
+            if (modal && card) {
+                modal.classList.remove('hidden');
+                setTimeout(() => {
+                    card.classList.remove('scale-95', 'opacity-0');
+                    card.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            }
+        }
+
+        function fecharModalWhitelistItem() {
+            const modal = document.getElementById('modal-whitelist-item');
+            const card = document.getElementById('modal-whitelist-item-card');
+            if (modal && card) {
+                card.classList.remove('scale-100', 'opacity-100');
+                card.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => modal.classList.add('hidden'), 200);
+            }
+        }
+
+        function salvarItemWhitelistModal() {
+            const idx = parseInt(document.getElementById('whitelist-item-index').value, 10);
+            const desc = document.getElementById('whitelist-descricao-input').value.trim();
+            let termo = document.getElementById('whitelist-termo-input').value.trim();
+            const maxQtd = parseInt(document.getElementById('whitelist-max-input').value, 10) || 0;
+
+            if (!termo) {
+                mostrarToast('Informe o termo ou palavra-chave validadora.', false);
+                return;
+            }
+
+            // Normaliza o termo sem acentos e em minúsculas
+            termo = termo.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+            const novoItem = {
+                termo: termo,
+                descricao: desc || termo,
+                max_por_ponto: Math.max(0, maxQtd)
+            };
+
+            if (idx >= 0 && idx < whitelistMateriaisCache.length) {
+                whitelistMateriaisCache[idx] = novoItem;
+            } else {
+                whitelistMateriaisCache.push(novoItem);
+            }
+
+            renderizarTabelaWhitelist();
+            fecharModalWhitelistItem();
+            mostrarToast('Item atualizado na lista! Lembre-se de clicar em "Salvar Alterações".', true);
+        }
+
+        function removerItemWhitelist(index) {
+            const item = whitelistMateriaisCache[index];
+            if (!item) return;
+            abrirConfirmacaoModal({
+                titulo: 'Remover Material da Whitelist',
+                mensagem: `Deseja realmente remover o material "${item.descricao || item.termo}" da lista autorizada?`,
+                icone: 'delete',
+                iconeCor: 'bg-rose-100 text-rose-700',
+                btnTexto: 'Remover',
+                btnCor: 'bg-rose-600 hover:bg-rose-700',
+                onConfirm: () => {
+                    whitelistMateriaisCache.splice(index, 1);
+                    renderizarTabelaWhitelist();
+                    mostrarToast('Item removido! Clique em "Salvar Alterações" para confirmar.', true);
+                }
+            });
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
 
         function trocarAba(abaId, btnElement) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
@@ -1959,6 +2229,16 @@
                 inputMarcasRel.value = arrRel.join(', ');
             }
 
+            // Whitelist de Materiais Viários
+            if (Array.isArray(dados.whitelist_materiais_viaria)) {
+                whitelistMateriaisCache = JSON.parse(JSON.stringify(dados.whitelist_materiais_viaria));
+            } else if (window.ConfiguracoesService && window.ConfiguracoesService.defaultValues.whitelist_materiais_viaria) {
+                whitelistMateriaisCache = JSON.parse(JSON.stringify(window.ConfiguracoesService.defaultValues.whitelist_materiais_viaria));
+            } else {
+                whitelistMateriaisCache = [];
+            }
+            renderizarTabelaWhitelist();
+
             // Carregar Janela de Medição
             try {
                 let janelaConfig = { diaInicio: 21, diaFim: 20, mesmoMes: false };
@@ -2001,7 +2281,8 @@
                 marcas_luminaria_viaria: (document.getElementById('marcas_luminaria_viaria')?.value || 'INSIGHT')
                     .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
                 marcas_rele_padrao: (document.getElementById('marcas_rele_padrao')?.value || 'EXATRON')
-                    .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
+                    .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+                whitelist_materiais_viaria: whitelistMateriaisCache
             };
         }
 
