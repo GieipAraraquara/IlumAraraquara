@@ -241,6 +241,17 @@
                     </div>
                 
                 <div class="flex items-center gap-2.5 flex-wrap">
+                    <!-- Filtro de Status (Ativas / Inativas) -->
+                    <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
+                        <span class="material-symbols-outlined text-[16px] text-on-surface-variant">tune</span>
+                        <label class="text-[11px] font-semibold text-on-surface-variant uppercase">Status:</label>
+                        <select id="select-filtro-status-plaqueta" class="bg-transparent text-xs font-semibold text-on-surface focus:outline-none cursor-pointer border-0 py-0 pl-1 pr-6">
+                            <option value="all" selected>Todas as Plaquetas</option>
+                            <option value="ativas">Apenas Ativas</option>
+                            <option value="inativas">Apenas Desativadas</option>
+                        </select>
+                    </div>
+
                     <!-- Seletor de Ordenação -->
                     <div class="flex items-center gap-1.5 bg-surface-container-low border border-outline-variant/80 rounded-xl px-3 py-1.5">
                         <span class="material-symbols-outlined text-[16px] text-on-surface-variant">swap_vert</span>
@@ -1250,10 +1261,19 @@
                 </div>
             </div>
 
-            <!-- Observação -->
-            <div>
-                <label for="form-input-observacao" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Observação</label>
-                <textarea id="form-input-observacao" rows="2" placeholder="Observações como DUPLICADO, PONTO ESPECIAL, etc..." class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-normal text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary resize-none"></textarea>
+            <!-- Observação & Status Ativo -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="sm:col-span-2">
+                    <label for="form-input-observacao" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Observação</label>
+                    <textarea id="form-input-observacao" rows="2" placeholder="Observações como DUPLICADO, PONTO ESPECIAL, etc..." class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2 text-xs font-normal text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary resize-none"></textarea>
+                </div>
+                <div>
+                    <label for="form-input-ativo" class="block text-xs font-bold text-on-surface-variant uppercase mb-1">Situação / Status</label>
+                    <select id="form-input-ativo" class="w-full bg-surface-container-low border border-outline-variant/80 rounded-xl px-3.5 py-2.5 text-xs font-bold text-on-surface focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary cursor-pointer">
+                        <option value="true" selected>✅ Ativa</option>
+                        <option value="false">🚫 Desativada</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Botões de Ação -->
@@ -1949,6 +1969,7 @@
         
         let buscaTexto = '';
         let ordemPlaquetas = 'recentes'; // 'recentes' | 'identificacao_asc' | 'identificacao_desc'
+        let filtroStatusPlaqueta = 'all'; // 'all', 'ativas', 'inativas'
         let filtroEmpresa = 'all';
         let filtroEmpresaSel = ['all'];
         let filtroObsPreset = ''; // '', 'DUPLICADO', 'HAS_OBS'
@@ -2143,6 +2164,15 @@
                         if (empresaFilterAll) empresaFilterAll.checked = false;
                         document.getElementById('empresa-filter-indicator')?.classList.remove('hidden');
                     }
+                    carregarPlaquetas(1);
+                });
+            }
+
+            const selectStatus = document.getElementById('select-filtro-status-plaqueta');
+            if (selectStatus) {
+                selectStatus.value = filtroStatusPlaqueta;
+                selectStatus.addEventListener('change', (e) => {
+                    filtroStatusPlaqueta = e.target.value;
                     carregarPlaquetas(1);
                 });
             }
@@ -2530,9 +2560,16 @@
             }
 
             try {
-                // Projeção cirúrgica de colunas existentes na tabela localizacao_plaquetas (incluindo dados de luminária e relé)
-                const COLUNAS_PLAQUETAS = 'id, identificacao, "Latitude", "Longitude", "QTD. Lum.", "Observação", "Empresa", "Quando foi colocado?", potencia_luminaria, marca_luminaria, data_troca_luminaria, marca_rele, data_troca_rele, ultima_os_manutencao';
+                // Projeção cirúrgica de colunas existentes na tabela localizacao_plaquetas (incluindo dados de luminária, relé e status ativo)
+                const COLUNAS_PLAQUETAS = 'id, identificacao, "Latitude", "Longitude", "QTD. Lum.", "Observação", "Empresa", "Quando foi colocado?", potencia_luminaria, marca_luminaria, data_troca_luminaria, marca_rele, data_troca_rele, ultima_os_manutencao, ativo';
                 let query = client.from('localizacao_plaquetas').select(COLUNAS_PLAQUETAS, { count: 'exact' });
+
+                // Filtro de Status (Ativas / Inativas)
+                if (filtroStatusPlaqueta === 'ativas') {
+                    query = query.neq('ativo', false);
+                } else if (filtroStatusPlaqueta === 'inativas') {
+                    query = query.eq('ativo', false);
+                }
 
                 // Filtro de busca textual (suporta busca por múltiplas plaquetas ex: C0012 C0013)
                 if (buscaTexto.trim()) {
@@ -2691,6 +2728,17 @@
             const data_troca_rele = row.data_troca_rele || null;
             const ultima_os_manutencao = row.ultima_os_manutencao || '';
 
+            // Status ativo: verifica coluna booleana 'ativo' e compatibilidade com observação ('DESATIVADA' / 'INATIVA')
+            let ativo = true;
+            if (row.ativo === false || row.ativo === 'false' || row.ativo === 0) {
+                ativo = false;
+            } else if (observacao) {
+                const obsUp = observacao.toUpperCase();
+                if (obsUp.includes('DESATIVAD') || obsUp.includes('INATIV')) {
+                    ativo = false;
+                }
+            }
+
             return {
                 id: row.id || identificacao,
                 identificacao,
@@ -2707,6 +2755,7 @@
                 marca_rele,
                 data_troca_rele,
                 ultima_os_manutencao,
+                ativo,
                 raw: row
             };
         }
@@ -2743,17 +2792,26 @@
 
             plaquetasCache.forEach((plq) => {
                 const tr = document.createElement('tr');
-                tr.className = 'border-b border-outline-variant/60 hover:bg-surface-container-low/60 transition-colors align-middle';
+                const rowOpacityClass = plq.ativo ? '' : 'opacity-70 bg-rose-50/20';
+                tr.className = `border-b border-outline-variant/60 hover:bg-surface-container-low/60 transition-colors align-middle ${rowOpacityClass}`;
 
                 // 1. Identificação
                 const isRecente = (ordemPlaquetas === 'recentes' && plq.raw && plq.raw.id);
+                const badgeStatusPlaqueta = plq.ativo 
+                    ? '' 
+                    : `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300">
+                        <span class="material-symbols-outlined text-[13px] text-rose-600">block</span>
+                        <span>Desativada</span>
+                       </span>`;
+
                 const tdIdent = `
                     <td class="py-3 px-5 font-bold">
                         <div class="flex items-center gap-1.5 flex-wrap">
-                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold bg-secondary/10 text-secondary border border-secondary/20">
+                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold ${plq.ativo ? 'bg-secondary/10 text-secondary border border-secondary/20' : 'bg-slate-200 text-slate-700 border border-slate-300'}">
                                 <span class="material-symbols-outlined text-[15px]">tag</span>
                                 <span>${plq.identificacao}</span>
                             </span>
+                            ${badgeStatusPlaqueta}
                             ${isRecente ? `<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200" title="Registro #${plq.raw.id}"><span class="material-symbols-outlined text-[12px]">fiber_new</span>#${plq.raw.id}</span>` : ''}
                         </div>
                     </td>`;
@@ -2856,6 +2914,14 @@
                 }
 
                 // 8. Ações
+                const btnToggleAtivo = plq.ativo
+                    ? `<button type="button" onclick="window.confirmarAlternarStatusPlaqueta('${plq.identificacao}', false)" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer active:scale-95" title="Desativar Plaqueta">
+                        <span class="material-symbols-outlined text-[17px]">block</span>
+                       </button>`
+                    : `<button type="button" onclick="window.confirmarAlternarStatusPlaqueta('${plq.identificacao}', true)" class="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-all cursor-pointer active:scale-95" title="Reativar Plaqueta">
+                        <span class="material-symbols-outlined text-[17px]">check_circle</span>
+                       </button>`;
+
                 const tdAcoes = `
                     <td class="py-3 px-3 text-center">
                         <div class="flex items-center justify-center gap-1">
@@ -2868,7 +2934,8 @@
                             <button type="button" onclick="window.abrirModalEditarPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 transition-all cursor-pointer active:scale-95" title="Editar dados da Plaqueta">
                                 <span class="material-symbols-outlined text-[17px]">edit</span>
                             </button>
-                            <button type="button" onclick="window.confirmarExcluirPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer active:scale-95" title="Excluir Plaqueta">
+                            ${btnToggleAtivo}
+                            <button type="button" onclick="window.confirmarExcluirPlaqueta('${plq.identificacao}')" class="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all cursor-pointer active:scale-95" title="Excluir Plaqueta Definitivamente">
                                 <span class="material-symbols-outlined text-[17px]">delete</span>
                             </button>
                         </div>
@@ -3189,6 +3256,8 @@
                 document.getElementById('form-input-qtd-lum').value = item.qtd_lum || 1;
                 document.getElementById('form-input-empresa').value = item.empresa || '';
                 document.getElementById('form-input-observacao').value = item.observacao || '';
+                const selAtivo = document.getElementById('form-input-ativo');
+                if (selAtivo) selAtivo.value = item.ativo ? 'true' : 'false';
             } else {
                 if (titulo) titulo.innerText = 'Cadastrar Nova Plaqueta';
                 if (icon) icon.innerText = 'add_location_alt';
@@ -3201,6 +3270,8 @@
                 document.getElementById('form-input-qtd-lum').value = 1;
                 document.getElementById('form-input-empresa').value = 'ILUMITERRA - SEGUNDO CONTRATO';
                 document.getElementById('form-input-observacao').value = '';
+                const selAtivo = document.getElementById('form-input-ativo');
+                if (selAtivo) selAtivo.value = 'true';
             }
 
             modal.classList.remove('hidden');
@@ -3220,6 +3291,7 @@
             const qtdLum = parseInt(document.getElementById('form-input-qtd-lum').value, 10) || 1;
             const empresa = document.getElementById('form-input-empresa').value.trim();
             const observacao = document.getElementById('form-input-observacao').value.trim();
+            const ativoVal = document.getElementById('form-input-ativo') ? (document.getElementById('form-input-ativo').value === 'true') : true;
 
             if (!identificacao) {
                 alert("A identificação da plaqueta é obrigatória.");
@@ -3242,7 +3314,8 @@
                     Longitude: !isNaN(lngVal) ? lngVal : null,
                     "QTD. Lum.": qtdLum,
                     Empresa: empresa,
-                    "Observação": observacao
+                    "Observação": observacao,
+                    ativo: ativoVal
                 };
 
                 let res;
@@ -3330,6 +3403,51 @@
             setTimeout(() => {
                 modal.classList.add('hidden');
             }, 200);
+        };
+
+        // =========================================================================
+        // ATIVAÇÃO / DESATIVAÇÃO DE PLAQUETA
+        // =========================================================================
+        window.confirmarAlternarStatusPlaqueta = async function(identificacao, novoStatusAtivo) {
+            const acaoTexto = novoStatusAtivo ? 'reativar' : 'desativar';
+            const acaoIcone = novoStatusAtivo ? '✅' : '🚫';
+
+            if (!confirm(`${acaoIcone} Deseja realmente ${acaoTexto} a plaqueta #${identificacao}?${novoStatusAtivo ? '' : '\n\nPlaquetas desativadas ficam bloqueadas para novas aberturas de OS.'}`)) {
+                return;
+            }
+
+            const client = (typeof obterSupabaseClient === 'function') ? obterSupabaseClient() : window.supabaseClient;
+            if (!client) {
+                alert("Erro: Conexão Supabase indisponível.");
+                return;
+            }
+
+            try {
+                const { error } = await client.from('localizacao_plaquetas')
+                    .update({ ativo: novoStatusAtivo })
+                    .eq('identificacao', identificacao);
+
+                if (error) {
+                    alert(`Erro ao ${acaoTexto} plaqueta: ` + error.message);
+                } else {
+                    // Registrar no histórico se a tabela estiver disponível
+                    try {
+                        const userState = (typeof getUserState === 'function') ? getUserState() : null;
+                        const userNome = userState?.nome || userState?.email || 'Administrador';
+                        await client.from('historico_localizacao_plaquetas').insert([{
+                            identificacao: identificacao,
+                            origem: novoStatusAtivo ? 'REATIVACAO_PLAQUETA' : 'DESATIVACAO_PLAQUETA',
+                            usuario: userNome,
+                            observacao: novoStatusAtivo ? 'Plaqueta reativada no sistema' : 'Plaqueta desativada no sistema'
+                        }]);
+                    } catch (hErr) { console.warn('Aviso histórico:', hErr); }
+
+                    alert(`Plaqueta #${identificacao} foi ${novoStatusAtivo ? 'reativada' : 'desativada'} com sucesso.`);
+                    carregarPlaquetas(paginaAtual);
+                }
+            } catch(e) {
+                alert("Erro: " + e.message);
+            }
         };
 
         // =========================================================================
@@ -5527,13 +5645,16 @@
                 return String(item).trim();
             }).filter(Boolean);
 
+            // Filtrar itens de material que sejam apenas placas/plaquetas de identificação para não dar falso positivo de luminária
+            const materiaisSemPlacas = stringsMateriais.filter(m => !/\b(PLACA|PLAQUETA)\b.*?\bIDENTIFICA[CÇ][AÃ]O\b/i.test(m));
+            const textoLuminaria = materiaisSemPlacas.join(' \n ');
             const textoCompleto = stringsMateriais.join(' \n ');
 
-            // 1. Detectar Luminária LED
-            const isLuminaria = /\b(LUMIN[AÁ]RIA|REFLETOR\s+LED|P[EÉ]TALA)\b/i.test(textoCompleto);
+            // 1. Detectar Luminária LED (ignora placas de identificação)
+            const isLuminaria = /\b(LUMIN[AÁ]RIA|REFLETOR\s+LED|P[EÉ]TALA)\b/i.test(textoLuminaria);
             if (isLuminaria) {
-                const potMatch = textoCompleto.match(/pot[êe]ncia\s*(?:de\s*(?:at[ée]\s*)?)?(\d{2,4})\s*w\b/i) ||
-                                 textoCompleto.match(/\b(\d{2,3})\s*W\b/i);
+                const potMatch = textoLuminaria.match(/pot[êe]ncia\s*(?:de\s*(?:at[ée]\s*)?)?(\d{2,4})\s*w\b/i) ||
+                                 textoLuminaria.match(/\b(\d{2,3})\s*W\b/i);
                 if (potMatch && potMatch[1]) {
                     const pNum = parseInt(potMatch[1], 10);
                     if (pNum >= 40 && pNum <= 70) res.potencia_luminaria = '60W';
@@ -5545,14 +5666,14 @@
                     else res.potencia_luminaria = `${pNum}W`;
                 }
 
-                if (/\bINSIGHT\b/i.test(textoCompleto)) res.marca_luminaria = 'INSIGHT';
-                else if (/\bTECNOWATT\b/i.test(textoCompleto)) res.marca_luminaria = 'TECNOWATT';
-                else if (/\bBRIGHTLUX\b/i.test(textoCompleto)) res.marca_luminaria = 'BRIGHTLUX';
-                else if (/\bPHILIPS\b/i.test(textoCompleto)) res.marca_luminaria = 'PHILIPS';
-                else if (/\bOLIVO\b/i.test(textoCompleto)) res.marca_luminaria = 'OLIVO';
-                else if (/\bVESUVIO\b/i.test(textoCompleto)) res.marca_luminaria = 'VESUVIO';
-                else if (/\bFORTNORT\b/i.test(textoCompleto)) res.marca_luminaria = 'FORTNORT';
-                else if (/\bINTELBRAS\b/i.test(textoCompleto)) res.marca_luminaria = 'INTELBRAS';
+                if (/\bINSIGHT\b/i.test(textoLuminaria)) res.marca_luminaria = 'INSIGHT';
+                else if (/\bTECNOWATT\b/i.test(textoLuminaria)) res.marca_luminaria = 'TECNOWATT';
+                else if (/\bBRIGHTLUX\b/i.test(textoLuminaria)) res.marca_luminaria = 'BRIGHTLUX';
+                else if (/\bPHILIPS\b/i.test(textoLuminaria)) res.marca_luminaria = 'PHILIPS';
+                else if (/\bOLIVO\b/i.test(textoLuminaria)) res.marca_luminaria = 'OLIVO';
+                else if (/\bVESUVIO\b/i.test(textoLuminaria)) res.marca_luminaria = 'VESUVIO';
+                else if (/\bFORTNORT\b/i.test(textoLuminaria)) res.marca_luminaria = 'FORTNORT';
+                else if (/\bINTELBRAS\b/i.test(textoLuminaria)) res.marca_luminaria = 'INTELBRAS';
                 else res.marca_luminaria = 'PADRÃO';
 
                 if (dataFechamento) {
@@ -5674,16 +5795,24 @@
                 };
 
                 // Consultar OSs e plaquetas que já foram deliberadas (Aprovadas, Calibradas em Poste ou Descartadas)
+                // e também consultar fechamentos de OS que foram marcados como desconsiderados
                 const deliberadasSet = new Set();
+                const fechamentosDesconsideradosSet = new Set(); // formato: `${protClean}__${numFechamento}`
                 try {
-                    const { data: resHistAudit } = await client
-                        .from('historico_localizacao_plaquetas')
-                        .select('numero_os, identificacao')
-                        .in('origem', ['SNAP_POSTE_AEREO', 'APROVACAO_OS', 'DESCARTE_OS', 'CADASTRO_NOVA_PLAQUETA'])
-                        .not('numero_os', 'is', null);
+                    const [resHistAudit, resFechDesc] = await Promise.all([
+                        client
+                            .from('historico_localizacao_plaquetas')
+                            .select('numero_os, identificacao')
+                            .in('origem', ['SNAP_POSTE_AEREO', 'APROVACAO_OS', 'DESCARTE_OS', 'CADASTRO_NOVA_PLAQUETA'])
+                            .not('numero_os', 'is', null),
+                        client
+                            .from('fechamentos_os')
+                            .select('protocolo, numero_fechamento')
+                            .eq('desconsiderado', true)
+                    ]);
 
-                    if (resHistAudit && resHistAudit.length > 0) {
-                        resHistAudit.forEach(h => {
+                    if (resHistAudit.data && resHistAudit.data.length > 0) {
+                        resHistAudit.data.forEach(h => {
                             if (h.numero_os) {
                                 const protClean = String(h.numero_os).trim().toUpperCase();
                                 const plqClean = h.identificacao ? String(h.identificacao).trim().toUpperCase() : '';
@@ -5696,8 +5825,17 @@
                         });
                         console.log(`🛡️ [Aprovação Coordenadas] ${deliberadasSet.size} registros já auditados/deliberados ignorados na fila.`);
                     }
+
+                    if (resFechDesc.data && resFechDesc.data.length > 0) {
+                        resFechDesc.data.forEach(f => {
+                            if (f.protocolo && f.numero_fechamento !== undefined && f.numero_fechamento !== null) {
+                                fechamentosDesconsideradosSet.add(`${String(f.protocolo).trim().toUpperCase()}__${f.numero_fechamento}`);
+                            }
+                        });
+                        console.log(`🗑️ [Aprovação Coordenadas] ${fechamentosDesconsideradosSet.size} fechamentos desconsiderados ignorados.`);
+                    }
                 } catch (eHist) {
-                    console.warn("⚠️ Aviso ao consultar registros já auditados:", eHist);
+                    console.warn("⚠️ Aviso ao consultar registros já auditados ou desconsiderados:", eHist);
                 }
 
                 // Filtrar apenas pontos_final com plaqueta e coordenada de reparo válidas
@@ -5709,7 +5847,9 @@
                     const ptsFinal = parseArrayJson(os.pontos_final);
 
                     if (ptsFinal && Array.isArray(ptsFinal) && ptsFinal.length > 0) {
-                        // Iterar exclusivamente por todos os pontos de fechamento (pontos_final)
+                        // Mapear pontos agrupando pela plaqueta para preservar apenas a ocorrência mais recente caso a OS tenha sido reaberta
+                        const pontosValidosMap = new Map(); // plq -> { pt, idx }
+
                         ptsFinal.forEach((pt, idx) => {
                             const plq = String(pt.plaqueta || pt.plaqueta_final || pt.identificacao || '').trim().toUpperCase();
                             if (!plq) return;
@@ -5719,6 +5859,30 @@
 
                             // Ignora se este ponto específico já foi deliberado
                             if (deliberadasSet.has(`${prot}__${plq}`) || deliberadasSet.has(prot)) return;
+
+                            // Ignora se o fechamento correspondente a este ponto foi desconsiderado
+                            const numFech = pt.fechamento !== undefined && pt.fechamento !== null ? pt.fechamento : null;
+                            if (numFech !== null && fechamentosDesconsideradosSet.has(`${prot}__${numFech}`)) {
+                                return;
+                            }
+
+                            // Se houver mais de um ponto com a mesma plaqueta (ex: OS reaberta e finalizada novamente),
+                            // prioriza o fechamento mais recente (maior número de fechamento ou último índice no array)
+                            if (pontosValidosMap.has(plq)) {
+                                const exist = pontosValidosMap.get(plq);
+                                const existFech = exist.pt.fechamento || 0;
+                                const curFech = numFech || 0;
+                                if (curFech >= existFech) {
+                                    pontosValidosMap.set(plq, { pt, idx });
+                                }
+                            } else {
+                                pontosValidosMap.set(plq, { pt, idx });
+                            }
+                        });
+
+                        // Iterar pelos pontos filtrados e desduplicados
+                        pontosValidosMap.forEach(({ pt, idx }) => {
+                            const plq = String(pt.plaqueta || pt.plaqueta_final || pt.identificacao || '').trim().toUpperCase();
 
                             let cRep = '';
                             if (pt.coordenada || pt.coordenada_reparo) {
@@ -5815,7 +5979,7 @@
                     const chunk = plaquetasArray.slice(i, i + CHUNK_SIZE);
                     const { data: plaquetasChunk, error: plqErr } = await client
                         .from('localizacao_plaquetas')
-                        .select('id, identificacao, "Latitude", "Longitude", "Empresa"')
+                        .select('id, identificacao, "Latitude", "Longitude", "Empresa", ultima_os_manutencao, data_troca_rele, data_troca_luminaria')
                         .in('identificacao', chunk);
 
                     if (!plqErr && plaquetasChunk) {
@@ -5891,6 +6055,84 @@
                     }
                 }
 
+                // Buscar histórico recente de vinculações das plaquetas para identificar OS anterior e Data do vínculo
+                const vinculosHistoricosMap = new Map(); // plaquetaUpper -> { numero_os: string, created_at: string }
+                for (let i = 0; i < plaquetasArray.length; i += CHUNK_SIZE) {
+                    const chunk = plaquetasArray.slice(i, i + CHUNK_SIZE);
+                    try {
+                        const { data: histVincData, error: histVincErr } = await client
+                            .from('historico_localizacao_plaquetas')
+                            .select('identificacao, numero_os, created_at')
+                            .in('identificacao', chunk)
+                            .not('numero_os', 'is', null)
+                            .order('created_at', { ascending: false });
+
+                        if (!histVincErr && histVincData) {
+                            histVincData.forEach(h => {
+                                const k = String(h.identificacao || '').trim().toUpperCase();
+                                if (k && !vinculosHistoricosMap.has(k)) {
+                                    vinculosHistoricosMap.set(k, {
+                                        numero_os: h.numero_os,
+                                        created_at: h.created_at
+                                    });
+                                }
+                            });
+                        }
+                    } catch (eH) {
+                        console.warn("⚠️ Aviso ao consultar histórico de vinculação das plaquetas:", eH);
+                    }
+                }
+
+                // Fallback adicional com localizacao_plaquetas (caso a tabela historico ainda não tenha log da plaqueta antiga)
+                const protocolosParaConsultarOS = new Set();
+                plaquetasMap.forEach((insts, k) => {
+                    if (!vinculosHistoricosMap.has(k)) {
+                        for (const inst of insts) {
+                            if (inst.ultima_os_manutencao) {
+                                const prot = String(inst.ultima_os_manutencao).trim();
+                                const dt = inst.data_troca_rele || inst.data_troca_luminaria || null;
+                                vinculosHistoricosMap.set(k, {
+                                    numero_os: prot,
+                                    created_at: dt
+                                });
+                                if (!dt && prot) {
+                                    protocolosParaConsultarOS.add(prot);
+                                }
+                                break;
+                            }
+                        }
+                    }
+                });
+
+                // Se houver OSs sem data na tabela de plaquetas, consulta as datas de fechamento das OSs
+                if (protocolosParaConsultarOS.size > 0) {
+                    const protArray = Array.from(protocolosParaConsultarOS);
+                    for (let i = 0; i < protArray.length; i += CHUNK_SIZE) {
+                        const chunkProt = protArray.slice(i, i + CHUNK_SIZE);
+                        try {
+                            const { data: osDatas, error: osDatasErr } = await client
+                                .from('vw_todas_ordens_servico')
+                                .select('protocolo, data_fechamento, data_abertura')
+                                .in('protocolo', chunkProt);
+
+                            if (!osDatasErr && osDatas) {
+                                const mapDatas = new Map();
+                                osDatas.forEach(o => {
+                                    if (o.protocolo) mapDatas.set(String(o.protocolo).trim().toUpperCase(), o.data_fechamento || o.data_abertura);
+                                });
+                                vinculosHistoricosMap.forEach((val, k) => {
+                                    if (val && val.numero_os && !val.created_at) {
+                                        const dt = mapDatas.get(String(val.numero_os).trim().toUpperCase());
+                                        if (dt) val.created_at = dt;
+                                    }
+                                });
+                            }
+                        } catch (eDt) {
+                            console.warn("⚠️ Aviso ao consultar datas das OSs de manutenção:", eDt);
+                        }
+                    }
+                }
+
                 // Cruzamento e cálculo de distância geodésica e conflitos
                 const filaMontada = [];
                 osComCoord.forEach(item => {
@@ -5906,7 +6148,17 @@
 
                         const postAnteriores = postesVinculadosMap.get(item.plaquetaId.toUpperCase()) || [];
                         const outroPosteVinculado = postAnteriores.find(p => !item.posteIdSelecionado || String(p.id) !== String(item.posteIdSelecionado));
-                        const temConflitoPosteMigrado = Boolean(outroPosteVinculado);
+                        
+                        // Verificar se o vínculo com este outro poste pertence à PRÓPRIA OS que estamos avaliando
+                        const vincHistInfo = outroPosteVinculado ? vinculosHistoricosMap.get(item.plaquetaId.toUpperCase()) : null;
+                        const vinculoPropriaOS = Boolean(
+                            outroPosteVinculado && (
+                                (vincHistInfo && vincHistInfo.numero_os && String(vincHistInfo.numero_os).trim().toUpperCase() === String(item.protocolo).trim().toUpperCase())
+                            )
+                        );
+
+                        // Se o vínculo do poste é originário da própria OS que está sendo analisada, não é uma migração indevida de outra OS
+                        const temConflitoPosteMigrado = Boolean(outroPosteVinculado && !vinculoPropriaOS);
 
                         const motivosAprovacao = [
                             {
@@ -5917,6 +6169,28 @@
                                 icon: 'add_circle'
                             }
                         ];
+
+                        if (temConflitoPosteMigrado) {
+                            let descMigrado = `Plaqueta já estava associada ao Poste #${outroPosteVinculado.id} anteriormente`;
+                            if (vincHistInfo && (vincHistInfo.numero_os || vincHistInfo.created_at)) {
+                                const partesDetalhe = [];
+                                if (vincHistInfo.numero_os) partesDetalhe.push(`OS #${vincHistInfo.numero_os}`);
+                                if (vincHistInfo.created_at) {
+                                    const dtStr = formatarDataIsoPtBr(vincHistInfo.created_at) || new Date(vincHistInfo.created_at).toLocaleDateString('pt-BR');
+                                    if (dtStr) partesDetalhe.push(`em ${dtStr}`);
+                                }
+                                if (partesDetalhe.length > 0) {
+                                    descMigrado += ` (${partesDetalhe.join(' ')})`;
+                                }
+                            }
+                            motivosAprovacao.push({
+                                tipo: 'POSTE_MIGRADO',
+                                titulo: 'Plaqueta Já Vinculada',
+                                descricao: descMigrado,
+                                badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
+                                icon: 'swap_horiz'
+                            });
+                        }
 
                         if (temConflitoPosteOcupado) {
                             motivosAprovacao.push({
@@ -5946,6 +6220,8 @@
                             outroPosteAnteriorCoords: (outroPosteVinculado && outroPosteVinculado.latitude && outroPosteVinculado.longitude) 
                                 ? { lat: parseFloat(outroPosteVinculado.latitude), lng: parseFloat(outroPosteVinculado.longitude) } 
                                 : null,
+                            outroPosteAnteriorOS: vincHistInfo ? (vincHistInfo.numero_os || null) : null,
+                            outroPosteAnteriorData: vincHistInfo ? (vincHistInfo.created_at || null) : null,
                             temDuplicatasBanco: false,
                             temDesvioAlto: false,
                             motivosAprovacao: motivosAprovacao,
@@ -5992,7 +6268,18 @@
                     // Conflito de Poste Anterior: a plaqueta já foi vinculada a um poste diferente do atual
                     const postAnteriores = postesVinculadosMap.get(item.plaquetaId.toUpperCase()) || [];
                     const outroPosteVinculado = postAnteriores.find(p => !item.posteIdSelecionado || String(p.id) !== String(item.posteIdSelecionado));
-                    const temConflitoPosteMigrado = Boolean(outroPosteVinculado);
+                    
+                    // Verificar se o vínculo deste outro poste pertence à PRÓPRIA OS que estamos avaliando
+                    const vincHistInfo = outroPosteVinculado ? vinculosHistoricosMap.get(item.plaquetaId.toUpperCase()) : null;
+                    const vinculoPropriaOS = Boolean(
+                        outroPosteVinculado && (
+                            (vincHistInfo && vincHistInfo.numero_os && String(vincHistInfo.numero_os).trim().toUpperCase() === String(item.protocolo).trim().toUpperCase()) ||
+                            instsCadastradas.some(c => c.ultima_os_manutencao && String(c.ultima_os_manutencao).trim().toUpperCase() === String(item.protocolo).trim().toUpperCase())
+                        )
+                    );
+
+                    // Se o vínculo do poste é da própria OS (ex: reabertura ou fechamento anterior da mesma OS), não é um conflito de migração
+                    const temConflitoPosteMigrado = Boolean(outroPosteVinculado && !vinculoPropriaOS);
 
                     // Conflito Geodésico: distância > 15m
                     const temDesvioAlto = melhorInstancia.distanciaMetros > 15;
@@ -6012,10 +6299,22 @@
                         });
                     }
                     if (temConflitoPosteMigrado) {
+                        let descMigrado = `Plaqueta já estava associada ao Poste #${outroPosteVinculado.id} anteriormente`;
+                        if (vincHistInfo && (vincHistInfo.numero_os || vincHistInfo.created_at)) {
+                            const partesDetalhe = [];
+                            if (vincHistInfo.numero_os) partesDetalhe.push(`OS #${vincHistInfo.numero_os}`);
+                            if (vincHistInfo.created_at) {
+                                const dtStr = formatarDataIsoPtBr(vincHistInfo.created_at) || new Date(vincHistInfo.created_at).toLocaleDateString('pt-BR');
+                                if (dtStr) partesDetalhe.push(`em ${dtStr}`);
+                            }
+                            if (partesDetalhe.length > 0) {
+                                descMigrado += ` (${partesDetalhe.join(' ')})`;
+                            }
+                        }
                         motivosAprovacao.push({
                             tipo: 'POSTE_MIGRADO',
                             titulo: 'Plaqueta Já Vinculada',
-                            descricao: `Plaqueta já estava associada ao Poste #${outroPosteVinculado.id} anteriormente`,
+                            descricao: descMigrado,
                             badgeClass: 'bg-purple-100 text-purple-900 border-purple-300',
                             icon: 'swap_horiz'
                         });
@@ -6083,6 +6382,8 @@
                         outroPosteAnteriorCoords: (outroPosteVinculado && outroPosteVinculado.latitude && outroPosteVinculado.longitude) 
                             ? { lat: parseFloat(outroPosteVinculado.latitude), lng: parseFloat(outroPosteVinculado.longitude) } 
                             : null,
+                        outroPosteAnteriorOS: vincHistInfo ? (vincHistInfo.numero_os || null) : null,
+                        outroPosteAnteriorData: vincHistInfo ? (vincHistInfo.created_at || null) : null,
                         temDuplicatasBanco: temDuplicatasBanco,
                         temDesvioAlto: temDesvioAlto,
                         motivosAprovacao: motivosAprovacao,
@@ -7121,6 +7422,14 @@
 
             const badgeOpPosteEl = document.getElementById('comp-panel-os-poste-badge');
             if (badgeOpPosteEl) {
+                const labelBotaoAnterior = item.outroPosteAnteriorOS 
+                    ? `Antes no Poste #${item.outroPosteAnteriorId} (OS #${item.outroPosteAnteriorOS})`
+                    : `Antes no Poste #${item.outroPosteAnteriorId} (Ver)`;
+
+                const titleBotaoAnterior = item.outroPosteAnteriorOS 
+                    ? `Clique para focar no Poste anterior #${item.outroPosteAnteriorId} (Vinculado na OS #${item.outroPosteAnteriorOS}${item.outroPosteAnteriorData ? ' em ' + (formatarDataIsoPtBr(item.outroPosteAnteriorData) || new Date(item.outroPosteAnteriorData).toLocaleDateString('pt-BR')) : ''})`
+                    : `Clique para focar no Poste anterior #${item.outroPosteAnteriorId}`;
+
                 if (item.posteIdSelecionado) {
                     badgeOpPosteEl.classList.remove('hidden');
                     badgeOpPosteEl.innerHTML = `
@@ -7136,9 +7445,9 @@
                                 </span>
                             ` : ''}
                             ${item.temConflitoPosteMigrado ? `
-                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
+                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="${titleBotaoAnterior}">
                                     <span class="material-symbols-outlined text-[12px] text-purple-700">swap_horiz</span>
-                                    <span>Antes no Poste #${item.outroPosteAnteriorId} (Ver)</span>
+                                    <span>${labelBotaoAnterior}</span>
                                 </button>
                             ` : ''}
                         </div>
@@ -7152,9 +7461,9 @@
                                 <span>Poste não encontrado no mapa</span>
                             </span>
                             ${item.temConflitoPosteMigrado ? `
-                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
+                                <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer" title="${titleBotaoAnterior}">
                                     <span class="material-symbols-outlined text-[12px] text-purple-700">swap_horiz</span>
-                                    <span>Antes no Poste #${item.outroPosteAnteriorId} (Ver)</span>
+                                    <span>${labelBotaoAnterior}</span>
                                 </button>
                             ` : ''}
                         </div>
@@ -7162,9 +7471,9 @@
                 } else if (item.temConflitoPosteMigrado) {
                     badgeOpPosteEl.classList.remove('hidden');
                     badgeOpPosteEl.innerHTML = `
-                        <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer shadow-2xs" title="Clique para focar no Poste anterior #${item.outroPosteAnteriorId}">
+                        <button type="button" onclick="window.focarPontoComparativo('poste_anterior')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-bold bg-purple-100 hover:bg-purple-200 text-purple-900 border border-purple-300 transition-colors cursor-pointer shadow-2xs" title="${titleBotaoAnterior}">
                             <span class="material-symbols-outlined text-[13px] text-purple-700">swap_horiz</span>
-                            <span>Vinculada antes ao Poste #${item.outroPosteAnteriorId} (Ver no Mapa)</span>
+                            <span>Vinculada antes ao Poste #${item.outroPosteAnteriorId}${item.outroPosteAnteriorOS ? ' (OS #' + item.outroPosteAnteriorOS + ')' : ''} (Ver no Mapa)</span>
                         </button>
                     `;
                 } else {

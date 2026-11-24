@@ -62,6 +62,19 @@
             font-feature-settings: 'liga' 1;
             text-rendering: optimizeLegibility;
         }
+        .material-symbols-outlined.text-\[9px\], .material-symbols-outlined[class*="text-[9px]"] { font-size: 9px !important; }
+        .material-symbols-outlined.text-\[10px\], .material-symbols-outlined[class*="text-[10px]"] { font-size: 10px !important; }
+        .material-symbols-outlined.text-\[11px\], .material-symbols-outlined[class*="text-[11px]"] { font-size: 11px !important; }
+        .material-symbols-outlined.text-\[12px\], .material-symbols-outlined[class*="text-[12px]"] { font-size: 12px !important; }
+        .material-symbols-outlined.text-\[13px\], .material-symbols-outlined[class*="text-[13px]"] { font-size: 13px !important; }
+        .material-symbols-outlined.text-\[14px\], .material-symbols-outlined[class*="text-[14px]"] { font-size: 14px !important; }
+        .material-symbols-outlined.text-\[15px\], .material-symbols-outlined[class*="text-[15px]"] { font-size: 15px !important; }
+        .material-symbols-outlined.text-\[16px\], .material-symbols-outlined[class*="text-[16px]"] { font-size: 16px !important; }
+        .material-symbols-outlined.text-\[17px\], .material-symbols-outlined[class*="text-[17px]"] { font-size: 17px !important; }
+        .material-symbols-outlined.text-\[18px\], .material-symbols-outlined[class*="text-[18px]"] { font-size: 18px !important; }
+        .material-symbols-outlined.text-\[20px\], .material-symbols-outlined[class*="text-[20px]"] { font-size: 20px !important; }
+        .material-symbols-outlined.text-\[22px\], .material-symbols-outlined[class*="text-[22px]"] { font-size: 22px !important; }
+        .material-symbols-outlined.text-\[24px\], .material-symbols-outlined[class*="text-[24px]"] { font-size: 24px !important; }
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -196,6 +209,10 @@
                     <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Pendentes para aprovação</h3>
                 </div>
                 <div class="flex items-center gap-2">
+                    <button type="button" class="btn-toggle-modo-rota-painel inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm" onclick="window.toggleModoRotaPainel()" title="Ativar seleção de OSs para criar uma rota no mapa">
+                        <span class="material-symbols-outlined text-[17px] text-emerald-600">route</span>
+                        <span class="label-btn-modo-rota-painel">Criar Rota no Mapa</span>
+                    </button>
                     <button type="button" id="btn-mapa-pendentes-aprovacao" onclick="window.abrirMapaPendentesAprovacaoModal()" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-all shadow-sm active:scale-95 cursor-pointer" title="Visualizar todos os pontos das OS pendentes no mapa Mapbox">
                         <span class="material-symbols-outlined text-[18px]">map</span>
                         <span id="label-btn-mapa-pendentes">Ver Pontos no Mapa</span>
@@ -207,6 +224,10 @@
                 <table class="w-full text-left border-collapse table-fixed max-w-full" id="pendentes-os-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
+                            <!-- Checkbox de Rota (Oculto por padrão, ativado via modo rota) -->
+                            <th class="th-checkbox-rota hidden py-3 px-2 w-[44px] min-w-[44px] text-center align-middle" data-col="chk">
+                                <input type="checkbox" id="chk-rota-painel-all-pendentes" onchange="window.toggleSelecionarTodasRotaPainel(this, 'pendentes')" class="w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" title="Marcar/Desmarcar todas visíveis" />
+                            </th>
                             <!-- Column 1: Protocolo -->
                             <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
                                 <div class="relative inline-block text-left group/protocol-filter">
@@ -250,7 +271,7 @@
                             </th>
                             
                             <!-- Column 5: Motivo -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 200px; min-width: 200px;" data-col="4">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 220px; min-width: 200px;" data-col="4">
                                 <div class="flex items-center gap-1">Motivo</div>
                                 <div class="resizer"></div>
                             </th>
@@ -263,7 +284,7 @@
                     </thead>
                     <tbody class="font-data-tabular text-data-tabular text-on-surface">
                         <tr id="no-pendentes-results" class="hidden">
-                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                            <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                                 <div class="flex flex-col items-center justify-center gap-1.5">
                                     <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                                     <span class="text-xs">Nenhum protocolo pendente de aprovação para os filtros selecionados.</span>
@@ -280,12 +301,22 @@
         <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-hidden">
             <div class="px-5 py-4 border-b border-outline-variant bg-[#F8FAFC]/80 flex justify-between items-center">
                 <h3 class="font-data-tabular text-data-tabular font-bold text-on-surface">Ordens de Serviço Recentes</h3>
+                <div class="flex items-center gap-2">
+                    <button type="button" class="btn-toggle-modo-rota-painel inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm" onclick="window.toggleModoRotaPainel()" title="Ativar seleção de OSs para criar uma rota no mapa">
+                        <span class="material-symbols-outlined text-[17px] text-emerald-600">route</span>
+                        <span class="label-btn-modo-rota-painel">Criar Rota no Mapa</span>
+                    </button>
+                </div>
             </div>
             
             <div class="w-full min-h-[300px]">
                 <table class="w-full text-left border-collapse table-fixed max-w-full" id="os-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative">
+                            <!-- Checkbox de Rota (Oculto por padrão, ativado via modo rota) -->
+                            <th class="th-checkbox-rota hidden py-3 px-2 w-[44px] min-w-[44px] text-center align-middle" data-col="chk">
+                                <input type="checkbox" id="chk-rota-painel-all-os" onchange="window.toggleSelecionarTodasRotaPainel(this, 'os')" class="w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer" title="Marcar/Desmarcar todas visíveis" />
+                            </th>
                             <!-- Column 1: Protocolo com Filtro -->
                             <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative align-bottom pb-3" style="width: 160px; min-width: 160px;" data-col="0">
                                 <div class="relative inline-block text-left group/protocol-filter">
@@ -479,7 +510,7 @@
                     <tbody class="font-data-tabular text-data-tabular text-on-surface">
                         <!-- Empty State Row -->
                         <tr id="no-audit-results" class="hidden">
-                            <td colspan="6" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
+                            <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
                                 <div class="flex flex-col items-center justify-center gap-1.5">
                                     <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
                                     <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
@@ -1377,8 +1408,10 @@
         const rows = Array.from(tbody.querySelectorAll("tr"));
         
         rows.sort((a, b) => {
-            const valA = a.cells[colIndex].textContent.trim();
-            const valB = b.cells[colIndex].textContent.trim();
+            const offsetA = a.querySelector('.td-checkbox-rota') ? 1 : 0;
+            const offsetB = b.querySelector('.td-checkbox-rota') ? 1 : 0;
+            const valA = a.cells[offsetA + colIndex]?.textContent.trim() || '';
+            const valB = b.cells[offsetB + colIndex]?.textContent.trim() || '';
             
             const partsA = valA.split('/');
             const partsB = valB.split('/');
@@ -1403,7 +1436,7 @@
 
         const minWidths = { '0': 120, '1': 100, '2': 160, '3': 150, '4': 150, '5': 160 };
         const maxWidths = { '0': 300, '1': 220, '2': 800, '3': 350, '4': 300, '5': 240 };
-        const defaultWidths = { '0': 160, '1': 120, '2': 380, '3': 200, '4': 200, '5': 160 };
+        const defaultWidths = { '0': 160, '1': 120, '2': 380, '3': 200, '4': 220, '5': 160 };
 
         tables.forEach((table) => {
             const tableId = table.id || 'os-table';
@@ -1427,6 +1460,7 @@
 
             cols.forEach((col) => {
                 const dataCol = col.getAttribute('data-col');
+                if (dataCol === 'chk') return;
                 if (dataCol !== null) {
                     const minW = minWidths[dataCol] || 100;
                     const maxW = maxWidths[dataCol] || 400;
@@ -1453,6 +1487,7 @@
 
             cols.forEach((col) => {
                 const dataCol = col.getAttribute('data-col');
+                if (dataCol === 'chk') return;
                 if (dataCol !== null && rawWidths[dataCol] !== undefined) {
                     const finalW = Math.floor(rawWidths[dataCol] * scale);
                     col.style.width = finalW + 'px';
@@ -1803,9 +1838,11 @@
         window.activeProtocolPrefix = '';
 
         function checkRowMatchesFilters(row, currentPrefix, isPendentesTable = false) {
+            const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
+
             // 1. Date Filter (Col 1)
             if (activeDatePredicate) {
-                const dateStr = row.cells[1]?.textContent.trim() || '';
+                const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
                 const rowDate = parseTableDate(dateStr);
                 if (!rowDate || !activeDatePredicate(rowDate)) {
                     return false;
@@ -1814,14 +1851,14 @@
 
             // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
             if (currentPrefix) {
-                const protText = (row.cells[0]?.textContent || '').trim().toUpperCase();
+                const protText = (row.cells[offset + 0]?.textContent || '').trim().toUpperCase();
                 if (!protText.startsWith(currentPrefix.toUpperCase())) {
                     return false;
                 }
             }
 
             // 2b. Protocol Specific Search Filter (Column 0)
-            if (!matchColumnText(row, 0, protocolSearchQuery)) {
+            if (!matchColumnText(row, offset + 0, protocolSearchQuery)) {
                 return false;
             }
 
@@ -3199,5 +3236,210 @@
         }
     };
 </script>
+    <!-- Barra Flutuante de Seleção de Rota do Painel -->
+    <div id="barra-flutuante-rota-painel" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[5000] hidden items-center gap-3 bg-surface-container-lowest/95 backdrop-blur-md border border-emerald-500/40 px-5 py-3 rounded-2xl shadow-2xl transition-all duration-300">
+        <div class="flex items-center gap-2 pr-3 border-r border-outline-variant/50">
+            <div class="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-700 flex items-center justify-center">
+                <span class="material-symbols-outlined text-[18px]">alt_route</span>
+            </div>
+            <div>
+                <div class="font-bold text-xs text-on-surface">Modo Rota Ativo</div>
+                <div class="text-[11px] text-on-surface-variant">
+                    <span id="label-qtd-selecionadas-rota-painel" class="text-emerald-700 font-extrabold text-sm">0 OSs</span> selecionadas
+                </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button type="button" onclick="window.limparSelecaoRotaPainel()" class="px-2.5 py-1.5 text-xs font-semibold text-on-surface-variant hover:text-error hover:bg-error/10 rounded-lg transition-colors cursor-pointer">
+                Limpar
+            </button>
+            <button type="button" onclick="window.cancelarModoRotaPainel()" class="px-3 py-1.5 text-xs font-semibold border border-outline-variant/60 text-on-surface hover:bg-surface-container-high rounded-lg transition-colors cursor-pointer">
+                Cancelar
+            </button>
+            <button type="button" id="btn-confirmar-gerar-rota-painel" onclick="window.confirmarEnvioRotaAoMapaPainel()" class="px-4 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-all shadow-md active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                <span>Gerar Rota no Mapa</span>
+                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SELEÇÃO DE OSs PARA ROTA NO MAPA (PAINEL) -->
+    <script>
+    window.modoSelecaoRotaPainel = false;
+    window.selectedOSsParaRotaPainel = new Map(); // id/protocolo -> { id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, data, status, prioridade }
+
+    window.toggleModoRotaPainel = function(forceState = null) {
+        window.modoSelecaoRotaPainel = (forceState !== null) ? forceState : !window.modoSelecaoRotaPainel;
+        const ativo = window.modoSelecaoRotaPainel;
+
+        // Alterna classes visuais dos botões nas duas tabelas
+        document.querySelectorAll('.btn-toggle-modo-rota-painel').forEach(btn => {
+            const labelBtn = btn.querySelector('.label-btn-modo-rota-painel');
+            if (ativo) {
+                btn.className = "btn-toggle-modo-rota-painel inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-emerald-600 text-white border-emerald-600 shadow-md active:scale-95";
+                if (labelBtn) labelBtn.innerText = "Modo Rota Ativo ✓";
+            } else {
+                btn.className = "btn-toggle-modo-rota-painel inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border transition-all cursor-pointer bg-surface-container-high border-outline-variant/60 text-on-surface hover:bg-emerald-500/15 hover:text-emerald-700 hover:border-emerald-500/40 active:scale-95 shadow-sm";
+                if (labelBtn) labelBtn.innerText = "Criar Rota no Mapa";
+            }
+        });
+
+        // Exibe ou oculta cabeçalhos e células de checkbox
+        document.querySelectorAll('.th-checkbox-rota').forEach(th => {
+            th.classList.toggle('hidden', !ativo);
+        });
+        document.querySelectorAll('.td-checkbox-rota').forEach(td => {
+            td.classList.toggle('hidden', !ativo);
+        });
+
+        // Barra flutuante de ações
+        const barra = document.getElementById('barra-flutuante-rota-painel');
+        if (barra) {
+            if (ativo) {
+                barra.classList.remove('hidden');
+                barra.classList.add('flex');
+            } else {
+                barra.classList.add('hidden');
+                barra.classList.remove('flex');
+            }
+        }
+
+        window.atualizarContadorSelecaoRotaPainel();
+    };
+
+    window.cancelarModoRotaPainel = function() {
+        window.selectedOSsParaRotaPainel.clear();
+        document.querySelectorAll('.chk-item-rota-painel').forEach(cb => { cb.checked = false; });
+        const allPendentes = document.getElementById('chk-rota-painel-all-pendentes');
+        const allOs = document.getElementById('chk-rota-painel-all-os');
+        if (allPendentes) allPendentes.checked = false;
+        if (allOs) allOs.checked = false;
+        window.toggleModoRotaPainel(false);
+    };
+
+    window.limparSelecaoRotaPainel = function() {
+        window.selectedOSsParaRotaPainel.clear();
+        document.querySelectorAll('.chk-item-rota-painel').forEach(cb => { cb.checked = false; });
+        const allPendentes = document.getElementById('chk-rota-painel-all-pendentes');
+        const allOs = document.getElementById('chk-rota-painel-all-os');
+        if (allPendentes) allPendentes.checked = false;
+        if (allOs) allOs.checked = false;
+        window.atualizarContadorSelecaoRotaPainel();
+    };
+
+    window.toggleItemRotaPainel = function(checkbox, event) {
+        if (event) event.stopPropagation();
+        const id = checkbox.dataset.id;
+        const protocolo = checkbox.dataset.protocolo;
+        const lat = parseFloat(checkbox.dataset.lat);
+        const lng = parseFloat(checkbox.dataset.lng);
+        const endereco = checkbox.dataset.endereco || '';
+        const tecnico = checkbox.dataset.tecnico || '';
+        const problema = checkbox.dataset.problema || '';
+        const plaqueta = checkbox.dataset.plaqueta || '';
+        const dataOS = checkbox.dataset.data || '';
+        const status = checkbox.dataset.status || '';
+        const prioridade = checkbox.dataset.prioridade || '';
+
+        if (checkbox.checked) {
+            window.selectedOSsParaRotaPainel.set(protocolo || id, {
+                id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, dataConclusao: dataOS, status, prioridade
+            });
+        } else {
+            window.selectedOSsParaRotaPainel.delete(protocolo || id);
+        }
+        window.atualizarContadorSelecaoRotaPainel();
+    };
+
+    window.toggleSelecionarTodasRotaPainel = function(masterCheckbox, tipo) {
+        const tableId = tipo === 'pendentes' ? '#pendentes-os-table' : '#os-table';
+        const isChecked = masterCheckbox.checked;
+        const rows = document.querySelectorAll(`${tableId} tbody tr:not([id^="no-"])`);
+
+        rows.forEach(row => {
+            if (row.style.display === 'none') return;
+            const cb = row.querySelector('.chk-item-rota-painel');
+            if (cb) {
+                cb.checked = isChecked;
+                const id = cb.dataset.id;
+                const protocolo = cb.dataset.protocolo;
+                const lat = parseFloat(cb.dataset.lat);
+                const lng = parseFloat(cb.dataset.lng);
+                const endereco = cb.dataset.endereco || '';
+                const tecnico = cb.dataset.tecnico || '';
+                const problema = cb.dataset.problema || '';
+                const plaqueta = cb.dataset.plaqueta || '';
+                const dataOS = cb.dataset.data || '';
+                const status = cb.dataset.status || '';
+                const prioridade = cb.dataset.prioridade || '';
+
+                if (isChecked) {
+                    window.selectedOSsParaRotaPainel.set(protocolo || id, {
+                        id, protocolo, lat, lng, endereco, tecnico, problema, plaqueta, dataConclusao: dataOS, status, prioridade
+                    });
+                } else {
+                    window.selectedOSsParaRotaPainel.delete(protocolo || id);
+                }
+            }
+        });
+
+        window.atualizarContadorSelecaoRotaPainel();
+    };
+
+    window.atualizarContadorSelecaoRotaPainel = function() {
+        const count = window.selectedOSsParaRotaPainel ? window.selectedOSsParaRotaPainel.size : 0;
+        const label = document.getElementById('label-qtd-selecionadas-rota-painel');
+        const btnConfirm = document.getElementById('btn-confirmar-gerar-rota-painel');
+
+        if (label) {
+            label.innerText = `${count} ${count === 1 ? 'OS' : 'OSs'}`;
+        }
+        if (btnConfirm) {
+            btnConfirm.disabled = (count === 0);
+        }
+    };
+
+    window.confirmarEnvioRotaAoMapaPainel = function() {
+        if (!window.selectedOSsParaRotaPainel || window.selectedOSsParaRotaPainel.size === 0) {
+            alert("Selecione ao menos 1 Ordem de Serviço para traçar a rota no mapa.");
+            return;
+        }
+
+        const items = Array.from(window.selectedOSsParaRotaPainel.values());
+
+        // Valida se há coordenadas disponíveis
+        const comCoords = items.filter(it => !isNaN(it.lat) && !isNaN(it.lng) && it.lat !== 0 && it.lng !== 0);
+        if (comCoords.length === 0) {
+            alert("As OSs selecionadas não possuem coordenadas de latitude/longitude válidas para traçar a rota.");
+            return;
+        }
+
+        const payload = {
+            timestamp: Date.now(),
+            origem: 'painel',
+            totalSelecionadas: items.length,
+            pontos: items
+        };
+
+        try {
+            sessionStorage.setItem('rota_auditoria_selecionada', JSON.stringify(payload));
+        } catch(e) {
+            console.error("Erro ao gravar rota no sessionStorage:", e);
+        }
+
+        // Redireciona para o Mapa com modo auditoria/rota ativado
+        window.location.href = 'Mapa.html?modo=auditoria&origem=painel_tabela';
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && window.modoSelecaoRotaPainel) {
+            const modalOpen = document.querySelector('.modal:not(.hidden), #detalhes-os-modal:not(.hidden), #modalNovaOS:not(.hidden)');
+            if (!modalOpen) {
+                window.cancelarModoRotaPainel();
+            }
+        }
+    });
+    </script>
 </body>
 </html>

@@ -28,3 +28,17 @@
   text-rendering: optimizeLegibility;
 }
 
+.material-symbols-outlined.text-\[9px\], .material-symbols-outlined[class*="text-[9px]"] { font-size: 9px !important; }
+.material-symbols-outlined.text-\[10px\], .material-symbols-outlined[class*="text-[10px]"] { font-size: 10px !important; }
+.material-symbols-outlined.text-\[11px\], .material-symbols-outlined[class*="text-[11px]"] { font-size: 11px !important; }
+.material-symbols-outlined.text-\[12px\], .material-symbols-outlined[class*="text-[12px]"] { font-size: 12px !important; }
+.material-symbols-outlined.text-\[13px\], .material-symbols-outlined[class*="text-[13px]"] { font-size: 13px !important; }
+.material-symbols-outlined.text-\[14px\], .material-symbols-outlined[class*="text-[14px]"] { font-size: 14px !important; }
+.material-symbols-outlined.text-\[15px\], .material-symbols-outlined[class*="text-[15px]"] { font-size: 15px !important; }
+.material-symbols-outlined.text-\[16px\], .material-symbols-outlined[class*="text-[16px]"] { font-size: 16px !important; }
+.material-symbols-outlined.text-\[17px\], .material-symbols-outlined[class*="text-[17px]"] { font-size: 17px !important; }
+.material-symbols-outlined.text-\[18px\], .material-symbols-outlined[class*="text-[18px]"] { font-size: 18px !important; }
+.material-symbols-outlined.text-\[20px\], .material-symbols-outlined[class*="text-[20px]"] { font-size: 20px !important; }
+.material-symbols-outlined.text-\[22px\], .material-symbols-outlined[class*="text-[22px]"] { font-size: 22px !important; }
+.material-symbols-outlined.text-\[24px\], .material-symbols-outlined[class*="text-[24px]"] { font-size: 24px !important; }
+

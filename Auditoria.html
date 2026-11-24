@@ -62,6 +62,19 @@
             font-feature-settings: 'liga' 1;
             text-rendering: optimizeLegibility;
         }
+        .material-symbols-outlined.text-\[9px\], .material-symbols-outlined[class*="text-[9px]"] { font-size: 9px !important; }
+        .material-symbols-outlined.text-\[10px\], .material-symbols-outlined[class*="text-[10px]"] { font-size: 10px !important; }
+        .material-symbols-outlined.text-\[11px\], .material-symbols-outlined[class*="text-[11px]"] { font-size: 11px !important; }
+        .material-symbols-outlined.text-\[12px\], .material-symbols-outlined[class*="text-[12px]"] { font-size: 12px !important; }
+        .material-symbols-outlined.text-\[13px\], .material-symbols-outlined[class*="text-[13px]"] { font-size: 13px !important; }
+        .material-symbols-outlined.text-\[14px\], .material-symbols-outlined[class*="text-[14px]"] { font-size: 14px !important; }
+        .material-symbols-outlined.text-\[15px\], .material-symbols-outlined[class*="text-[15px]"] { font-size: 15px !important; }
+        .material-symbols-outlined.text-\[16px\], .material-symbols-outlined[class*="text-[16px]"] { font-size: 16px !important; }
+        .material-symbols-outlined.text-\[17px\], .material-symbols-outlined[class*="text-[17px]"] { font-size: 17px !important; }
+        .material-symbols-outlined.text-\[18px\], .material-symbols-outlined[class*="text-[18px]"] { font-size: 18px !important; }
+        .material-symbols-outlined.text-\[20px\], .material-symbols-outlined[class*="text-[20px]"] { font-size: 20px !important; }
+        .material-symbols-outlined.text-\[22px\], .material-symbols-outlined[class*="text-[22px]"] { font-size: 22px !important; }
+        .material-symbols-outlined.text-\[24px\], .material-symbols-outlined[class*="text-[24px]"] { font-size: 24px !important; }
         html, body {
             overflow-x: hidden !important;
             max-width: 100vw !important;
@@ -947,7 +960,7 @@
                         <span class="material-symbols-outlined text-[17px] text-emerald-600">route</span>
                         <span>Criar Rota no Mapa</span>
                     </button>
-                    <span class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
+                    <span id="completed-services-count-badge" class="text-label-sm text-on-surface-variant bg-surface-container-high px-2.5 py-1 rounded-full font-semibold">
                         0 Registros
                     </span>
                 </div>
@@ -1310,6 +1323,8 @@
                     </tbody>
                 </table>
             </div>
+            <!-- Controles de Paginação Remota da Tabela de Serviços Concluídos -->
+            <div id="completed-pagination-controls"></div>
         </div>
 
         <!-- Tabela de Demandas Emergenciais (Atendimento Direto) -->
@@ -2806,7 +2821,7 @@
         const pracaProblemIndicator = document.getElementById('praca-problem-filter-indicator');
 
         // Completed Services Filter Elements
-        let compActiveDatePredicate = buildDatePredicate('30dias');
+        let compActiveDatePredicate = null;
         let compProtocolPrefix = '';
         const compDateTrigger = document.getElementById('comp-date-filter-trigger');
         const compDateDropdown = document.getElementById('comp-date-filter-dropdown');
@@ -3303,11 +3318,13 @@
         };
 
         window.toggleCompProtocolPrefix = function(prefix) {
+
             if (compProtocolPrefix === prefix) {
                 compProtocolPrefix = '';
             } else {
                 compProtocolPrefix = prefix;
             }
+            window.compProtocolPrefix = compProtocolPrefix;
             window.updateCompProtocolPrefixUI();
             closeAllFilterDropdowns();
             applyCompletedServicesFilters();
@@ -3743,104 +3760,91 @@
 
         window.applyPracaServicesFilters = applyPracaServicesFilters;
 
-        // Completed Services Filter Function
-        function applyCompletedServicesFilters() {
-            const rows = document.querySelectorAll('#completed-services-table tbody tr:not(#no-completed-results)');
-            let visibleCount = 0;
+        // Auxiliar para obter intervalo ISO para consultas remotas ao Supabase
+        let compActiveDateType = null;
+        let compActiveCustomRange = null;
 
-            rows.forEach(row => {
-                let showRow = true;
-                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
+        window.getCompActiveDateRange = function() {
+            const now = new Date();
+            now.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(now);
+            todayEnd.setHours(23, 59, 59, 999);
 
-                // Protocol Search Filter (Col 0)
-                if (showRow && !matchColumnText(row, offset + 0, compProtocolSearchQuery)) {
-                    showRow = false;
-                }
-
-                // Date Filter (Col 1)
-                if (showRow && compActiveDatePredicate) {
-                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
-                    const rowDate = parseTableDate(dateStr);
-                    if (!rowDate || !compActiveDatePredicate(rowDate)) {
-                        showRow = false;
-                    }
-                }
-
-                // Plaqueta Filter (Col 2)
-                if (showRow && !matchColumnText(row, offset + 2, compPlaquetaSearchQuery)) {
-                    showRow = false;
-                }
-
-                // Material Filter (Col 6 - Accent Insensitive)
-                if (showRow && !matchColumnText(row, offset + 6, compMaterialSearchQuery)) {
-                    showRow = false;
-                }
-
-                // Problem Filter (Col 4)
-                if (showRow && compActiveProblemFilter && compActiveProblemFilter.length > 0 && !compActiveProblemFilter.includes('all')) {
-                    const probTd = row.cells[offset + 4];
-                    const probVal = probTd?.getAttribute('data-problem-value') || '';
-                    const probText = (probTd?.textContent || '').trim().toLowerCase();
-                    
-                    const matches = compActiveProblemFilter.some(filterVal => {
-                        if (probVal && (filterVal === probVal || filterVal === probVal.toLowerCase() || probVal.toLowerCase().includes(filterVal))) return true;
-                        if (filterVal === 'lampada-apagada' || filterVal === 'lampada-queimada') {
-                            return probText.includes('apagada') || probText.includes('queimada') || probText.includes('sem luz');
-                        }
-                        if (filterVal === 'lampada-intermitente') {
-                            return probText.includes('intermitente');
-                        }
-                        if (filterVal === 'acesa-dia' || filterVal === 'lampada-acesa-dia') {
-                            return probText.includes('acesa');
-                        }
-                        if (filterVal === 'braco-quebrado' || filterVal === 'lampada-quebrada') {
-                            return probText.includes('braço') || probText.includes('braco') || probText.includes('quebrada');
-                        }
-                        if (filterVal === 'outros-problemas' || filterVal === 'outro') {
-                            return probText.includes('outro') || probText.includes('outros');
-                        }
-                        if (filterVal === 'nenhum') {
-                            return probText.includes('nenhum');
-                        }
-                        return false;
-                    });
-
-                    if (!matches) {
-                        showRow = false;
-                    }
-                }
-
-                row.style.display = showRow ? '' : 'none';
-                if (showRow) visibleCount++;
-            });
-
-            const noResultsRow = document.getElementById('no-completed-results');
-            if (noResultsRow) {
-                noResultsRow.classList.toggle('hidden', visibleCount > 0);
+            if (compActiveDateType === 'hoje') {
+                return { startIso: now.toISOString(), endIso: todayEnd.toISOString() };
+            } else if (compActiveDateType === 'ontem') {
+                const y = new Date(now);
+                y.setDate(now.getDate() - 1);
+                const yEnd = new Date(y);
+                yEnd.setHours(23, 59, 59, 999);
+                return { startIso: y.toISOString(), endIso: yEnd.toISOString() };
+            } else if (compActiveDateType === '7dias') {
+                const w = new Date(now);
+                w.setDate(now.getDate() - 7);
+                return { startIso: w.toISOString(), endIso: todayEnd.toISOString() };
+            } else if (compActiveDateType === '30dias') {
+                const m = new Date(now);
+                m.setDate(now.getDate() - 30);
+                return { startIso: m.toISOString(), endIso: todayEnd.toISOString() };
+            } else if (compActiveDateType === 'custom' && compActiveCustomRange) {
+                const s = new Date(compActiveCustomRange.start + 'T00:00:00');
+                const e = new Date(compActiveCustomRange.end + 'T23:59:59');
+                return { startIso: s.toISOString(), endIso: e.toISOString() };
             }
+            return null; // Sem limite de data = todo o banco de dados
+        };
 
-            if (compDateIndicator) compDateIndicator.classList.toggle('hidden', !compActiveDatePredicate);
+        // Completed Services Filter Function com busca remota paginada e debounce
+        let compSearchDebounceTimer = null;
+        function applyCompletedServicesFilters(debounceMs = 300) {
+            if (compDateIndicator) compDateIndicator.classList.toggle('hidden', !compActiveDateType);
             if (compProtocolIndicator) compProtocolIndicator.classList.toggle('hidden', compProtocolSearchQuery.trim() === '' && !compProtocolPrefix);
             if (compPlaquetaIndicator) compPlaquetaIndicator.classList.toggle('hidden', compPlaquetaSearchQuery.trim() === '');
             if (compMaterialIndicator) compMaterialIndicator.classList.toggle('hidden', compMaterialSearchQuery.trim() === '');
             if (compProblemIndicator) compProblemIndicator.classList.toggle('hidden', !compActiveProblemFilter || compActiveProblemFilter.includes('all') || compActiveProblemFilter.length === 0);
+
+            if (compSearchDebounceTimer) clearTimeout(compSearchDebounceTimer);
+            compSearchDebounceTimer = setTimeout(() => {
+                if (window.auditoriaController && typeof window.auditoriaController.loadCompletedTablePaged === 'function') {
+                    window.auditoriaController.loadCompletedTablePaged(1);
+                }
+            }, debounceMs);
         }
+
+        // Expor funções globais de navegação da paginação
+        window.irParaPaginaServicosConcluidos = function(page) {
+            if (window.auditoriaController && typeof window.auditoriaController.loadCompletedTablePaged === 'function') {
+                window.auditoriaController.loadCompletedTablePaged(page);
+                const tbl = document.getElementById('completed-services-table');
+                if (tbl) tbl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        };
+
+        window.alterarTamanhoPaginaServicosConcluidos = function(newSize) {
+            if (window.auditoriaController && window.auditoriaController.completedPagination) {
+                window.auditoriaController.completedPagination.pageSize = parseInt(newSize, 10) || 20;
+                window.auditoriaController.loadCompletedTablePaged(1);
+            }
+        };
 
         // Search Input Handlers
         compProtocolSearchInput?.addEventListener('input', (e) => {
             compProtocolSearchQuery = e.target.value;
+            window.compProtocolSearchQuery = compProtocolSearchQuery;
             window.updateCompProtocolPrefixUI();
-            applyCompletedServicesFilters();
+            applyCompletedServicesFilters(300);
         });
 
         compPlaquetaSearchInput?.addEventListener('input', (e) => {
             compPlaquetaSearchQuery = e.target.value;
-            applyCompletedServicesFilters();
+            window.compPlaquetaSearchQuery = compPlaquetaSearchQuery;
+            applyCompletedServicesFilters(300);
         });
 
         compMaterialSearchInput?.addEventListener('input', (e) => {
             compMaterialSearchQuery = e.target.value;
-            applyCompletedServicesFilters();
+            window.compMaterialSearchQuery = compMaterialSearchQuery;
+            applyCompletedServicesFilters(300);
         });
 
         window.clearCompProtocolFilter = function() {
@@ -3853,6 +3857,8 @@
         };
 
         window.clearCompDateFilter = function() {
+            compActiveDateType = null;
+            compActiveCustomRange = null;
             compActiveDatePredicate = null;
             const start = document.getElementById('comp-range-start');
             const end = document.getElementById('comp-range-end');
@@ -3860,7 +3866,7 @@
             if (end) end.value = '';
             window.updateQuickDateUI('comp-date-filter-dropdown', null);
             closeAllFilterDropdowns();
-            applyCompletedServicesFilters();
+            applyCompletedServicesFilters(0);
         };
 
         window.clearCompPlaquetaFilter = function() {
@@ -3892,6 +3898,8 @@
             compProtocolPrefix = '';
             compPlaquetaSearchQuery = '';
             compMaterialSearchQuery = '';
+            compActiveDateType = null;
+            compActiveCustomRange = null;
             compActiveDatePredicate = null;
             compActiveProblemFilter = ['all'];
             if (compProtocolSearchInput) compProtocolSearchInput.value = '';
@@ -3908,7 +3916,7 @@
             window.updateQuickDateUI('comp-date-filter-dropdown', null);
             window.updateCompProtocolPrefixUI();
             closeAllFilterDropdowns();
-            applyCompletedServicesFilters();
+            applyCompletedServicesFilters(0);
         };
 
         // Checkbox completed problem filters
@@ -3934,7 +3942,8 @@
                 compActiveProblemFilter = checkedValues;
                 if (compProblemIndicator) compProblemIndicator.classList.remove('hidden');
             }
-            applyCompletedServicesFilters();
+            window.compActiveProblemFilter = compActiveProblemFilter;
+            applyCompletedServicesFilters(150);
         };
 
         if (compProblemFilterAll) {
@@ -3952,20 +3961,24 @@
         });
 
         window.applyCompQuickFilter = function(type) {
+            compActiveDateType = type;
+            compActiveCustomRange = null;
             compActiveDatePredicate = buildDatePredicate(type);
             window.updateQuickDateUI('comp-date-filter-dropdown', type);
             closeAllFilterDropdowns();
-            applyCompletedServicesFilters();
+            applyCompletedServicesFilters(0);
         };
 
         window.applyCompCustomRange = function() {
             const startVal = document.getElementById('comp-range-start')?.value;
             const endVal = document.getElementById('comp-range-end')?.value;
             if (!startVal || !endVal) return;
+            compActiveDateType = 'custom';
+            compActiveCustomRange = { start: startVal, end: endVal };
             compActiveDatePredicate = buildDatePredicate('custom', startVal, endVal);
             window.updateQuickDateUI('comp-date-filter-dropdown', 'custom');
             closeAllFilterDropdowns();
-            applyCompletedServicesFilters();
+            applyCompletedServicesFilters(0);
         };
 
         // Emergency Services Filter Function
@@ -4310,7 +4323,7 @@
 
         // Initialize date filter UI selected states on load
         window.updateQuickDateUI('praca-date-filter-dropdown', '30dias');
-        window.updateQuickDateUI('comp-date-filter-dropdown', '30dias');
+        window.updateQuickDateUI('comp-date-filter-dropdown', null);
         window.updateQuickDateUI('emg-date-filter-dropdown', '30dias');
 
         window.clearProtocolFilter = function() {

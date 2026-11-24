@@ -7,6 +7,16 @@ class AuditoriaController {
         this.chamadosList = [];
         this.concludedList = [];
         this.userRole = '';
+
+        // Estado da Paginação Remota da Tabela de Serviços Concluídos (Viário)
+        this.completedPagination = {
+            page: 1,
+            pageSize: 20,
+            total: 0,
+            totalPages: 1,
+            isLoading: false,
+            items: []
+        };
     }
 
     isManutentorUser() {
@@ -976,6 +986,166 @@ class AuditoriaController {
     /**
      * Renders Completed Services Table rows using Finalization/Conclusao data
      */
+    /**
+     * Carrega serviços concluídos (viário) de forma paginada do Supabase sem limitação de 45 dias
+     */
+    async loadCompletedTablePaged(page = 1) {
+        if (!this.service || typeof this.service.getCompletedViariaChamadosPaged !== 'function') {
+            console.warn('⚠️ [AuditoriaController] getCompletedViariaChamadosPaged não disponível');
+            return;
+        }
+
+        this.completedPagination.isLoading = true;
+        this.completedPagination.page = page;
+        this.renderCompletedTableLoading();
+
+        try {
+            // Obter valores atuais dos filtros da interface
+            const protocolo = (window.compProtocolSearchQuery || '').trim();
+            const protocolPrefix = window.compProtocolPrefix || '';
+            const plaqueta = (window.compPlaquetaSearchQuery || '').trim();
+            const material = (window.compMaterialSearchQuery || '').trim();
+            const problema = (window.compActiveProblemFilter && window.compActiveProblemFilter.length === 1 && window.compActiveProblemFilter[0] !== 'all')
+                ? window.compActiveProblemFilter[0]
+                : '';
+
+            // Filtros de Data
+            let dataInicio = null;
+            let dataFim = null;
+            if (typeof window.getCompActiveDateRange === 'function') {
+                const range = window.getCompActiveDateRange();
+                if (range) {
+                    dataInicio = range.startIso;
+                    dataFim = range.endIso;
+                }
+            }
+
+            const res = await this.service.getCompletedViariaChamadosPaged({
+                page: this.completedPagination.page,
+                pageSize: this.completedPagination.pageSize,
+                protocolo,
+                protocolPrefix,
+                plaqueta,
+                material,
+                problema,
+                dataInicio,
+                dataFim
+            });
+
+            this.completedPagination.items = res.data || [];
+            this.completedPagination.total = res.total || 0;
+            this.completedPagination.totalPages = res.totalPages || 1;
+            this.completedPagination.page = res.page || page;
+
+            // Renderiza tabela com os dados recebidos
+            this.renderCompletedTable(this.completedPagination.items, false);
+            this.renderCompletedPaginationControls();
+        } catch (err) {
+            console.error('❌ [AuditoriaController] Erro ao carregar página de serviços concluídos:', err);
+            this.renderCompletedTable([], false);
+            this.renderCompletedPaginationControls();
+        } finally {
+            this.completedPagination.isLoading = false;
+        }
+    }
+
+    renderCompletedTableLoading() {
+        const tbody = document.querySelector('#completed-services-table tbody');
+        if (!tbody) return;
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="py-12 text-center text-on-surface-variant font-medium bg-surface-container-lowest">
+                    <div class="flex flex-col items-center justify-center gap-2">
+                        <div class="w-7 h-7 border-3 border-secondary/30 border-t-secondary rounded-full animate-spin"></div>
+                        <span class="text-xs text-on-surface-variant/80">Carregando serviços finalizados do banco de dados...</span>
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+
+    renderCompletedPaginationControls() {
+        const container = document.getElementById('completed-pagination-controls');
+        if (!container) return;
+
+        const { page, totalPages, total, pageSize } = this.completedPagination;
+
+        if (total === 0) {
+            container.innerHTML = `
+                <div class="flex items-center justify-between w-full px-4 py-3 text-xs text-on-surface-variant bg-surface-container-low/50 border-t border-outline-variant rounded-b-lg">
+                    <span>Nenhum registro encontrado</span>
+                    <span>Página 0 de 0</span>
+                </div>
+            `;
+            return;
+        }
+
+        const startIdx = (page - 1) * pageSize + 1;
+        const endIdx = Math.min(page * pageSize, total);
+
+        let paginationButtonsHtml = '';
+        const maxVisibleButtons = 5;
+        let startPage = Math.max(1, page - Math.floor(maxVisibleButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisibleButtons - 1);
+        if (endPage - startPage + 1 < maxVisibleButtons) {
+            startPage = Math.max(1, endPage - maxVisibleButtons + 1);
+        }
+
+        if (startPage > 1) {
+            paginationButtonsHtml += `<button type="button" onclick="window.irParaPaginaServicosConcluidos(1)" class="px-2.5 py-1 text-xs rounded border border-outline-variant/60 bg-surface-container-high hover:bg-secondary/15 hover:text-secondary font-medium transition-colors cursor-pointer">1</button>`;
+            if (startPage > 2) {
+                paginationButtonsHtml += `<span class="px-1 text-on-surface-variant text-xs">...</span>`;
+            }
+        }
+
+        for (let p = startPage; p <= endPage; p++) {
+            const isActive = p === page;
+            const activeCls = isActive 
+                ? 'bg-secondary text-on-secondary font-bold border-secondary shadow-2xs' 
+                : 'bg-surface-container-high hover:bg-secondary/15 hover:text-secondary text-on-surface border-outline-variant/60 font-medium cursor-pointer';
+            paginationButtonsHtml += `<button type="button" onclick="window.irParaPaginaServicosConcluidos(${p})" class="px-2.5 py-1 text-xs rounded border ${activeCls} transition-colors">${p}</button>`;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                paginationButtonsHtml += `<span class="px-1 text-on-surface-variant text-xs">...</span>`;
+            }
+            paginationButtonsHtml += `<button type="button" onclick="window.irParaPaginaServicosConcluidos(${totalPages})" class="px-2.5 py-1 text-xs rounded border border-outline-variant/60 bg-surface-container-high hover:bg-secondary/15 hover:text-secondary font-medium transition-colors cursor-pointer">${totalPages}</button>`;
+        }
+
+        container.innerHTML = `
+            <div class="flex flex-wrap items-center justify-between gap-3 w-full px-4 py-3 bg-surface-container-low/50 border-t border-outline-variant rounded-b-lg">
+                <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+                    <span>Exibindo <strong>${startIdx}–${endIdx}</strong> de <strong>${total.toLocaleString('pt-BR')}</strong> OSs concluídas</span>
+                    <span class="text-outline-variant">•</span>
+                    <div class="flex items-center gap-1.5">
+                        <label for="comp-page-size-select" class="text-[11px] text-on-surface-variant">Linhas por página:</label>
+                        <select id="comp-page-size-select" onchange="window.alterarTamanhoPaginaServicosConcluidos(this.value)" class="text-xs bg-surface-container-lowest border border-outline-variant rounded px-2 py-0.5 text-on-surface cursor-pointer focus:ring-1 focus:ring-secondary outline-none">
+                            <option value="10" ${pageSize === 10 ? 'selected' : ''}>10</option>
+                            <option value="20" ${pageSize === 20 ? 'selected' : ''}>20</option>
+                            <option value="50" ${pageSize === 50 ? 'selected' : ''}>50</option>
+                            <option value="100" ${pageSize === 100 ? 'selected' : ''}>100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="window.irParaPaginaServicosConcluidos(${page - 1})" ${page <= 1 ? 'disabled' : ''} class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-outline-variant/60 bg-surface-container-high hover:bg-secondary/15 hover:text-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer" title="Página Anterior">
+                        <span class="material-symbols-outlined text-[15px]">chevron_left</span>
+                        <span>Anterior</span>
+                    </button>
+                    <div class="flex items-center gap-1">
+                        ${paginationButtonsHtml}
+                    </div>
+                    <button type="button" onclick="window.irParaPaginaServicosConcluidos(${page + 1})" ${page >= totalPages ? 'disabled' : ''} class="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded border border-outline-variant/60 bg-surface-container-high hover:bg-secondary/15 hover:text-secondary disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer" title="Próxima Página">
+                        <span>Próxima</span>
+                        <span class="material-symbols-outlined text-[15px]">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     renderCompletedTable(auditList = null) {
         const tbody = document.querySelector('#completed-services-table tbody');
         if (!tbody) return;
@@ -1000,9 +1170,12 @@ class AuditoriaController {
         tbody.innerHTML = emptyRowHtml + rowsHtml;
 
         // Update count badge
-        const badge = document.querySelector('#completed-services-table')?.closest('.col-span-12')?.querySelector('.px-2\\.5');
+        const badge = document.getElementById('completed-services-count-badge') || document.querySelector('#completed-services-table')?.closest('.col-span-12')?.querySelector('.px-2\\.5');
         if (badge) {
-            badge.textContent = `${listToUse.length} Registros`;
+            const count = (this.completedPagination && this.completedPagination.total > 0) 
+                ? this.completedPagination.total 
+                : listToUse.length;
+            badge.textContent = `${count.toLocaleString('pt-BR')} Registros`;
         }
     }
 
@@ -2547,31 +2720,31 @@ class AuditoriaController {
                                          <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
                                          ${isRealAddr(endFinVal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFinVal}</span></div>` : ''}
                                          ${p.posteId ? `
-                                         <div class="mt-1.5 p-1.5 rounded-lg bg-purple-50/80 border border-purple-200/80 text-[11px] space-y-1">
-                                             <div class="flex items-center justify-between gap-1 flex-wrap">
-                                                 <span class="inline-flex items-center gap-1 font-bold text-purple-900">
-                                                     <span class="material-symbols-outlined text-[14px] text-purple-700">electric_bolt</span>
+                                         <div class="mt-1 px-2 py-1 rounded-md bg-purple-50/70 border border-purple-200/80 text-xs">
+                                             <div class="flex items-center justify-between gap-1.5">
+                                                 <span class="inline-flex items-center gap-1 font-bold text-purple-900 text-[11px] leading-tight">
+                                                     <span class="material-symbols-outlined text-purple-700 select-none" style="font-size: 13px; line-height: 1;">electric_bolt</span>
                                                      <span>Poste #${p.posteId}</span>
                                                  </span>
                                                  ${p.posteDistanciaMetros !== null && p.posteDistanciaMetros !== undefined ? `
-                                                     <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200" title="Distância entre o GPS do operador e o Poste Selecionado">
+                                                     <span class="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200 leading-none shrink-0" title="Distância entre o GPS do operador e o Poste Selecionado">
                                                          ${p.posteDistanciaMetros}m do reparo
                                                      </span>
                                                  ` : ''}
                                              </div>
                                              ${(p.posteLat && p.posteLng) ? `
-                                                 <div class="text-[10px] font-mono text-purple-800/80 flex items-center justify-between">
-                                                     <span>${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
-                                                     <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 text-amber-700 hover:text-amber-800 font-semibold cursor-pointer" title="Ver Poste no Street View 360°">
-                                                         <span class="material-symbols-outlined text-[12px]">streetview</span>
+                                                 <div class="mt-1 pt-0.5 border-t border-purple-200/50 flex items-center justify-between gap-1 text-[10px] font-mono text-purple-900/80 leading-tight">
+                                                     <span class="truncate" title="Coordenadas do poste">${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
+                                                     <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-sans font-semibold bg-white hover:bg-amber-50 text-amber-800 hover:text-amber-900 border border-amber-300 active:scale-95 transition-all cursor-pointer shrink-0 shadow-2xs leading-none" title="Ver Poste no Street View 360°">
+                                                         <span class="material-symbols-outlined text-amber-600 select-none" style="font-size: 11px; line-height: 1;">streetview</span>
                                                          <span>Street View</span>
                                                      </a>
                                                  </div>
                                              ` : ''}
                                          </div>
                                          ` : (p.posteNaoEncontrado ? `
-                                         <div class="mt-1 p-1 rounded bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
-                                             <span class="material-symbols-outlined text-[13px] text-amber-600">info</span>
+                                         <div class="mt-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
+                                             <span class="material-symbols-outlined text-amber-600 select-none" style="font-size: 13px; line-height: 1;">info</span>
                                              <span>Operador marcou poste não encontrado no mapa</span>
                                          </div>
                                          ` : '')}
@@ -3612,20 +3785,15 @@ class AuditoriaController {
                         }
                     } catch (eMat) {}
 
-                    // Atualiza fechamentos_os bruto e fechamentosRaw
-                    if (!isPracaOS) {
-                        if (targetObj.fechamentosRaw && Array.isArray(targetObj.fechamentosRaw)) {
-                            fechamentosState.forEach((fState, idx) => {
-                                if (targetObj.fechamentosRaw[idx]) {
-                                    targetObj.fechamentosRaw[idx].materiais = [...fState.materiais];
-                                }
-                            });
-                        }
-
-                        fechamentosState.forEach((fState, idx) => {
-                            if (targetObj.fechamentos_os && targetObj.fechamentos_os[idx]) {
-                                targetObj.fechamentos_os[idx].materiais = [...fState.materiais];
-                            }
+                    // Atualiza fechamentos_os bruto e fechamentosRaw em memória
+                    if (targetObj.fechamentosRaw && Array.isArray(targetObj.fechamentosRaw)) {
+                        targetObj.fechamentosRaw.forEach(f => {
+                            if (f) f.materiais = isPracaOS ? [...todosMateriaisConsolidados] : f.materiais;
+                        });
+                    }
+                    if (targetObj.fechamentos_os && Array.isArray(targetObj.fechamentos_os)) {
+                        targetObj.fechamentos_os.forEach(f => {
+                            if (f) f.materiais = isPracaOS ? [...todosMateriaisConsolidados] : f.materiais;
                         });
                     }
 
@@ -3658,6 +3826,17 @@ class AuditoriaController {
                                 }
                             }
                         }
+                        // Sincroniza a propriedade sessoesList em memoria para atualizar calculos e auditoria
+                        if (targetObj.sessoesList && Array.isArray(targetObj.sessoesList)) {
+                            fechamentosState.forEach((fState) => {
+                                const sIdx = targetObj.sessoesList.findIndex(s => Number(s.numero) === Number(fState.numero));
+                                if (sIdx >= 0) {
+                                    targetObj.sessoesList[sIdx].materiais = [...fState.materiais];
+                                } else if (targetObj.sessoesList.length === 1) {
+                                    targetObj.sessoesList[0].materiais = [...fState.materiais];
+                                }
+                            });
+                        }
                     }
                 };
 
@@ -3670,6 +3849,16 @@ class AuditoriaController {
                            .forEach(o => updateItemRef(o));
                     }
                 });
+
+                // Invalida cache de sessão do repositório para evitar que F5 traga estado desatualizado
+                try {
+                    if (window.ChamadosRepository && typeof window.ChamadosRepository.clearCache === 'function') {
+                        window.ChamadosRepository.clearCache();
+                    }
+                    sessionStorage.removeItem('chamados_repo_cache_v2');
+                    sessionStorage.removeItem('chamados_repo_meta_v2');
+                    sessionStorage.removeItem('chamados_repo_cache_v1');
+                } catch(eCache) {}
 
                 // Atualiza a lista de divergentes da auditoria com base no estado atualizado
                 if (Array.isArray(this.concludedList)) {

@@ -26,7 +26,7 @@
     <script src="js/controllers/PainelController.js?v=40"></script>
     <!-- ExcelJS para geração avançada de relatórios XLSX com comentários/notas em células -->
     <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
-    <script src="js/controllers/MedicaoController.js?v=26"></script>
+    <script src="js/controllers/MedicaoController.js?v=29"></script>
     <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js"></script>
     <script src="header.js"></script>
@@ -223,22 +223,10 @@
                     <span>Parâmetros TR</span>
                 </button>
 
-                <!-- Botão Unificado de Exportação CSV Padrão -->
-                <button id="btn-exportar-medicao" type="button" onclick="window.medicaoController.exportarAbaAtivaCSV()" class="h-9 bg-purple-700 hover:bg-purple-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar consolidado simples de materiais ou aba ativa em CSV">
+                <!-- Botão Unificado de Exportação de Medição -->
+                <button id="btn-exportar-medicao" type="button" onclick="window.medicaoController.abrirModalExportar()" class="h-9 bg-secondary hover:bg-secondary/90 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar dados da medição (CSV sem glosas, CSV com glosas do TR, Excel XLSX)">
                     <span class="material-symbols-outlined text-[18px]">download</span>
-                    <span id="txt-btn-exportar-medicao">Exportar CSV (Padrão)</span>
-                </button>
-
-                <!-- Botão de Exportação CSV Detalhado com Glosas do TR -->
-                <button id="btn-exportar-medicao-glosas-tr" type="button" onclick="window.medicaoController.exportarMedicaoMensalDetalhadaCSV()" class="h-9 bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar consolidado de materiais com detalhamento de glosas do TR em formato CSV">
-                    <span class="material-symbols-outlined text-[18px]">fact_check</span>
-                    <span>CSV (Glosas TR)</span>
-                </button>
-
-                <!-- Botão de Exportação XLSX Avançado com Notas em Células de QTD -->
-                <button id="btn-exportar-medicao-xlsx" type="button" onclick="window.medicaoController.exportarMedicaoMensalDetalhadaXLSX()" class="h-9 bg-teal-700 hover:bg-teal-800 text-white px-3.5 rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 cursor-pointer whitespace-nowrap shrink-0" title="Exportar planilha Excel (.xlsx) com notas/comentários de protocolos nas colunas de quantidade">
-                    <span class="material-symbols-outlined text-[18px]">description</span>
-                    <span>Exportar Excel (XLSX)</span>
+                    <span id="txt-btn-exportar-medicao">Exportar</span>
                 </button>
             </div>
         </div>
@@ -747,6 +735,18 @@
             if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && (modalGaleria ? modalGaleria.classList.contains('hidden') : true)) {
                 if (e.key === 'Escape') window.fecharDetalhesOSModal();
             }
+            const modalExportar = document.getElementById('modalExportarMedicao');
+            if (modalExportar && !modalExportar.classList.contains('hidden')) {
+                if (e.key === 'Escape') {
+                    if (window.medicaoController && window.medicaoController.fecharModalExportar) {
+                        window.medicaoController.fecharModalExportar();
+                    }
+                } else if (e.key === 'Enter') {
+                    if (window.medicaoController && window.medicaoController.confirmarExportacao) {
+                        window.medicaoController.confirmarExportacao();
+                    }
+                }
+            }
         });
     </script>
 
@@ -895,6 +895,124 @@
         </div>
     </div>
 
+
+        <!-- ========================================================================= -->
+    <!-- MODAL UNIFICADO DE EXPORTAÇÃO DA MEDIÇÃO                                 -->
+    <!-- ========================================================================= -->
+    <div id="modalExportarMedicao" onclick="if (event.target === this) window.medicaoController.fecharModalExportar()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70000] hidden items-center justify-center p-3 sm:p-4 flex">
+        <div class="bg-surface-container-lowest border border-outline-variant/70 rounded-2xl shadow-2xl max-w-xl w-full flex flex-col max-h-[92vh] overflow-hidden text-on-surface transform transition-all duration-300 animate-fade-in-up">
+            <!-- Header do Modal com background suave e padding estruturado do sistema -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-outline-variant/60 bg-surface-container-low/70 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center font-bold shrink-0 border border-secondary/20">
+                        <span class="material-symbols-outlined text-[24px]">download</span>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <h3 class="font-headline-sm text-sm sm:text-base font-bold text-on-surface">Exportar Dados da Medição</h3>
+                            <span id="modal-exportar-periodo-badge" class="px-2.5 py-0.5 rounded-md text-[11px] font-mono font-bold bg-secondary/10 text-secondary border border-secondary/20">Competência: ---</span>
+                        </div>
+                        <p class="font-label-sm text-xs text-on-surface-variant truncate max-w-md mt-0.5" id="modal-exportar-subtitulo">Escolha o formato e o nível de detalhamento para a geração do relatório:</p>
+                    </div>
+                </div>
+                <button type="button" onclick="window.medicaoController.fecharModalExportar()" class="text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high p-1.5 rounded-full transition-colors cursor-pointer flex items-center justify-center" title="Fechar (Esc)">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+
+            <!-- Corpo Rolável / Opções de Exportação -->
+            <div class="p-6 space-y-3.5 flex-1 overflow-y-auto min-h-0 bg-surface-container-lowest">
+                <!-- Opção 1: CSV Padrão (Sem divisão de glosas) -->
+                <div id="opt-export-csv_padrao" onclick="window.medicaoController.selecionarOpcaoExportacao('csv_padrao')" ondblclick="window.medicaoController.confirmarExportacao()" class="export-option-card relative p-4 rounded-xl border-2 border-secondary bg-secondary/[0.04] ring-1 ring-secondary cursor-pointer transition-all hover:shadow-md flex items-start gap-4 select-none">
+                    <!-- Coluna Esquerda: Ícone + Tag de Formato Embaixo -->
+                    <div class="shrink-0 flex flex-col items-center">
+                        <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center border border-purple-200 shadow-xs">
+                            <span class="material-symbols-outlined text-[20px]">download</span>
+                        </div>
+                        <span class="mt-1.5 px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase tracking-wide bg-purple-100 text-purple-800 border border-purple-200">CSV</span>
+                    </div>
+
+                    <!-- Coluna Central: Título e Descritivo -->
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold text-on-surface mb-1">CSV Padrão (Sem divisão de glosas)</h4>
+                        <p class="text-xs text-on-surface-variant leading-relaxed">
+                            Exportação consolidada dos totais por item de material (ou conforme aba ativa). Exibe quantidades totais medidas, valores unitários com e sem BDI, valor total bruto, glosa contratual global e valor líquido final, sem segregar os materiais em colunas por alíquota de glosa.
+                        </p>
+                    </div>
+
+                    <!-- Coluna Direita: Círculo de Seleção (Radio) -->
+                    <div class="shrink-0 flex items-center justify-center pl-2 pt-0.5">
+                        <input type="radio" name="exportOption" id="radio-export-csv_padrao" value="csv_padrao" checked onchange="window.medicaoController.selecionarOpcaoExportacao('csv_padrao')" class="text-secondary focus:ring-secondary h-4 w-4 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Opção 2: CSV Detalhado com Glosas do TR (Com divisão de glosas) -->
+                <div id="opt-export-csv_glosas" onclick="window.medicaoController.selecionarOpcaoExportacao('csv_glosas')" ondblclick="window.medicaoController.confirmarExportacao()" class="export-option-card relative p-4 rounded-xl border border-outline-variant hover:border-emerald-500 bg-surface-container-lowest cursor-pointer transition-all hover:shadow-md flex items-start gap-4 select-none">
+                    <!-- Coluna Esquerda: Ícone + Tag de Formato Embaixo -->
+                    <div class="shrink-0 flex flex-col items-center">
+                        <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center border border-emerald-200 shadow-xs">
+                            <span class="material-symbols-outlined text-[20px]">fact_check</span>
+                        </div>
+                        <span class="mt-1.5 px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase tracking-wide bg-emerald-100 text-emerald-800 border border-emerald-200">CSV</span>
+                    </div>
+
+                    <!-- Coluna Central: Título e Descritivo -->
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold text-on-surface mb-1">CSV com Glosas do TR (Com divisão de glosas)</h4>
+                        <p class="text-xs text-on-surface-variant leading-relaxed">
+                            Exportação em formato CSV com divisão dinâmica de colunas por faixa de glosa (itens sem glosa e cada percentual específico ocorrido no período: 3%, 5%, 10%...), quantitativos parciais por alíquota e preços unitários com o respectivo desconto aplicado.
+                        </p>
+                    </div>
+
+                    <!-- Coluna Direita: Círculo de Seleção (Radio) -->
+                    <div class="shrink-0 flex items-center justify-center pl-2 pt-0.5">
+                        <input type="radio" name="exportOption" id="radio-export-csv_glosas" value="csv_glosas" onchange="window.medicaoController.selecionarOpcaoExportacao('csv_glosas')" class="text-secondary focus:ring-secondary h-4 w-4 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Opção 3: Planilha Excel (XLSX) Avançada -->
+                <div id="opt-export-xlsx" onclick="window.medicaoController.selecionarOpcaoExportacao('xlsx')" ondblclick="window.medicaoController.confirmarExportacao()" class="export-option-card relative p-4 rounded-xl border border-outline-variant hover:border-teal-500 bg-surface-container-lowest cursor-pointer transition-all hover:shadow-md flex items-start gap-4 select-none">
+                    <!-- Coluna Esquerda: Ícone + Tag de Formato Embaixo -->
+                    <div class="shrink-0 flex flex-col items-center">
+                        <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center border border-teal-200 shadow-xs">
+                            <span class="material-symbols-outlined text-[20px]">description</span>
+                        </div>
+                        <span class="mt-1.5 px-2 py-0.5 rounded text-[9.5px] font-extrabold uppercase tracking-wide bg-teal-100 text-teal-800 border border-teal-200">XLSX</span>
+                    </div>
+
+                    <!-- Coluna Central: Título e Descritivo -->
+                    <div class="flex-1 min-w-0">
+                        <h4 class="text-sm font-bold text-on-surface mb-1">Planilha Excel XLSX (Com divisão de glosas & notas)</h4>
+                        <p class="text-xs text-on-surface-variant leading-relaxed">
+                            Planilha Excel oficial (.xlsx) completa com formatação corporativa, colunas segregadas por faixas de glosas do TR, fórmulas de totais e <strong>comentários embutidos nas células de quantidade</strong> contendo os números de protocolos das OSs correspondentes.
+                        </p>
+                    </div>
+
+                    <!-- Coluna Direita: Círculo de Seleção (Radio) -->
+                    <div class="shrink-0 flex items-center justify-center pl-2 pt-0.5">
+                        <input type="radio" name="exportOption" id="radio-export-xlsx" value="xlsx" onchange="window.medicaoController.selecionarOpcaoExportacao('xlsx')" class="text-secondary focus:ring-secondary h-4 w-4 cursor-pointer">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer do Modal seguindo padrão px-6 py-4 bg-surface-container-low/50 -->
+            <div class="px-6 py-3.5 border-t border-outline-variant/60 bg-surface-container-low/50 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div class="text-[11px] text-on-surface-variant flex items-center gap-1.5 self-start sm:self-auto">
+                    <span class="material-symbols-outlined text-[15px] text-secondary">info</span>
+                    <span>Os filtros ativos de mês e busca serão aplicados no arquivo gerado.</span>
+                </div>
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button type="button" onclick="window.medicaoController.fecharModalExportar()" class="px-5 py-2 rounded-xl text-xs font-semibold border border-outline-variant text-on-surface hover:bg-surface-container-high transition-colors cursor-pointer">
+                        Cancelar
+                    </button>
+                    <button id="btn-confirmar-exportacao" type="button" onclick="window.medicaoController.confirmarExportacao()" class="px-5 py-2 rounded-xl bg-secondary hover:bg-secondary-container text-white font-bold text-xs transition-all shadow-sm active:scale-95 cursor-pointer flex items-center gap-1.5">
+                        <span class="material-symbols-outlined text-[18px]">download</span>
+                        <span id="btn-confirmar-exportacao-label">Exportar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal de Detalhamento & Substituição de Item em Lote na Medição -->
     <div id="modal-detalhes-medicao" onclick="if (event.target === this) window.medicaoController.fecharModalDetalhesMedicao()" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm hidden transition-opacity duration-300">

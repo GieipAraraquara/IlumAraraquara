@@ -2600,8 +2600,16 @@
           return;
         }
 
-        // Tabela estática (~230 registros, ~78 KB): utiliza cache de 1h em sessionStorage
+        // Tabela de praças: utiliza cache em sessionStorage sincronizado com versão do localStorage
         var CACHE_KEY_PRACAS = 'luz_pracas_cache_v1';
+        var CACHE_KEY_VER = 'luz_pracas_cache_version';
+        var currentVer = localStorage.getItem('luz_pracas_version') || '1';
+        var savedVer = sessionStorage.getItem(CACHE_KEY_VER);
+
+        if (savedVer && savedVer !== currentVer) {
+          try { sessionStorage.removeItem(CACHE_KEY_PRACAS); } catch(eIgn) {}
+        }
+
         try {
           var cachedPracas = sessionStorage.getItem(CACHE_KEY_PRACAS);
           if (cachedPracas) {
@@ -2658,6 +2666,10 @@
               var endereco = row['Endereço'] || row.endereco || row.bairro || '';
               var cor = row['Cor do Marcador'] || row.cor_do_marcador || row.cor || 'Verde';
               var considerar = row['Considerar?'] || row.considerar || 'Sim';
+              // Pula praças inativas / desconsideradas no catálogo de configurações
+              if (considerar && String(considerar).trim().toLowerCase() === 'não') {
+                return;
+              }
 
               var corHex = '#137333';
               var cLower = cor.toString().toLowerCase();
@@ -2689,6 +2701,7 @@
               });
               try {
                 sessionStorage.setItem(CACHE_KEY_PRACAS, JSON.stringify(lista));
+                sessionStorage.setItem(CACHE_KEY_VER, currentVer);
               } catch(eSavePracas) {}
               console.log("🌳 [Supabase] LISTA_PRACAS carregada e salva em cache:", LISTA_PRACAS.length, "praças.");
               if (mapaPracasInstance) {
@@ -3112,10 +3125,12 @@
               var lat = coordsParsed ? coordsParsed.lat : parseFloat(row.latitude || row.lat || 0);
               var lng = coordsParsed ? coordsParsed.lng : parseFloat(row.longitude || row.lng || 0);
 
-              // 🚫 Checar se a plaqueta está desativada
+              // 🚫 Checar se a plaqueta está desativada (via coluna 'ativo' ou via texto na observação)
               var temTagDesativada = rowsP.some(function(r) {
+                if (r.ativo === false || r.ativo === 'false' || r.ativo === 0) return true;
                 var obs = r.observacao || r['Observação'] || r.observacoes || r.observacao_especial || '';
-                return obs.toUpperCase().indexOf('DESATIVADA') !== -1;
+                var obsUpper = obs.toUpperCase();
+                return obsUpper.indexOf('DESATIVAD') !== -1 || obsUpper.indexOf('INATIV') !== -1;
               });
 
               if (temTagDesativada) {
@@ -4853,11 +4868,13 @@
                 var coordsParsed = extrairCoordenadasPlaquetaRow(row);
                 if (coordsParsed) {
                   var obsRow = row.observacao || row['Observação'] || row.observacoes || row.observacao_especial || row.observacao_divergente || '';
+                  var isAtivo = (row.ativo !== false && row.ativo !== 'false' && row.ativo !== 0);
                   coordenadas.push({
                     lat: coordsParsed.lat,
                     lng: coordsParsed.lng,
                     endereco: row.endereco || row.bairro || '',
-                    observacao: obsRow
+                    observacao: obsRow,
+                    ativo: isAtivo
                   });
                 }
               });
@@ -4882,9 +4899,11 @@
               input.value = pl; 
               var pt = pontosData[idx];
 
-              // 🚫 Bloqueio de Plaqueta Desativada
+              // 🚫 Bloqueio de Plaqueta Desativada (via coluna 'ativo' ou via texto na observação)
               var itemDesativado = coordenadas.find(function(c) {
-                  return (c.observacao || '').toUpperCase().indexOf('DESATIVADA') !== -1;
+                  if (c.ativo === false) return true;
+                  var obsUpper = (c.observacao || '').toUpperCase();
+                  return obsUpper.indexOf('DESATIVAD') !== -1 || obsUpper.indexOf('INATIV') !== -1;
               });
 
               if (itemDesativado) {

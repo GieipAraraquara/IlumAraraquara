@@ -325,6 +325,16 @@ class ChamadosService {
     }
 
     /**
+     * Busca paginada de Serviços Finalizados (Viário) para a tabela de Auditoria
+     */
+    async getCompletedViariaChamadosPaged(params = {}) {
+        if (this.repository && typeof this.repository.fetchCompletedViariaChamadosPaged === 'function') {
+            return await this.repository.fetchCompletedViariaChamadosPaged(params);
+        }
+        return { data: [], total: 0, page: 1, pageSize: params.pageSize || 20, totalPages: 1 };
+    }
+
+    /**
      * Calculates Auditoria KPI metrics from list of Chamados
      */
     calculateAuditoriaMetrics(chamadosList = []) {

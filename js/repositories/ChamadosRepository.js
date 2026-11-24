@@ -667,6 +667,166 @@ class ChamadosRepository {
     }
 
     /**
+     * Busca paginada e filtrada de Serviços Finalizados (Viário) direto no Supabase.
+     * Sem limite de 45 dias, ordenado do mais novo para o mais antigo por data de conclusão/fechamento.
+     * @param {Object} params
+     * @param {number} params.page Página atual (base 1)
+     * @param {number} params.pageSize Quantidade por página (ex: 20, 50)
+     * @param {string} [params.protocolo] Filtro de protocolo (ilike)
+     * @param {string} [params.protocolPrefix] Filtro de prefixo (ex: 'I')
+     * @param {string} [params.plaqueta] Filtro de plaqueta
+     * @param {string} [params.material] Filtro de material
+     * @param {string} [params.problema] Filtro de problema
+     * @param {string} [params.dataInicio] ISO ou YYYY-MM-DD
+     * @param {string} [params.dataFim] ISO ou YYYY-MM-DD
+     * @returns {Promise<{ data: Array, total: number, page: number, pageSize: number, totalPages: number }>}
+     */
+    async fetchCompletedViariaChamadosPaged({
+        page = 1,
+        pageSize = 20,
+        protocolo = '',
+        protocolPrefix = '',
+        plaqueta = '',
+        material = '',
+        problema = '',
+        dataInicio = null,
+        dataFim = null
+    } = {}) {
+        try {
+            const client = this.getClient();
+            const colunasView = ChamadosRepository.COLUNAS_VIEW;
+            const colunasTabela = ChamadosRepository.COLUNAS_TABELA_OS;
+
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize - 1;
+
+            // Função auxiliar para aplicar filtros comuns
+            const applyFilters = (query) => {
+                // Apenas concluídas
+                query = query.or('status.eq.Concluída,status.eq.Concluida');
+
+                // Apenas Viário: exclui protocolos que começam com 'P' e garante que praca_nome seja null
+                if (protocolPrefix === 'I') {
+                    query = query.ilike('protocolo', 'I%');
+                } else if (protocolPrefix === 'P') {
+                    query = query.ilike('protocolo', 'P%');
+                } else {
+                    // Por padrão na tabela de Serviços Viários Concluídos:
+                    // Não começa com 'P' (praças)
+                    query = query.not('protocolo', 'ilike', 'P%');
+                }
+
+                // Exclui Atendimentos Diretos / Emergenciais nominais conhecidos
+                query = query.not('municipe_nome', 'ilike', '%ATENDIMENTO DIRETO%');
+                query = query.not('municipe_nome', 'ilike', '%EMERGENCIAL%');
+
+                // Filtro por Protocolo
+                if (protocolo && String(protocolo).trim() !== '') {
+                    const cleanProt = String(protocolo).replace(/^#/, '').trim();
+                    query = query.ilike('protocolo', `%${cleanProt}%`);
+                }
+
+                // Filtro por Plaqueta (inicial ou final)
+                if (plaqueta && String(plaqueta).trim() !== '') {
+                    const cleanPlq = String(plaqueta).trim();
+                    query = query.or(`plaqueta_final.ilike.%${cleanPlq}%,plaqueta_inicial.ilike.%${cleanPlq}%`);
+                }
+
+                // Filtro por Material
+                if (material && String(material).trim() !== '') {
+                    const cleanMat = String(material).trim();
+                    query = query.ilike('materiais', `%${cleanMat}%`);
+                }
+
+                // Filtro por Problema
+                if (problema && String(problema).trim() !== '' && problema !== 'all') {
+                    const p = String(problema).toLowerCase().trim();
+                    if (p === 'lampada-apagada' || p === 'lampada-queimada') {
+                        query = query.or('problemas.ilike.%apagada%,problemas.ilike.%queimada%,problemas.ilike.%sem luz%');
+                    } else if (p === 'lampada-intermitente') {
+                        query = query.ilike('problemas', '%intermitente%');
+                    } else if (p === 'acesa-dia' || p === 'lampada-acesa-dia') {
+                        query = query.ilike('problemas', '%acesa%');
+                    } else if (p === 'braco-quebrado' || p === 'lampada-quebrada') {
+                        query = query.or('problemas.ilike.%braço%,problemas.ilike.%braco%,problemas.ilike.%quebrada%');
+                    } else if (p === 'outros-problemas' || p === 'outro') {
+                        query = query.or('problemas.ilike.%outro%,problemas.ilike.%outros%');
+                    } else if (p === 'nenhum') {
+                        query = query.ilike('problemas', '%nenhum%');
+                    } else {
+                        query = query.ilike('problemas', `%${p}%`);
+                    }
+                }
+
+                // Filtros de Data (data_fechamento ou data_abertura)
+                if (dataInicio) {
+                    query = query.gte('data_fechamento', dataInicio);
+                }
+                if (dataFim) {
+                    query = query.lte('data_fechamento', dataFim);
+                }
+
+                return query;
+            };
+
+            // 1. Tenta buscar pela View (com count exato) ordenando do mais novo para o mais antigo
+            let query = client
+                .from(this.viewName)
+                .select(colunasView, { count: 'exact' });
+
+            query = applyFilters(query);
+            query = query.order('data_fechamento', { ascending: false, nullsFirst: false });
+            query = query.range(from, to);
+
+            let res = await query;
+
+            // Se falhou ou a view não tem suporte, tenta na tabela primária ordens_servico
+            if (res.error || !res.data) {
+                console.warn('⚠️ [ChamadosRepository] Consulta paginada na view falhou, tentando na tabela primária:', res.error);
+                let queryPrimary = client
+                    .from(this.primaryTable)
+                    .select(colunasTabela, { count: 'exact' });
+
+                queryPrimary = applyFilters(queryPrimary);
+                queryPrimary = queryPrimary.order('data_fechamento', { ascending: false, nullsFirst: false });
+                queryPrimary = queryPrimary.range(from, to);
+
+                res = await queryPrimary;
+            }
+
+            const rawList = res.data || [];
+            const total = typeof res.count === 'number' ? res.count : rawList.length;
+            const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+            // Carrega fechamentos fatiados para as OSs da página atual (materiais, fotos, etc.)
+            if (rawList.length > 0) {
+                await this.carregarFechamentosFatiados(client, rawList);
+            }
+
+            const ModelClass = (typeof window !== 'undefined' && window.ChamadoModel) ? window.ChamadoModel : (typeof ChamadoModel !== 'undefined' ? ChamadoModel : null);
+            const models = rawList.map(row => {
+                if (ModelClass && typeof ModelClass.fromRow === 'function') {
+                    return ModelClass.fromRow(row);
+                } else if (ModelClass && typeof ModelClass === 'function') {
+                    return new ModelClass(row);
+                }
+                return row;
+            });
+
+            return {
+                data: models,
+                total: total,
+                page: page,
+                pageSize: pageSize,
+                totalPages: totalPages
+            };
+        } catch (err) {
+            console.error('❌ [ChamadosRepository] Erro ao buscar serviços concluídos paginados:', err);
+            return { data: [], total: 0, page: 1, pageSize: pageSize, totalPages: 1 };
+        }
+    }
+
+    /**
      * Updates status for an OS across ordens_servico and ordens_servico_pracas
      */
     async updateStatus(idOrProtocol, newStatus, justification = '', updateDate = true) {
@@ -1191,14 +1351,16 @@ class ChamadosRepository {
                         fechQuery = fechQuery.eq('protocolo', protStr);
                     }
                     const { data: fechamentos } = await fechQuery
-                        .order('data_fechamento', { ascending: false })
-                        .limit(1);
+                        .order('data_fechamento', { ascending: false });
 
                     if (fechamentos && fechamentos.length > 0) {
-                        await client
-                            .from('fechamentos_os')
-                            .update({ materiais: matPayload })
-                            .eq('id', fechamentos[0].id);
+                        // Se for Praça ou não especificado fechamento único, atualiza todos os fechamentos vinculados ao protocolo
+                        for (const fech of fechamentos) {
+                            await client
+                                .from('fechamentos_os')
+                                .update({ materiais: matPayload })
+                                .eq('id', fech.id);
+                        }
                     }
                 } catch (fechErr) {
                     console.warn('⚠️ [ChamadosRepository] Aviso ao atualizar fechamentos_os:', fechErr);

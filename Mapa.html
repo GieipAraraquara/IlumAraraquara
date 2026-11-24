@@ -515,13 +515,13 @@
                     <div class="flex items-center justify-between">
                         <span class="font-bold text-[11px] flex items-center gap-1">
                             <span class="material-symbols-outlined text-[15px] text-emerald-600">verified</span>
-                            <span>Pontos de Auditoria</span>
+                            <span id="tituloInfoAuditoriaRota">Pontos de Auditoria / Painel</span>
                         </span>
                         <span id="badgeQtdAuditoriaCarregada" class="text-[10px] px-2 py-0.5 rounded-full font-bold bg-emerald-600 text-white">0 OSs</span>
                     </div>
-                    <p id="descAuditoriaRotaTexto" class="text-[10.5px] leading-snug">Selecione OSs na tela de Auditoria ou use os pontos já importados.</p>
-                    <a href="Auditoria.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline pt-0.5">
-                        <span>Ir para tabela de Auditoria</span>
+                    <p id="descAuditoriaRotaTexto" class="text-[10.5px] leading-snug">Selecione OSs na tela de Auditoria ou Painel ou use os pontos já importados.</p>
+                    <a id="linkVoltarOrigemRota" href="Auditoria.html" class="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 hover:underline pt-0.5">
+                        <span id="labelLinkVoltarOrigemRota">Ir para tabela de Auditoria</span>
                         <span class="material-symbols-outlined text-[13px]">open_in_new</span>
                     </a>
                 </div>
@@ -1716,6 +1716,7 @@
 
     function alternarModoVisao(modo) {
         modoVisaoMapaAtual = modo;
+        window.modoVisaoMapaAtual = modo;
         const btnPinos = document.getElementById('btnModoPinos');
         const btnHeatmap = document.getElementById('btnModoHeatmap');
         const conteudoLegenda = document.getElementById('conteudoLegendaCores');
@@ -1734,7 +1735,7 @@
             if (btnLeg) btnLeg.classList.remove('opacity-40', 'pointer-events-none');
         }
 
-        renderizarMapaOSs(dadosOSsAbertasCache);
+        aplicarFiltrosMapa();
     }
 
     function renderizarMapaOSs(listaOSs) {
@@ -3993,7 +3994,12 @@
     function atualizarBadgeAuditoriaPainel() {
         const badge = document.getElementById('badgeQtdAuditoriaCarregada');
         const desc = document.getElementById('descAuditoriaRotaTexto');
+        const tituloEl = document.getElementById('tituloInfoAuditoriaRota');
+        const linkVoltar = document.getElementById('linkVoltarOrigemRota');
+        const labelLink = document.getElementById('labelLinkVoltarOrigemRota');
         let count = 0;
+        let origem = 'auditoria';
+
         try {
             const raw = sessionStorage.getItem('rota_auditoria_selecionada');
             if (raw) {
@@ -4001,15 +4007,31 @@
                 if (parsed && Array.isArray(parsed.pontos)) {
                     count = parsed.pontos.length;
                 }
+                if (parsed && parsed.origem) {
+                    origem = parsed.origem;
+                }
             }
         } catch(e) {}
 
         if (badge) badge.innerText = `${count} ${count === 1 ? 'OS' : 'OSs'}`;
         if (desc) {
             if (count > 0) {
-                desc.innerHTML = `<b>${count} pontos selecionados</b> na auditoria prontos para gerar o trajeto otimizado.`;
+                const origemTxt = (origem === 'painel') ? 'no Painel' : 'na Auditoria';
+                desc.innerHTML = `<b>${count} pontos selecionados</b> ${origemTxt} prontos para gerar o trajeto otimizado.`;
             } else {
-                desc.innerText = "Nenhum ponto importado ainda. Selecione na tabela de Auditoria ou gere uma rota com OSs concluídas.";
+                desc.innerText = "Nenhum ponto importado ainda. Selecione na tabela de Auditoria ou Painel.";
+            }
+        }
+        if (tituloEl) {
+            tituloEl.innerText = (origem === 'painel') ? 'Pontos do Painel' : 'Pontos de Auditoria';
+        }
+        if (linkVoltar && labelLink) {
+            if (origem === 'painel') {
+                linkVoltar.href = 'Painel.html';
+                labelLink.innerText = 'Ir para o Painel de OS';
+            } else {
+                linkVoltar.href = 'Auditoria.html';
+                labelLink.innerText = 'Ir para tabela de Auditoria';
             }
         }
     }
@@ -4259,10 +4281,10 @@
                             os: {
                                 protocolo: item.protocolo,
                                 id: item.id,
-                                status: 'Concluída (Auditoria)',
-                                prioridade: 'Auditoria',
+                                status: item.status || 'Concluída (Auditoria)',
+                                prioridade: item.prioridade || 'Auditoria',
                                 tecnico: item.tecnico,
-                                data: item.dataConclusao || ''
+                                data: item.dataConclusao || item.data || ''
                             },
                             pt: {
                                 endereco: item.endereco || 'Ponto de Auditoria',
@@ -4697,8 +4719,22 @@
         if (!container) return;
 
         const isRotaAuditoria = (modoEscopoRota === 'auditoria') || (rota.sequencia && rota.sequencia.some(p => p.isAuditoria));
+        let rotaOrigem = 'auditoria';
+        try {
+            const raw = sessionStorage.getItem('rota_auditoria_selecionada');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (parsed && parsed.origem) rotaOrigem = parsed.origem;
+            }
+        } catch(e) {}
 
-        if (elQtde) elQtde.innerText = isRotaAuditoria ? `${rota.sequencia.length} Pontos de Auditoria` : `${rota.sequencia.length} Ordens Viárias`;
+        if (elQtde) {
+            if (isRotaAuditoria) {
+                elQtde.innerText = (rotaOrigem === 'painel') ? `${rota.sequencia.length} OSs Selecionadas (Painel)` : `${rota.sequencia.length} Pontos de Auditoria`;
+            } else {
+                elQtde.innerText = `${rota.sequencia.length} Ordens Viárias`;
+            }
+        }
         if (elDist) elDist.innerText = `~ ${rota.distanciaTotalKm.toFixed(1)} km`;
         if (elLinkGmaps) elLinkGmaps.href = rota.googleMapsUrl;
 
@@ -4709,7 +4745,7 @@
         if (badgeAging) {
             if (isRotaAuditoria) {
                 badgeAging.className = "text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-bold";
-                badgeAging.innerText = "Auditoria de Campo";
+                badgeAging.innerText = (rotaOrigem === 'painel') ? "Rota do Painel" : "Auditoria de Campo";
             } else {
                 badgeAging.className = "text-[10px] px-2 py-0.5 rounded-full bg-error/10 text-error font-bold";
                 badgeAging.innerText = maiorDias > 0 ? `OS mais antiga: ${maiorDias}d` : 'OSs recentes';

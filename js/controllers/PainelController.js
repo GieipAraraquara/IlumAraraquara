@@ -243,6 +243,10 @@ class PainelController {
                 tbodyMain.appendChild(fragmentMain);
             }
         }
+
+        if (typeof window.atualizarContadorSelecaoRotaPainel === 'function') {
+            window.atualizarContadorSelecaoRotaPainel();
+        }
     }
 
     /**
@@ -262,6 +266,57 @@ class PainelController {
         const targetId = item.protocolo || item.id || '';
         tr.setAttribute('data-id', targetId);
         tr.setAttribute('onclick', `window.abrirDetalhesOSModal('${targetId}')`);
+
+        // Checkbox para Rota no Mapa
+        const isModoRotaAtivo = Boolean(window.modoSelecaoRotaPainel);
+        const isChecked = Boolean(window.selectedOSsParaRotaPainel && window.selectedOSsParaRotaPainel.has(item.protocolo || item.id));
+
+        const rawCoord = item.coordenadaReparo || item.coordenadaInicial;
+        const coordPair = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(rawCoord) : { lat: 0, lng: 0 };
+        let lat = (coordPair && coordPair.lat !== '--') ? parseFloat(coordPair.lat) : 0;
+        let lng = (coordPair && coordPair.lng !== '--') ? parseFloat(coordPair.lng) : 0;
+
+        if ((!lat || !lng) && item.pontos && item.pontos.length > 0) {
+            const p0 = item.pontos[0];
+            if (p0.lat && p0.lng) {
+                lat = parseFloat(p0.lat);
+                lng = parseFloat(p0.lng);
+            } else if (p0.coordenada) {
+                const cp = window.ChamadoModel ? window.ChamadoModel.formatCoordPair(p0.coordenada) : null;
+                if (cp && cp.lat !== '--') {
+                    lat = parseFloat(cp.lat);
+                    lng = parseFloat(cp.lng);
+                }
+            }
+        }
+
+        const firstAddr = (item.addressPointsIniciais && item.addressPointsIniciais[0]) ? item.addressPointsIniciais[0].replace(/"/g, '&quot;') : (item.endereco || '').replace(/"/g, '&quot;');
+        const safeTecnico = (item.tecnico || item.operadorFinalizacao || item.operador || '').replace(/"/g, '&quot;');
+        const safeProb = (item.problemaEncontrado || item.problemaInicial || '').replace(/"/g, '&quot;');
+        const safePlaq = (item.plaquetaFinal || item.plaquetaInicial || item.plaqueta || '').replace(/"/g, '&quot;');
+        const dataOS = (item.formattedDateConclusaoShort || item.formattedDateShort || '').replace(/"/g, '&quot;');
+        const safeStatus = (item.statusBadgeLabel || item.status || '').replace(/"/g, '&quot;');
+        const safePrioridade = (item.prioridade || 'Normal').replace(/"/g, '&quot;');
+
+        const tdCheckbox = document.createElement('td');
+        tdCheckbox.className = `td-checkbox-rota ${isModoRotaAtivo ? '' : 'hidden'} py-3 px-2 text-center align-middle`;
+        tdCheckbox.setAttribute('onclick', 'event.stopPropagation()');
+        tdCheckbox.innerHTML = `
+            <input type="checkbox" class="chk-item-rota-painel w-4 h-4 text-emerald-600 rounded border-outline-variant focus:ring-emerald-500 cursor-pointer"
+                ${isChecked ? 'checked' : ''}
+                data-id="${item.id}"
+                data-protocolo="${item.protocolo}"
+                data-lat="${lat || 0}"
+                data-lng="${lng || 0}"
+                data-endereco="${firstAddr}"
+                data-tecnico="${safeTecnico}"
+                data-problema="${safeProb}"
+                data-plaqueta="${safePlaq}"
+                data-data="${dataOS}"
+                data-status="${safeStatus}"
+                data-prioridade="${safePrioridade}"
+                onchange="window.toggleItemRotaPainel(this, event)" />
+        `;
 
         // Protocolo
         const tdProtocolo = document.createElement('td');
@@ -418,26 +473,15 @@ class PainelController {
 
         // Status / Motivo Column
         const tdStatus = document.createElement('td');
-        tdStatus.className = 'py-3 px-5 whitespace-nowrap truncate align-middle';
 
         if (isPendentesTable) {
-            const motivoFull = item.motivoAprovacao || 'Sem motivo registrado';
             const hasMotivo = Boolean(item.motivoAprovacao);
 
             if (hasMotivo) {
-                const motivoConteudo = this.formatarMotivoComLinks(item.motivoAprovacao, { 
-                    isTable: true, 
-                    stopPropagation: true, 
-                    currentProtocolo: item.protocolo || item.id,
-                    item: item 
-                });
-                tdStatus.innerHTML = `
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] leading-tight font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs" style="font-size: 11px;" title="${motivoFull}">
-                        <span class="material-symbols-outlined text-[14px] text-amber-600 shrink-0" style="font-size: 14px;">info</span>
-                        <div class="truncate flex items-center gap-1 text-[11px]" style="font-size: 11px;">${motivoConteudo}</div>
-                    </div>
-                `;
+                tdStatus.className = 'py-2 px-4 align-middle';
+                tdStatus.innerHTML = this.renderMotivoTabelaHtml(item);
             } else {
+                tdStatus.className = 'py-3 px-5 whitespace-nowrap truncate align-middle';
                 tdStatus.innerHTML = `
                     <span class="text-on-surface-variant/60 text-[11px] font-normal italic" style="font-size: 11px;">Sem motivo informado</span>
                 `;
@@ -519,6 +563,7 @@ class PainelController {
             </div>
         `;
 
+        tr.appendChild(tdCheckbox);
         tr.appendChild(tdProtocolo);
         tr.appendChild(tdData);
         tr.appendChild(tdEndereco);
@@ -544,6 +589,10 @@ class PainelController {
      */
     formatarMotivoComLinks(motivo, options = {}) {
         if (!motivo) return '';
+        if (options.isTable && !options.omitButton) {
+            const itemObj = options.item || { motivoAprovacao: motivo, protocolo: options.currentProtocolo || options.protocolo };
+            return this.renderMotivoTabelaHtml(itemObj);
+        }
         let baseHtml = '';
         if (window.ChamadoModel && typeof window.ChamadoModel.formatarMotivoHtml === 'function') {
             baseHtml = window.ChamadoModel.formatarMotivoHtml(motivo, { ...options, omitButton: true });
@@ -663,6 +712,76 @@ class PainelController {
      * - Linha 1: Texto descritivo limpo (ex: "Reparo recente (há 12 dias, a 42 metros)")
      * - Linha 2: Os dois botões com mesma estrutura física: Protocolo e Comparar no Mapa
      */
+
+    /**
+     * Renderiza o badge de Motivo para a tabela do Painel
+     */
+    renderMotivoTabelaHtml(item) {
+        if (window.ChamadoModel && typeof window.ChamadoModel.renderMotivoTabelaHtml === 'function') {
+            return window.ChamadoModel.renderMotivoTabelaHtml(item);
+        }
+        if (!item || !item.motivoAprovacao) return '';
+        const motivo = String(item.motivoAprovacao).trim();
+        const currentProt = String(item.protocolo || item.id || '').replace(/^#/, '').trim();
+        const info = this.extrairInfoMotivo(motivo);
+        if (info.protocolos && info.protocolos.length > 0) {
+            const btnBaseClass = 'inline-flex items-center justify-center gap-1 px-2 h-[22px] box-border rounded text-[10.5px] font-semibold leading-none shadow-2xs transition-all cursor-pointer select-none active:scale-95';
+            const btnProtClass = `${btnBaseClass} bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-300 hover:border-blue-400`;
+            const btnCompClass = `${btnBaseClass} bg-white hover:bg-amber-100/80 text-amber-900 hover:text-amber-950 border border-amber-300 hover:border-amber-400`;
+
+            const btns = info.protocolos.map(cleanProt => `
+                <button type="button" onclick="event.stopPropagation(); window.abrirDetalhesOSModal('${cleanProt}')" class="${btnProtClass}" title="Abrir Ordem de Serviço #${cleanProt}">
+                    <span class="material-symbols-outlined text-[12px] leading-none text-blue-600 pointer-events-none">open_in_new</span>
+                    <span class="leading-none">#${cleanProt}</span>
+                </button>
+            `.trim()).join('');
+
+            // Reparo Recente: 2 linhas
+            if (info.isReparo) {
+                let btnComp = '';
+                if (currentProt && info.protocolo) {
+                    btnComp = `
+                        <button type="button" onclick="event.stopPropagation(); window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" class="${btnCompClass}" title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                            <span class="material-symbols-outlined text-[12px] leading-none text-amber-700 pointer-events-none">map</span>
+                            <span class="leading-none">Comparar</span>
+                        </button>
+                    `.trim();
+                }
+
+                return `
+                    <div class="inline-flex flex-col gap-1 p-1.5 rounded-lg bg-amber-50/80 text-amber-950 border border-amber-200/90 shadow-2xs max-w-full text-left" title="${this._escapeHtml(motivo)}">
+                        <div class="flex items-center gap-1.5 text-[11px] font-semibold leading-tight truncate">
+                            <span class="material-symbols-outlined text-[13px] text-amber-700 shrink-0">history</span>
+                            <span class="truncate">${this._escapeHtml(info.textoLimpo || motivo)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 pt-0.5 whitespace-nowrap">
+                            ${btns}
+                            ${btnComp}
+                        </div>
+                    </div>
+                `.trim();
+            }
+
+            // Duplicata / outros motivos curtos com protocolo: na mesma linha
+            const labelDuplicata = info.textoLimpo || 'Duplicata';
+            return `
+                <div class="inline-flex items-center gap-1.5 p-1 px-2 rounded-lg bg-amber-50/80 text-amber-950 border border-amber-200/90 shadow-2xs max-w-full text-left" title="${this._escapeHtml(motivo)}">
+                    <span class="material-symbols-outlined text-[13px] text-amber-700 shrink-0">content_copy</span>
+                    <span class="text-[11px] font-semibold leading-none truncate">${this._escapeHtml(labelDuplicata)}</span>
+                    <div class="inline-flex items-center gap-1 shrink-0">
+                        ${btns}
+                    </div>
+                </div>
+            `.trim();
+        }
+
+        return `
+            <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] leading-tight font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs truncate text-left" title="${this._escapeHtml(motivo)}">
+                <span class="truncate">${this._escapeHtml(motivo)}</span>
+            </div>
+        `.trim();
+    }
+
     renderMotivoAprovacaoDetalhesHtml(item) {
         if (window.ChamadoModel && typeof window.ChamadoModel.renderMotivoDetalhesHtml === 'function') {
             return window.ChamadoModel.renderMotivoDetalhesHtml(item);
@@ -683,25 +802,42 @@ class PainelController {
                 </button>
             `.trim()).join('');
 
-            let btnComp = '';
-            if (info.isReparo && currentProt && info.protocolo) {
-                btnComp = `
-                    <button type="button" onclick="event.stopPropagation(); window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" class="${btnCompClass}" title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
-                        <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
-                        <span class="leading-none">Comparar</span>
-                    </button>
+            // Se for Reparo Recente: 2 linhas
+            if (info.isReparo) {
+                let btnComp = '';
+                if (currentProt && info.protocolo) {
+                    btnComp = `
+                        <button type="button" onclick="event.stopPropagation(); window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" class="${btnCompClass}" title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                            <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
+                            <span class="leading-none">Comparar</span>
+                        </button>
+                    `.trim();
+                }
+
+                return `
+                    <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
+                        <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
+                            <span>${this._escapeHtml(info.textoLimpo || motivo)}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                            ${btns}
+                            ${btnComp}
+                        </div>
+                    </div>
                 `.trim();
             }
 
+            // Se for Duplicata: na mesma linha
+            const labelDuplicata = info.textoLimpo || 'Duplicata';
             return `
-                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
-                    <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
-                        <span>${this._escapeHtml(info.textoLimpo || motivo)}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
-                        ${btns}
-                        ${btnComp}
+                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2 px-3 shadow-2xs mt-1">
+                    <div class="flex items-center flex-wrap gap-2">
+                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">content_copy</span>
+                        <span class="font-semibold text-amber-950 text-xs leading-none">${this._escapeHtml(labelDuplicata)}</span>
+                        <div class="inline-flex items-center gap-1.5">
+                            ${btns}
+                        </div>
                     </div>
                 </div>
             `.trim();
@@ -2279,31 +2415,31 @@ class PainelController {
                                         <div><b class="text-slate-600">Problema:</b> <span class="font-medium text-emerald-900">${(p.problemaEncontrado && p.problemaEncontrado !== 'Não informado') ? p.problemaEncontrado : (pIdx === 0 ? (item.problemaEncontrado || 'Não informado') : 'Não informado')}</span></div>
                                         ${isRealAddr(endFinVal) ? `<div><b class="text-slate-600">Endereço Reparo:</b> <span class="font-medium text-emerald-900">${endFinVal}</span></div>` : ''}
                                         ${p.posteId ? `
-                                        <div class="mt-1.5 p-1.5 rounded-lg bg-purple-50/80 border border-purple-200/80 text-[11px] space-y-1">
-                                            <div class="flex items-center justify-between gap-1 flex-wrap">
-                                                <span class="inline-flex items-center gap-1 font-bold text-purple-900">
-                                                    <span class="material-symbols-outlined text-[14px] text-purple-700">electric_bolt</span>
+                                        <div class="mt-1 px-2 py-1 rounded-md bg-purple-50/70 border border-purple-200/80 text-xs">
+                                            <div class="flex items-center justify-between gap-1.5">
+                                                <span class="inline-flex items-center gap-1 font-bold text-purple-900 text-[11px] leading-tight">
+                                                    <span class="material-symbols-outlined text-purple-700 select-none" style="font-size: 13px; line-height: 1;">electric_bolt</span>
                                                     <span>Poste #${p.posteId}</span>
                                                 </span>
                                                 ${p.posteDistanciaMetros !== null && p.posteDistanciaMetros !== undefined ? `
-                                                    <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200" title="Distância entre o GPS do operador e o Poste Selecionado">
+                                                    <span class="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200 leading-none shrink-0" title="Distância entre o GPS do operador e o Poste Selecionado">
                                                         ${p.posteDistanciaMetros}m do reparo
                                                     </span>
                                                 ` : ''}
                                             </div>
                                             ${(p.posteLat && p.posteLng) ? `
-                                                <div class="text-[10px] font-mono text-purple-800/80 flex items-center justify-between">
-                                                    <span>${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
-                                                    <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 text-amber-700 hover:text-amber-800 font-semibold cursor-pointer" title="Ver Poste no Street View 360°">
-                                                        <span class="material-symbols-outlined text-[12px]">streetview</span>
+                                                <div class="mt-1 pt-0.5 border-t border-purple-200/50 flex items-center justify-between gap-1 text-[10px] font-mono text-purple-900/80 leading-tight">
+                                                    <span class="truncate" title="Coordenadas do poste">${Number(p.posteLat).toFixed(6)}, ${Number(p.posteLng).toFixed(6)}</span>
+                                                    <a href="https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${p.posteLat},${p.posteLng}" target="_blank" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9.5px] font-sans font-semibold bg-white hover:bg-amber-50 text-amber-800 hover:text-amber-900 border border-amber-300 active:scale-95 transition-all cursor-pointer shrink-0 shadow-2xs leading-none" title="Ver Poste no Street View 360°">
+                                                        <span class="material-symbols-outlined text-amber-600 select-none" style="font-size: 11px; line-height: 1;">streetview</span>
                                                         <span>Street View</span>
                                                     </a>
                                                 </div>
                                             ` : ''}
                                         </div>
                                         ` : (p.posteNaoEncontrado ? `
-                                        <div class="mt-1 p-1 rounded bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
-                                            <span class="material-symbols-outlined text-[13px] text-amber-600">info</span>
+                                        <div class="mt-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-[10.5px] text-amber-800 flex items-center gap-1">
+                                            <span class="material-symbols-outlined text-amber-600 select-none" style="font-size: 13px; line-height: 1;">info</span>
                                             <span>Operador marcou poste não encontrado no mapa</span>
                                         </div>
                                         ` : '')}

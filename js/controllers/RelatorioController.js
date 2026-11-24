@@ -1069,9 +1069,25 @@ class RelatorioController {
                     );
                 }
 
-                if (sess.materiais && Array.isArray(sess.materiais)) {
+                const sessoesMateriaisJaProcessados = (rawMats && rawMats.length > 0);
+                if (!sessoesMateriaisJaProcessados && sess.materiais && Array.isArray(sess.materiais)) {
                     sess.materiais.forEach(sMat => {
-                        registrarMaterial(sMat, 1, prot, 'UN', 'Material em Sessão Praça');
+                        let mStr = typeof sMat === 'string' ? sMat : (sMat.nome || sMat.descricao || sMat.material || '');
+                        let mQtd = typeof sMat === 'object' ? (sMat.qtd || sMat.quantidade || 1) : 1;
+                        if (typeof sMat === 'string') {
+                            const matchX = mStr.match(/\((?:x\s*(\d+)|\s*(\d+)\s*x?)\)$/i);
+                            if (matchX) {
+                                mQtd = parseInt(matchX[1] || matchX[2], 10) || 1;
+                                mStr = mStr.replace(/\((?:x\s*\d+|\s*\d+\s*x?)\)$/i, '').trim();
+                            } else {
+                                const matchStartNum = mStr.match(/^(\d+)\s*x?\s+(.*)/i);
+                                if (matchStartNum) {
+                                    mQtd = parseInt(matchStartNum[1], 10) || 1;
+                                    mStr = matchStartNum[2].trim();
+                                }
+                            }
+                        }
+                        registrarMaterial(mStr, mQtd, prot, 'UN', 'Material em Sessão Praça');
                     });
                 }
             });
@@ -1224,17 +1240,24 @@ class RelatorioController {
             let itemDisplayHtml = '';
             if (isHoras) {
                 itemDisplayHtml = `
-                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs bg-amber-50 text-amber-950 border border-amber-300/80 shadow-2xs">
+                    <div class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs bg-amber-50 text-amber-950 border border-amber-300/80 shadow-2xs">
                         <span class="material-symbols-outlined text-amber-700 text-[16px] shrink-0">engineering</span>
                         <span class="font-semibold text-xs leading-tight">${item.descricao}</span>
                     </div>
                 `;
             } else {
+                const temMarca = Boolean(item.marca && item.marca !== 'PRÓPRIO');
                 itemDisplayHtml = `
-                    <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs bg-surface-container-lowest text-slate-800 border border-outline-variant/70 shadow-2xs group-hover:border-purple-300 transition-colors">
-                        <span class="material-symbols-outlined text-secondary text-[16px] shrink-0">inventory_2</span>
-                        <span class="font-semibold text-xs leading-tight text-slate-800">${item.descricao}</span>
-                        ${item.marca && item.marca !== 'PRÓPRIO' ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 border border-purple-200 rounded shrink-0">${item.marca}</span>` : ''}
+                    <div class="inline-flex ${temMarca ? 'items-start' : 'items-center'} gap-2 px-2.5 py-1.5 rounded-lg text-xs bg-surface-container-lowest text-slate-800 border border-outline-variant/70 shadow-2xs group-hover:border-purple-300 transition-colors max-w-full">
+                        <span class="material-symbols-outlined text-secondary text-[16px] shrink-0 ${temMarca ? 'mt-0.5' : ''}">inventory_2</span>
+                        <div class="flex flex-col items-start min-w-0 flex-1">
+                            ${temMarca ? `
+                                <span class="text-[9.5px] font-mono font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 border border-purple-200 rounded tracking-wide shadow-2xs leading-none mb-1">
+                                    ${item.marca}
+                                </span>
+                            ` : ''}
+                            <span class="font-semibold text-xs leading-snug text-slate-800 break-words">${item.descricao}</span>
+                        </div>
                     </div>
                 `;
             }
@@ -1503,23 +1526,39 @@ class RelatorioController {
                     });
                 }
 
-                if (sess.materiais && Array.isArray(sess.materiais)) {
+                const sessoesMateriaisJaProcessados = (rawMats && rawMats.length > 0);
+                if (!sessoesMateriaisJaProcessados && sess.materiais && Array.isArray(sess.materiais)) {
                     sess.materiais.forEach(sMat => {
-                        const { marca, desc, unidade, valorUnitario, valorUnitarioBdi } = this.resolveMarcaEMaterial(sMat, 'UN');
+                        let mStr = typeof sMat === 'string' ? sMat : (sMat.nome || sMat.descricao || sMat.material || '');
+                        let mQtd = typeof sMat === 'object' ? (sMat.qtd || sMat.quantidade || 1) : 1;
+                        if (typeof sMat === 'string') {
+                            const matchX = mStr.match(/\((?:x\s*(\d+)|\s*(\d+)\s*x?)\)$/i);
+                            if (matchX) {
+                                mQtd = parseInt(matchX[1] || matchX[2], 10) || 1;
+                                mStr = mStr.replace(/\((?:x\s*\d+|\s*\d+\s*x?)\)$/i, '').trim();
+                            } else {
+                                const matchStartNum = mStr.match(/^(\d+)\s*x?\s+(.*)/i);
+                                if (matchStartNum) {
+                                    mQtd = parseInt(matchStartNum[1], 10) || 1;
+                                    mStr = matchStartNum[2].trim();
+                                }
+                            }
+                        }
+                        const { marca, desc, unidade, valorUnitario, valorUnitarioBdi } = this.resolveMarcaEMaterial(mStr, 'UN');
                         const vUnit = Number(valorUnitario) || 0;
                         const vUnitBdi = Number(valorUnitarioBdi) || 0;
                         matsDaOS.push({
                             marca: marca,
                             descricao: desc,
                             unidade: unidade || 'UN',
-                            quantidade: 1,
+                            quantidade: mQtd,
                             valorUnitario: vUnit,
                             valorUnitarioBdi: vUnitBdi,
-                            subtotalComBdi: 1 * vUnitBdi,
+                            subtotalComBdi: mQtd * vUnitBdi,
                             categoria: 'Material em Sessão Praça',
                             isMaoDeObra: false
                         });
-                        totalQtdOS += 1;
+                        totalQtdOS += mQtd;
                     });
                 }
             });

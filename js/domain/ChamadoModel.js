@@ -335,28 +335,45 @@ class ChamadoModel {
                 </button>
             `.trim()).join('');
 
-            let btnComparar = '';
-            if (info.isReparo && currentProt && info.protocolo) {
-                btnComparar = `
-                    <button type="button" 
-                            onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" 
-                            class="${btnCompClass}" 
-                            title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
-                        <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
-                        <span class="leading-none">Comparar</span>
-                    </button>
+            // Se for Reparo Recente: 2 linhas
+            if (info.isReparo) {
+                let btnComparar = '';
+                if (currentProt && info.protocolo) {
+                    btnComparar = `
+                        <button type="button" 
+                                onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" 
+                                class="${btnCompClass}" 
+                                title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                            <span class="material-symbols-outlined text-[15px] leading-none text-amber-700 pointer-events-none">map</span>
+                            <span class="leading-none">Comparar</span>
+                        </button>
+                    `.trim();
+                }
+
+                return `
+                    <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
+                        <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
+                            <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
+                            <span>${escapeHtml(info.textoLimpo || motivo)}</span>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 pt-0.5">
+                            ${btnsProtocolos}
+                            ${btnComparar}
+                        </div>
+                    </div>
                 `.trim();
             }
 
+            // Se for Duplicata: na mesma linha
+            const labelDuplicata = info.textoLimpo || 'Duplicata';
             return `
-                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2.5 space-y-2 shadow-2xs mt-1">
-                    <div class="font-semibold text-amber-950 text-xs leading-snug flex items-center gap-1.5">
-                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">history</span>
-                        <span>${escapeHtml(info.textoLimpo || motivo)}</span>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2 pt-0.5">
-                        ${btnsProtocolos}
-                        ${btnComparar}
+                <div class="bg-amber-50/80 border border-amber-200/90 rounded-xl p-2 px-3 shadow-2xs mt-1">
+                    <div class="flex items-center flex-wrap gap-2">
+                        <span class="material-symbols-outlined text-[16px] text-amber-700 shrink-0">content_copy</span>
+                        <span class="font-semibold text-amber-950 text-xs leading-none">${escapeHtml(labelDuplicata)}</span>
+                        <div class="inline-flex items-center gap-1.5">
+                            ${btnsProtocolos}
+                        </div>
                     </div>
                 </div>
             `.trim();
@@ -371,6 +388,98 @@ class ChamadoModel {
 
     get motivoDetalhesHtml() {
         return ChamadoModel.renderMotivoDetalhesHtml(this);
+    }
+
+
+    /**
+     * Renderiza o badge de Motivo de Pendência/Aprovação para exibição em tabelas (ex: Pendentes de Aprovação).
+     * Quando for Reparo Recente (ou tiver protocolo associado), exibe em 2 linhas compactas:
+     * - Linha 1: Texto limpo descritivo (ex: "Reparo recente (há 12 dias, a 42 metros)")
+     * - Linha 2: Os dois botões com mesma estrutura e altura exata: Protocolo e Comparar
+     */
+    static renderMotivoTabelaHtml(item, options = {}) {
+        if (!item) return '';
+        const motivo = String(item.motivoAprovacao || item.motivo || '').trim();
+        if (!motivo) return '';
+
+        const currentProt = String(item.protocolo || item.id || options.currentProtocolo || '').replace(/^#/, '').trim();
+        const info = (typeof ChamadoModel.extrairInfoMotivo === 'function') 
+            ? ChamadoModel.extrairInfoMotivo(motivo) 
+            : { textoLimpo: motivo, protocolos: [], protocolo: '', isReparo: false };
+        const stopProp = options.stopPropagation ? 'event.stopPropagation(); ' : 'event.stopPropagation(); ';
+
+        const escapeHtml = (str) => String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        if (info.protocolos && info.protocolos.length > 0) {
+            const btnBaseClass = 'inline-flex items-center justify-center gap-1 px-2 h-[22px] box-border rounded text-[10.5px] font-semibold leading-none shadow-2xs transition-all cursor-pointer select-none active:scale-95';
+            const btnProtClass = `${btnBaseClass} bg-white hover:bg-blue-50 text-blue-700 hover:text-blue-800 border border-blue-300 hover:border-blue-400`;
+            const btnCompClass = `${btnBaseClass} bg-white hover:bg-amber-100/80 text-amber-900 hover:text-amber-950 border border-amber-300 hover:border-amber-400`;
+
+            const btnsProtocolos = info.protocolos.map(cleanProt => `
+                <button type="button" 
+                        onclick="${stopProp}window.abrirDetalhesOSModal('${cleanProt}')" 
+                        class="${btnProtClass}" 
+                        title="Abrir Ordem de Serviço #${cleanProt}">
+                    <span class="material-symbols-outlined text-[12px] leading-none text-blue-600 pointer-events-none">open_in_new</span>
+                    <span class="leading-none">#${cleanProt}</span>
+                </button>
+            `.trim()).join('');
+
+            // Reparo Recente: 2 linhas (texto longo + Comparar)
+            if (info.isReparo) {
+                let btnComparar = '';
+                if (currentProt && info.protocolo) {
+                    btnComparar = `
+                        <button type="button" 
+                                onclick="${stopProp}window.painelController ? window.painelController.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event) : (window.compararReparoRecenteNoMapa && window.compararReparoRecenteNoMapa('${currentProt}', '${info.protocolo}', event))" 
+                                class="${btnCompClass}" 
+                                title="Comparar a OS #${currentProt} com o Reparo Recente #${info.protocolo} no mapa Mapbox">
+                            <span class="material-symbols-outlined text-[12px] leading-none text-amber-700 pointer-events-none">map</span>
+                            <span class="leading-none">Comparar</span>
+                        </button>
+                    `.trim();
+                }
+
+                return `
+                    <div class="inline-flex flex-col gap-1 p-1.5 rounded-lg bg-amber-50/80 text-amber-950 border border-amber-200/90 shadow-2xs max-w-full text-left" title="${escapeHtml(motivo)}">
+                        <div class="flex items-center gap-1.5 text-[11px] font-semibold leading-tight truncate">
+                            <span class="material-symbols-outlined text-[13px] text-amber-700 shrink-0">history</span>
+                            <span class="truncate">${escapeHtml(info.textoLimpo || motivo)}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 pt-0.5 whitespace-nowrap">
+                            ${btnsProtocolos}
+                            ${btnComparar}
+                        </div>
+                    </div>
+                `.trim();
+            }
+
+            // Duplicata / outros motivos com protocolo: na mesma linha
+            const labelDuplicata = info.textoLimpo || 'Duplicata';
+            return `
+                <div class="inline-flex items-center gap-1.5 p-1 px-2 rounded-lg bg-amber-50/80 text-amber-950 border border-amber-200/90 shadow-2xs max-w-full text-left" title="${escapeHtml(motivo)}">
+                    <span class="material-symbols-outlined text-[13px] text-amber-700 shrink-0">content_copy</span>
+                    <span class="text-[11px] font-semibold leading-none truncate">${escapeHtml(labelDuplicata)}</span>
+                    <div class="inline-flex items-center gap-1 shrink-0">
+                        ${btnsProtocolos}
+                    </div>
+                </div>
+            `.trim();
+        }
+
+        return `
+            <div class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] leading-tight font-semibold bg-amber-50 text-amber-900 border border-amber-200/80 max-w-full shadow-2xs truncate text-left" title="${escapeHtml(motivo)}">
+                <span class="truncate">${escapeHtml(motivo)}</span>
+            </div>
+        `.trim();
+    }
+
+    get motivoTabelaHtml() {
+        return ChamadoModel.renderMotivoTabelaHtml(this);
     }
 
     get motivoFormatadoHtml() {
@@ -889,13 +998,46 @@ class ChamadoModel {
             let qtd = 1;
 
             if (typeof item === 'string') {
-                nome = item.trim();
+                let s = item.trim();
+                if (!s || s === '[object Object]') return;
+
+                // Tenta extrair quantidade do sufixo (x12) ou (12x) ou (12)
+                const matchX = s.match(/\((?:x\s*(\d+)|\s*(\d+)\s*x?)\)$/i);
+                if (matchX) {
+                    qtd = parseInt(matchX[1] || matchX[2], 10) || 1;
+                    nome = s.replace(/\((?:x\s*\d+|\s*\d+\s*x?)\)$/i, '').trim();
+                } else {
+                    // Tenta extrair quantidade do prefixo como '12x Material' ou '12 x Material' ou '12 Material'
+                    const matchStartNum = s.match(/^(\d+)\s*x?\s+(.*)/i);
+                    if (matchStartNum) {
+                        qtd = parseInt(matchStartNum[1], 10) || 1;
+                        nome = matchStartNum[2].trim();
+                    } else {
+                        nome = s;
+                    }
+                }
             } else if (typeof item === 'object') {
-                nome = (item.nome || item.descricao || item.material || '').trim();
-                qtd = parseInt(item.qtd || item.quantidade, 10) || 1;
+                nome = (item.nome || item.descricao || item.material || item.item || item.nome_material || item.material_nome || '').trim();
+                qtd = parseInt(item.qtd || item.quantidade || item.qtd_final || item.qtd_inicial || 1, 10) || 1;
+
+                if (nome) {
+                    const matchX = nome.match(/\((?:x\s*(\d+)|\s*(\d+)\s*x?)\)$/i);
+                    if (matchX) {
+                        const subQtd = parseInt(matchX[1] || matchX[2], 10) || 1;
+                        qtd = qtd > 1 ? qtd : subQtd;
+                        nome = nome.replace(/\((?:x\s*\d+|\s*\d+\s*x?)\)$/i, '').trim();
+                    } else {
+                        const matchStartNum = nome.match(/^(\d+)\s*x?\s+(.*)/i);
+                        if (matchStartNum) {
+                            const subQtd = parseInt(matchStartNum[1], 10) || 1;
+                            qtd = qtd > 1 ? qtd : subQtd;
+                            nome = matchStartNum[2].trim();
+                        }
+                    }
+                }
             }
 
-            if (!nome) return;
+            if (!nome || nome === '[object Object]') return;
             const key = nome.toUpperCase();
             if (map.has(key)) {
                 const existing = map.get(key);
@@ -905,7 +1047,40 @@ class ChamadoModel {
             }
         };
 
-        // 1. Prioriza materiais dos fechamentos complementares (não desconsiderados)
+        // 1. Para Praça Pública: prioriza os materiais das sessões de trabalho ativas
+        if (this.isPraca) {
+            if (this.sessoesList && this.sessoesList.length > 0) {
+                this.sessoesList.forEach(s => {
+                    if (s.desconsiderada) return;
+                    if (s.materiais && Array.isArray(s.materiais)) {
+                        s.materiais.forEach(addMat);
+                    }
+                });
+                // Se a praça possui sessões de trabalho, a lista de sessões é a autoridade máxima
+                return Array.from(map.values());
+            }
+
+            // Fallback para fechamentos complementares apenas se não houver sessões de trabalho
+            if (map.size === 0 && this.fechamentosList && this.fechamentosList.length > 0) {
+                this.fechamentosList.forEach(f => {
+                    if (f.desconsiderado) return;
+                    if (f.materiais && Array.isArray(f.materiais)) {
+                        f.materiais.forEach(addMat);
+                    }
+                });
+            }
+
+            // Fallback para materiais gravados diretamente na OS
+            if (map.size === 0 && this.materialUtilizado) {
+                const legacyList = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+                legacyList.forEach(addMat);
+            }
+
+            return Array.from(map.values());
+        }
+
+        // 2. Para OSs Viárias / Gerais:
+        // Prioriza materiais dos fechamentos complementares (não desconsiderados)
         if (this.fechamentosList && this.fechamentosList.length > 0) {
             this.fechamentosList.forEach(f => {
                 if (f.desconsiderado) return;
@@ -915,13 +1090,7 @@ class ChamadoModel {
             });
         }
 
-        // 2. Fallback para materias gravados diretamente na tabela ordens_servico
-        if (map.size === 0 && this.materialUtilizado) {
-            const legacyList = ChamadoModel.parseMaterialsList(this.materialUtilizado);
-            legacyList.forEach(addMat);
-        }
-
-        // 3. Fallback para materiais gravados em sessões de trabalho (sessoesList)
+        // Fallback para materiais gravados em sessões de trabalho (sessoesList)
         if (map.size === 0 && this.sessoesList && this.sessoesList.length > 0) {
             this.sessoesList.forEach(s => {
                 if (s.desconsiderada) return;
@@ -929,6 +1098,12 @@ class ChamadoModel {
                     s.materiais.forEach(addMat);
                 }
             });
+        }
+
+        // Fallback para materiais gravados diretamente na tabela ordens_servico
+        if (map.size === 0 && this.materialUtilizado) {
+            const legacyList = ChamadoModel.parseMaterialsList(this.materialUtilizado);
+            legacyList.forEach(addMat);
         }
 
         return Array.from(map.values());
@@ -1961,7 +2136,8 @@ class ChamadoModel {
         let list = ChamadoModel.parseMaterialsList(this.materialUtilizado);
 
         // Agrega materiais da nova tabela fechamentos_os (fechamentosList, excluindo desconsiderados)
-        if (this.fechamentosList && this.fechamentosList.length > 0) {
+        // Para Praças com sessões de trabalho, as sessões têm precedência e fechamentos_os legados não devem poluir
+        if ((!this.isPraca || !this.sessoesList || this.sessoesList.length === 0) && this.fechamentosList && this.fechamentosList.length > 0) {
             this.fechamentosList.forEach(f => {
                 if (f.desconsiderado) return;
                 if (f.materiais) {
