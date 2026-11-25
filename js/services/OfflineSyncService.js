@@ -458,6 +458,50 @@ class OfflineSyncService {
         }
       }
 
+      // BLINDAGEM DE SINCRONIZAÇÃO: Nunca permitir que a fila offline sobrescreva ou zere
+      // um histórico de sessões já existente no banco de dados se o payload vier com menos sessões ou vazio.
+      try {
+        const { data: dbPracaRow } = await supabaseClient
+          .from('ordens_servico_pracas')
+          .select('historico_sessoes, tempo_total_minutos')
+          .eq('protocolo', item.protocolo)
+          .maybeSingle();
+
+        if (dbPracaRow && dbPracaRow.historico_sessoes) {
+          let dbSessoes = [];
+          try {
+            dbSessoes = typeof dbPracaRow.historico_sessoes === 'string'
+              ? JSON.parse(dbPracaRow.historico_sessoes)
+              : (Array.isArray(dbPracaRow.historico_sessoes) ? dbPracaRow.historico_sessoes : []);
+          } catch(e) { dbSessoes = []; }
+
+          if (Array.isArray(dbSessoes) && dbSessoes.length > 0) {
+            let payloadSessoes = [];
+            if (payload.historico_sessoes) {
+              try {
+                payloadSessoes = typeof payload.historico_sessoes === 'string'
+                  ? JSON.parse(payload.historico_sessoes)
+                  : (Array.isArray(payload.historico_sessoes) ? payload.historico_sessoes : []);
+              } catch(e) { payloadSessoes = []; }
+            }
+
+            if (!Array.isArray(payloadSessoes) || payloadSessoes.length === 0) {
+              console.warn(`🛡️ [OfflineSync Praça] Payload offline de ${item.protocolo} veio sem histórico. Preservando ${dbSessoes.length} sessões do banco!`);
+              payload.historico_sessoes = dbSessoes;
+              payload.tempo_total_minutos = dbPracaRow.tempo_total_minutos || 0;
+            } else if (dbSessoes.length > payloadSessoes.length) {
+              console.warn(`🛡️ [OfflineSync Praça] Banco possui mais sessões (${dbSessoes.length}) que o payload (${payloadSessoes.length}). Mesclando histórico...`);
+              const maxNumDb = dbSessoes.reduce((m, s) => Math.max(m, s.numero || 0), 0);
+              const novasOffline = payloadSessoes.filter(s => !s.numero || s.numero > maxNumDb);
+              payload.historico_sessoes = dbSessoes.concat(novasOffline);
+              payload.tempo_total_minutos = payload.historico_sessoes.reduce((acc, s) => acc + (s.duracao_minutos || 0), 0);
+            }
+          }
+        }
+      } catch (errSyncCheck) {
+        console.warn('⚠️ [OfflineSync Praça] Falha ao verificar integridade de sessões prévias:', errSyncCheck);
+      }
+
       let payloadAtual = { ...payload };
       if (payloadAtual.evidencias) delete payloadAtual.evidencias;
 

@@ -3792,6 +3792,34 @@
             }
 
             var ocrTexto = stObj.textoAuditoriaOCR || null;
+            var isAnexoPlaquetaDiv = false;
+
+            // Auditoria Automática de Plaqueta via IA (Gemini Flash) no Fechamento
+            if (evidenciasUrls['Plaqueta'] && plaq) {
+              try {
+                if (btnTexto) btnTexto.textContent = `Auditando Plaqueta (Ponto ${i + 1})...`;
+                console.log(`🤖 [Finalizar] Disparando leitura de plaqueta via IA para o Ponto ${i + 1}: ${plaq}...`);
+                
+                const respOcr = await fetch('/api/analisar-plaqueta', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    imageUrl: evidenciasUrls['Plaqueta'],
+                    plaquetaEsperada: plaq
+                  })
+                }).then(r => r.json());
+
+                if (respOcr && respOcr.sucesso && respOcr.resultado) {
+                  const resIa = respOcr.resultado;
+                  ocrTexto = resIa.codigo_lido || 'Não identificado';
+                  isAnexoPlaquetaDiv = Boolean(resIa.divergente);
+                  console.log(`✅ [Finalizar] Leitura da Plaqueta (Ponto ${i + 1}): Lido "${ocrTexto}" | Divergente: ${isAnexoPlaquetaDiv}`);
+                }
+              } catch (errOcr) {
+                console.warn(`⚠️ [Finalizar] Falha não impeditiva na auditoria de IA da plaqueta:`, errOcr);
+                if (!ocrTexto) ocrTexto = 'Leitura pendente';
+              }
+            }
 
             // Metadados do Poste da Base Aérea selecionado no mapa
             var posteSel = stObj.posteSelecionado || null;
@@ -3838,7 +3866,8 @@
               precisao_gps_metros: (typeof stObj.precisaoGps === 'number') ? stObj.precisaoGps : null,
               data_reparo: dataReparo,
               evidencias: evidenciasUrls,
-              texto_auditoria_ocr: ocrTexto
+              texto_auditoria_ocr: ocrTexto,
+              anexo_plaqueta_divergente: isAnexoPlaquetaDiv
             });
           }
 
@@ -3896,6 +3925,8 @@
           }
 
           var obsFinalTexto = document.getElementById('descricao').value.trim() || null;
+          var hasAnyAnexoPlaquetaDiv = arrPontosPayload.some(p => p.anexo_plaqueta_divergente === true);
+
           var payloadUpdate = {
             status: "Concluída",
             data_fechamento: new Date().toISOString(),
@@ -3903,7 +3934,8 @@
             materiais: carrinhoMateriais,
             pontos_final: pontosFinalAcumulados,
             status_auditoria: "Pendente",
-            texto_auditoria_ocr: ocrGeral
+            texto_auditoria_ocr: ocrGeral,
+            anexo_plaqueta_divergente: hasAnyAnexoPlaquetaDiv
           };
 
           if (urlsComplementaresViaria.length > 0) {
@@ -4002,6 +4034,7 @@
               relatorio_tecnico: document.getElementById('descricao').value.trim() || null,
               observacoes: document.getElementById('descricao').value.trim() || null,
               texto_auditoria_ocr: ocrGeral,
+              anexo_plaqueta_divergente: hasAnyAnexoPlaquetaDiv,
               materiais: carrinhoMateriais,
               fotos: arrPontosPayload
             };
