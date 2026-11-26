@@ -18,9 +18,22 @@ class ChamadoModel {
             return str;
         };
 
+        this.fechamentosRaw = data.fechamentos_os || data.fechamentos || [];
+        const rawFechArr = Array.isArray(this.fechamentosRaw)
+            ? this.fechamentosRaw
+            : (typeof this.fechamentosRaw === 'string' ? (() => { try { return JSON.parse(this.fechamentosRaw); } catch(e) { return []; } })() : []);
+        const activeFechList = (Array.isArray(rawFechArr) ? rawFechArr : [])
+            .filter(f => f && !f.desconsiderado)
+            .sort((a, b) => (Number(a.numero_fechamento || 0) - Number(b.numero_fechamento || 0)) || (new Date(a.data_fechamento || 0) - new Date(b.data_fechamento || 0)));
+        const lastActiveFech = activeFechList.length > 0 ? activeFechList[activeFechList.length - 1] : null;
+        const ptsFromFech = (lastActiveFech && Array.isArray(lastActiveFech.fotos) && lastActiveFech.fotos.length > 0)
+            ? lastActiveFech.fotos
+            : null;
+
         this.userEmail = cleanVal(data.user_email);
         this.operadorAbertura = cleanVal(data.operador_abertura) || cleanVal(data.operador) || cleanVal(data.cadastrado_por) || cleanVal(data.usuario_cadastro) || cleanVal(data.user_email) || cleanVal(data.solicitante_operador) || cleanVal(data.criado_por) || cleanVal(data.usuario_abertura) || '';
-        this.operadorFinalizacao = cleanVal(data.operador_finalizacao) 
+        this.operadorFinalizacao = (lastActiveFech ? cleanVal(lastActiveFech.operador) : '')
+            || cleanVal(data.operador_finalizacao) 
             || cleanVal(data.finalizado_por) 
             || cleanVal(data.usuario_finalizacao) 
             || cleanVal(data.operador_fechamento) 
@@ -42,7 +55,7 @@ class ChamadoModel {
         };
 
         const ptsInicial = parseArrayJson(data.pontos_inicial) || parseArrayJson(data.pontos);
-        const ptsFinal = parseArrayJson(data.pontos_final) || (String(data.status || '').toLowerCase().includes('conclu') ? parseArrayJson(data.pontos) : null);
+        const ptsFinal = ptsFromFech || parseArrayJson(data.pontos_final) || (String(data.status || '').toLowerCase().includes('conclu') ? parseArrayJson(data.pontos) : null);
 
         let endExtraido = data.endereco || data.praca_nome || '';
         let plaqExtraida = data.plaqueta_inicial || data.plaqueta || '';
@@ -121,9 +134,13 @@ class ChamadoModel {
         this.coordenadaReparo = coordRepExtraida;
         this.descricao = data.descricao || data.observacao || data.observacoes || data.obs || '';
         this.observacaoInicial = data.observacao_inicial || data.observacao || data.observacoes || data.descricao || data.obs || '';
-        this.dataConclusao = (data.data_conclusao || data.data_fechamento) ? new Date(data.data_conclusao || data.data_fechamento) : null;
-        this.observacaoFinal = data.observacao_final || data.observacao_conclusao || data.justificativa || '';
-        this.anexoPlaquetaDivergente = data.anexo_plaqueta_divergente === true || data.anexo_plaqueta_divergente === 'true';
+        this.dataConclusao = (data.data_conclusao || data.data_fechamento || (lastActiveFech && lastActiveFech.data_fechamento)) ? new Date(data.data_conclusao || data.data_fechamento || lastActiveFech.data_fechamento) : null;
+        this.justificativaStatus = cleanVal(data.justificativa_status) || '';
+        this.observacaoFinal = (lastActiveFech ? (cleanVal(lastActiveFech.observacoes) || cleanVal(lastActiveFech.relatorio_tecnico)) : '')
+            || data.observacao_final || data.observacao_conclusao || data.justificativa || '';
+        this.anexoPlaquetaDivergente = activeFechList.length > 0
+            ? activeFechList.some(f => f.anexo_plaqueta_divergente === true || f.anexo_plaqueta_divergente === 'true')
+            : (data.anexo_plaqueta_divergente === true || data.anexo_plaqueta_divergente === 'true');
         this.anexoFaltante = data.anexo_faltante === true || data.anexo_faltante === 'true';
         this.materialUtilizado = data.material_utilizado || data.materiais || '';
         this.statusAuditoria = data.status_auditoria || (data.auditoria_concluida === true ? 'Concluída' : 'Pendente');
@@ -152,8 +169,7 @@ class ChamadoModel {
         this.qtdEletricistas = parseInt(data.qtd_eletricistas, 10) || parseInt(data.qtd_eletricista, 10) || 1;
         this.historicoSessoes = data.historico_sessoes || data.historico_sessao || data.sessoes || data.historico || null;
         this.tempoTotalMinutos = data.tempo_total_minutos !== undefined && data.tempo_total_minutos !== null ? parseInt(data.tempo_total_minutos, 10) : null;
-        this.textoAuditoriaOCR = data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
-        this.fechamentosRaw = data.fechamentos_os || data.fechamentos || [];
+        this.textoAuditoriaOCR = (lastActiveFech ? cleanVal(lastActiveFech.texto_auditoria_ocr) : '') || data.texto_auditoria_ocr || (ptsFinal && ptsFinal[0]?.texto_auditoria_ocr) || '';
     }
 
     /**
@@ -2025,11 +2041,17 @@ class ChamadoModel {
 
         if (isConcluida) {
             const noPrazo = diffMs >= 0;
+            let label = 'No SLA';
+            if (!noPrazo) {
+                const horasAtraso = Math.abs(Math.round(diffHoras));
+                const diasAtraso = Math.floor(horasAtraso / 24);
+                label = diasAtraso > 0 ? `c/ ${diasAtraso}d atraso` : `c/ ${horasAtraso}h atraso`;
+            }
             return {
                 dataLimite,
                 horasRestantes: diffHoras,
                 statusSla: 'concluido',
-                label: noPrazo ? 'Concluída no SLA' : 'Concluída c/ Atraso',
+                label,
                 badgeClass: noPrazo ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'
             };
         }

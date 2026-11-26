@@ -44,7 +44,7 @@ class ChamadosRepository {
             'motivo_aprovacao', 'operador_finalizacao',
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
-            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'justificativa_status', 'tipo_os', 'pontos_inicial',
             'materiais', 'historico_sessoes', 'pontos_final', 'texto_auditoria_ocr', 'anexo_plaqueta_divergente'
         ].join(',');
     }
@@ -58,11 +58,7 @@ class ChamadosRepository {
             'quantidade', 'descricao', 'data_abertura', 'data_fechamento',
             'cpf_solicitante', 'municipe_nome', 'user_id', 'user_email', 'origem_login',
             'operador', 'status_auditoria', 'data_conclusao_auditoria',
-            'motivo_aprovacao', 'operador_finalizacao',
-            'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
-            'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
-            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
-            'materiais', 'historico_sessoes', 'pontos_final', 'texto_auditoria_ocr', 'anexo_plaqueta_divergente'
+            'motivo_aprovacao', 'justificativa_status', 'glosas', 'pontos_inicial'
         ].join(',');
     }
 
@@ -78,7 +74,7 @@ class ChamadosRepository {
             'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas', 'historico_sessoes',
-            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'anexo_plaqueta_divergente'
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'justificativa_status', 'tipo_os', 'anexo_plaqueta_divergente'
         ].join(',');
     }
 
@@ -834,7 +830,7 @@ class ChamadosRepository {
             const client = this.getClient();
             const updatePayload = {
                 status: newStatus,
-                ...(justification ? { observacao_final: justification } : {})
+                ...(justification ? { justificativa_status: justification } : {})
             };
 
             if (newStatus === 'Concluída' || newStatus === 'Concluida') {
@@ -1367,11 +1363,8 @@ class ChamadosRepository {
                 }
             }
 
-            // 2. Update primary OS table
-            const updatePayloadPrimary = {
-                materiais: matPayload,
-                material_utilizado: matStr
-            };
+            // 2. Para Praças Públicas, sincroniza historico_sessoes (sem gravar materiais redundantes em ordens_servico / pracas)
+            const updatePayloadPrimary = {};
 
             const isPraca = protStr.toUpperCase().startsWith('P');
             const tablesToTry = isPraca
@@ -1431,6 +1424,11 @@ class ChamadosRepository {
                                     console.warn('⚠️ [ChamadosRepository] Falha ao sincronizar historico_sessoes da praça:', eSess);
                                 }
                             }
+                        }
+
+                        if (Object.keys(currentPayload).length === 0) {
+                            updatedData = updatedData || [{ protocolo: protStr }];
+                            break;
                         }
 
                         let res = await client

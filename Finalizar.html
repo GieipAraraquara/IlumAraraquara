@@ -3926,16 +3926,27 @@
 
           var obsFinalTexto = document.getElementById('descricao').value.trim() || null;
           var hasAnyAnexoPlaquetaDiv = arrPontosPayload.some(p => p.anexo_plaqueta_divergente === true);
+          var dataFechamentoIso = new Date().toISOString();
 
           var payloadUpdate = {
             status: "Concluída",
-            data_fechamento: new Date().toISOString(),
-            operador_finalizacao: nomeOperadorFinalizacao,
-            materiais: carrinhoMateriais,
-            pontos_final: pontosFinalAcumulados,
-            status_auditoria: "Pendente",
+            data_fechamento: dataFechamentoIso,
+            status_auditoria: "Pendente"
+          };
+
+          var fechPayloadBase = {
+            protocolo: protFinal,
+            os_id: osAtual ? String(osAtual.id) : null,
+            numero_fechamento: proximoNum,
+            ponto_referencia: arrPontosPayload.length > 1 ? (arrPontosPayload.length + ' Pontos') : (firstPoint.plaqueta ? ('Plaqueta ' + firstPoint.plaqueta) : 'Ponto 1'),
+            operador: nomeOperadorFinalizacao,
+            data_fechamento: dataFechamentoIso,
+            relatorio_tecnico: obsFinalTexto,
+            observacoes: obsFinalTexto,
             texto_auditoria_ocr: ocrGeral,
-            anexo_plaqueta_divergente: hasAnyAnexoPlaquetaDiv
+            anexo_plaqueta_divergente: hasAnyAnexoPlaquetaDiv,
+            materiais: carrinhoMateriais,
+            fotos: arrPontosPayload
           };
 
           if (urlsComplementaresViaria.length > 0) {
@@ -3955,7 +3966,10 @@
           if (!navigator.onLine) {
             if (window.offlineSyncService) {
               var tipoFila = isDireto ? 'abertura_viaria' : 'viaria';
-              await window.offlineSyncService.savePendingSubmission(tipoFila, protFinal, payloadUpdate);
+              await window.offlineSyncService.savePendingSubmission(tipoFila, protFinal, {
+                ...payloadUpdate,
+                _fechamento: fechPayloadBase
+              });
             }
             btn.disabled = false;
             btnTexto.innerText = "Finalizar Ordem de Serviço";
@@ -4022,45 +4036,29 @@
             }
           }
 
-          // Registo complementar na tabela fechamentos_os (para histórico sem sobrescrita)
-          try {
-            var fechPayload = {
-              protocolo: protFinal,
-              os_id: osAtual ? String(osAtual.id) : null,
-              numero_fechamento: proximoNum,
-              ponto_referencia: arrPontosPayload.length > 1 ? (arrPontosPayload.length + ' Pontos') : (firstPoint.plaqueta ? ('Plaqueta ' + firstPoint.plaqueta) : 'Ponto 1'),
-              operador: nomeOperadorFinalizacao,
-              data_fechamento: new Date().toISOString(),
-              relatorio_tecnico: document.getElementById('descricao').value.trim() || null,
-              observacoes: document.getElementById('descricao').value.trim() || null,
-              texto_auditoria_ocr: ocrGeral,
-              anexo_plaqueta_divergente: hasAnyAnexoPlaquetaDiv,
-              materiais: carrinhoMateriais,
-              fotos: arrPontosPayload
-            };
+          // Gravação principal na tabela fechamentos_os (fonte única de encerramento)
+          var fechPayload = { ...fechPayloadBase };
+          let fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
 
-            let fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
-
-            while (fechInsertRes.error && fechInsertRes.error.message && fechInsertRes.error.message.includes("Could not find the")) {
-              const matchFech = fechInsertRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
-              if (matchFech && matchFech[1]) {
-                const colAusenteFech = matchFech[1];
-                console.warn(`⚠️ [Finalizar] Coluna '${colAusenteFech}' não existe na tabela 'fechamentos_os'. Removendo e tentando novamente...`);
-                delete fechPayload[colAusenteFech];
-                fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
-              } else {
-                break;
-              }
-            }
-
-            if (fechInsertRes.error) {
-              console.warn('⚠️ Erro ao inserir na tabela fechamentos_os:', fechInsertRes.error);
+          while (fechInsertRes.error && fechInsertRes.error.message && fechInsertRes.error.message.includes("Could not find the")) {
+            const matchFech = fechInsertRes.error.message.match(/Could not find the ['"]([^'"]+)['"] column/i);
+            if (matchFech && matchFech[1]) {
+              const colAusenteFech = matchFech[1];
+              console.warn(`⚠️ [Finalizar] Coluna '${colAusenteFech}' não existe na tabela 'fechamentos_os'. Removendo e tentando novamente...`);
+              delete fechPayload[colAusenteFech];
+              fechInsertRes = await client.from('fechamentos_os').insert([fechPayload]);
             } else {
-              console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
+              break;
             }
-          } catch(errFechInsert) {
-            console.warn('⚠️ Não foi possível salvar em fechamentos_os:', errFechInsert);
           }
+
+          if (fechInsertRes.error) {
+            btn.disabled = false;
+            btnTexto.innerText = "Finalizar Ordem de Serviço";
+            msg.innerHTML = '<span class="text-red-600 font-bold">Erro ao gravar fechamento em fechamentos_os: ' + fechInsertRes.error.message + '</span>';
+            return;
+          }
+          console.log('✅ Fechamento #' + proximoNum + ' gravado com sucesso na tabela fechamentos_os!');
 
           // Atualização e gravação do histórico de posição das plaquetas atendidas nesta OS
           try {
@@ -4272,10 +4270,16 @@
               var fallbackPayload = {
                 status: "Concluída",
                 data_fechamento: new Date().toISOString(),
-                materiais: carrinhoMateriais,
-                observacao_final: document.getElementById('descricao').value.trim() || null,
-                pontos: arrPontosPayload || [],
-                status_auditoria: "Pendente"
+                status_auditoria: "Pendente",
+                _fechamento: {
+                  protocolo: protFinal || prot,
+                  operador: typeof nomeOperadorFinalizacao !== 'undefined' ? nomeOperadorFinalizacao : 'Técnico',
+                  data_fechamento: new Date().toISOString(),
+                  relatorio_tecnico: document.getElementById('descricao').value.trim() || null,
+                  observacoes: document.getElementById('descricao').value.trim() || null,
+                  materiais: carrinhoMateriais || [],
+                  fotos: arrPontosPayload || []
+                }
               };
               await window.offlineSyncService.savePendingSubmission('viaria', prot, fallbackPayload);
               document.getElementById('msgSucessoTexto').innerHTML = "📱 Sinal instável. O protocolo <strong class='text-amber-600 font-bold'>" + prot + "</strong> foi <strong class='text-amber-600 font-bold'>salvo no dispositivo</strong> e será sincronizado assim que a conexão retornar!";
@@ -5174,32 +5178,52 @@
             todosMateriaisPraca = [...carrinhoMateriaisPraca];
           }
 
+          var dataFechPracaIso = statusFinal === "Concluída" ? new Date().toISOString() : null;
           var payload = {
             status: statusFinal,
-            materiais: todosMateriaisPraca,
             qtd_eletricistas: qtdElet,
             historico_sessoes: historicoSessoes,
             tempo_total_minutos: tempoTotalMinutos,
             status_auditoria: "Pendente"
           };
 
-          if (obsAdicionalModal) {
-            payload.observacao_final = obsAdicionalModal;
-          }
-
           if (fotoEntradaUrl) {
             payload.foto_entrada = fotoEntradaUrl;
           }
 
-          if (statusFinal === "Concluída") {
-            payload.data_fechamento = new Date().toISOString();
-            payload.operador_finalizacao = usuarioAtual;
+          if (dataFechPracaIso) {
+            payload.data_fechamento = dataFechPracaIso;
+          }
+
+          var fotosFechamentoPraca = [];
+          if (fotoEntradaUrl) {
+            fotosFechamentoPraca.push({ url: fotoEntradaUrl, titulo: 'Foto de Entrada/Conclusão Praça' });
+          }
+          if (urlsAndamento && urlsAndamento.length > 0) {
+            urlsAndamento.forEach(function(uAnd, uIdx) {
+              fotosFechamentoPraca.push({ url: uAnd, titulo: 'Foto do Andamento #' + (uIdx + 1) });
+            });
           }
 
           // Se estiver OFFLINE, salva atualização da praça localmente
           if (!navigator.onLine) {
             if (window.offlineSyncService) {
-              await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, payload);
+              var offlinePayloadPraca = { ...payload };
+              if (statusFinal === 'Concluída') {
+                offlinePayloadPraca._fechamento = {
+                  protocolo: dadosPracaAtual.protocolo,
+                  os_id: dadosPracaAtual.id ? String(dadosPracaAtual.id) : null,
+                  ponto_referencia: dadosPracaAtual.praca_nome || 'Praça Pública',
+                  operador: usuarioAtual,
+                  data_fechamento: dataFechPracaIso,
+                  relatorio_tecnico: obsAdicionalModal || 'Conclusão de Serviço em Praça Pública',
+                  observacoes: obsAdicionalModal || '',
+                  texto_auditoria_ocr: null,
+                  materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
+                  fotos: fotosFechamentoPraca
+                };
+              }
+              await window.offlineSyncService.savePendingSubmission('praca', dadosPracaAtual.protocolo, offlinePayloadPraca);
             }
             dadosPracaAtual.status = novoStatus;
             document.getElementById('badgeStatusPraca').innerText = novoStatus;
@@ -5238,43 +5262,33 @@
           document.getElementById('badgeStatusPraca').innerText = novoStatus;
 
           if (statusFinal === 'Concluída') {
-            try {
-              const { data: existFech } = await client
-                .from('fechamentos_os')
-                .select('numero_fechamento')
-                .eq('protocolo', dadosPracaAtual.protocolo);
+            const { data: existFech } = await client
+              .from('fechamentos_os')
+              .select('numero_fechamento')
+              .eq('protocolo', dadosPracaAtual.protocolo);
 
-              const proximoNum = (existFech && existFech.length > 0)
-                ? Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1
-                : 1;
+            const proximoNum = (existFech && existFech.length > 0)
+              ? Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1
+              : 1;
 
-              var fotosFechamento = [];
-              if (fotoEntradaUrl) {
-                fotosFechamento.push({ url: fotoEntradaUrl, titulo: 'Foto de Entrada/Conclusão Praça' });
-              }
-              if (urlsAndamento && urlsAndamento.length > 0) {
-                urlsAndamento.forEach(function(uAnd, uIdx) {
-                  fotosFechamento.push({ url: uAnd, titulo: 'Foto do Andamento #' + (uIdx + 1) });
-                });
-              }
-
-              await client.from('fechamentos_os').insert([{
-                protocolo: dadosPracaAtual.protocolo,
-                os_id: dadosPracaAtual.id ? String(dadosPracaAtual.id) : null,
-                numero_fechamento: proximoNum,
-                ponto_referencia: dadosPracaAtual.praca_nome || 'Praça Pública',
-                operador: usuarioAtual,
-                data_fechamento: new Date().toISOString(),
-                relatorio_tecnico: obsAdicionalModal || 'Conclusão de Serviço em Praça Pública',
-                observacoes: obsAdicionalModal || '',
-                texto_auditoria_ocr: null,
-                materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
-                fotos: fotosFechamento
-              }]);
-              console.log('✅ Fechamento Praça #' + proximoNum + ' gravado na tabela fechamentos_os!');
-            } catch(eFechPraca) {
-              console.warn('⚠️ Não foi possível salvar fechamento de praça em fechamentos_os:', eFechPraca);
+            const { error: errFechPraca } = await client.from('fechamentos_os').insert([{
+              protocolo: dadosPracaAtual.protocolo,
+              os_id: dadosPracaAtual.id ? String(dadosPracaAtual.id) : null,
+              numero_fechamento: proximoNum,
+              ponto_referencia: dadosPracaAtual.praca_nome || 'Praça Pública',
+              operador: usuarioAtual,
+              data_fechamento: dataFechPracaIso || new Date().toISOString(),
+              relatorio_tecnico: obsAdicionalModal || 'Conclusão de Serviço em Praça Pública',
+              observacoes: obsAdicionalModal || '',
+              texto_auditoria_ocr: null,
+              materiais: todosMateriaisPraca.length > 0 ? todosMateriaisPraca : carrinhoMateriaisPraca,
+              fotos: fotosFechamentoPraca
+            }]);
+            if (errFechPraca) {
+              msgPraca.innerHTML = '<span class="text-red-600 font-bold">Erro ao gravar fechamento em fechamentos_os: ' + errFechPraca.message + '</span>';
+              return;
             }
+            console.log('✅ Fechamento Praça #' + proximoNum + ' gravado na tabela fechamentos_os!');
           }
 
           var htmlSucesso = "";

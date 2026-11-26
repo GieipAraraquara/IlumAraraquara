@@ -4964,9 +4964,13 @@
             return s;
         };
 
-        // Prioridade absoluta: Operador que FINALIZOU / CONCLUIU a OS (operador_finalizacao / usuario_finalizacao)
+        const lastFechOp = (m?.fechamentosList && m.fechamentosList.length > 0)
+            ? m.fechamentosList[m.fechamentosList.length - 1]?.operador
+            : null;
+        // Prioridade absoluta: Operador que FINALIZOU / CONCLUIU a OS (fechamentos_os / operador_finalizacao)
         const finalizacaoCandidatos = [
             m?.operadorFinalizacao,
+            lastFechOp,
             m?.rawRow?.operador_finalizacao,
             m?.rawRow?.finalizado_por,
             m?.rawRow?.usuario_finalizacao,

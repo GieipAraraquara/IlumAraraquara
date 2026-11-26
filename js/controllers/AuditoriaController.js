@@ -2009,6 +2009,7 @@ class AuditoriaController {
 
                     const labelMap = {
                         'status': 'Status',
+                        'justificativa_status': 'Justificativa de Status',
                         'observacao_final': 'Justificativa / Motivo',
                         'prioridade': 'Prioridade',
                         'status_auditoria': 'Status da Auditoria',
@@ -2447,12 +2448,16 @@ class AuditoriaController {
         ${(() => {
             const obsIni = (item.observacaoInicial || (item.raw && (item.raw.observacao_inicial || item.raw.observacao || item.raw.observacoes)) || (!item.isDireto ? item.descricao : '') || '').trim();
             const obsFin = (item.observacaoFinal || (item.raw && (item.raw.observacao_final || item.raw.justificativa)) || '').trim();
+            const justStatus = (item.justificativaStatus || (item.raw && item.raw.justificativa_status) || '').trim();
 
-            if (!obsIni) return '';
+            if (!obsIni && !justStatus) return '';
 
-            let bodyObs = `<div>${obsIni.replace(/\n/g, '<br/>')}</div>`;
-            if (obsFin && obsFin !== obsIni && !item.isDireto) {
-                bodyObs += `<div class="mt-2 pt-2 border-t border-slate-200/60"><b class="text-slate-700 font-semibold">📝 Observação Complementar:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
+            let bodyObs = obsIni ? `<div>${obsIni.replace(/\n/g, '<br/>')}</div>` : '';
+            if (isPracaOS && obsFin && obsFin !== obsIni && !item.isDireto) {
+                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-slate-700 font-semibold">📝 Observação de Fechamento:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
+            }
+            if (justStatus && justStatus !== obsIni && justStatus !== obsFin) {
+                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-amber-800 font-semibold">⚖️ Justificativa de Status:</b> ${justStatus.replace(/\n/g, '<br/>')}</div>`;
             }
 
             return `

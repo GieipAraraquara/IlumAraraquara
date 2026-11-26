@@ -387,27 +387,6 @@
                     }
                 }
 
-                // Sincroniza também na tabela principal ordens_servico.pontos_final (mantendo a mesma estrutura, sem duplicar)
-                try {
-                    const { data: osRow } = await client
-                        .from('ordens_servico')
-                        .select('id, pontos_final')
-                        .eq('protocolo', protClean)
-                        .maybeSingle();
-
-                    if (osRow && osRow.id && Array.isArray(osRow.pontos_final)) {
-                        const novosPontosOS = editModels.flatMap(m => m.pontos || []);
-                        if (novosPontosOS.length > 0) {
-                            await client
-                                .from('ordens_servico')
-                                .update({ pontos_final: novosPontosOS })
-                                .eq('id', osRow.id);
-                        }
-                    }
-                } catch (eOsSync) {
-                    console.warn('⚠️ [corrigirPlaquetaOS] Erro ao sincronizar ordens_servico:', eOsSync);
-                }
-
                 if (checkReabrir.checked) {
                     await client
                         .from('historico_localizacao_plaquetas')

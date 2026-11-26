@@ -52,14 +52,14 @@ async function run() {
         const from = page * pageSize;
         const to = from + pageSize - 1;
         const { data, error } = await supabase
-            .from('ordens_servico')
-            .select('id, protocolo, pontos_final, texto_auditoria_ocr, anexo_plaqueta_divergente')
-            .not('data_fechamento', 'is', null)
+            .from('fechamentos_os')
+            .select('id, protocolo, fotos, texto_auditoria_ocr, anexo_plaqueta_divergente')
+            .eq('desconsiderado', false)
             .order('data_fechamento', { ascending: false })
             .range(from, to);
 
         if (error) {
-            console.error('❌ Erro ao buscar ordens_servico:', error);
+            console.error('❌ Erro ao buscar fechamentos_os:', error);
             process.exit(1);
         }
         if (!data || data.length === 0) break;
@@ -68,26 +68,26 @@ async function run() {
         page++;
     }
 
-    console.log(`📦 Total de OSs concluídas encontradas: ${todasOS.length}`);
+    console.log(`📦 Total de fechamentos ativos encontrados: ${todasOS.length}`);
 
-    const pendentes = todasOS.filter(os => {
-        if (!Array.isArray(os.pontos_final) || os.pontos_final.length === 0) return false;
-        const temFoto = os.pontos_final.some(p => extrairFotoPlaqueta(p) !== null);
+    const pendentes = todasOS.filter(fech => {
+        if (!Array.isArray(fech.fotos) || fech.fotos.length === 0) return false;
+        const temFoto = fech.fotos.some(p => extrairFotoPlaqueta(p) !== null);
         if (!temFoto) return false;
 
-        const ocr = os.texto_auditoria_ocr;
+        const ocr = fech.texto_auditoria_ocr;
         return !ocr || ocr === 'Nenhuma leitura realizada' || ocr === 'Leitura pendente';
     });
 
-    console.log(`🔍 OSs com foto de plaqueta pendentes de leitura IA: ${pendentes.length}\n`);
+    console.log(`🔍 Fechamentos com foto de plaqueta pendentes de leitura IA: ${pendentes.length}\n`);
 
     let processadas = 0;
     let sucessos = 0;
     let erros = 0;
 
-    for (const os of pendentes) {
+    for (const fech of pendentes) {
         processadas++;
-        let pontosAtualizados = [...os.pontos_final];
+        let pontosAtualizados = [...fech.fotos];
         let textosLidos = [];
         let algumaDivergencia = false;
         let houveAtualizacao = false;
@@ -99,7 +99,7 @@ async function run() {
 
             if (!fotoUrl) continue;
 
-            console.log(`[${processadas}/${pendentes.length}] OS ${os.protocolo} (Ponto ${i + 1}) | Plaqueta: ${plaquetaEsp || 'N/I'}...`);
+            console.log(`[${processadas}/${pendentes.length}] OS ${fech.protocolo} (Ponto ${i + 1}) | Plaqueta: ${plaquetaEsp || 'N/I'}...`);
             const resp = await analisarComHandler(fotoUrl, plaquetaEsp);
 
             if (resp.statusCode === 200 && resp.data?.sucesso && resp.data?.resultado) {
@@ -123,25 +123,16 @@ async function run() {
         if (houveAtualizacao) {
             const ocrGeral = textosLidos.join(' | ');
             const { error: upErr } = await supabase
-                .from('ordens_servico')
+                .from('fechamentos_os')
                 .update({
-                    pontos_final: pontosAtualizados,
+                    fotos: pontosAtualizados,
                     texto_auditoria_ocr: ocrGeral,
                     anexo_plaqueta_divergente: algumaDivergencia
                 })
-                .eq('id', os.id);
+                .eq('id', fech.id);
 
             if (upErr) {
-                console.error(`   ❌ Erro ao atualizar ordens_servico (ID ${os.id}):`, upErr.message);
-            } else {
-                // Atualiza também fechamentos_os se existir
-                await supabase
-                    .from('fechamentos_os')
-                    .update({
-                        texto_auditoria_ocr: ocrGeral,
-                        anexo_plaqueta_divergente: algumaDivergencia
-                    })
-                    .eq('protocolo', os.protocolo);
+                console.error(`   ❌ Erro ao atualizar fechamentos_os (ID ${fech.id}):`, upErr.message);
             }
         }
     }

@@ -403,7 +403,14 @@ class OfflineSyncService {
       }
 
       console.log(`🚀 [ProcessItem Supabase] Enviando update para ordens_servico...`, payload);
+      const fechExplicitViaria = payload._fechamento || null;
       let payloadAtualViaria = { ...payload };
+      delete payloadAtualViaria._fechamento;
+      delete payloadAtualViaria.operador_finalizacao;
+      delete payloadAtualViaria.materiais;
+      delete payloadAtualViaria.pontos_final;
+      delete payloadAtualViaria.texto_auditoria_ocr;
+      delete payloadAtualViaria.anexo_plaqueta_divergente;
       let updateRes = await supabaseClient.from('ordens_servico').update(payloadAtualViaria).eq('protocolo', item.protocolo);
 
       while (updateRes.error && updateRes.error.message && updateRes.error.message.includes("Could not find the")) {
@@ -426,6 +433,9 @@ class OfflineSyncService {
         console.log('📊 [ProcessItem Chamados Fallback Response]:', fallbackRes);
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
       }
+
+      // Sincroniza fechamento na tabela fechamentos_os (fonte única de encerramento)
+      await this._syncFechamentoOffline(supabaseClient, item.protocolo, payload, fechExplicitViaria);
 
       if (window.LogsRepository) {
         window.LogsRepository.registrarLog({
@@ -502,8 +512,13 @@ class OfflineSyncService {
         console.warn('⚠️ [OfflineSync Praça] Falha ao verificar integridade de sessões prévias:', errSyncCheck);
       }
 
+      const fechExplicitPraca = payload._fechamento || null;
       let payloadAtual = { ...payload };
       if (payloadAtual.evidencias) delete payloadAtual.evidencias;
+      delete payloadAtual._fechamento;
+      delete payloadAtual.materiais;
+      delete payloadAtual.observacao_final;
+      delete payloadAtual.operador_finalizacao;
 
       let updateRes = await supabaseClient.from('ordens_servico_pracas').update(payloadAtual).eq('protocolo', item.protocolo);
 
@@ -523,6 +538,10 @@ class OfflineSyncService {
 
       if (updateRes.error) return { success: false, error: updateRes.error.message };
 
+      if (fechExplicitPraca || payload.status === 'Concluída') {
+        await this._syncFechamentoOffline(supabaseClient, item.protocolo, payload, fechExplicitPraca);
+      }
+
       if (window.LogsRepository) {
         window.LogsRepository.registrarLog({
           protocolo: item.protocolo,
@@ -538,7 +557,14 @@ class OfflineSyncService {
 
     } else if (item.tipo === 'abertura_viaria') {
       console.log(`➕ [ProcessItem Abertura Viária] Cadastrando novo chamado ${item.protocolo} no Supabase...`);
+      const fechExplicitAbertura = payload._fechamento || null;
       let payloadAtualAbertura = { ...payload };
+      delete payloadAtualAbertura._fechamento;
+      delete payloadAtualAbertura.operador_finalizacao;
+      delete payloadAtualAbertura.materiais;
+      delete payloadAtualAbertura.pontos_final;
+      delete payloadAtualAbertura.texto_auditoria_ocr;
+      delete payloadAtualAbertura.anexo_plaqueta_divergente;
       let insertRes = await supabaseClient.from('ordens_servico').insert([payloadAtualAbertura]);
 
       while (insertRes.error && insertRes.error.message && insertRes.error.message.includes("Could not find the")) {
@@ -558,6 +584,10 @@ class OfflineSyncService {
         console.warn('⚠️ Falha ao inserir em ordens_servico, tentando tabela chamados...', insertRes.error);
         let fallbackRes = await supabaseClient.from('chamados').insert([payloadAtualAbertura]);
         if (fallbackRes.error) return { success: false, error: fallbackRes.error.message };
+      }
+
+      if (fechExplicitAbertura || payload.status === 'Concluída') {
+        await this._syncFechamentoOffline(supabaseClient, item.protocolo, payload, fechExplicitAbertura);
       }
 
       if (window.LogsRepository) {
@@ -671,6 +701,47 @@ class OfflineSyncService {
                             <span class="text-xs font-bold">${message || 'Sincronizando...'}</span>`;
     } else if (loaderEl) {
       loaderEl.remove();
+    }
+  }
+
+  async _syncFechamentoOffline(supabaseClient, protocolo, payloadOrig, fechExplicit) {
+    try {
+      const { data: existFech } = await supabaseClient
+        .from('fechamentos_os')
+        .select('numero_fechamento')
+        .eq('protocolo', protocolo);
+
+      const proximoNum = (existFech && existFech.length > 0)
+        ? Math.max(...existFech.map(f => parseInt(f.numero_fechamento, 10) || 0)) + 1
+        : 1;
+
+      const fotosArr = (fechExplicit && Array.isArray(fechExplicit.fotos))
+        ? fechExplicit.fotos
+        : (Array.isArray(payloadOrig.pontos_final) ? payloadOrig.pontos_final : (Array.isArray(payloadOrig.pontos) ? payloadOrig.pontos : []));
+
+      const fechRow = {
+        protocolo: protocolo,
+        os_id: (fechExplicit && fechExplicit.os_id) || null,
+        numero_fechamento: (fechExplicit && fechExplicit.numero_fechamento) || proximoNum,
+        ponto_referencia: (fechExplicit && fechExplicit.ponto_referencia) || (fotosArr[0]?.plaqueta ? `Plaqueta ${fotosArr[0].plaqueta}` : 'Geral'),
+        operador: (fechExplicit && fechExplicit.operador) || payloadOrig.operador_finalizacao || payloadOrig.operador || 'Técnico',
+        data_fechamento: (fechExplicit && fechExplicit.data_fechamento) || payloadOrig.data_fechamento || new Date().toISOString(),
+        relatorio_tecnico: (fechExplicit && fechExplicit.relatorio_tecnico) || payloadOrig.observacao_final || null,
+        observacoes: (fechExplicit && fechExplicit.observacoes) || payloadOrig.observacao_final || null,
+        texto_auditoria_ocr: (fechExplicit && fechExplicit.texto_auditoria_ocr) || payloadOrig.texto_auditoria_ocr || null,
+        anexo_plaqueta_divergente: Boolean((fechExplicit && fechExplicit.anexo_plaqueta_divergente) || payloadOrig.anexo_plaqueta_divergente),
+        materiais: (fechExplicit && fechExplicit.materiais) || payloadOrig.materiais || [],
+        fotos: fotosArr
+      };
+
+      let { error } = await supabaseClient.from('fechamentos_os').insert([fechRow]);
+      if (error) {
+        console.warn(`⚠️ [OfflineSync] Falha ao inserir em fechamentos_os para ${protocolo}:`, error);
+      } else {
+        console.log(`✅ [OfflineSync] Fechamento #${fechRow.numero_fechamento} de ${protocolo} gravado em fechamentos_os.`);
+      }
+    } catch (e) {
+      console.warn(`⚠️ [OfflineSync] Exceção ao sincronizar fechamentos_os para ${protocolo}:`, e);
     }
   }
 

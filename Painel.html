@@ -241,7 +241,7 @@
                             </th>
                             
                             <!-- Column 2: Data -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 120px; min-width: 120px;" data-col="1">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible text-center" style="width: 120px; min-width: 120px;" data-col="1">
                                 <div class="relative inline-block text-left group/date-filter">
                                     <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-date-filter-trigger">
                                         <span class="font-label-md uppercase tracking-wider">Data</span>
@@ -259,7 +259,7 @@
                             </th>
                             
                             <!-- Column 4: Problema -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 200px; min-width: 200px;" data-col="3">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible text-center" style="width: 200px; min-width: 200px;" data-col="3">
                                 <div class="relative inline-block text-left">
                                     <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="pendentes-problem-filter-trigger">
                                         <span class="font-label-md uppercase tracking-wider">Problema</span>
@@ -351,7 +351,7 @@
                             </th>
                             
                             <!-- Column 2 (Date Filter) -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 120px; min-width: 120px;" data-col="1">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible text-center" style="width: 120px; min-width: 120px;" data-col="1">
                                 <div class="relative inline-block text-left group/date-filter">
                                     <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="date-filter-trigger">
                                         <span class="font-label-md uppercase tracking-wider">Data</span>
@@ -406,7 +406,7 @@
                             </th>
                             
                             <!-- Column 4 (Problema Filter) -->
-                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 200px; min-width: 200px;" data-col="3">
+                            <th class="py-3 px-5 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible text-center" style="width: 200px; min-width: 200px;" data-col="3">
                                 <div class="relative inline-block text-left">
                                     <button class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary" id="problem-filter-trigger">
                                         <span class="font-label-md uppercase tracking-wider">Problema</span>
@@ -2574,6 +2574,12 @@
                     ptsMotivoRaw = osMotivo.pontosDetalhados;
                 } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontosDetalhados) && osMotivo.raw.pontosDetalhados.length > 0) {
                     ptsMotivoRaw = osMotivo.raw.pontosDetalhados;
+                } else if (Array.isArray(osMotivo.fechamentosList) && osMotivo.fechamentosList.length > 0) {
+                    const ptsFech = osMotivo.fechamentosList.flatMap(f => Array.isArray(f.fotos) ? f.fotos : []);
+                    if (ptsFech.length > 0) ptsMotivoRaw = ptsFech;
+                    else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontos_final) && osMotivo.raw.pontos_final.length > 0) {
+                        ptsMotivoRaw = osMotivo.raw.pontos_final;
+                    }
                 } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontos_final) && osMotivo.raw.pontos_final.length > 0) {
                     ptsMotivoRaw = osMotivo.raw.pontos_final;
                 } else if (osMotivo.raw && Array.isArray(osMotivo.raw.pontos_inicial) && osMotivo.raw.pontos_inicial.length > 0) {
