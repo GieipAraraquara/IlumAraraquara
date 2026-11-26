@@ -7,9 +7,17 @@
     class SmartSearchBar {
         constructor(options = {}) {
             this.inputId = options.inputId || 'search-input';
+            this.context = options.context || 'painel';
             this.onChange = typeof options.onChange === 'function' ? options.onChange : null;
-            this.getItems = typeof options.getItems === 'function' ? options.getItems : (() => (window.painelController ? window.painelController.chamadosList : []));
-            this.isManutentor = typeof options.isManutentor === 'function' ? options.isManutentor : (() => Boolean(window.isManutentorView));
+            this.getItems = typeof options.getItems === 'function' ? options.getItems : (() => (
+                window.painelController
+                    ? window.painelController.chamadosList
+                    : (window.auditoriaController ? window.auditoriaController.chamadosList : [])
+            ));
+            this.isManutentor = typeof options.isManutentor === 'function' ? options.isManutentor : (() => (
+                Boolean(window.isManutentorView) ||
+                Boolean(window.auditoriaController && typeof window.auditoriaController.isManutentorUser === 'function' && window.auditoriaController.isManutentorUser())
+            ));
 
             this.state = {
                 activeMode: 'auto',
@@ -402,6 +410,8 @@
                 this.onChange(snapshot);
             } else if (window.painelController && typeof window.painelController.setSmartSearchState === 'function') {
                 window.painelController.setSmartSearchState(snapshot);
+            } else if (window.auditoriaController && typeof window.auditoriaController.setSmartSearchState === 'function') {
+                window.auditoriaController.setSmartSearchState(snapshot);
             }
         }
 
@@ -503,7 +513,9 @@
             const suggestions = this.engine.buildSuggestions(items, this.state.liveText, this.state.activeMode, this.state.chips, isManutentor);
             this.currentSuggestions = suggestions;
 
-            const modesOrder = ['auto', 'protocolo', 'endereco', 'problema', 'data', 'status', 'tecnico', 'plaqueta'];
+            const modesOrder = this.context === 'auditoria'
+                ? ['auto', 'protocolo', 'endereco', 'problema', 'data', 'material', 'tecnico', 'plaqueta', 'status']
+                : ['auto', 'protocolo', 'endereco', 'problema', 'data', 'status', 'tecnico', 'plaqueta'];
             const modePillsHtml = modesOrder.map(mId => {
                 const m = this.engine.MODES[mId];
                 const isActive = this.state.activeMode === mId;
@@ -529,13 +541,20 @@
             // Presets + Recent History when query is empty
             let presetsAndHistoryHtml = '';
             if (!this.state.liveText.trim()) {
-                const presets = [
+                const presets = this.context === 'auditoria' ? [
+                    { text: 'concluidas hoje', label: 'Concluídas hoje', icon: 'task_alt', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' },
+                    { text: 'reincidencia', label: 'Reincidência 30d', icon: 'history', cls: 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100' },
+                    { text: 'distancia', label: 'Distância > 100m', icon: 'straighten', cls: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100' },
+                    { text: 'plaqueta divergente', label: 'Plaqueta Divergente', icon: 'qr_code_2', cls: 'bg-violet-50 text-violet-800 border-violet-200 hover:bg-violet-100' },
+                    { text: 'material divergente', label: 'Material Divergente', icon: 'inventory_2', cls: 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100' },
+                    { text: 'emergencial', label: 'Emergenciais', icon: 'electric_bolt', cls: 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100' }
+                ] : [
                     { text: 'concluidas hoje', label: 'Concluídas hoje', icon: 'task_alt', cls: 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' },
                     { text: 'atrasada', label: 'SLA Atrasado', icon: 'warning', cls: 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100' },
                     { text: 'vencendo', label: 'Vencendo SLA', icon: 'timer', cls: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' },
                     { text: 'emergencial', label: 'Emergenciais', icon: 'electric_bolt', cls: 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100' }
                 ];
-                if (!isManutentor) {
+                if (this.context !== 'auditoria' && !isManutentor) {
                     presets.push({ text: 'duplicata', label: 'Duplicatas', icon: 'content_copy', cls: 'bg-purple-50 text-purple-800 border-purple-200 hover:bg-purple-100' });
                     presets.push({ text: 'reparo recente', label: 'Reincidência', icon: 'history', cls: 'bg-indigo-50 text-indigo-800 border-indigo-200 hover:bg-indigo-100' });
                 }
@@ -623,7 +642,7 @@
                     <div class="pb-2">
                         <div class="flex items-center justify-between mb-1.5 px-1">
                             <span class="text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Modo de Busca (Gatilhos)</span>
-                            <span class="text-[10px] text-on-surface-variant">Use <code class="font-mono bg-surface-container-high px-1 rounded">p:</code> <code class="font-mono bg-surface-container-high px-1 rounded">e:</code> <code class="font-mono bg-surface-container-high px-1 rounded">prob:</code> <code class="font-mono bg-surface-container-high px-1 rounded">d:</code> <code class="font-mono bg-surface-container-high px-1 rounded">s:</code> <code class="font-mono bg-surface-container-high px-1 rounded">tec:</code></span>
+                            <span class="text-[10px] text-on-surface-variant">Use <code class="font-mono bg-surface-container-high px-1 rounded">p:</code> <code class="font-mono bg-surface-container-high px-1 rounded">e:</code> <code class="font-mono bg-surface-container-high px-1 rounded">prob:</code> <code class="font-mono bg-surface-container-high px-1 rounded">d:</code> ${this.context === 'auditoria' ? '<code class="font-mono bg-surface-container-high px-1 rounded">mat:</code> ' : '<code class="font-mono bg-surface-container-high px-1 rounded">s:</code> '}<code class="font-mono bg-surface-container-high px-1 rounded">tec:</code></span>
                         </div>
                         <div class="flex flex-wrap gap-1.5">
                             ${modePillsHtml}
@@ -761,6 +780,10 @@
                             <button type="button" data-help-prefix="tecnico" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-orange-50/70 hover:bg-orange-100 border border-orange-200 text-orange-900 cursor-pointer transition-colors">
                                 <code class="font-mono font-bold">tec:</code>
                                 <span class="text-[11px] truncate">Técnico</span>
+                            </button>
+                            <button type="button" data-help-prefix="material" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-cyan-50/70 hover:bg-cyan-100 border border-cyan-200 text-cyan-900 cursor-pointer transition-colors">
+                                <code class="font-mono font-bold">mat:</code>
+                                <span class="text-[11px] truncate">Material</span>
                             </button>
                             <button type="button" data-help-prefix="plaqueta" class="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-violet-50/70 hover:bg-violet-100 border border-violet-200 text-violet-900 cursor-pointer transition-colors">
                                 <code class="font-mono font-bold">pl:</code>

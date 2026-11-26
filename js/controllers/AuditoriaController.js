@@ -17,6 +17,271 @@ class AuditoriaController {
             isLoading: false,
             items: []
         };
+
+        this.smartSearchState = {
+            activeMode: 'auto',
+            liveText: '',
+            chips: [],
+            includeAllStatuses: true
+        };
+        this._lastRemoteSmartKey = '';
+        this._remoteSmartTimer = null;
+        this._itemsByIdMap = new Map();
+    }
+
+    isSmartSearchActive() {
+        if (!window.SmartSearchEngine) return false;
+        const st = this.smartSearchState || {};
+        return Boolean((st.chips && st.chips.length > 0) || (st.liveText && st.liveText.trim().length > 0));
+    }
+
+    rebuildItemsIndex() {
+        const map = new Map();
+        const addList = (arr) => {
+            if (!Array.isArray(arr)) return;
+            arr.forEach(item => {
+                if (!item) return;
+                const p = String(item.protocolo || '').trim().toUpperCase();
+                const id = String(item.id || '').trim().toUpperCase();
+                if (p && !map.has(p)) map.set(p, item);
+                if (id && !map.has(id)) map.set(id, item);
+            });
+        };
+        addList(this.completedPagination && this.completedPagination.items);
+        addList(this.auditDivergentList);
+        addList(this.pracaServicesList);
+        addList(this.emergenciaServicesList);
+        addList(this.concludedList);
+        addList(this.chamadosList);
+        this._itemsByIdMap = map;
+    }
+
+    setSmartSearchState(smartState) {
+        this.smartSearchState = smartState || {
+            activeMode: 'auto',
+            liveText: '',
+            chips: [],
+            includeAllStatuses: true
+        };
+        this.rebuildItemsIndex();
+
+        if (typeof window.applyCombinedFilters === 'function') window.applyCombinedFilters();
+        if (typeof window.applyPracaServicesFilters === 'function') window.applyPracaServicesFilters();
+        if (typeof window.applyEmergenciaServicesFilters === 'function') window.applyEmergenciaServicesFilters();
+
+        if (window.SmartSearchEngine && typeof window.SmartSearchEngine.toRemoteFilters === 'function') {
+            const remote = window.SmartSearchEngine.toRemoteFilters(this.smartSearchState);
+            const remoteKey = JSON.stringify({
+                protocolo: remote.protocolo,
+                protocolPrefix: remote.protocolPrefix,
+                plaqueta: remote.plaqueta,
+                material: remote.material,
+                problema: remote.problema,
+                dataInicio: remote.dataInicio,
+                dataFim: remote.dataFim
+            });
+            if (remoteKey !== this._lastRemoteSmartKey) {
+                this._lastRemoteSmartKey = remoteKey;
+                clearTimeout(this._remoteSmartTimer);
+                this._remoteSmartTimer = setTimeout(() => {
+                    this.loadCompletedTablePaged(1);
+                }, 420);
+            } else {
+                this.applySmartFilterOnCompletedTable();
+            }
+        } else {
+            this.applySmartFilterOnCompletedTable();
+        }
+
+        this.updateAuditoriaSmartSummary();
+    }
+
+    clearRowHighlight(row) {
+        if (!row) return;
+        const marks = row.querySelectorAll('mark.smart-search-mark');
+        marks.forEach(m => {
+            const parent = m.parentNode;
+            if (!parent) return;
+            parent.replaceChild(document.createTextNode(m.textContent || ''), m);
+            parent.normalize();
+        });
+    }
+
+    highlightRowElement(row, hlTerms) {
+        this.clearRowHighlight(row);
+        const engine = window.SmartSearchEngine;
+        if (!row || !engine || !hlTerms) return;
+
+        const allTerms = Array.from(new Set(
+            Object.values(hlTerms)
+                .flat()
+                .map(t => engine.cleanStr(t))
+                .filter(t => t && t.length >= 2)
+        ));
+        if (allTerms.length === 0) return;
+
+        const tds = row.querySelectorAll('td:not(.col-audit):not(.td-checkbox-rota)');
+        tds.forEach(td => {
+            const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT, {
+                acceptNode(node) {
+                    if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                    const p = node.parentElement;
+                    if (!p) return NodeFilter.FILTER_REJECT;
+                    if (p.closest('select, option, script, style, .audit-badge, mark')) return NodeFilter.FILTER_REJECT;
+                    return NodeFilter.FILTER_ACCEPT;
+                }
+            });
+            const textNodes = [];
+            let n;
+            while ((n = walker.nextNode())) textNodes.push(n);
+
+            textNodes.forEach(tNode => {
+                const raw = tNode.nodeValue;
+                const html = engine.highlightText(raw, allTerms);
+                if (html !== engine.escapeHtml(raw)) {
+                    const span = document.createElement('span');
+                    span.innerHTML = html;
+                    const frag = document.createDocumentFragment();
+                    while (span.firstChild) frag.appendChild(span.firstChild);
+                    tNode.parentNode.replaceChild(frag, tNode);
+                }
+            });
+        });
+    }
+
+    matchesSmartSearchRow(row) {
+        if (!this.isSmartSearchActive()) {
+            this.clearRowHighlight(row);
+            return true;
+        }
+
+        const engine = window.SmartSearchEngine;
+        const rowId = (row.getAttribute('data-id') || row.getAttribute('data-protocolo') || '').trim().toUpperCase();
+        const item = rowId ? this._itemsByIdMap.get(rowId) : null;
+
+        if (item) {
+            const res = engine.matchItem(item, this.smartSearchState);
+            if (res.matched) {
+                this.highlightRowElement(row, res.highlightTermsByField);
+                return true;
+            }
+            this.clearRowHighlight(row);
+            return false;
+        }
+
+        // Fallback if item is not in index map
+        const txt = engine.cleanStr(row.textContent || '');
+        const live = engine.cleanStr(this.smartSearchState.liveText || '');
+        const chipOk = (this.smartSearchState.chips || []).every(c => txt.includes(engine.cleanStr(c.value)));
+        const liveOk = !live || live.split(/\s+/).every(t => txt.includes(t));
+        const matched = chipOk && liveOk;
+        if (!matched) this.clearRowHighlight(row);
+        return matched;
+    }
+
+    applySmartFilterOnCompletedTable() {
+        const rows = document.querySelectorAll('#completed-services-table tbody tr:not(#no-completed-results)');
+        let visibleCount = 0;
+        const smartActive = this.isSmartSearchActive();
+
+        rows.forEach(row => {
+            if (row.querySelector('.animate-spin')) return;
+            const show = smartActive ? this.matchesSmartSearchRow(row) : (this.clearRowHighlight(row), true);
+            row.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+
+        const noRow = document.getElementById('no-completed-results');
+        if (noRow && rows.length > 0) {
+            noRow.classList.toggle('hidden', visibleCount > 0);
+        }
+        return visibleCount;
+    }
+
+    updateAuditoriaSmartSummary() {
+        const summaryEl = document.getElementById('auditoria-smart-summary');
+        if (!summaryEl) return;
+
+        if (!this.isSmartSearchActive()) {
+            summaryEl.classList.add('hidden');
+            summaryEl.innerHTML = '';
+            return;
+        }
+
+        const engine = window.SmartSearchEngine;
+        const smart = this.smartSearchState || {};
+        const badgesHtml = [];
+
+        (smart.chips || []).forEach(c => {
+            const m = engine.MODES[c.mode] || engine.MODES.auto;
+            const prefixLabel = c.mode === 'auto' ? 'Filtro' : m.shortLabel;
+            badgesHtml.push(`
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${m.chipClass}">
+                    <span class="material-symbols-outlined text-[13px]">${m.icon}</span>
+                    <span class="opacity-75">${prefixLabel}:</span>
+                    <span class="font-bold">${engine.escapeHtml(c.label)}</span>
+                    <button type="button" onclick="window.smartSearchBar?.removeChip('${c.id}')" class="ml-0.5 hover:bg-black/10 rounded cursor-pointer flex items-center" title="Remover filtro">
+                        <span class="material-symbols-outlined text-[13px]">close</span>
+                    </button>
+                </span>
+            `);
+        });
+
+        if (smart.liveText && smart.liveText.trim()) {
+            const intent = engine.detectQueryIntent(smart.liveText, smart.activeMode);
+            const modeTitle = intent.detectedMode && engine.MODES[intent.detectedMode]
+                ? engine.MODES[intent.detectedMode].shortLabel
+                : 'Auto';
+            badgesHtml.push(`
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${intent.pillClass}">
+                    <span class="material-symbols-outlined text-[13px]">${intent.icon}</span>
+                    <span>${engine.escapeHtml(modeTitle)}:</span>
+                    <span class="font-bold">"${engine.escapeHtml(smart.liveText.trim())}"</span>
+                </span>
+            `);
+        }
+
+        const countVisible = (sel, excludeSel) => {
+            const rows = document.querySelectorAll(`${sel} tbody tr:not(${excludeSel})`);
+            let c = 0;
+            rows.forEach(r => {
+                if (r.style.display !== 'none' && !r.querySelector('.animate-spin')) c++;
+            });
+            return c;
+        };
+
+        const cDiv = countVisible('#os-table', '#no-audit-results');
+        const cPraca = countVisible('#praca-services-table', '#no-praca-results');
+        const cCompPage = countVisible('#completed-services-table', '#no-completed-results');
+        const cCompTotal = (this.completedPagination && typeof this.completedPagination.total === 'number')
+            ? this.completedPagination.total
+            : cCompPage;
+        const cEmg = countVisible('#emergencia-services-table', '#no-emergencia-results');
+
+        const remote = typeof engine.toRemoteFilters === 'function' ? engine.toRemoteFilters(smart) : { hasClientOnlyCriteria: false };
+        const compLabel = remote.hasClientOnlyCriteria
+            ? `Concluídos: ${cCompPage} (pág.)`
+            : `Concluídos: ${cCompTotal.toLocaleString('pt-BR')}`;
+
+        summaryEl.classList.remove('hidden');
+        summaryEl.innerHTML = `
+            <div class="flex flex-wrap items-center justify-between gap-2.5">
+                <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span class="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-secondary shrink-0">
+                        <span class="material-symbols-outlined text-[15px]">filter_alt</span>
+                        <span>Filtrando nas 4 tabelas:</span>
+                    </span>
+                    ${badgesHtml.join('')}
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                    <button type="button" onclick="document.getElementById('os-table')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${cDiv > 0 ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100' : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50'}">Divergências: ${cDiv}</button>
+                    <button type="button" onclick="document.getElementById('praca-services-table')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${cPraca > 0 ? 'bg-sky-50 text-sky-800 border-sky-200 hover:bg-sky-100' : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50'}">Praças: ${cPraca}</button>
+                    <button type="button" onclick="document.getElementById('completed-services-table')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${cCompPage > 0 ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50'}">${compLabel}</button>
+                    <button type="button" onclick="document.getElementById('emergencia-services-table')?.scrollIntoView({behavior:'smooth', block:'nearest'})" class="px-2 py-0.5 rounded-full text-[11px] font-bold border cursor-pointer transition-colors ${cEmg > 0 ? 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' : 'bg-surface-container-high text-on-surface-variant border-outline-variant/50'}">Emergenciais: ${cEmg}</button>
+                    <button type="button" onclick="window.smartSearchBar?.clear()" class="ml-1 text-[11px] font-semibold text-error hover:underline cursor-pointer">Limpar busca</button>
+                </div>
+            </div>
+        `;
     }
 
     isManutentorUser() {
@@ -231,13 +496,17 @@ class AuditoriaController {
      * Binds general event listeners for search and refresh
      */
     bindEvents() {
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
-                }
-            });
+        if (window.smartSearchBar && typeof window.smartSearchBar.getState === 'function') {
+            this.smartSearchState = window.smartSearchBar.getState();
+        } else {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    if (typeof window.applyCombinedFilters === 'function') {
+                        window.applyCombinedFilters();
+                    }
+                });
+            }
         }
 
         // Event delegation for table row clicks
@@ -322,6 +591,7 @@ class AuditoriaController {
             console.log(`✅ [AuditoriaController] ${this.concludedList.length} OSs concluídas encontradas. (${this.pracaServicesList.length} Praças, ${this.emergenciaServicesList.length} Emergenciais, ${this.viariaConcludedList.length} Viárias Concluídas, ${this.auditDivergentList.length} com divergências 'S')`);
 
             this.updateKPIs(this.concludedList);
+            this.rebuildItemsIndex();
             this.renderOSTable(this.auditDivergentList);
             this.renderPracaTable(this.pracaServicesList);
             this.renderCompletedTable(this.viariaConcludedList);
@@ -334,9 +604,13 @@ class AuditoriaController {
             if (typeof window.applyPracaServicesFilters === 'function') {
                 window.applyPracaServicesFilters();
             }
+            if (typeof window.applyEmergenciaServicesFilters === 'function') {
+                window.applyEmergenciaServicesFilters();
+            }
             if (typeof window.applyCompletedServicesFilters === 'function') {
                 window.applyCompletedServicesFilters();
             }
+            this.updateAuditoriaSmartSummary();
         } catch (err) {
             console.error('❌ [AuditoriaController] Erro ao carregar dados de auditoria:', err);
         }
@@ -1014,14 +1288,19 @@ class AuditoriaController {
         this.renderCompletedTableLoading();
 
         try {
-            // Obter valores atuais dos filtros da interface
-            const protocolo = (window.compProtocolSearchQuery || '').trim();
-            const protocolPrefix = window.compProtocolPrefix || '';
-            const plaqueta = (window.compPlaquetaSearchQuery || '').trim();
-            const material = (window.compMaterialSearchQuery || '').trim();
-            const problema = (window.compActiveProblemFilter && window.compActiveProblemFilter.length === 1 && window.compActiveProblemFilter[0] !== 'all')
+            const remoteSmart = (this.isSmartSearchActive() && window.SmartSearchEngine && typeof window.SmartSearchEngine.toRemoteFilters === 'function')
+                ? window.SmartSearchEngine.toRemoteFilters(this.smartSearchState)
+                : { protocolo: '', protocolPrefix: '', plaqueta: '', material: '', problema: '', dataInicio: null, dataFim: null };
+
+            // Obter valores atuais dos filtros da interface (mesclando filtros de coluna com a Smart Search Bar)
+            const protocolo = (window.compProtocolSearchQuery || '').trim() || remoteSmart.protocolo || '';
+            const protocolPrefix = window.compProtocolPrefix || remoteSmart.protocolPrefix || '';
+            const plaqueta = (window.compPlaquetaSearchQuery || '').trim() || remoteSmart.plaqueta || '';
+            const material = (window.compMaterialSearchQuery || '').trim() || remoteSmart.material || '';
+            const colProblema = (window.compActiveProblemFilter && window.compActiveProblemFilter.length === 1 && window.compActiveProblemFilter[0] !== 'all')
                 ? window.compActiveProblemFilter[0]
                 : '';
+            const problema = colProblema || remoteSmart.problema || '';
 
             // Filtros de Data
             let dataInicio = null;
@@ -1032,6 +1311,10 @@ class AuditoriaController {
                     dataInicio = range.startIso;
                     dataFim = range.endIso;
                 }
+            }
+            if (!dataInicio && !dataFim && (remoteSmart.dataInicio || remoteSmart.dataFim)) {
+                dataInicio = remoteSmart.dataInicio;
+                dataFim = remoteSmart.dataFim;
             }
 
             const res = await this.service.getCompletedViariaChamadosPaged({
@@ -1051,9 +1334,12 @@ class AuditoriaController {
             this.completedPagination.totalPages = res.totalPages || 1;
             this.completedPagination.page = res.page || page;
 
+            this.rebuildItemsIndex();
             // Renderiza tabela com os dados recebidos
             this.renderCompletedTable(this.completedPagination.items, false);
             this.renderCompletedPaginationControls();
+            this.applySmartFilterOnCompletedTable();
+            this.updateAuditoriaSmartSummary();
         } catch (err) {
             console.error('❌ [AuditoriaController] Erro ao carregar página de serviços concluídos:', err);
             this.renderCompletedTable([], false);

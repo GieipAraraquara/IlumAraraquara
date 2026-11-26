@@ -4,6 +4,7 @@ class AppHeader extends HTMLElement {
         const searchId = this.getAttribute('search-id') || 'search-input';
         const oninputAttr = this.getAttribute('oninput') ? `oninput="${this.getAttribute('oninput')}"` : '';
         const debounceMs = parseInt(this.getAttribute('debounce') || '350', 10);
+        const searchContext = this.getAttribute('search-context') || 'painel';
         const isSmartSearch = this.getAttribute('smart-search') === 'true' && typeof window.SmartSearchBar === 'function' && typeof window.SmartSearchEngine === 'object';
 
         const searchBarHtml = isSmartSearch ? `
@@ -16,7 +17,7 @@ class AppHeader extends HTMLElement {
                     <span class="material-symbols-outlined text-[13px] opacity-60">expand_more</span>
                 </button>
                 <div id="smart-chips-container" class="hidden flex items-center flex-wrap gap-1"></div>
-                <input class="flex-1 min-w-[140px] py-0.5 bg-transparent font-body-md text-xs sm:text-sm text-on-surface placeholder:text-on-surface-variant/70 focus:outline-none" id="${searchId}" placeholder="${placeholder}" type="text" autocomplete="off" ${oninputAttr}/>
+                <input class="flex-1 min-w-[140px] py-0.5 bg-transparent border-0 outline-none focus:outline-none focus:ring-0 focus:border-0 font-body-md text-xs sm:text-sm text-on-surface placeholder:text-on-surface-variant/70" id="${searchId}" placeholder="${placeholder}" type="text" autocomplete="off" ${oninputAttr}/>
                 <span id="smart-kbd-hint" class="hidden sm:inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono font-semibold text-on-surface-variant/70 bg-surface-container-low border border-outline-variant/60 rounded shrink-0 select-none">Ctrl+K</span>
                 <button type="button" id="smart-clear-btn" class="hidden p-0.5 rounded-full text-on-surface-variant hover:text-error hover:bg-error-container/50 transition-colors cursor-pointer shrink-0 flex items-center justify-center" title="Limpar busca">
                     <span class="material-symbols-outlined text-[16px]">close</span>
@@ -76,7 +77,7 @@ class AppHeader extends HTMLElement {
 </header>`;
 
         if (isSmartSearch) {
-            window.smartSearchBar = new window.SmartSearchBar({ inputId: searchId });
+            window.smartSearchBar = new window.SmartSearchBar({ inputId: searchId, context: searchContext });
         } else {
             const inputEl = this.querySelector(`#${searchId}`);
             if (inputEl && debounceMs > 0) {

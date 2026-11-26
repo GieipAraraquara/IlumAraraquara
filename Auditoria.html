@@ -19,14 +19,16 @@
     <script src="js/domain/ChamadoModel.js?v=60"></script>
     <script src="js/repositories/ChamadosRepository.js?v=40"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=33"></script>
+    <script src="js/services/ChamadosService.js?v=36"></script>
     <script src="js/services/MapService.js?v=76"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/MedicaoService.js?v=2"></script>
-    <script src="js/controllers/AuditoriaController.js?v=78"></script>
+    <script src="js/utils/SmartSearchEngine.js?v=3"></script>
+    <script src="js/components/SmartSearchBar.js?v=3"></script>
+    <script src="js/controllers/AuditoriaController.js?v=79"></script>
     <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js"></script>
-    <script src="header.js"></script>
+    <script src="header.js?v=3"></script>
     
     <!-- Mapbox GL JS -->
     <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.css" rel="stylesheet" />
@@ -314,7 +316,7 @@
 
 <app-sidebar active="auditoria"></app-sidebar>
 
-<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+<app-header placeholder="Buscar por protocolo, plaqueta, endereço, material, data ou divergência..." search-id="search-input" smart-search="true" search-context="auditoria"></app-header>
 
 <main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
     
@@ -332,6 +334,9 @@
         <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:400ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Em Conformidade</div><div class="font-headline-lg text-headline-lg text-[#059669] overflow-visible" id="kpi-em-conformidade"><div class="h-8 w-20 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">check_circle</span><span class="font-label-sm text-label-sm">Total sem falhas</span></div></div>
         <div class="col-span-12 md:col-span-6 lg:col-span-3 bg-surface-container-lowest/90 backdrop-blur-sm rounded-lg border border-outline-variant p-5 shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] hover:shadow-md transition-all duration-300 hover:-translate-y-1 opacity-0 animate-fade-in-up [animation-delay:500ms]"><div class="font-label-md text-label-md text-on-surface-variant mb-1 uppercase tracking-wider">Taxa de Conformidade</div><div class="font-headline-lg text-headline-lg text-secondary overflow-visible" id="kpi-taxa-conformidade"><div class="h-8 w-24 bg-surface-container-high animate-pulse rounded my-1"></div></div><div class="flex items-center gap-1 mt-2 text-[#059669]"><span class="material-symbols-outlined text-[16px]">trending_up</span><span class="font-label-sm text-label-sm">+1.2% vs mês anterior</span></div></div>
     </div>
+
+    <!-- Faixa Unificada da Busca Inteligente nas 4 Tabelas -->
+    <div id="auditoria-smart-summary" class="hidden max-w-max-width-content mx-auto mb-card-gap px-4 py-3 rounded-lg border border-secondary/30 bg-surface-container-lowest shadow-xs"></div>
 
     <div class="grid grid-cols-12 gap-card-gap max-w-max-width-content mx-auto opacity-0 animate-fade-in-up [animation-delay:600ms]">
         <div class="col-span-12 bg-surface-container-lowest rounded-lg border border-outline-variant shadow-[0_1px_3px_0_rgba(0,0,0,0.1)] transition-shadow duration-300 hover:shadow-md overflow-visible relative z-30">
@@ -3423,9 +3428,15 @@
                     }
                 }
 
-                // 4. Global Text Search Filter
-                if (showRow && !matchRowGlobalText(row, searchQuery)) {
-                    showRow = false;
+                // 4. Global Smart Search Filter
+                if (showRow) {
+                    if (window.auditoriaController && typeof window.auditoriaController.matchesSmartSearchRow === 'function') {
+                        if (!window.auditoriaController.matchesSmartSearchRow(row)) {
+                            showRow = false;
+                        }
+                    } else if (!matchRowGlobalText(row, searchQuery)) {
+                        showRow = false;
+                    }
                 }
 
                 row.style.display = showRow ? '' : 'none';
@@ -3442,6 +3453,9 @@
             if (dateIndicator) dateIndicator.classList.toggle('hidden', !activeDatePredicate);
             if (protocolIndicator) protocolIndicator.classList.toggle('hidden', protocolSearchQuery.trim() === '' && !activeProtocolPrefix);
             if (actionIndicator) actionIndicator.classList.toggle('hidden', !activeActionFilter || activeActionFilter.includes('all') || activeActionFilter.length === 0);
+            if (window.auditoriaController && typeof window.auditoriaController.updateAuditoriaSmartSummary === 'function') {
+                window.auditoriaController.updateAuditoriaSmartSummary();
+            }
         }
 
         // Praca Services Filter Function
@@ -3528,6 +3542,13 @@
                     }
                 }
 
+                // Global Smart Search Filter
+                if (showRow && window.auditoriaController && typeof window.auditoriaController.matchesSmartSearchRow === 'function') {
+                    if (!window.auditoriaController.matchesSmartSearchRow(row)) {
+                        showRow = false;
+                    }
+                }
+
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visibleCount++;
             });
@@ -3547,6 +3568,9 @@
             if (pracaPlaquetaIndicator) pracaPlaquetaIndicator.classList.toggle('hidden', pracaPlaquetaSearchQuery.trim() === '');
             if (pracaStatusIndicator) pracaStatusIndicator.classList.toggle('hidden', !pracaActiveStatusFilter || pracaActiveStatusFilter.includes('all') || pracaActiveStatusFilter.length === 0);
             if (pracaProblemIndicator) pracaProblemIndicator.classList.toggle('hidden', !pracaActiveProblemFilter || pracaActiveProblemFilter.includes('all') || pracaActiveProblemFilter.length === 0);
+            if (window.auditoriaController && typeof window.auditoriaController.updateAuditoriaSmartSummary === 'function') {
+                window.auditoriaController.updateAuditoriaSmartSummary();
+            }
         }
 
         // Search Input Handlers for Praca Services
@@ -4049,6 +4073,13 @@
                     }
                 }
 
+                // Global Smart Search Filter
+                if (showRow && window.auditoriaController && typeof window.auditoriaController.matchesSmartSearchRow === 'function') {
+                    if (!window.auditoriaController.matchesSmartSearchRow(row)) {
+                        showRow = false;
+                    }
+                }
+
                 row.style.display = showRow ? '' : 'none';
                 if (showRow) visibleCount++;
             });
@@ -4068,6 +4099,9 @@
             if (emgPlaquetaIndicator) emgPlaquetaIndicator.classList.toggle('hidden', emgPlaquetaSearchQuery.trim() === '');
             if (emgMaterialIndicator) emgMaterialIndicator.classList.toggle('hidden', emgMaterialSearchQuery.trim() === '');
             if (emgProblemIndicator) emgProblemIndicator.classList.toggle('hidden', !emgActiveProblemFilter || emgActiveProblemFilter.includes('all') || emgActiveProblemFilter.length === 0);
+            if (window.auditoriaController && typeof window.auditoriaController.updateAuditoriaSmartSummary === 'function') {
+                window.auditoriaController.updateAuditoriaSmartSummary();
+            }
         }
 
         window.applyEmergenciaServicesFilters = applyEmergenciaServicesFilters;
@@ -4269,11 +4303,13 @@
             });
         });
 
-        // Search input handler
-        searchInput?.addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            applyCombinedFilters();
-        });
+        // Search input handler (fallback only when SmartSearchBar is not active)
+        if (!window.smartSearchBar) {
+            searchInput?.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                applyCombinedFilters();
+            });
+        }
 
         // Dynamic change on row selects
         document.getElementById('os-table')?.addEventListener('change', (e) => {
@@ -4307,11 +4343,16 @@
             protocolSearchQuery = '';
             activeProtocolPrefix = '';
             activeActionFilter = ['all'];
+            searchQuery = '';
             const start = document.getElementById('range-start');
             const end = document.getElementById('range-end');
             if (start) start.value = '';
             if (end) end.value = '';
             if (protocolSearchInput) protocolSearchInput.value = '';
+            if (searchInput) searchInput.value = '';
+            if (window.smartSearchBar && typeof window.smartSearchBar.clear === 'function') {
+                window.smartSearchBar.clear();
+            }
             const actionAll = document.getElementById('action-filter-all');
             if (actionAll) actionAll.checked = true;
             document.querySelectorAll('input[name="action-filter"].action-checkbox').forEach(cb => cb.checked = true);

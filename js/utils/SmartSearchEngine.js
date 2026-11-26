@@ -72,6 +72,16 @@
             pillClass: 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100',
             chipClass: 'bg-orange-50 text-orange-900 border-orange-200'
         },
+        material: {
+            id: 'material',
+            label: 'Material',
+            shortLabel: 'Material',
+            icon: 'inventory_2',
+            prefix: 'mat:',
+            placeholder: 'Ex: LED 50W, Reator, Fotocélula, Cabo...',
+            pillClass: 'bg-cyan-50 text-cyan-800 border-cyan-200 hover:bg-cyan-100',
+            chipClass: 'bg-cyan-50 text-cyan-900 border-cyan-200'
+        },
         plaqueta: {
             id: 'plaqueta',
             label: 'Plaqueta',
@@ -195,7 +205,7 @@
         const text = String(rawValue || '');
         const trimmedStart = text.replace(/^\s+/, '');
 
-        const colonMatch = trimmedStart.match(/^(p|prot|protocolo|e|end|endereco|endereço|local|prob|problema|d|data|dt|s|st|status|tec|tecnico|técnico|op|operador|por|pl|plaq|plaqueta):(.*)$/i);
+        const colonMatch = trimmedStart.match(/^(p|prot|protocolo|e|end|endereco|endereço|local|prob|problema|d|data|dt|s|st|status|tec|tecnico|técnico|op|operador|por|mat|material|materiais|item|pl|plaq|plaqueta):(.*)$/i);
         if (colonMatch) {
             const key = cleanStr(colonMatch[1]);
             const rest = colonMatch[2].replace(/^\s+/, '');
@@ -205,6 +215,7 @@
             if (['d', 'data', 'dt'].includes(key)) return { triggered: true, mode: 'data', rest };
             if (['s', 'st', 'status'].includes(key)) return { triggered: true, mode: 'status', rest };
             if (['tec', 'tecnico', 'op', 'operador', 'por'].includes(key)) return { triggered: true, mode: 'tecnico', rest };
+            if (['mat', 'material', 'materiais', 'item'].includes(key)) return { triggered: true, mode: 'material', rest };
             if (['pl', 'plaq', 'plaqueta'].includes(key)) return { triggered: true, mode: 'plaqueta', rest };
         }
 
@@ -512,8 +523,12 @@
             { pattern: /\bno prazo\b|\bdentro do sla\b|\bno sla\b/g, type: 'tag', value: 'no_prazo', label: 'No Prazo' },
             { pattern: /\breparo recente\b/g, type: 'tag', value: 'reparo_recente', label: 'Reparo Recente' },
             { pattern: /\bplaqueta divergente\b/g, type: 'tag', value: 'plaqueta_divergente', label: 'Plaqueta Divergente' },
+            { pattern: /\bmaterial divergente\b/g, type: 'tag', value: 'material_divergente', label: 'Material Divergente' },
+            { pattern: /\bproblema divergente\b/g, type: 'tag', value: 'problema_divergente', label: 'Problema Divergente' },
+            { pattern: /\bsem foto\b|\banexo faltante\b/g, type: 'tag', value: 'anexo_faltante', label: 'Anexo Faltante' },
             { pattern: /\bcom glosa\b/g, type: 'tag', value: 'com_glosa', label: 'Com Glosa' },
             { pattern: /\bauditoria pendente\b/g, type: 'tag', value: 'auditoria_pendente', label: 'Auditoria Pendente' },
+            { pattern: /\bauditoria concluida\b/g, type: 'tag', value: 'auditoria_concluida', label: 'Auditoria Concluída' },
             { pattern: /\bmultiplos pontos\b|\bvarios pontos\b/g, type: 'tag', value: 'multiplos_pontos', label: 'Múltiplos Pontos' },
             { pattern: /\b2 eletricistas\b/g, type: 'tag', value: 'dupla', label: '2 Eletricistas' }
         ];
@@ -567,7 +582,10 @@
             duplicatas: { id: 'duplicata', label: 'Duplicata' },
             duplicidade: { id: 'duplicata', label: 'Duplicata' },
             reincidencia: { id: 'reparo_recente', label: 'Reincidência' },
-            divergente: { id: 'plaqueta_divergente', label: 'Plaqueta Divergente' },
+            distancia: { id: 'distancia_100m', label: 'Distância > 100m' },
+            divergente: { id: 'divergente', label: 'Com Divergência' },
+            divergencia: { id: 'divergente', label: 'Com Divergência' },
+            divergencias: { id: 'divergente', label: 'Com Divergência' },
             glosa: { id: 'com_glosa', label: 'Com Glosa' },
             glosas: { id: 'com_glosa', label: 'Com Glosa' },
             dupla: { id: 'dupla', label: '2 Eletricistas' }
@@ -900,13 +918,25 @@
             case 'duplicata':
                 return motivoNorm.includes('duplicat') || motivoNorm.includes('duplicid');
             case 'reparo_recente':
-                return motivoNorm.includes('reparo recente') || motivoNorm.includes('reincid');
+                return Boolean(item.isReincidencia30d || item.isPlaquetaProblematica) || motivoNorm.includes('reparo recente') || motivoNorm.includes('reincid');
+            case 'distancia_100m':
+                return Boolean(item.isDistanciaAcima100m);
             case 'plaqueta_divergente':
-                return Boolean(item.anexoPlaquetaDivergente);
+                return Boolean(item.isPlaquetaDivergente || item.anexoPlaquetaDivergente);
+            case 'material_divergente':
+                return Boolean(item.isMaterialDivergente);
+            case 'problema_divergente':
+                return Boolean(item.isProblemaDivergente);
+            case 'anexo_faltante':
+                return Boolean(item.isAnexoFaltante || item.anexoFaltante || (item.audit && item.audit.anexo_faltante));
+            case 'divergente':
+                return Boolean(item.hasDivergence);
             case 'com_glosa':
                 return Array.isArray(item.glosas) && item.glosas.length > 0;
             case 'auditoria_pendente':
-                return cleanStr(item.statusAuditoria) === 'pendente';
+                return !item.isAuditoriaConcluida && cleanStr(item.statusAuditoria) !== 'concluida';
+            case 'auditoria_concluida':
+                return Boolean(item.isAuditoriaConcluida) || cleanStr(item.statusAuditoria) === 'concluida';
             case 'multiplos_pontos':
                 return (Array.isArray(item.addressPointsIniciais) && item.addressPointsIniciais.length > 1) || (Number(item.qtdInicial || 1) > 1);
             case 'dupla':
@@ -914,6 +944,17 @@
             default:
                 return false;
         }
+    }
+
+    function getMaterialsText(item) {
+        if (!item) return '';
+        if (window.ChamadoModel && typeof window.ChamadoModel.parseMaterialsList === 'function') {
+            const list = window.ChamadoModel.parseMaterialsList(item.materialUtilizado);
+            if (Array.isArray(list) && list.length > 0) return list.join(', ');
+        }
+        return typeof item.materialUtilizado === 'string'
+            ? item.materialUtilizado
+            : (item.materialUtilizado ? JSON.stringify(item.materialUtilizado) : '');
     }
 
     function matchSingleTokenAllFields(item, token, fmt, highlights) {
@@ -941,6 +982,7 @@
         const opFin = item.operadorFinalizacao || '';
         const motivo = item.motivoAprovacao || '';
         const prio = item.prioridade || '';
+        const materialsStr = getMaterialsText(item);
         const slaInfo = (typeof item.calcularSLA === 'function') ? item.calcularSLA() : null;
         const slaLabel = slaInfo && slaInfo.label ? slaInfo.label : '';
 
@@ -1005,12 +1047,17 @@
             cleanStr(opFin).includes(token) ||
             cleanStr(municipe).includes(token) ||
             cleanStr(motivo).includes(token) ||
-            cleanStr(prio).includes(token)
+            cleanStr(prio).includes(token) ||
+            cleanStr(materialsStr).includes(token)
         ) {
             tokenMatched = true;
             score += 40;
             if (cleanStr(opFin).includes(token) || cleanStr(opAbert).includes(token)) {
                 highlights.tecnico.push(token);
+            }
+            if (cleanStr(materialsStr).includes(token)) {
+                highlights.material = highlights.material || [];
+                highlights.material.push(token);
             }
         }
 
@@ -1161,6 +1208,16 @@
                 score = cleanStr(opFin).includes(q) ? 85 : 70;
                 matchedFields.push('tecnico');
                 highlights.tecnico.push(val);
+            }
+            return { matched: matchedFields.length > 0, score, matchedFields, highlightTermsByField: highlights };
+        }
+
+        if (mode === 'material') {
+            const materialsStr = getMaterialsText(item);
+            if (cleanStr(materialsStr).includes(q)) {
+                score = 80;
+                matchedFields.push('material');
+                highlights.material = [val];
             }
             return { matched: matchedFields.length > 0, score, matchedFields, highlightTermsByField: highlights };
         }
@@ -1642,7 +1699,207 @@
                 });
         }
 
+        if (activeMode === 'material' || (activeMode === 'auto' && q.length >= 2)) {
+            const matMap = new Map();
+            list.forEach(item => {
+                const matText = getMaterialsText(item);
+                if (!matText) return;
+                matText.split(/[,|;\n]+/).forEach(part => {
+                    const trimmed = part.replace(/\(x\d+\)/gi, '').trim();
+                    const mNorm = cleanStr(trimmed);
+                    if (mNorm && mNorm.length >= 2 && mNorm.includes(q)) {
+                        if (!matMap.has(mNorm)) {
+                            matMap.set(mNorm, { display: trimmed, count: 1 });
+                        } else {
+                            matMap.get(mNorm).count++;
+                        }
+                    }
+                });
+            });
+
+            Array.from(matMap.values())
+                .sort((a, b) => b.count - a.count)
+                .slice(0, activeMode === 'material' ? 6 : 3)
+                .forEach(entry => {
+                    if (!hasChip('material', entry.display)) {
+                        suggestions.push({
+                            type: 'chip',
+                            mode: 'material',
+                            value: entry.display,
+                            label: entry.display,
+                            sublabel: `${entry.count} OS`,
+                            icon: MODES.material.icon
+                        });
+                    }
+                });
+        }
+
         return suggestions.slice(0, 8);
+    }
+
+    /**
+     * Converts a calendar date query string into ISO start/end range for Supabase queries.
+     */
+    function parseDateIsoRange(raw) {
+        const q = cleanStr(raw);
+        if (!q) return null;
+
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+        const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+        if (q === 'hoje') return { startIso: todayStart.toISOString(), endIso: todayEnd.toISOString() };
+        if (q === 'ontem') {
+            const s = new Date(todayStart); s.setDate(s.getDate() - 1);
+            const e = new Date(s); e.setHours(23, 59, 59, 999);
+            return { startIso: s.toISOString(), endIso: e.toISOString() };
+        }
+        if (q === 'anteontem') {
+            const s = new Date(todayStart); s.setDate(s.getDate() - 2);
+            const e = new Date(s); e.setHours(23, 59, 59, 999);
+            return { startIso: s.toISOString(), endIso: e.toISOString() };
+        }
+        if (['7d', '7dias', '7 dias', 'semana', 'essa semana', 'ultima semana', 'ultimos 7 dias'].includes(q)) {
+            const s = new Date(todayStart); s.setDate(s.getDate() - 7);
+            return { startIso: s.toISOString(), endIso: todayEnd.toISOString() };
+        }
+        if (['30d', '30dias', '30 dias', 'mes', 'esse mes', 'ultimo mes', 'ultimos 30 dias'].includes(q)) {
+            const s = new Date(todayStart); s.setDate(s.getDate() - 30);
+            return { startIso: s.toISOString(), endIso: todayEnd.toISOString() };
+        }
+
+        const rangeMatch = q.match(/^(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\s*(?:a|ate|-|\.\.)\s*(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)$/);
+        if (rangeMatch) {
+            const p1 = parseDatePart(rangeMatch[1], now.getFullYear());
+            const p2 = parseDatePart(rangeMatch[2], p1 ? p1.year : now.getFullYear());
+            if (p1 && p2) {
+                const s = new Date(p1.year, p1.month - 1, p1.day, 0, 0, 0, 0);
+                const e = new Date(p2.year, p2.month - 1, p2.day, 23, 59, 59, 999);
+                return { startIso: s.toISOString(), endIso: e.toISOString() };
+            }
+        }
+
+        const single = parseDatePart(q);
+        if (single) {
+            const s = new Date(single.year, single.month - 1, single.day, 0, 0, 0, 0);
+            const e = new Date(single.year, single.month - 1, single.day, 23, 59, 59, 999);
+            return { startIso: s.toISOString(), endIso: e.toISOString() };
+        }
+
+        const monthYearMatch = q.match(/^(\d{1,2})\/(\d{4})$/);
+        if (monthYearMatch) {
+            const month = parseInt(monthYearMatch[1], 10);
+            const year = parseInt(monthYearMatch[2], 10);
+            if (month >= 1 && month <= 12) {
+                const s = new Date(year, month - 1, 1, 0, 0, 0, 0);
+                const e = new Date(year, month, 0, 23, 59, 59, 999);
+                return { startIso: s.toISOString(), endIso: e.toISOString() };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Translates SmartSearchBar state into server-side parameters for fetchCompletedViariaChamadosPaged
+     */
+    function toRemoteFilters(smartState = {}) {
+        const chips = Array.isArray(smartState.chips) ? smartState.chips : [];
+        const liveText = String(smartState.liveText || '').trim();
+        const activeMode = smartState.activeMode || 'auto';
+
+        const out = {
+            protocolo: '',
+            protocolPrefix: '',
+            plaqueta: '',
+            material: '',
+            problema: '',
+            dataInicio: null,
+            dataFim: null,
+            hasClientOnlyCriteria: false
+        };
+
+        const applyOne = (mode, val) => {
+            const v = String(val || '').trim();
+            if (!v) return;
+
+            if (mode === 'protocolo') {
+                const up = v.toUpperCase();
+                if (up === 'P' || up === 'I') out.protocolPrefix = up;
+                else out.protocolo = v;
+                return;
+            }
+            if (mode === 'plaqueta') {
+                out.plaqueta = v;
+                return;
+            }
+            if (mode === 'material') {
+                out.material = v;
+                return;
+            }
+            if (mode === 'problema') {
+                const codes = parseProblemCodes(v);
+                out.problema = codes.length === 1 ? codes[0] : v;
+                return;
+            }
+            if (mode === 'data') {
+                const rng = parseDateIsoRange(v);
+                if (rng) {
+                    out.dataInicio = rng.startIso;
+                    out.dataFim = rng.endIso;
+                } else {
+                    out.hasClientOnlyCriteria = true;
+                }
+                return;
+            }
+            if (mode === 'status') {
+                // Completed table is already Concluída; only mark client-only if another status was requested
+                const codes = parseStatusCodes(v);
+                if (codes.length > 0 && !codes.includes('concluida')) {
+                    out.hasClientOnlyCriteria = true;
+                }
+                return;
+            }
+            if (mode === 'endereco' || mode === 'tecnico') {
+                out.hasClientOnlyCriteria = true;
+                return;
+            }
+
+            // mode === 'auto'
+            const comp = extractCompositeClauses(v);
+            if (comp.dateSpecs.length > 0) {
+                const rng = parseDateIsoRange(comp.dateSpecs[0]);
+                if (rng) {
+                    out.dataInicio = rng.startIso;
+                    out.dataFim = rng.endIso;
+                }
+            }
+            if (comp.exclusions.length > 0 || comp.specialTags.length > 0 || comp.remainingTokens.length > 0) {
+                // Check if single auto token maps cleanly to protocol / problem
+                const intent = detectQueryIntent(v, 'auto');
+                if (comp.exclusions.length === 0 && comp.specialTags.length === 0 && comp.dateSpecs.length === 0 && comp.statusCodes.length === 0) {
+                    if (intent.detectedMode === 'protocolo' && !intent.isAmbiguousProtocolOrPlaqueta) {
+                        const up = v.toUpperCase();
+                        if (up === 'P' || up === 'I') out.protocolPrefix = up;
+                        else out.protocolo = v;
+                        return;
+                    }
+                    if (intent.detectedMode === 'problema') {
+                        const codes = parseProblemCodes(v);
+                        if (codes.length === 1) {
+                            out.problema = codes[0];
+                            return;
+                        }
+                    }
+                }
+                out.hasClientOnlyCriteria = true;
+            }
+        };
+
+        chips.forEach(c => applyOne(c.mode, c.value));
+        if (liveText) applyOne(activeMode, liveText);
+
+        return out;
     }
 
     window.SmartSearchEngine = {
@@ -1652,13 +1909,16 @@
         cleanStr,
         escapeHtml,
         highlightText,
+        getMaterialsText,
         consumePrefixTrigger,
         parseStatusCodes,
         parseProblemCodes,
         parseDateQuery,
+        parseDateIsoRange,
         extractCompositeClauses,
         detectQueryIntent,
         matchItem,
-        buildSuggestions
+        buildSuggestions,
+        toRemoteFilters
     };
 })();
