@@ -941,15 +941,20 @@ class AuditoriaController {
                     <div class="flex items-center justify-center gap-1 action-buttons">
                         ${this.isManutentorUser() ? `
                             <span class="text-[11px] text-on-surface-variant/40 font-medium" title="Apenas administradores podem concluir auditoria">—</span>
-                        ` : (isCompleted ? `
+                        ` : `
+                            <button class="p-1.5 rounded-lg hover:bg-amber-50 text-amber-600 hover:text-amber-700 transition-colors cursor-pointer" onclick="window.auditoriaController?.corrigirPlaquetaOS('${item.protocolo || item.id}', event)" title="Corrigir Plaqueta / Coordenada">
+                                <span class="material-symbols-outlined text-[18px]">edit_location_alt</span>
+                            </button>
+                            ${isCompleted ? `
                             <button class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors btn-uncomplete cursor-pointer" onclick="desfazerAuditoria(this, event)" title="Desfazer Auditoria">
                                 <span class="material-symbols-outlined text-[18px]">undo</span>
                             </button>
-                        ` : `
+                            ` : `
                             <button class="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 hover:text-emerald-700 transition-colors btn-complete cursor-pointer" onclick="concluirAuditoria(this, event)" title="Concluir Auditoria">
                                 <span class="material-symbols-outlined text-[18px]">check_circle</span>
                             </button>
-                        `)}
+                            `}
+                        `}
                     </div>
                 </td>
             </tr>
@@ -1594,6 +1599,32 @@ class AuditoriaController {
             window.abrirModalEditarOS(item);
         } else if (typeof window.abrirModalEditarOS === 'function' && idOrItem) {
             window.abrirModalEditarOS(typeof idOrItem === 'object' ? idOrItem : { id: idOrItem, protocolo: idOrItem });
+        }
+    }
+
+    async corrigirPlaquetaOS(protocolo, event) {
+        if (event) event.stopPropagation();
+        if (this.isManutentorUser()) {
+            console.warn('⛔ [AuditoriaController] Correção de plaqueta permitida apenas para administradores.');
+            return;
+        }
+        if (typeof window.abrirModalCorrigirPlaquetaOS !== 'function') {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'js/utils/corrigirPlaquetaOS.js';
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+        if (typeof window.abrirModalCorrigirPlaquetaOS === 'function') {
+            window.abrirModalCorrigirPlaquetaOS(protocolo, () => {
+                if (typeof this.loadAuditoriaData === 'function') this.loadAuditoriaData();
+                const modalDetalhes = document.getElementById('modal-detalhes-os');
+                if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && typeof this.abrirDetalhesOSModal === 'function') {
+                    this.abrirDetalhesOSModal(protocolo);
+                }
+            });
         }
     }
 
@@ -2313,7 +2344,16 @@ class AuditoriaController {
                             </button>
                         ` : ''}
 
+                        <button type="button" onclick="window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.auditoriaController || window.painelController).abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Adicionar uma nova observação/apontamento nesta OS">
+                            <span class="material-symbols-outlined text-[16px]">add_comment</span>
+                            <span>+ Nova Observação</span>
+                        </button>
+
                         ${isAdminUser ? `
+                            <button type="button" onclick="window.auditoriaController?.corrigirPlaquetaOS('${item.protocolo || item.id}', event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Corrigir Plaqueta / Coordenada da OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_location_alt</span>
+                                <span>Corrigir Plaqueta</span>
+                            </button>
                             ${isAuditoriaConcluida ? `
                             <button type="button" onclick="window.desfazerAuditoriaModal('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Desfazer conclusão e reabrir auditoria">
                                 <span class="material-symbols-outlined text-[16px]">undo</span>
@@ -2422,10 +2462,6 @@ class AuditoriaController {
                         <span class="material-symbols-outlined text-[16px]">chat</span>
                         <span>Observações de Abertura (Munícipe / Solicitante)</span>
                     </strong>
-                    <button type="button" onclick="window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.auditoriaController || window.painelController).abrirModalAdicionarObservacao('${item.protocolo || item.id}')" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
-                        <span class="material-symbols-outlined text-[13px]">add_comment</span>
-                        <span>+ Nova Observação</span>
-                    </button>
                 </div>
                 <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 text-[11.5px] text-on-surface leading-relaxed italic">
                     ${bodyObs}

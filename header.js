@@ -3,6 +3,7 @@ class AppHeader extends HTMLElement {
         const placeholder = this.getAttribute('placeholder') || 'Buscar OS por Protocolo, Plaqueta ou Endereço...';
         const searchId = this.getAttribute('search-id') || 'search-input';
         const oninputAttr = this.getAttribute('oninput') ? `oninput="${this.getAttribute('oninput')}"` : '';
+        const debounceMs = parseInt(this.getAttribute('debounce') || '350', 10);
 
         this.innerHTML = `
 <header class="bg-surface dark:bg-surface-container docked full-width top-0 h-16 border-b border-outline-variant dark:border-outline flex justify-between items-center px-container-padding ml-[260px] w-[calc(100%-260px)] z-10 fixed transition-all duration-300" id="top-header">
@@ -43,6 +44,21 @@ class AppHeader extends HTMLElement {
         </div>
     </div>
 </header>`;
+
+        const inputEl = this.querySelector(`#${searchId}`);
+        if (inputEl && debounceMs > 0) {
+            let debounceTimer = null;
+            inputEl.addEventListener('input', (e) => {
+                if (e._isDebounced) return;
+                e.stopImmediatePropagation();
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    const debouncedEvent = new Event('input', { bubbles: true });
+                    debouncedEvent._isDebounced = true;
+                    inputEl.dispatchEvent(debouncedEvent);
+                }, debounceMs);
+            }, true);
+        }
 
         await this.initUserProfile();
     }

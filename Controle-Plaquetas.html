@@ -280,12 +280,12 @@
                 </div>
             </div>
             
-            <div class="w-full min-h-[360px] overflow-x-auto">
+            <div class="w-full min-h-[360px]">
                 <table class="w-full text-left border-collapse table-fixed max-w-full" id="plaquetas-table">
                     <thead>
                         <tr class="bg-[#F8FAFC]/80 border-b border-outline-variant z-20 relative select-none">
                             <!-- Coluna 1: Identificação -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 135px; min-width: 135px;" data-col="0">
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 11%;" data-col="0">
                                 <div class="flex items-center gap-1.5">
                                     <span>Identificação</span>
                                     <span class="material-symbols-outlined text-[16px] text-on-surface-variant/60">tag</span>
@@ -294,7 +294,7 @@
                             </th>
                             
                             <!-- Coluna 2: Localização (Latitude e Longitude - 2 linhas) -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 160px; min-width: 160px;" data-col="1">
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative" style="width: 12%;" data-col="1">
                                 <div class="flex items-center gap-1.5">
                                     <span class="material-symbols-outlined text-[16px] text-emerald-600">location_on</span>
                                     <span>Localização</span>
@@ -303,7 +303,7 @@
                             </th>
                             
                             <!-- Coluna 3: Qtd. Luminárias -->
-                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative text-center" style="width: 95px; min-width: 95px;" data-col="2">
+                            <th class="py-3 px-3 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative text-center" style="width: 7%;" data-col="2">
                                 <div class="flex items-center justify-center gap-1">
                                     <span>Qtd. Lum.</span>
                                 </div>
@@ -311,7 +311,7 @@
                             </th>
                             
                             <!-- Coluna 4: Empresa (Com Filtro no Cabeçalho) -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 145px; min-width: 145px;" data-col="3">
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 11%;" data-col="3">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="empresa-filter-trigger" title="Filtrar por Empresa">
                                         <span class="font-label-md uppercase tracking-wider">Empresa</span>
@@ -349,7 +349,7 @@
                             </th>
                             
                             <!-- Coluna 5: Observação (Com Espaço Nobre e Filtro) -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 260px; min-width: 220px;" data-col="4">
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 20%;" data-col="4">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="obs-filter-trigger" title="Filtrar por Observação">
                                         <span class="font-label-md uppercase tracking-wider">Observação</span>
@@ -387,7 +387,7 @@
                             </th>
                             
                             <!-- Coluna 6: Luminária Atual (Com Filtro por Potência e Status) -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 190px; min-width: 180px;" data-col="5">
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 14%;" data-col="5">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="luminaria-filter-trigger" title="Filtrar por Luminária / Potência">
                                         <span class="material-symbols-outlined text-[16px] text-amber-500">lightbulb</span>
@@ -432,7 +432,7 @@
                             </th>
 
                             <!-- Coluna 7: Relé Fotoelétrico (Com Filtro no Cabeçalho) -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 175px; min-width: 165px;" data-col="6">
+                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider relative overflow-visible" style="width: 13%;" data-col="6">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-secondary cursor-pointer" id="rele-filter-trigger" title="Filtrar por Relé">
                                         <span class="material-symbols-outlined text-[16px] text-blue-500">power</span>
@@ -468,7 +468,7 @@
                             </th>
                             
                             <!-- Coluna 8: Ações -->
-                            <th class="py-3 px-4 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 155px; min-width: 155px;" data-col="7">
+                            <th class="py-3 pl-4 pr-6 font-label-md text-label-md text-on-surface-variant uppercase tracking-wider text-center" style="width: 12%;" data-col="7">
                                 Ações
                             </th>
                         </tr>
@@ -659,7 +659,7 @@
                             </th>
                             
                             <!-- Coluna OS / Protocolo -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 20%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-os-filter-trigger" title="Filtrar por OS / Protocolo">
                                         <span class="font-label-md uppercase tracking-wider">OS / Protocolo</span>
@@ -705,7 +705,7 @@
                             </th>
 
                             <!-- Coluna Motivo / Alerta (Substitui o antigo select avulso) -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 220px; min-width: 220px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 27%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-motivo-filter-trigger" title="Filtrar por Motivo de Aprovação">
                                         <span class="font-label-md uppercase tracking-wider">Motivo / Alerta</span>
@@ -796,7 +796,7 @@
                             </th>
 
                             <!-- Coluna Operador -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 20%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-amber-700 cursor-pointer" id="aprov-operador-filter-trigger" title="Filtrar por Operador">
                                         <span class="font-label-md uppercase tracking-wider">OPERADOR</span>
@@ -896,12 +896,12 @@
             </div>
 
             <!-- Container da Tabela -->
-            <div id="hist-tabela-wrapper" class="w-full min-h-[320px] overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs" id="tabela-historico-movimentacoes">
+            <div id="hist-tabela-wrapper" class="w-full min-h-[320px]">
+                <table class="w-full text-left border-collapse table-fixed max-w-full text-xs" id="tabela-historico-movimentacoes">
                     <thead>
                         <tr class="bg-[#F8FAFC]/90 border-b border-outline-variant font-semibold text-on-surface-variant uppercase tracking-wider select-none">
                             <!-- Coluna 1: Data / Período -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 18%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-date-filter-trigger" title="Filtrar por Período">
                                         <span class="font-label-md uppercase tracking-wider">Data / Hora</span>
@@ -939,7 +939,7 @@
                             </th>
 
                             <!-- Coluna 2: Plaqueta com busca rápida integrada -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 140px; min-width: 140px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 15%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-placa-filter-trigger" title="Filtrar por Plaqueta">
                                         <span class="font-label-md uppercase tracking-wider">Plaqueta</span>
@@ -962,7 +962,7 @@
                             </th>
 
                             <!-- Coluna 3: Tipo de Movimentação com filtro de checklist/seleção -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 220px; min-width: 220px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 27%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-origem-filter-trigger" title="Filtrar por Tipo de Movimentação">
                                         <span class="font-label-md uppercase tracking-wider">Tipo de Movimentação</span>
@@ -1027,7 +1027,7 @@
                             <th class="py-3 px-4 whitespace-nowrap text-center">Desvio / Distância</th>
 
                             <!-- Coluna 5: Ordem de Serviço (OS) com filtro de busca rápida -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 20%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-os-filter-trigger" title="Filtrar por Ordem de Serviço">
                                         <span class="font-label-md uppercase tracking-wider">Ordem de Serviço (OS)</span>
@@ -1050,7 +1050,7 @@
                             </th>
 
                             <!-- Coluna 6: Usuário Responsável com filtro de busca rápida -->
-                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 170px; min-width: 170px;">
+                            <th class="py-3 px-4 whitespace-nowrap relative overflow-visible" style="width: 20%;">
                                 <div class="relative inline-block text-left">
                                     <button type="button" class="flex items-center gap-1.5 px-2 py-1 rounded hover:bg-surface-container-low transition-colors text-on-surface-variant hover:text-purple-700 cursor-pointer" id="hist-usuario-filter-trigger" title="Filtrar por Usuário">
                                         <span class="font-label-md uppercase tracking-wider">Usuário Responsável</span>
@@ -2105,6 +2105,28 @@
             carregarPlaquetas(1);
             if (typeof window.carregarFilaAprovacaoCoordenadas === 'function') {
                 window.carregarFilaAprovacaoCoordenadas();
+            }
+            if (!window._plaquetasRefreshListenerBound) {
+                window._plaquetasRefreshListenerBound = true;
+                const recarregarFila = () => {
+                    if (typeof window.carregarFilaAprovacaoCoordenadas === 'function') {
+                        window.carregarFilaAprovacaoCoordenadas();
+                    }
+                };
+                try {
+                    if (typeof BroadcastChannel !== 'undefined') {
+                        const bc = new BroadcastChannel('sistema_os_plaquetas');
+                        bc.onmessage = (ev) => {
+                            if (ev?.data?.action === 'PLAQUETAS_FILA_REFRESH') recarregarFila();
+                        };
+                    }
+                } catch (e) {}
+                window.addEventListener('storage', (ev) => {
+                    if (ev.key === 'plaquetas_fila_refresh_ts') recarregarFila();
+                });
+                window.addEventListener('message', (ev) => {
+                    if (ev?.data?.action === 'PLAQUETAS_FILA_REFRESH') recarregarFila();
+                });
             }
         };
 
@@ -8970,6 +8992,7 @@
             // Dicionário de Formatação de Movimentação (Badges com cores semânticas)
             const badgesOrigem = {
                 'APROVACAO_OS': { label: 'Aprovação de OS', bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'verified' },
+                'CORRECAO_ADMIN_OS': { label: 'Correção Admin OS', bg: 'bg-amber-50 text-amber-700 border-amber-200', icon: 'edit_location_alt' },
                 'SNAP_POSTE_AEREO': { label: 'Ajuste Poste Aéreo', bg: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'near_me' },
                 'TRIGGER_UPDATE': { label: 'Trigger Banco', bg: 'bg-violet-50 text-violet-700 border-violet-200', icon: 'database' },
                 'EDICAO_MAPA': { label: 'Edição via Mapa', bg: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'edit_location' },

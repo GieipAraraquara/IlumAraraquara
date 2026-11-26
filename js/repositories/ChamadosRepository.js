@@ -45,7 +45,7 @@ class ChamadosRepository {
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
             'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
-            'materiais', 'historico_sessoes', 'pontos_final'
+            'materiais', 'historico_sessoes', 'pontos_final', 'texto_auditoria_ocr', 'anexo_plaqueta_divergente'
         ].join(',');
     }
 
@@ -62,7 +62,7 @@ class ChamadosRepository {
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas',
             'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'pontos_inicial',
-            'materiais', 'historico_sessoes', 'pontos_final'
+            'materiais', 'historico_sessoes', 'pontos_final', 'texto_auditoria_ocr', 'anexo_plaqueta_divergente'
         ].join(',');
     }
 
@@ -78,7 +78,7 @@ class ChamadosRepository {
             'pontos_final', 'motivo_aprovacao', 'operador_finalizacao', 'texto_auditoria_ocr',
             'glosas', 'praca_nome', 'problemas', 'endereco', 'coordenada', 'plaqueta_inicial',
             'plaqueta_final', 'coordenada_reparo', 'qtd_eletricistas', 'historico_sessoes',
-            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os'
+            'tempo_total_minutos', 'foto_entrada', 'observacao_final', 'tipo_os', 'anexo_plaqueta_divergente'
         ].join(',');
     }
 

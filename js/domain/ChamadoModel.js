@@ -2015,14 +2015,15 @@ class ChamadoModel {
         }
 
         const agora = new Date();
-        const dataFimCalculo = (this.isConcluida && this.dataConclusao && !isNaN(this.dataConclusao.getTime())) ? this.dataConclusao : agora;
+        const isConcluida = this.normalizedStatus === 'concluida';
+        const dataFimCalculo = (isConcluida && this.dataConclusao && !isNaN(this.dataConclusao.getTime())) ? this.dataConclusao : agora;
         const diffMs = dataLimite.getTime() - dataFimCalculo.getTime();
         const diffHoras = diffMs / (3600 * 1000);
 
         const alertaDias = parseInt(cfg.alerta_vencimento_dias, 10) || 2;
         const alertaCriticoHoras = parseInt(cfg.alerta_critico_horas, 10) || 12;
 
-        if (this.isConcluida) {
+        if (isConcluida) {
             const noPrazo = diffMs >= 0;
             return {
                 dataLimite,

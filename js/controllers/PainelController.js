@@ -549,6 +549,12 @@ class PainelController {
             </button>
         `;
 
+        const corrigirPlaquetaButtonHtml = (!isManutentorView && isConcluida) ? `
+            <button class="text-amber-600 hover:bg-amber-50 p-1 rounded transition-all duration-200 active:scale-90 cursor-pointer" onclick="window.painelController.corrigirPlaquetaOS('${item.protocolo || item.id}', event)" title="Corrigir Plaqueta / Coordenada">
+                <span class="material-symbols-outlined text-[20px]">edit_location_alt</span>
+            </button>
+        ` : '';
+
         tdAcoes.innerHTML = `
             <div class="flex items-center justify-center gap-1 action-buttons">
                 ${approveButtonHtml}
@@ -558,6 +564,7 @@ class PainelController {
                 <button class="btn-complete text-[#059669] hover:bg-[#dcfce7] p-1 rounded transition-all duration-200 active:scale-90 ${isAberto || isEmAndamento ? '' : 'hidden'}" onclick="window.painelController.handleStatusAction('${item.protocolo || item.id}', 'concluida', event)" title="Concluir / Finalizar OS">
                     <span class="material-symbols-outlined text-[20px]">task_alt</span>
                 </button>
+                ${corrigirPlaquetaButtonHtml}
                 ${revertButtonHtml}
                 ${editButtonHtml}
             </div>
@@ -1301,6 +1308,32 @@ class PainelController {
         }
     }
 
+    async corrigirPlaquetaOS(protocolo, event) {
+        if (event) event.stopPropagation();
+        if (this.isManutentorUser()) {
+            console.warn('⛔ [PainelController] Correção de plaqueta permitida apenas para administradores.');
+            return;
+        }
+        if (typeof window.abrirModalCorrigirPlaquetaOS !== 'function') {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'js/utils/corrigirPlaquetaOS.js';
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        }
+        if (typeof window.abrirModalCorrigirPlaquetaOS === 'function') {
+            window.abrirModalCorrigirPlaquetaOS(protocolo, () => {
+                if (typeof this.loadChamados === 'function') this.loadChamados();
+                const modalDetalhes = document.getElementById('modal-detalhes-os');
+                if (modalDetalhes && !modalDetalhes.classList.contains('hidden') && typeof this.abrirDetalhesOSModal === 'function') {
+                    this.abrirDetalhesOSModal(protocolo);
+                }
+            });
+        }
+    }
+
     setupGlobalAuditTooltip() {
         const getOrCreatePopover = () => {
             let popover = document.getElementById('audit-global-popover');
@@ -2031,7 +2064,17 @@ class PainelController {
                             </button>
                         ` : ''}
 
+                        <button type="button" onclick="(window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.painelController || window.auditoriaController).abrirModalAdicionarObservacao('${item.protocolo || item.id}'))" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 text-white hover:bg-amber-600 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Adicionar uma nova observação/apontamento nesta OS">
+                            <span class="material-symbols-outlined text-[16px]">add_comment</span>
+                            <span>+ Nova Observação</span>
+                        </button>
+
                         ${isAdminUser ? `
+                            ${isConcluida ? `
+                            <button type="button" onclick="window.painelController?.corrigirPlaquetaOS('${item.protocolo || item.id}', event)" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 active:scale-95 transition-all shadow-2xs cursor-pointer" title="Corrigir Plaqueta / Coordenada da OS">
+                                <span class="material-symbols-outlined text-[16px]">edit_location_alt</span>
+                                <span>Corrigir Plaqueta</span>
+                            </button>` : ''}
                             ${isPendente ? `
                             <button type="button" onclick="window.aprovarOSAdmin('${item.protocolo || item.id}')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 active:scale-95 transition-all shadow-2xs cursor-pointer">
                                 <span class="material-symbols-outlined text-[16px]">check</span>
@@ -2108,10 +2151,6 @@ class PainelController {
                         <span class="material-symbols-outlined text-[16px]">chat</span>
                         <span>Observações de Abertura (Munícipe / Solicitante)</span>
                     </strong>
-                    <button type="button" onclick="(window.abrirModalAdicionarObservacao ? window.abrirModalAdicionarObservacao('${item.protocolo || item.id}') : (window.painelController || window.auditoriaController).abrirModalAdicionarObservacao('${item.protocolo || item.id}'))" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-bold bg-amber-500 hover:bg-amber-600 active:scale-95 text-white transition-all shadow-2xs cursor-pointer">
-                        <span class="material-symbols-outlined text-[13px]">add_comment</span>
-                        <span>+ Nova Observação</span>
-                    </button>
                 </div>
                 <div class="bg-surface-container-lowest p-2.5 rounded-lg border border-outline-variant/40 text-[11.5px] text-on-surface leading-relaxed italic">
                     ${bodyObs}
