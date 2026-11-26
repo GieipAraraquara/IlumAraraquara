@@ -2453,11 +2453,14 @@ class AuditoriaController {
             if (!obsIni && !justStatus) return '';
 
             let bodyObs = obsIni ? `<div>${obsIni.replace(/\n/g, '<br/>')}</div>` : '';
-            if (isPracaOS && obsFin && obsFin !== obsIni && !item.isDireto) {
-                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-slate-700 font-semibold">📝 Observação de Fechamento:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
-            }
-            if (justStatus && justStatus !== obsIni && justStatus !== obsFin) {
-                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-amber-800 font-semibold">⚖️ Justificativa de Status:</b> ${justStatus.replace(/\n/g, '<br/>')}</div>`;
+            if (justStatus && justStatus !== obsIni) {
+                const stLower = String(item.rawStatus || item.status || '').toLowerCase();
+                let labelJust = '⚖️ Justificativa de Status:';
+                if (stLower.includes('abert')) labelJust = '🔄 Motivo da Reabertura:';
+                else if (stLower.includes('cancel')) labelJust = '🚫 Motivo do Cancelamento:';
+                else if (stLower.includes('rejeit')) labelJust = '❌ Motivo da Rejeição:';
+                else if (stLower.includes('bloq')) labelJust = '🔒 Motivo do Bloqueio:';
+                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-amber-800 font-semibold">${labelJust}</b> ${justStatus.replace(/\n/g, '<br/>')}</div>`;
             }
 
             return `

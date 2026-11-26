@@ -62,21 +62,52 @@ class ChamadosService {
     }
 
     /**
-     * Filters chamados list based on active UI filter criteria
+     * Filters chamados list based on active UI filter criteria and returns both items and match metadata.
      */
-    filterChamados(chamadosList, filters = {}) {
-        const { search, protocol, protocolPrefix, datePredicate, problem, status } = filters;
+    filterChamadosWithMeta(chamadosList, filters = {}) {
+        const { search, smartSearch, protocol, protocolPrefix, datePredicate, problem, status } = filters;
         const isManutentor = typeof window !== 'undefined' && Boolean(window.isManutentorView);
+        const engine = typeof window !== 'undefined' ? window.SmartSearchEngine : null;
 
-        return chamadosList.filter(item => {
+        const hasSmartChips = Boolean(smartSearch && Array.isArray(smartSearch.chips) && smartSearch.chips.length > 0);
+        const hasSmartLive = Boolean(smartSearch && smartSearch.liveText && String(smartSearch.liveText).trim().length > 0);
+        const isSmartActive = Boolean(engine && (hasSmartChips || hasSmartLive));
+        const hasStatusChip = Boolean(hasSmartChips && smartSearch.chips.some(c =>
+            c.mode === 'status' ||
+            (c.mode === 'auto' && engine && typeof engine.extractCompositeClauses === 'function' && engine.extractCompositeClauses(c.value).hasStatusClause)
+        ));
+        const hasLegacySearch = Boolean(!isSmartActive && search && String(search).trim().length > 0);
+
+        let bypassColumnStatus = false;
+        if (isSmartActive) {
+            if (hasStatusChip) {
+                bypassColumnStatus = true;
+            } else {
+                const intent = hasSmartLive ? engine.detectQueryIntent(smartSearch.liveText, smartSearch.activeMode) : null;
+                const isDirectStatusSearch = Boolean(intent && intent.detectedMode === 'status');
+                bypassColumnStatus = isDirectStatusSearch || (smartSearch.includeAllStatuses !== false);
+            }
+        } else if (hasLegacySearch) {
+            bypassColumnStatus = true;
+        }
+
+        const metaMap = new Map();
+        const scoredResults = [];
+
+        chamadosList.forEach(item => {
             // Manutentor view rule: Never show 'pendente' or 'bloqueada' OS
             const itemStatus = item.normalizedStatus || item.status;
             if (isManutentor && (itemStatus === 'pendente' || itemStatus === 'Pendente' || itemStatus === 'bloqueada' || itemStatus === 'Bloqueada')) {
-                return false;
+                return;
             }
 
-            // General top-bar search filter
-            if (search) {
+            let matchMeta = null;
+
+            // Smart search filter
+            if (isSmartActive) {
+                matchMeta = engine.matchItem(item, smartSearch);
+                if (!matchMeta.matched) return;
+            } else if (search) {
                 const cleanStr = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
                 const term = cleanStr(search);
                 const fmt = window.ChamadoModel ? window.ChamadoModel.formatLocationText : (v => String(v || ''));
@@ -88,52 +119,74 @@ class ChamadosService {
                 const matchOperador = cleanStr(item.operadorAbertura).includes(term) || cleanStr(item.operadorFinalizacao).includes(term);
                 const matchStatus = cleanStr(item.statusBadgeLabel || item.normalizedStatus || item.rawStatus).includes(term);
                 const matchPoints = Array.isArray(item.addressPointsIniciais) && item.addressPointsIniciais.some(pt => cleanStr(pt).includes(term));
-                if (!matchProtocol && !matchPlaqueta && !matchAddress && !matchCoord && !matchMunicipe && !matchOperador && !matchStatus && !matchPoints) return false;
+                const matchProblem = cleanStr(item.problemaInicial).includes(term) || cleanStr(item.problemaEncontrado).includes(term);
+                const matchPlaquetaFin = cleanStr(fmt(item.plaquetaFinal)).includes(term);
+                const matchPraca = cleanStr(fmt(item.pracaNome)).includes(term);
+                if (!matchProtocol && !matchPlaqueta && !matchPlaquetaFin && !matchAddress && !matchPraca && !matchCoord && !matchMunicipe && !matchOperador && !matchStatus && !matchProblem && !matchPoints) return;
             }
 
             // Protocol prefix filter (Praça 'P' / Viária 'I')
             if (protocolPrefix) {
                 const pref = protocolPrefix.toUpperCase().trim();
                 const prot = String(item.protocolo || '').trim().toUpperCase();
-                if (!prot.startsWith(pref)) return false;
+                if (!prot.startsWith(pref)) return;
             }
 
             // Protocol specific column search
             if (protocol) {
                 const pTerm = protocol.toLowerCase().trim();
                 const fmt = window.ChamadoModel ? window.ChamadoModel.formatLocationText : (v => String(v || ''));
-                if (!fmt(item.protocolo).toLowerCase().includes(pTerm)) return false;
+                if (!fmt(item.protocolo).toLowerCase().includes(pTerm)) return;
             }
 
             // Date predicate filter
             if (typeof datePredicate === 'function') {
-                if (!datePredicate(item.dataAbertura)) return false;
+                if (!datePredicate(item.dataAbertura)) return;
             }
 
             // Problem filter
             if (problem && problem !== 'all') {
                 if (Array.isArray(problem)) {
-                    if (problem.length === 0) return false;
-                    if (!problem.includes('all') && !problem.includes(item.problemSelectValue)) return false;
+                    if (problem.length === 0) return;
+                    if (!problem.includes('all') && !problem.includes(item.problemSelectValue)) return;
                 } else if (item.problemSelectValue !== problem) {
-                    return false;
+                    return;
                 }
             }
 
             // Status filter
-            // Quando há texto digitado na barra de busca superior (search), ignora o filtro de status da OS para que OS concluídas e de outros tipos apareçam
-            const hasSearchQuery = Boolean(search && String(search).trim().length > 0);
-            if (!hasSearchQuery && status && status !== 'all') {
+            if (!bypassColumnStatus && status && status !== 'all') {
                 if (Array.isArray(status)) {
-                    if (status.length === 0) return false;
-                    if (!status.includes('all') && !status.includes(item.normalizedStatus)) return false;
+                    if (status.length === 0) return;
+                    if (!status.includes('all') && !status.includes(item.normalizedStatus)) return;
                 } else if (item.normalizedStatus !== status) {
-                    return false;
+                    return;
                 }
             }
 
-            return true;
+            if (matchMeta) {
+                metaMap.set(item.protocolo || item.id, matchMeta);
+            }
+            scoredResults.push({ item, score: matchMeta ? matchMeta.score : 0 });
         });
+
+        if (isSmartActive && scoredResults.length > 1) {
+            scoredResults.sort((a, b) => b.score - a.score);
+        }
+
+        return {
+            items: scoredResults.map(r => r.item),
+            metaMap,
+            bypassColumnStatus,
+            isSmartActive
+        };
+    }
+
+    /**
+     * Filters chamados list based on active UI filter criteria
+     */
+    filterChamados(chamadosList, filters = {}) {
+        return this.filterChamadosWithMeta(chamadosList, filters).items;
     }
 
     /**

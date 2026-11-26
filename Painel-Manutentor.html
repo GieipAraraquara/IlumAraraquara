@@ -16,17 +16,19 @@
     <script src="js/vendor/supabase.js"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=43"></script>
+    <script src="js/domain/ChamadoModel.js?v=44"></script>
     <script src="js/repositories/ChamadosRepository.js?v=30"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
     <script>window.isManutentorView = true;</script>
-    <script src="js/services/ChamadosService.js?v=34"></script>
+    <script src="js/services/ChamadosService.js?v=36"></script>
     <script src="js/services/MapService.js?v=73"></script>
     <script src="js/services/PushNotificationService.js"></script>
-    <script src="js/controllers/PainelController.js?v=51"></script>
+    <script src="js/utils/SmartSearchEngine.js?v=2"></script>
+    <script src="js/components/SmartSearchBar.js?v=2"></script>
+    <script src="js/controllers/PainelController.js?v=53"></script>
     <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js"></script>
-    <script src="header.js"></script>
+    <script src="header.js?v=2"></script>
     
     <!-- Mapbox GL JS -->
     <!-- Mapbox GL JS (defer para não bloquear renderização inicial) -->
@@ -129,7 +131,7 @@
 
 <app-sidebar active="painel-manutentor" mode="manutentor"></app-sidebar>
 
-<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+<app-header placeholder="Buscar por protocolo, endereço, problema, data ou status..." search-id="search-input" smart-search="true"></app-header>
 
 <main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto w-[calc(100%-260px)] mx-auto overflow-visible transition-all duration-300 relative z-0" id="main-content">
 
@@ -179,6 +181,7 @@
                     </button>
                 </div>
             </div>
+            <div id="smart-filter-summary" class="hidden px-5 py-2.5 border-b border-outline-variant bg-secondary/[0.04]"></div>
             
             <div class="w-full min-h-[300px] overflow-visible">
                 <table class="w-full text-left border-collapse table-fixed max-w-full overflow-visible" id="os-table">
@@ -374,10 +377,14 @@
                         <!-- Empty State Row -->
                         <tr id="no-audit-results" class="hidden">
                             <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
-                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                <div class="flex flex-col items-center justify-center gap-2">
                                     <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
-                                    <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
-                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                    <span id="no-audit-results-msg" class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
+                                    <div id="no-audit-results-detail" class="hidden flex flex-wrap items-center justify-center gap-1.5 max-w-xl"></div>
+                                    <div class="flex items-center gap-3 mt-1">
+                                        <button type="button" id="no-audit-include-concluidas-btn" class="hidden px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-xs hover:bg-emerald-100 cursor-pointer" onclick="window.smartSearchBar?.toggleIncludeAllStatuses()">Incluir Concluídas/Canceladas</button>
+                                        <button type="button" class="text-secondary font-label-md text-xs hover:underline cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -1430,74 +1437,78 @@
         window.activeProtocolPrefix = '';
 
         function applyCombinedFilters() {
-            const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
-            let visibleCount = 0;
             const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
 
-            rows.forEach(row => {
-                let showRow = true;
-                const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
+            // Quando o PainelController está ativo, ele já filtra e renderiza as linhas via SmartSearchEngine / ChamadosService
+            if (!window.painelController) {
+                const rows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
+                let visibleCount = 0;
 
-                // 1. Date Filter (Col 1)
-                if (activeDatePredicate) {
-                    const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
-                    const rowDate = parseTableDate(dateStr);
-                    if (!rowDate || !activeDatePredicate(rowDate)) {
+                rows.forEach(row => {
+                    let showRow = true;
+                    const offset = row.querySelector('.td-checkbox-rota') ? 1 : 0;
+
+                    // 1. Date Filter (Col 1)
+                    if (activeDatePredicate) {
+                        const dateStr = row.cells[offset + 1]?.textContent.trim() || '';
+                        const rowDate = parseTableDate(dateStr);
+                        if (!rowDate || !activeDatePredicate(rowDate)) {
+                            showRow = false;
+                        }
+                    }
+
+                    // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
+                    if (showRow && currentPrefix) {
+                        const protText = (row.cells[offset + 0]?.textContent || '').trim().toUpperCase();
+                        if (!protText.startsWith(currentPrefix.toUpperCase())) {
+                            showRow = false;
+                        }
+                    }
+
+                    // 2b. Protocol Specific Search Filter (Column 0)
+                    if (showRow && !matchColumnText(row, offset + 0, protocolSearchQuery)) {
                         showRow = false;
                     }
-                }
 
-                // 2. Protocol Prefix Filter (Column 0: Praça 'P' / Viária 'I')
-                if (showRow && currentPrefix) {
-                    const protText = (row.cells[offset + 0]?.textContent || '').trim().toUpperCase();
-                    if (!protText.startsWith(currentPrefix.toUpperCase())) {
+                    // 3. Status Filter
+                    const statusBadge = row.querySelector('.status-badge');
+                    const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
+                    
+                    // Manutentor view never shows pendente
+                    if (rowStatus === 'pendente') {
                         showRow = false;
                     }
-                }
 
-                // 2b. Protocol Specific Search Filter (Column 0)
-                if (showRow && !matchColumnText(row, offset + 0, protocolSearchQuery)) {
-                    showRow = false;
-                }
+                    const hasSearchQuery = Boolean(searchQuery && searchQuery.trim().length > 0);
+                    if (!hasSearchQuery && showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
+                        if (!activeStatusFilter.includes(rowStatus)) {
+                            showRow = false;
+                        }
+                    }
 
-                // 3. Status Filter
-                const statusBadge = row.querySelector('.status-badge');
-                const rowStatus = statusBadge ? (statusBadge.getAttribute('data-status') || '') : '';
-                
-                // Manutentor view never shows pendente
-                if (rowStatus === 'pendente') {
-                    showRow = false;
-                }
+                    // 4. Problem Filter
+                    if (showRow && activeProblemFilter.length > 0 && !activeProblemFilter.includes('all')) {
+                        const problemSelect = row.querySelector('.problem-select');
+                        const rowProblem = problemSelect ? problemSelect.value : '';
+                        if (!activeProblemFilter.includes(rowProblem)) {
+                            showRow = false;
+                        }
+                    }
 
-                const hasSearchQuery = Boolean(searchQuery && searchQuery.trim().length > 0);
-                if (!hasSearchQuery && showRow && activeStatusFilter.length > 0 && !activeStatusFilter.includes('all')) {
-                    if (!activeStatusFilter.includes(rowStatus)) {
+                    // 5. Global Text Search Filter
+                    if (showRow && !matchRowGlobalText(row, searchQuery)) {
                         showRow = false;
                     }
+
+                    row.style.display = showRow ? '' : 'none';
+                    if (showRow) visibleCount++;
+                });
+
+                // Toggle No Results Row
+                const noResultsRow = document.getElementById('no-audit-results');
+                if (noResultsRow) {
+                    noResultsRow.classList.toggle('hidden', visibleCount > 0);
                 }
-
-                // 4. Problem Filter
-                if (showRow && activeProblemFilter.length > 0 && !activeProblemFilter.includes('all')) {
-                    const problemSelect = row.querySelector('.problem-select');
-                    const rowProblem = problemSelect ? problemSelect.value : '';
-                    if (!activeProblemFilter.includes(rowProblem)) {
-                        showRow = false;
-                    }
-                }
-
-                // 5. Global Text Search Filter
-                if (showRow && !matchRowGlobalText(row, searchQuery)) {
-                    showRow = false;
-                }
-
-                row.style.display = showRow ? '' : 'none';
-                if (showRow) visibleCount++;
-            });
-
-            // Toggle No Results Row
-            const noResultsRow = document.getElementById('no-audit-results');
-            if (noResultsRow) {
-                noResultsRow.classList.toggle('hidden', visibleCount > 0);
             }
 
             // Indicators update
@@ -1636,15 +1647,17 @@
             });
         });
 
-        // Search input handler
-        searchInput?.addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            if (window.painelController) {
-                window.painelController.activeFilters.search = e.target.value;
-                window.painelController.renderTable();
-            }
-            applyCombinedFilters();
-        });
+        // Search input handler (fallback only when SmartSearchBar is not active)
+        if (!window.smartSearchBar) {
+            searchInput?.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                if (window.painelController) {
+                    window.painelController.activeFilters.search = e.target.value;
+                    window.painelController.renderTable();
+                }
+                applyCombinedFilters();
+            });
+        }
 
         // Dynamic change on row selects
         document.getElementById('os-table')?.addEventListener('change', (e) => {
@@ -1717,6 +1730,15 @@
             if (protocolSearchInput) protocolSearchInput.value = '';
             if (searchInput) searchInput.value = '';
 
+            if (window.smartSearchBar && typeof window.smartSearchBar.clear === 'function') {
+                window.smartSearchBar.state.activeMode = 'auto';
+                window.smartSearchBar.state.liveText = '';
+                window.smartSearchBar.state.chips = [];
+                window.smartSearchBar.state.includeAllStatuses = true;
+                window.smartSearchBar.renderUI();
+                window.smartSearchBar.closePopover();
+            }
+
             const statusAll = document.getElementById('status-filter-all');
             if (statusAll) statusAll.checked = true;
             document.querySelectorAll('input[name="status-filter"].status-checkbox').forEach(cb => cb.checked = true);
@@ -1726,6 +1748,13 @@
             document.querySelectorAll('input[name="problem-filter"].problem-checkbox').forEach(cb => cb.checked = true);
 
             if (window.painelController) {
+                window.painelController.activeFilters.search = '';
+                window.painelController.activeFilters.smartSearch = {
+                    activeMode: 'auto',
+                    liveText: '',
+                    chips: [],
+                    includeAllStatuses: true
+                };
                 window.painelController.activeFilters.datePredicate = null;
                 window.painelController.activeFilters.protocolPrefix = '';
                 window.painelController.activeFilters.protocol = '';
@@ -1735,6 +1764,7 @@
             }
 
             window.updateProtocolPrefixUI();
+            window.updateQuickDateUI('date-filter-dropdown', null);
             closeAllFilterDropdowns();
             applyCombinedFilters();
         };

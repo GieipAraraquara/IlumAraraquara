@@ -7,6 +7,12 @@ class PainelController {
         this.chamadosList = [];
         this.activeFilters = {
             search: '',
+            smartSearch: {
+                activeMode: 'auto',
+                liveText: '',
+                chips: [],
+                includeAllStatuses: true
+            },
             protocol: '',
             protocolPrefix: '',
             datePredicate: null,
@@ -14,6 +20,31 @@ class PainelController {
             status: ['all']
         };
         this.medicaoService = window.MedicaoService ? new window.MedicaoService() : null;
+    }
+
+    setSmartSearchState(smartState) {
+        this.activeFilters.smartSearch = smartState || {
+            activeMode: 'auto',
+            liveText: '',
+            chips: [],
+            includeAllStatuses: true
+        };
+        this.activeFilters.search = this.activeFilters.smartSearch.liveText || '';
+        this.renderTable();
+        if (typeof window.applyCombinedFilters === 'function') {
+            window.applyCombinedFilters();
+        }
+    }
+
+    selectFilteredForRoute() {
+        if (typeof window.toggleModoRotaPainel === 'function') {
+            window.toggleModoRotaPainel(true);
+        }
+        const master = document.getElementById('chk-rota-painel-all-os');
+        if (master) master.checked = true;
+        if (typeof window.toggleSelecionarTodasRotaPainel === 'function') {
+            window.toggleSelecionarTodasRotaPainel({ checked: true }, 'os');
+        }
     }
 
     isManutentorUser() {
@@ -180,12 +211,17 @@ class PainelController {
 
         if (!tbodyMain && !tbodyPendentes) return;
 
-        const filteredList = this.service.filterChamados(this.chamadosList, this.activeFilters);
+        const mainFilterRes = typeof this.service.filterChamadosWithMeta === 'function'
+            ? this.service.filterChamadosWithMeta(this.chamadosList, this.activeFilters)
+            : { items: this.service.filterChamados(this.chamadosList, this.activeFilters), metaMap: new Map(), bypassColumnStatus: false, isSmartActive: false };
+        const filteredList = mainFilterRes.items;
 
         // Separate pending items matching current filters (ignoring the status filter of the main table)
         const pendentesFilters = { ...this.activeFilters, status: ['all'] };
-        const pendentesFilteredList = this.service.filterChamados(this.chamadosList, pendentesFilters);
-        const pendentesList = pendentesFilteredList.filter(item => item.normalizedStatus === 'pendente');
+        const pendentesFilterRes = typeof this.service.filterChamadosWithMeta === 'function'
+            ? this.service.filterChamadosWithMeta(this.chamadosList, pendentesFilters)
+            : { items: this.service.filterChamados(this.chamadosList, pendentesFilters), metaMap: new Map() };
+        const pendentesList = pendentesFilterRes.items.filter(item => item.normalizedStatus === 'pendente');
 
         // Check if system has any pending approval records
         const hasAnyPendingInSystem = (this.chamadosList || []).some(item => item.normalizedStatus === 'pendente');
@@ -218,7 +254,8 @@ class PainelController {
                 if (noResultsRowPendentes) noResultsRowPendentes.classList.add('hidden');
                 const fragmentPendentes = document.createDocumentFragment();
                 pendentesList.forEach(item => {
-                    const tr = this.createRowElement(item, true);
+                    const mMeta = pendentesFilterRes.metaMap ? pendentesFilterRes.metaMap.get(item.protocolo || item.id) : null;
+                    const tr = this.createRowElement(item, true, mMeta);
                     fragmentPendentes.appendChild(tr);
                 });
                 tbodyPendentes.appendChild(fragmentPendentes);
@@ -237,12 +274,15 @@ class PainelController {
                 if (noResultsRowMain) noResultsRowMain.classList.add('hidden');
                 const fragmentMain = document.createDocumentFragment();
                 filteredList.forEach(item => {
-                    const tr = this.createRowElement(item);
+                    const mMeta = mainFilterRes.metaMap ? mainFilterRes.metaMap.get(item.protocolo || item.id) : null;
+                    const tr = this.createRowElement(item, false, mMeta);
                     fragmentMain.appendChild(tr);
                 });
                 tbodyMain.appendChild(fragmentMain);
             }
         }
+
+        this.updateSmartFilterSummary(mainFilterRes, pendentesList);
 
         if (typeof window.atualizarContadorSelecaoRotaPainel === 'function') {
             window.atualizarContadorSelecaoRotaPainel();
@@ -250,9 +290,181 @@ class PainelController {
     }
 
     /**
+     * Updates the live transparent filter summary banner and smart empty state
+     */
+    updateSmartFilterSummary(filterRes, pendentesList = []) {
+        const engine = window.SmartSearchEngine;
+        const summaryEl = document.getElementById('smart-filter-summary');
+        const smart = this.activeFilters.smartSearch || { activeMode: 'auto', liveText: '', chips: [], includeAllStatuses: true };
+        const hasChips = Array.isArray(smart.chips) && smart.chips.length > 0;
+        const hasLive = Boolean(smart.liveText && smart.liveText.trim());
+        const hasProtocolPrefix = Boolean(this.activeFilters.protocolPrefix);
+        const hasProtocolCol = Boolean(this.activeFilters.protocol && this.activeFilters.protocol.trim());
+        const hasDateCol = typeof this.activeFilters.datePredicate === 'function';
+        const hasProbCol = Array.isArray(this.activeFilters.problem) && !this.activeFilters.problem.includes('all');
+
+        const shouldShow = Boolean(filterRes.isSmartActive || hasProtocolPrefix || hasProtocolCol || hasDateCol || hasProbCol);
+
+        const activeDescriptions = [];
+        if (engine) {
+            (smart.chips || []).forEach(c => {
+                const m = engine.MODES[c.mode] || engine.MODES.auto;
+                activeDescriptions.push(`${m.shortLabel}: ${c.label}`);
+            });
+            if (hasLive) {
+                const intent = engine.detectQueryIntent(smart.liveText, smart.activeMode);
+                const modeTitle = intent.detectedMode && engine.MODES[intent.detectedMode]
+                    ? engine.MODES[intent.detectedMode].shortLabel
+                    : 'Geral';
+                activeDescriptions.push(`${modeTitle}: "${smart.liveText.trim()}"`);
+            }
+        }
+        if (hasProtocolPrefix) activeDescriptions.push(`Tipo: ${this.activeFilters.protocolPrefix === 'P' ? 'Praça (P)' : 'Viária (I)'}`);
+        if (hasProtocolCol) activeDescriptions.push(`Col. Protocolo: "${this.activeFilters.protocol.trim()}"`);
+        if (hasDateCol) activeDescriptions.push('Col. Data ativa');
+        if (hasProbCol) activeDescriptions.push(`Col. Problema (${this.activeFilters.problem.length})`);
+
+        if (summaryEl) {
+            if (!shouldShow) {
+                summaryEl.classList.add('hidden');
+                summaryEl.innerHTML = '';
+            } else {
+                summaryEl.classList.remove('hidden');
+                const badgesHtml = [];
+
+                if (engine) {
+                    (smart.chips || []).forEach(c => {
+                        const m = engine.MODES[c.mode] || engine.MODES.auto;
+                        const prefixLabel = c.mode === 'auto' ? 'Filtro' : m.shortLabel;
+                        badgesHtml.push(`
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${m.chipClass}">
+                                <span class="material-symbols-outlined text-[13px]">${m.icon}</span>
+                                <span class="opacity-75">${prefixLabel}:</span>
+                                <span class="font-bold">${engine.escapeHtml(c.label)}</span>
+                                <button type="button" onclick="window.smartSearchBar?.removeChip('${c.id}')" class="ml-0.5 hover:bg-black/10 rounded cursor-pointer flex items-center" title="Remover este filtro">
+                                    <span class="material-symbols-outlined text-[13px]">close</span>
+                                </button>
+                            </span>
+                        `);
+                    });
+
+                    if (hasLive) {
+                        const intent = engine.detectQueryIntent(smart.liveText, smart.activeMode);
+                        const modeTitle = intent.detectedMode && engine.MODES[intent.detectedMode]
+                            ? engine.MODES[intent.detectedMode].shortLabel
+                            : 'Auto';
+                        badgesHtml.push(`
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border ${intent.pillClass}">
+                                <span class="material-symbols-outlined text-[13px]">${intent.icon}</span>
+                                <span>${engine.escapeHtml(modeTitle)}:</span>
+                                <span class="font-bold">"${engine.escapeHtml(smart.liveText.trim())}"</span>
+                            </span>
+                        `);
+                    }
+                }
+
+                if (hasProtocolPrefix) {
+                    badgesHtml.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-indigo-50 text-indigo-800 border-indigo-200">Tipo: ${this.activeFilters.protocolPrefix === 'P' ? 'Praça (P)' : 'Viária (I)'}</span>`);
+                }
+                if (hasProtocolCol) {
+                    badgesHtml.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-indigo-50 text-indigo-800 border-indigo-200">Col. Protocolo: "${engine ? engine.escapeHtml(this.activeFilters.protocol.trim()) : this.activeFilters.protocol.trim()}"</span>`);
+                }
+                if (hasDateCol) {
+                    badgesHtml.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-teal-50 text-teal-800 border-teal-200">Filtro de Data (coluna)</span>`);
+                }
+                if (hasProbCol) {
+                    badgesHtml.push(`<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border bg-amber-50 text-amber-800 border-amber-200">Problema (coluna)</span>`);
+                }
+
+        const hasExplicitStatusChip = hasChips && smart.chips.some(c =>
+            c.mode === 'status' ||
+            (c.mode === 'auto' && engine && typeof engine.extractCompositeClauses === 'function' && engine.extractCompositeClauses(c.value).hasStatusClause)
+        );
+                const intentLive = (hasLive && engine) ? engine.detectQueryIntent(smart.liveText, smart.activeMode) : null;
+                const isDirectStatusLive = Boolean(intentLive && intentLive.detectedMode === 'status');
+                const showAllStatusToggle = filterRes.isSmartActive && !hasExplicitStatusChip && !isDirectStatusLive;
+                const allStatusToggleHtml = showAllStatusToggle ? `
+                    <button type="button" onclick="window.smartSearchBar?.toggleIncludeAllStatuses()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors cursor-pointer ${filterRes.bypassColumnStatus ? 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'}" title="Clique para alternar entre incluir concluídas/canceladas ou respeitar apenas os status marcados na coluna">
+                        <span class="material-symbols-outlined text-[13px]">${filterRes.bypassColumnStatus ? 'lock_open' : 'lock'}</span>
+                        <span>${filterRes.bypassColumnStatus ? 'Incluindo concluídas/canceladas' : 'Somente status da coluna'}</span>
+                    </button>
+                ` : '';
+
+                const countMain = filterRes.items ? filterRes.items.length : 0;
+                const countPend = Array.isArray(pendentesList) ? pendentesList.length : 0;
+                const countText = countPend > 0
+                    ? `${countMain} OS + ${countPend} pendente${countPend > 1 ? 's' : ''}`
+                    : `${countMain} OS encontrada${countMain === 1 ? '' : 's'}`;
+
+                const routeSelectBtnHtml = (countMain > 0 && typeof window.toggleModoRotaPainel === 'function' && typeof window.toggleSelecionarTodasRotaPainel === 'function') ? `
+                    <button type="button" onclick="window.painelController?.selectFilteredForRoute()" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer" title="Ativar Modo Rota e selecionar todas as OS filtradas">
+                        <span class="material-symbols-outlined text-[13px]">route</span>
+                        <span>Selecionar p/ Rota</span>
+                    </button>
+                ` : '';
+
+                summaryEl.innerHTML = `
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                            <span class="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider text-secondary shrink-0">
+                                <span class="material-symbols-outlined text-[15px]">filter_alt</span>
+                                <span>Filtrando:</span>
+                            </span>
+                            ${badgesHtml.join('')}
+                            ${allStatusToggleHtml}
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            ${routeSelectBtnHtml}
+                            <span class="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface text-[11px] font-bold">${countText}</span>
+                            <button type="button" onclick="if(window.smartSearchBar)window.smartSearchBar.clear(); if(typeof window.clearAllFilters==='function')window.clearAllFilters();" class="text-[11px] font-semibold text-error hover:underline cursor-pointer">Limpar</button>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Update Smart Empty State message (#no-audit-results)
+        const emptyRow = document.getElementById('no-audit-results');
+        if (emptyRow && filterRes.items && filterRes.items.length === 0) {
+            const msgSpan = emptyRow.querySelector('#no-audit-results-msg') || emptyRow.querySelector('span.text-xs');
+            const detailEl = emptyRow.querySelector('#no-audit-results-detail');
+            if (msgSpan && activeDescriptions.length > 0) {
+                msgSpan.textContent = 'Nenhuma ordem de serviço encontrada para os filtros ativos:';
+            } else if (msgSpan) {
+                msgSpan.textContent = 'Nenhuma ordem de serviço encontrada para os filtros selecionados.';
+            }
+            if (detailEl) {
+                if (activeDescriptions.length > 0 && engine) {
+                    detailEl.classList.remove('hidden');
+                    detailEl.innerHTML = activeDescriptions.map(d =>
+                        `<span class="px-2 py-0.5 rounded bg-surface-container-high border border-outline-variant/60 text-[11px] font-semibold text-on-surface">${engine.escapeHtml(d)}</span>`
+                    ).join('');
+                } else {
+                    detailEl.classList.add('hidden');
+                    detailEl.innerHTML = '';
+                }
+            }
+            const includeConclBtn = emptyRow.querySelector('#no-audit-include-concluidas-btn');
+            if (includeConclBtn) {
+                const canInclude = filterRes.isSmartActive && !filterRes.bypassColumnStatus;
+                includeConclBtn.classList.toggle('hidden', !canInclude);
+            }
+        }
+    }
+
+    /**
      * Creates a HTMLTableRowElement for a ChamadoModel entity
      */
-    createRowElement(item, isPendentesTable = false) {
+    createRowElement(item, isPendentesTable = false, matchMeta = null) {
+        const engine = window.SmartSearchEngine;
+        const hlTerms = (matchMeta && matchMeta.highlightTermsByField) ? matchMeta.highlightTermsByField : {};
+        const hl = (text, field) => {
+            const terms = hlTerms[field];
+            if (engine && Array.isArray(terms) && terms.length > 0) {
+                return engine.highlightText(text, terms);
+            }
+            return engine ? engine.escapeHtml(text) : String(text || '');
+        };
         const tr = document.createElement('tr');
         const isCancelada = item.normalizedStatus === 'cancelada';
         const isRejeitada = item.normalizedStatus === 'rejeitada';
@@ -321,38 +533,50 @@ class PainelController {
         // Protocolo
         const tdProtocolo = document.createElement('td');
         tdProtocolo.className = 'py-3 px-5 font-medium whitespace-nowrap truncate align-middle';
+        const protHtml = hl(item.protocolo, 'protocolo');
         if (item.isDireto) {
             const tecNome = item.operadorFinalizacao || item.operador || 'Não informado';
+            const emgBadgeHtml = hl('Emergencial', 'protocolo');
+            const tecHtml = hl(tecNome, 'tecnico');
             tdProtocolo.innerHTML = `
                 <div class="flex flex-col gap-0.5 max-w-full overflow-hidden">
-                    <span class="font-mono font-bold text-amber-900 truncate" title="${item.protocolo}">${item.protocolo}</span>
+                    <span class="font-mono font-bold text-amber-900 truncate" title="${item.protocolo}">${protHtml}</span>
                     <span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 px-1.5 py-0.2 rounded text-[10px] font-bold max-w-full truncate border border-amber-200">
                         <span class="material-symbols-outlined text-[11px] text-amber-600 shrink-0">electric_bolt</span>
-                        <span class="truncate">Emergencial (${tecNome})</span>
+                        <span class="truncate">${emgBadgeHtml} (${tecHtml})</span>
                     </span>
                 </div>
             `;
         } else {
-            tdProtocolo.textContent = item.protocolo;
+            tdProtocolo.innerHTML = `<span title="${item.protocolo}">${protHtml}</span>`;
         }
 
         // Data Abertura & Indicador de SLA Contratual
         const tdData = document.createElement('td');
         tdData.className = 'py-3 px-5 text-on-surface-variant whitespace-nowrap truncate align-middle';
+        const dataShortHtml = hl(item.formattedDateShort, 'data');
+        const showConclDateHint = isConcluida && item.dataConclusao && matchMeta && Array.isArray(matchMeta.matchedFields) && matchMeta.matchedFields.includes('data');
+        const conclDateHintHtml = showConclDateHint
+            ? `<span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200" title="Data de conclusão">Concl. ${item.formattedDateConclusaoShort}</span>`
+            : '';
 
         const sla = item.calcularSLA ? item.calcularSLA() : null;
         if (sla && !isCancelada && !isRejeitada) {
+            const slaLabelHtml = hl(sla.label, 'sla');
             tdData.innerHTML = `
                 <div class="flex flex-col gap-1 items-center">
-                    <span class="font-medium text-slate-700">${item.formattedDateShort}</span>
+                    <span class="font-medium text-slate-700">${dataShortHtml}</span>
+                    ${conclDateHintHtml}
                     <span class="px-2 py-0.5 rounded text-[10px] font-semibold flex items-center gap-1 ${sla.badgeClass}" title="Vencimento estimado: ${sla.dataLimite ? sla.dataLimite.toLocaleDateString('pt-BR') : '--'}">
                         <span class="material-symbols-outlined text-[11px]">${sla.statusSla === 'atrasado' || sla.statusSla === 'critico' ? 'warning' : 'timer'}</span>
-                        <span>${sla.label}</span>
+                        <span>${slaLabelHtml}</span>
                     </span>
                 </div>
             `;
         } else {
-            tdData.textContent = item.formattedDateShort;
+            tdData.innerHTML = conclDateHintHtml
+                ? `<div class="flex flex-col gap-1 items-center"><span>${dataShortHtml}</span>${conclDateHintHtml}</div>`
+                : `<span>${dataShortHtml}</span>`;
         }
 
         // Endereço / Pontos
@@ -365,7 +589,7 @@ class PainelController {
             tdEndereco.innerHTML = `
                 <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir a localização no mapa Mapbox">
                     <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                    <span class="font-medium truncate group-hover/loc:underline" title="${pracaNome}">${pracaNome}</span>
+                    <span class="font-medium truncate group-hover/loc:underline" title="${pracaNome}">${hl(pracaNome, 'endereco')}</span>
                 </button>
             `;
         } else {
@@ -377,7 +601,7 @@ class PainelController {
                         <div class="flex items-center gap-2 whitespace-nowrap w-full">
                             <button onclick="window.abrirMapaPonto('${item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors flex-1 min-w-0" title="Clique para abrir no mapa Mapbox">
                                 <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                <span class="font-medium truncate group-hover/loc:underline" title="${points[0]}">${points[0]}</span>
+                                <span class="font-medium truncate group-hover/loc:underline" title="${points[0]}">${hl(points[0], 'endereco')}</span>
                             </button>
                             <button class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-label-sm font-semibold bg-secondary/10 text-secondary hover:bg-secondary/20 transition-all cursor-pointer active:scale-95 flex-shrink-0" onclick="window.toggleInlinePoints(this, ${points.length - 1}, event)" title="Expandir/Recolher pontos">
                                 <span class="btn-text">+${points.length - 1}</span>
@@ -388,7 +612,7 @@ class PainelController {
                             ${points.slice(1).map((p, idx) => `
                                 <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', ${idx + 1}, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
                                     <span class="material-symbols-outlined text-[16px] text-secondary/80 group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                                    <span class="font-medium truncate group-hover/loc:underline" title="${p}">${p}</span>
+                                    <span class="font-medium truncate group-hover/loc:underline" title="${p}">${hl(p, 'endereco')}</span>
                                 </button>
                             `).join('')}
                         </div>
@@ -399,7 +623,7 @@ class PainelController {
                 tdEndereco.innerHTML = `
                     <button onclick="window.abrirMapaPonto('${item.protocolo || item.id}', 0, event)" class="inline-flex items-center gap-1.5 text-on-surface hover:text-secondary group/loc text-left cursor-pointer transition-colors w-full min-w-0" title="Clique para abrir no mapa Mapbox">
                         <span class="material-symbols-outlined text-[18px] text-secondary group-hover/loc:scale-110 transition-transform flex-shrink-0">location_on</span>
-                        <span class="font-medium truncate group-hover/loc:underline" title="${pointText}">${pointText}</span>
+                        <span class="font-medium truncate group-hover/loc:underline" title="${pointText}">${hl(pointText, 'endereco')}</span>
                     </button>
                 `;
             }
@@ -444,10 +668,11 @@ class PainelController {
             if (probVal === 'lampada-quebrada') selectBgColor = 'bg-[#ffedd5] text-[#9a3412]';
 
             const problemText = problemLabels[probVal] || item.problemaInicial || 'Outro';
+            const probHighlightRing = (hlTerms.problema && hlTerms.problema.length > 0) ? 'ring-2 ring-amber-400/80' : '';
 
             tdProblema.innerHTML = `
-                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] max-w-full truncate ${selectBgColor}">
-                    ${problemText}
+                <span class="px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-block text-center w-[160px] max-w-full truncate ${selectBgColor} ${probHighlightRing}">
+                    ${hl(problemText, 'problema')}
                 </span>
             `;
         } else {
@@ -457,9 +682,10 @@ class PainelController {
             if (probVal === 'lampada-queimada') selectBgColor = 'bg-[#fef3c7] text-[#92400e]';
             if (probVal === 'acesa-dia') selectBgColor = 'bg-[#dbeafe] text-[#1e40af]';
             if (probVal === 'lampada-quebrada') selectBgColor = 'bg-[#ffedd5] text-[#9a3412]';
+            const probHighlightRing = (hlTerms.problema && hlTerms.problema.length > 0) ? 'ring-2 ring-amber-400/80 rounded-full' : '';
 
             tdProblema.innerHTML = `
-                <div class="relative inline-block w-[160px] max-w-full" onclick="event.stopPropagation()">
+                <div class="relative inline-block w-[160px] max-w-full ${probHighlightRing}" onclick="event.stopPropagation()">
                     <select ${isConcluida ? 'disabled' : ''} class="w-full appearance-none [background-image:none] bg-none border-0 px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold outline-none focus:ring-0 text-center pr-6 transition-colors problem-select ${selectBgColor} ${selectDisabled}" onchange="window.painelController.handleProblemChange('${item.protocolo || item.id}', this)">
                         <option value="lampada-queimada" ${probVal === 'lampada-queimada' ? 'selected' : ''}>Lâmpada Queimada</option>
                         <option value="acesa-dia" ${probVal === 'acesa-dia' ? 'selected' : ''}>Acesa Dia</option>
@@ -495,11 +721,12 @@ class PainelController {
             if (isCancelada) badgeClass = 'bg-slate-200 text-slate-700';
             if (isRejeitada) badgeClass = 'bg-rose-100 text-rose-800 border border-rose-300';
             if (isPendente) badgeClass = 'bg-surface-container-high text-on-surface';
+            const statusHighlightRing = (hlTerms.status && hlTerms.status.length > 0) ? 'ring-2 ring-emerald-400/80' : '';
 
             tdStatus.innerHTML = `
-                <span class="status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-flex items-center justify-center gap-1 text-center w-[150px] max-w-full truncate transition-colors ${badgeClass}" data-status="${item.normalizedStatus}">
+                <span class="status-badge px-3 py-1.5 rounded-full text-label-sm font-label-sm font-semibold inline-flex items-center justify-center gap-1 text-center w-[150px] max-w-full truncate transition-colors ${badgeClass} ${statusHighlightRing}" data-status="${item.normalizedStatus}">
                     ${isBloqueada ? '<span class="material-symbols-outlined text-[14px]">lock</span>' : ''}
-                    <span>${item.statusBadgeLabel}</span>
+                    <span>${hl(item.statusBadgeLabel, 'status')}</span>
                 </span>
             `;
         }
@@ -999,19 +1226,24 @@ class PainelController {
         window.compararReparoRecenteNoMapa = (pPendente, pMotivo, ev) => this.compararReparoRecenteNoMapa(pPendente, pMotivo, ev);
         window.abrirEdicaoOS = (id, ev) => this.abrirEdicaoOS(id, ev);
 
-        // Main search bar input
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) {
-            if (searchInput.value) {
-                this.activeFilters.search = searchInput.value;
-            }
-            searchInput.addEventListener('input', (e) => {
-                this.activeFilters.search = e.target.value;
-                this.renderTable();
-                if (typeof window.applyCombinedFilters === 'function') {
-                    window.applyCombinedFilters();
+        // Main search bar input (delegated to SmartSearchBar when active)
+        if (window.smartSearchBar && typeof window.smartSearchBar.getState === 'function') {
+            this.activeFilters.smartSearch = window.smartSearchBar.getState();
+            this.activeFilters.search = this.activeFilters.smartSearch.liveText || '';
+        } else {
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                if (searchInput.value) {
+                    this.activeFilters.search = searchInput.value;
                 }
-            });
+                searchInput.addEventListener('input', (e) => {
+                    this.activeFilters.search = e.target.value;
+                    this.renderTable();
+                    if (typeof window.applyCombinedFilters === 'function') {
+                        window.applyCombinedFilters();
+                    }
+                });
+            }
         }
 
         // Protocol column search input
@@ -2142,11 +2374,14 @@ class PainelController {
             if (!obsIni && !justStatus) return '';
 
             let bodyObs = obsIni ? `<div>${obsIni.replace(/\n/g, '<br/>')}</div>` : '';
-            if (isPracaOS && obsFin && obsFin !== obsIni && !item.isDireto) {
-                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-slate-700 font-semibold">📝 Observação de Fechamento:</b> ${obsFin.replace(/\n/g, '<br/>')}</div>`;
-            }
-            if (justStatus && justStatus !== obsIni && justStatus !== obsFin) {
-                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-amber-800 font-semibold">⚖️ Justificativa de Status:</b> ${justStatus.replace(/\n/g, '<br/>')}</div>`;
+            if (justStatus && justStatus !== obsIni) {
+                const stLower = String(item.rawStatus || item.status || '').toLowerCase();
+                let labelJust = '⚖️ Justificativa de Status:';
+                if (stLower.includes('abert')) labelJust = '🔄 Motivo da Reabertura:';
+                else if (stLower.includes('cancel')) labelJust = '🚫 Motivo do Cancelamento:';
+                else if (stLower.includes('rejeit')) labelJust = '❌ Motivo da Rejeição:';
+                else if (stLower.includes('bloq')) labelJust = '🔒 Motivo do Bloqueio:';
+                bodyObs += `<div class="${bodyObs ? 'mt-2 pt-2 border-t border-slate-200/60' : ''}"><b class="text-amber-800 font-semibold">${labelJust}</b> ${justStatus.replace(/\n/g, '<br/>')}</div>`;
             }
 
             return `

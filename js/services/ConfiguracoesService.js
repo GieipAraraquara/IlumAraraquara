@@ -32,6 +32,7 @@ class ConfiguracoesService {
             notificar_relatorio_mensal: false,
             marcas_luminaria_viaria: ['INSIGHT'],
             marcas_rele_padrao: ['EXATRON'],
+            nomes_operadores_emergencia: ['IGOR', 'FERNANDO', 'CARLOS', 'ANA', 'ERNESTO', 'VALTER'],
             whitelist_materiais_viaria: [
                 { termo: 'rele fotoeletrico', descricao: 'Relé Fotoelétrico', max_por_ponto: 1 },
                 { termo: 'fita em aco inoxidavel', descricao: 'Fita em Aço Inox (Fechometal)', max_por_ponto: 2 },

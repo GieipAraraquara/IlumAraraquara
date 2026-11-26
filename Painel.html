@@ -16,17 +16,19 @@
     <script src="js/vendor/supabase.js"></script>
     <script src="js/config/supabaseClient.js"></script>
     <script src="js/guards/authGuard.js?v=30"></script>
-    <script src="js/domain/ChamadoModel.js?v=56"></script>
+    <script src="js/domain/ChamadoModel.js?v=57"></script>
     <script src="js/repositories/ChamadosRepository.js?v=43"></script>
     <script src="js/repositories/LogsRepository.js?v=30"></script>
-    <script src="js/services/ChamadosService.js?v=34"></script>
+    <script src="js/services/ChamadosService.js?v=36"></script>
     <script src="js/services/MapService.js?v=75"></script>
     <script src="js/services/PushNotificationService.js"></script>
     <script src="js/services/ConfiguracoesService.js?v=1"></script>
-    <script src="js/controllers/PainelController.js?v=51"></script>
+    <script src="js/utils/SmartSearchEngine.js?v=2"></script>
+    <script src="js/components/SmartSearchBar.js?v=2"></script>
+    <script src="js/controllers/PainelController.js?v=53"></script>
     <link rel="stylesheet" href="css/tailwind.min.css" />
     <script src="sidebar.js?v=33"></script>
-    <script src="header.js"></script>
+    <script src="header.js?v=2"></script>
     
     <!-- Mapbox GL JS (defer para não bloquear renderização inicial) -->
     <script src="https://api.mapbox.com/mapbox-gl-js/v3.1.2/mapbox-gl.js" defer></script>
@@ -161,7 +163,7 @@
 
 <app-sidebar active="painel"></app-sidebar>
 
-<app-header placeholder="Buscar OS por Protocolo, Plaqueta ou Endereço..." search-id="search-input"></app-header>
+<app-header placeholder="Buscar por protocolo, endereço, problema, data ou status..." search-id="search-input" smart-search="true"></app-header>
 
 <main class="ml-[260px] mt-16 p-container-padding h-[calc(100vh-64px)] overflow-y-auto overflow-x-hidden w-[calc(100%-260px)] transition-all duration-300 relative z-0" id="main-content">
 
@@ -308,6 +310,7 @@
                     </button>
                 </div>
             </div>
+            <div id="smart-filter-summary" class="hidden px-5 py-2.5 border-b border-outline-variant bg-secondary/[0.04]"></div>
             
             <div class="w-full min-h-[300px]">
                 <table class="w-full text-left border-collapse table-fixed max-w-full" id="os-table">
@@ -511,10 +514,14 @@
                         <!-- Empty State Row -->
                         <tr id="no-audit-results" class="hidden">
                             <td colspan="7" class="py-8 text-center text-on-surface-variant/70 font-medium bg-surface-container-lowest">
-                                <div class="flex flex-col items-center justify-center gap-1.5">
+                                <div class="flex flex-col items-center justify-center gap-2">
                                     <span class="material-symbols-outlined text-[24px] text-on-surface-variant/40">filter_alt_off</span>
-                                    <span class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
-                                    <button class="text-secondary font-label-md text-xs hover:underline mt-0.5 cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                    <span id="no-audit-results-msg" class="text-xs">Nenhuma ordem de serviço encontrada para os filtros selecionados.</span>
+                                    <div id="no-audit-results-detail" class="hidden flex flex-wrap items-center justify-center gap-1.5 max-w-xl"></div>
+                                    <div class="flex items-center gap-3 mt-1">
+                                        <button type="button" id="no-audit-include-concluidas-btn" class="hidden px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 font-semibold text-xs hover:bg-emerald-100 cursor-pointer" onclick="window.smartSearchBar?.toggleIncludeAllStatuses()">Incluir Concluídas/Canceladas</button>
+                                        <button type="button" class="text-secondary font-label-md text-xs hover:underline cursor-pointer" onclick="clearAllFilters()">Limpar todos os filtros</button>
+                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -1893,42 +1900,45 @@
         function applyCombinedFilters() {
             const currentPrefix = (window.painelController?.activeFilters?.protocolPrefix) || window.activeProtocolPrefix || '';
 
-            // 1. Main OS Table Rows
-            const mainRows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
-            let visibleMainCount = 0;
-            mainRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix, false);
-                row.style.display = showRow ? '' : 'none';
-                if (showRow) visibleMainCount++;
-            });
+            // Quando o PainelController está ativo, ele já filtra e renderiza as linhas via SmartSearchEngine / ChamadosService
+            if (!window.painelController) {
+                // 1. Main OS Table Rows
+                const mainRows = document.querySelectorAll('#os-table tbody tr:not(#no-audit-results)');
+                let visibleMainCount = 0;
+                mainRows.forEach(row => {
+                    const showRow = checkRowMatchesFilters(row, currentPrefix, false);
+                    row.style.display = showRow ? '' : 'none';
+                    if (showRow) visibleMainCount++;
+                });
 
-            // 2. Pendentes OS Table Rows
-            const pendentesRows = document.querySelectorAll('#pendentes-os-table tbody tr:not(#no-pendentes-results)');
-            let visiblePendentesCount = 0;
-            pendentesRows.forEach(row => {
-                const showRow = checkRowMatchesFilters(row, currentPrefix, true);
-                row.style.display = showRow ? '' : 'none';
-                if (showRow) visiblePendentesCount++;
-            });
+                // 2. Pendentes OS Table Rows
+                const pendentesRows = document.querySelectorAll('#pendentes-os-table tbody tr:not(#no-pendentes-results)');
+                let visiblePendentesCount = 0;
+                pendentesRows.forEach(row => {
+                    const showRow = checkRowMatchesFilters(row, currentPrefix, true);
+                    row.style.display = showRow ? '' : 'none';
+                    if (showRow) visiblePendentesCount++;
+                });
 
-            // Toggle No Results Rows
-            const noResultsRowMain = document.getElementById('no-audit-results');
-            if (noResultsRowMain) {
-                noResultsRowMain.classList.toggle('hidden', visibleMainCount > 0);
-            }
-            const noResultsRowPendentes = document.getElementById('no-pendentes-results');
-            if (noResultsRowPendentes) {
-                noResultsRowPendentes.classList.toggle('hidden', visiblePendentesCount > 0);
-            }
+                // Toggle No Results Rows
+                const noResultsRowMain = document.getElementById('no-audit-results');
+                if (noResultsRowMain) {
+                    noResultsRowMain.classList.toggle('hidden', visibleMainCount > 0);
+                }
+                const noResultsRowPendentes = document.getElementById('no-pendentes-results');
+                if (noResultsRowPendentes) {
+                    noResultsRowPendentes.classList.toggle('hidden', visiblePendentesCount > 0);
+                }
 
-            // Toggle Pendentes Container Visibility
-            const pendentesContainer = document.getElementById('container-pendentes-aprovacao');
-            if (pendentesContainer) {
-                const totalPendingCount = pendentesRows.length;
-                if (totalPendingCount > 0 && visiblePendentesCount > 0) {
-                    pendentesContainer.classList.remove('hidden');
-                } else {
-                    pendentesContainer.classList.add('hidden');
+                // Toggle Pendentes Container Visibility
+                const pendentesContainer = document.getElementById('container-pendentes-aprovacao');
+                if (pendentesContainer) {
+                    const totalPendingCount = pendentesRows.length;
+                    if (totalPendingCount > 0 && visiblePendentesCount > 0) {
+                        pendentesContainer.classList.remove('hidden');
+                    } else {
+                        pendentesContainer.classList.add('hidden');
+                    }
                 }
             }
 
@@ -2075,15 +2085,17 @@
             });
         });
 
-        // Search input handler
-        searchInput?.addEventListener('input', (e) => {
-            searchQuery = e.target.value;
-            if (window.painelController) {
-                window.painelController.activeFilters.search = e.target.value;
-                window.painelController.renderTable();
-            }
-            applyCombinedFilters();
-        });
+        // Search input handler (fallback only when SmartSearchBar is not active)
+        if (!window.smartSearchBar) {
+            searchInput?.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                if (window.painelController) {
+                    window.painelController.activeFilters.search = e.target.value;
+                    window.painelController.renderTable();
+                }
+                applyCombinedFilters();
+            });
+        }
 
         // Dynamic change on row selects
         document.getElementById('os-table')?.addEventListener('change', (e) => {
@@ -2157,6 +2169,15 @@
             if (protocolSearchInput) protocolSearchInput.value = '';
             if (searchInput) searchInput.value = '';
 
+            if (window.smartSearchBar && typeof window.smartSearchBar.clear === 'function') {
+                window.smartSearchBar.state.activeMode = 'auto';
+                window.smartSearchBar.state.liveText = '';
+                window.smartSearchBar.state.chips = [];
+                window.smartSearchBar.state.includeAllStatuses = true;
+                window.smartSearchBar.renderUI();
+                window.smartSearchBar.closePopover();
+            }
+
             const statusAll = document.getElementById('status-filter-all');
             if (statusAll) statusAll.checked = true;
             document.querySelectorAll('input[name="status-filter"].status-checkbox').forEach(cb => cb.checked = true);
@@ -2166,6 +2187,13 @@
             document.querySelectorAll('input[name="problem-filter"].problem-checkbox').forEach(cb => cb.checked = true);
 
             if (window.painelController) {
+                window.painelController.activeFilters.search = '';
+                window.painelController.activeFilters.smartSearch = {
+                    activeMode: 'auto',
+                    liveText: '',
+                    chips: [],
+                    includeAllStatuses: true
+                };
                 window.painelController.activeFilters.datePredicate = null;
                 window.painelController.activeFilters.protocolPrefix = '';
                 window.painelController.activeFilters.protocol = '';

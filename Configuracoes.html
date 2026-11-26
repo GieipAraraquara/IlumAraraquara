@@ -396,6 +396,16 @@
                                 <input type="text" id="marcas_rele_padrao" name="marcas_rele_padrao" placeholder="Ex: EXATRON" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface" />
                             </div>
                         </div>
+
+                        <!-- Operadores Permitidos em Protocolos Emergenciais Diretos -->
+                        <div class="mt-6 p-4 rounded-xl border border-outline-variant/40 bg-surface-container-low">
+                            <label for="nomes_operadores_emergencia" class="block text-xs font-semibold uppercase tracking-wider text-on-surface-variant mb-1 flex items-center gap-1.5">
+                                <span class="material-symbols-outlined text-[16px] text-red-500">emergency</span>
+                                Operadores Permitidos (Protocolo Emergencial Direto)
+                            </label>
+                            <span class="text-xs text-on-surface-variant block mb-3">Nomes de operadores aceitos no campo de protocolo da tela Finalizar para gerar atendimento emergencial direto (ex: IGOR, FERNANDO, CARLOS, ANA, ERNESTO, VALTER). Separe por vírgula.</span>
+                            <input type="text" id="nomes_operadores_emergencia" name="nomes_operadores_emergencia" placeholder="Ex: IGOR, FERNANDO, CARLOS, ANA, ERNESTO, VALTER" class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-3 py-2 text-sm font-semibold text-on-surface uppercase" />
+                        </div>
                     </div>
                 </section>
 
@@ -2229,6 +2239,15 @@
                 inputMarcasRel.value = arrRel.join(', ');
             }
 
+            const inputOperadoresEmerg = document.getElementById('nomes_operadores_emergencia');
+            if (inputOperadoresEmerg) {
+                const defaultOps = ['IGOR', 'FERNANDO', 'CARLOS', 'ANA', 'ERNESTO', 'VALTER'];
+                const arrOps = Array.isArray(dados.nomes_operadores_emergencia)
+                    ? dados.nomes_operadores_emergencia
+                    : (dados.nomes_operadores_emergencia ? [dados.nomes_operadores_emergencia] : defaultOps);
+                inputOperadoresEmerg.value = arrOps.join(', ');
+            }
+
             // Whitelist de Materiais Viários
             if (Array.isArray(dados.whitelist_materiais_viaria)) {
                 whitelistMateriaisCache = JSON.parse(JSON.stringify(dados.whitelist_materiais_viaria));
@@ -2282,6 +2301,10 @@
                     .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
                 marcas_rele_padrao: (document.getElementById('marcas_rele_padrao')?.value || 'EXATRON')
                     .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean),
+                nomes_operadores_emergencia: Array.from(new Set(
+                    (document.getElementById('nomes_operadores_emergencia')?.value || '')
+                        .split(/[\s,;]+/).map(s => s.trim().toUpperCase()).filter(Boolean)
+                )),
                 whitelist_materiais_viaria: whitelistMateriaisCache
             };
         }

@@ -45,6 +45,10 @@
 
         async init() {
             console.log('📑 [MedicaoController] Inicializando tela de medição...');
+            const abaUrl = new URLSearchParams(window.location.search).get('aba');
+            if (abaUrl && ['materiais', 'protocolos', 'glosas'].includes(abaUrl)) {
+                this.switchTab(abaUrl);
+            }
 
             // Verificar segurança: Admin e Manutentor
             if (window.AuthGuard) {
@@ -314,6 +318,11 @@
 
         switchTab(tabName) {
             this.activeTab = tabName;
+            try {
+                const url = new URL(window.location.href);
+                url.searchParams.set('aba', tabName);
+                window.history.replaceState(null, '', url.toString());
+            } catch (e) {}
             const tabMateriais = document.getElementById('view-tab-materiais');
             const tabGlosas = document.getElementById('view-tab-glosas');
             const btnTabMateriais = document.getElementById('btn-tab-materiais');

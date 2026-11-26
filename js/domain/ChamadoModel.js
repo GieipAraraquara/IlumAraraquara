@@ -520,7 +520,7 @@ class ChamadoModel {
         if (prot.includes('-')) {
             const parts = prot.split('-');
             const suf = parts[parts.length - 1].trim();
-            if (NOMES_DIRETOS.includes(suf) || suf === 'DIRETO' || suf === 'EMERGENCIAL') return true;
+            if (NOMES_DIRETOS.includes(suf)) return true;
         }
 
         if (prot.startsWith('IP2VGOA-') || prot.startsWith('IP2-')) return true;
